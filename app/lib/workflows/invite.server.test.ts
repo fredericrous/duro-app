@@ -1,7 +1,8 @@
 import { describe, expect } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { queueInvite, acceptInvite } from "./invite.server"
+import { WorkflowEngine } from "@effect/workflow"
+import { queueInvite, acceptInvite, InviteWorkflowLayer } from "./invite.server"
 import {
   InviteRepo,
   InviteError,
@@ -11,10 +12,9 @@ import {
   LldapClient,
   LldapError,
 } from "~/lib/services/LldapClient.server"
-import {
-  EventBroker,
-  EventBrokerError,
-} from "~/lib/services/EventBroker.server"
+import { VaultPki } from "~/lib/services/VaultPki.server"
+import { GitHubClient } from "~/lib/services/GitHubClient.server"
+import { EmailService } from "~/lib/services/EmailService.server"
 
 // --- Mock helpers ---
 
@@ -38,14 +38,6 @@ function makeInvite(overrides: Partial<Invite> = {}): Invite {
 }
 
 // --- Mock Layers ---
-
-const mockEventBroker = (
-  emitFn: (...args: unknown[]) => void = () => {},
-) =>
-  Layer.succeed(EventBroker, {
-    emit: (type, source, id, data) =>
-      Effect.sync(() => emitFn(type, source, id, data)),
-  })
 
 const mockInviteRepo = (store: Map<string, Invite> = new Map()) =>
   Layer.succeed(InviteRepo, {
@@ -123,16 +115,39 @@ const mockLldapClient = (
       }),
   })
 
+const mockVaultPki = Layer.succeed(VaultPki, {
+  issueCertAndP12: () => Effect.succeed({ p12Buffer: Buffer.from("fake"), password: "pass" }),
+  getP12Password: () => Effect.succeed("pass"),
+  consumeP12Password: () => Effect.succeed("pass"),
+})
+
+const mockGitHubClient = Layer.succeed(GitHubClient, {
+  createCertPR: () => Effect.succeed({ prUrl: "https://github.com/pr/1" }),
+})
+
+const mockEmailService = Layer.succeed(EmailService, {
+  sendInviteEmail: () => Effect.void,
+})
+
+// Full layer needed for queueInvite (workflow runs in-process)
+const makeQueueLayer = (store: Map<string, Invite>) =>
+  InviteWorkflowLayer.pipe(
+    Layer.provideMerge(
+      Layer.mergeAll(
+        mockInviteRepo(store),
+        mockVaultPki,
+        mockGitHubClient,
+        mockEmailService,
+        WorkflowEngine.layerMemory,
+      ),
+    ),
+  )
+
 // --- Tests ---
 
 describe("queueInvite", () => {
-  it.effect("creates an invite and emits a CloudEvent", () => {
-    const emitted: unknown[][] = []
+  it.effect("creates an invite and returns success", () => {
     const store = new Map<string, Invite>()
-    const layer = Layer.merge(
-      mockInviteRepo(store),
-      mockEventBroker((...args) => emitted.push(args)),
-    )
 
     return queueInvite({
       email: "alice@example.com",
@@ -145,39 +160,9 @@ describe("queueInvite", () => {
           expect(result.success).toBe(true)
           expect(result.message).toContain("alice@example.com")
           expect(store.size).toBe(1)
-          expect(emitted).toHaveLength(1)
-          expect(emitted[0][0]).toBe("duro.invite.requested")
-          expect(emitted[0][1]).toBe("duro/web")
         }),
       ),
-      Effect.provide(layer),
-    )
-  })
-
-  it.effect("rolls back invite if event emission fails", () => {
-    const store = new Map<string, Invite>()
-    const layer = Layer.merge(
-      mockInviteRepo(store),
-      Layer.succeed(EventBroker, {
-        emit: () => Effect.fail(new EventBrokerError("broker down")),
-      }),
-    )
-
-    return queueInvite({
-      email: "fail@example.com",
-      groups: [1],
-      groupNames: ["friends"],
-      invitedBy: "admin",
-    }).pipe(
-      Effect.flip,
-      Effect.tap((error) =>
-        Effect.sync(() => {
-          expect(error).toBeInstanceOf(EventBrokerError)
-          // The invite should have been cleaned up
-          expect(store.size).toBe(0)
-        }),
-      ),
-      Effect.provide(layer),
+      Effect.provide(makeQueueLayer(store)),
     )
   })
 })

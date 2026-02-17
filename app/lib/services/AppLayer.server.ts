@@ -5,7 +5,6 @@ import { VaultPkiLive } from "./VaultPki.server"
 import { GitHubClientLive } from "./GitHubClient.server"
 import { EmailServiceLive } from "./EmailService.server"
 import { InviteRepoLive } from "./InviteRepo.server"
-import { EventBrokerLive } from "./EventBroker.server"
 import { InviteWorkflowLayer } from "~/lib/workflows/invite.server"
 import { OtelLayer } from "~/lib/telemetry.server"
 
@@ -21,7 +20,6 @@ export const AppLayer = InviteWorkflowLayer.pipe(
       GitHubClientLive,
       EmailServiceLive,
       InviteRepoLive,
-      EventBrokerLive,
       WorkflowEngine.layerMemory,
     ),
   ),

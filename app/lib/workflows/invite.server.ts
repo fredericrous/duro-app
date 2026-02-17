@@ -5,7 +5,6 @@ import { VaultPki } from "~/lib/services/VaultPki.server"
 import { GitHubClient } from "~/lib/services/GitHubClient.server"
 import { EmailService } from "~/lib/services/EmailService.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
-import { EventBroker } from "~/lib/services/EventBroker.server"
 
 export interface InviteInput {
   email: string
@@ -160,26 +159,26 @@ export const InviteWorkflowLayer = InviteWorkflow.toLayer(
 export const queueInvite = (input: InviteInput) =>
   Effect.gen(function* () {
     const inviteRepo = yield* InviteRepo
-    const eventBroker = yield* EventBroker
 
     // Create invite record
     const invite = yield* inviteRepo.create(input)
 
-    // Emit CloudEvent to Knative Broker
-    yield* eventBroker
-      .emit("duro.invite.requested", "duro/web", invite.id, {
-        inviteId: invite.id,
-        email: input.email,
-        groups: input.groups,
-        groupNames: input.groupNames,
-        invitedBy: input.invitedBy,
-        token: invite.token,
-      })
-      .pipe(
-        Effect.tapError(() =>
-          inviteRepo.deleteById(invite.id).pipe(Effect.ignore),
-        ),
-      )
+    // Run workflow in background — invite is persisted in SQLite
+    // with stepState for idempotent retry if the process restarts.
+    yield* InviteWorkflow.execute({
+      inviteId: invite.id,
+      email: input.email,
+      groups: input.groups,
+      groupNames: input.groupNames,
+      invitedBy: input.invitedBy,
+      token: invite.token,
+    }).pipe(
+      Effect.tapError((e) =>
+        Effect.logError("Invite workflow failed", e),
+      ),
+      Effect.ignore,
+      Effect.fork,
+    )
 
     return {
       success: true as const,

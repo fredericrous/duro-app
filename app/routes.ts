@@ -8,5 +8,4 @@ export default [
   route("health", "routes/health.ts"),
   route("invite/:token", "routes/invite.tsx"),
   route("welcome", "routes/welcome.tsx"),
-  route("api/process-invite", "routes/api.process-invite.ts"),
 ] satisfies RouteConfig;
