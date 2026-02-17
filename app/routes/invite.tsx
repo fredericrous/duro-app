@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react"
-import { useNavigation } from "react-router"
+import { Suspense, use, useState, useEffect, useRef } from "react"
+import { redirect, useNavigation } from "react-router"
 import type { Route } from "./+types/invite"
 import { runEffect } from "~/lib/runtime.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
@@ -7,6 +7,7 @@ import { VaultPki } from "~/lib/services/VaultPki.server"
 import { acceptInvite } from "~/lib/workflows/invite.server"
 import { hashToken } from "~/lib/crypto.server"
 import { Effect } from "effect"
+import styles from "./invite.module.css"
 
 export function meta() {
   return [{ title: "Join Daddyshome" }]
@@ -122,7 +123,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   try {
     await runEffect(acceptInvite(token, { username, password }))
-    return { success: true, redirectUrl: "https://home.daddyshome.fr/welcome" }
+    return redirect("https://home.daddyshome.fr/welcome")
   } catch (e) {
     const message =
       e instanceof Error ? e.message : "Failed to create account"
@@ -130,15 +131,23 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 }
 
+function checkCert(): Promise<boolean> {
+  return fetch("https://home.daddyshome.fr/health", { mode: "cors" })
+    .then((r) => r.ok)
+    .catch(() => false)
+}
+
 export default function InvitePage({
   loaderData,
   actionData,
 }: Route.ComponentProps) {
+  const [certPromise] = useState(() => checkCert())
+
   if (!loaderData.valid) {
     return (
-      <main className="invite-page">
-        <div className="invite-card">
-          <div className="error-icon">
+      <main className={styles.page}>
+        <div className={styles.card}>
+          <div className={styles.errorIcon}>
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -153,53 +162,22 @@ export default function InvitePage({
             </svg>
           </div>
           <h1>Unable to Join</h1>
-          <p className="error-message">{"error" in loaderData ? loaderData.error : "Invalid invite"}</p>
+          <p className={styles.errorMessage}>{"error" in loaderData ? loaderData.error : "Invalid invite"}</p>
         </div>
-        <style>{pageStyles}</style>
-      </main>
-    )
-  }
-
-  // Redirect on success
-  if (actionData && "success" in actionData && actionData.success) {
-    return (
-      <main className="invite-page">
-        <div className="invite-card">
-          <div className="success-icon">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              width="48"
-              height="48"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="16 10 11 15 8 12" />
-            </svg>
-          </div>
-          <h1>Account Created!</h1>
-          <p>Redirecting you to sign in...</p>
-          <a href={actionData.redirectUrl} className="btn btn-primary">
-            Continue to Sign In
-          </a>
-        </div>
-        <RedirectScript url={actionData.redirectUrl} />
-        <style>{pageStyles}</style>
       </main>
     )
   }
 
   return (
-    <main className="invite-page">
-      <div className="invite-card">
+    <main className={styles.page}>
+      <div className={styles.card}>
         <h1>Join Daddyshome</h1>
-        <p className="subtitle">
+        <p className={styles.subtitle}>
           You've been invited as <strong>{loaderData.email}</strong>
         </p>
 
         {loaderData.groupNames && loaderData.groupNames.length > 0 && (
-          <p className="groups-info">
+          <p className={styles.groupsInfo}>
             Groups: {loaderData.groupNames.join(", ")}
           </p>
         )}
@@ -208,40 +186,49 @@ export default function InvitePage({
         {loaderData.p12Password && <PasswordReveal password={loaderData.p12Password} />}
 
         {/* Cert Check */}
-        <CertCheck />
+        <Suspense fallback={<CertCheckLoading />}>
+          <CertCheckResult certPromise={certPromise} />
+        </Suspense>
 
         {/* Error */}
         {actionData && "error" in actionData && (
-          <div className="alert alert-error">{actionData.error}</div>
+          <div className={`${styles.alert} ${styles.alertError}`}>{actionData.error}</div>
         )}
 
         {/* Account Creation Form */}
         <AccountForm />
       </div>
-      <style>{pageStyles}</style>
     </main>
   )
 }
 
 function PasswordReveal({ password }: { password: string }) {
   const [copied, setCopied] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
 
   return (
-    <div className="password-section">
+    <div className={styles.passwordSection}>
       <h2>Certificate Password</h2>
-      <p className="warning-text">
+      <p className={styles.warningText}>
         Save this password — you'll need it to install the certificate from your
         email. It won't be shown again.
       </p>
-      <div className="password-display">
+      <div className={styles.passwordDisplay}>
         <code>{password}</code>
         <button
           type="button"
-          className="btn btn-small"
+          className={styles.btnSmall}
           onClick={() => {
             navigator.clipboard.writeText(password)
             setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
+            if (timerRef.current) clearTimeout(timerRef.current)
+            timerRef.current = setTimeout(() => setCopied(false), 2000)
           }}
         >
           {copied ? "Copied!" : "Copy"}
@@ -251,30 +238,23 @@ function PasswordReveal({ password }: { password: string }) {
   )
 }
 
-function CertCheck() {
-  const [status, setStatus] = useState<
-    "checking" | "installed" | "not-installed"
-  >("checking")
+function CertCheckLoading() {
+  return (
+    <div className={styles.certCheck}>
+      <p className={`${styles.certStatus} ${styles.certStatusChecking}`}>Checking certificate...</p>
+    </div>
+  )
+}
 
-  useEffect(() => {
-    fetch("https://home.daddyshome.fr/health", { mode: "cors" })
-      .then((r) => {
-        if (r.ok) setStatus("installed")
-        else setStatus("not-installed")
-      })
-      .catch(() => setStatus("not-installed"))
-  }, [])
+function CertCheckResult({ certPromise }: { certPromise: Promise<boolean> }) {
+  const installed = use(certPromise)
 
   return (
-    <div className="cert-check">
-      {status === "checking" && (
-        <p className="cert-status checking">Checking certificate...</p>
-      )}
-      {status === "installed" && (
-        <p className="cert-status success">Certificate detected</p>
-      )}
-      {status === "not-installed" && (
-        <div className="cert-warning">
+    <div className={styles.certCheck}>
+      {installed ? (
+        <p className={`${styles.certStatus} ${styles.certStatusSuccess}`}>Certificate detected</p>
+      ) : (
+        <div className={styles.certWarning}>
           <p>
             It looks like your certificate isn't installed yet. Install the .p12
             file from your email, then refresh this page.
@@ -290,10 +270,10 @@ function AccountForm() {
   const isSubmitting = navigation.state === "submitting"
 
   return (
-    <form method="post" className="account-form">
+    <form method="post" className={styles.accountForm}>
       <h2>Create Your Account</h2>
 
-      <div className="form-group">
+      <div className={styles.formGroup}>
         <label htmlFor="username">Username</label>
         <input
           id="username"
@@ -302,13 +282,13 @@ function AccountForm() {
           required
           pattern="^[a-zA-Z0-9_-]{3,32}$"
           placeholder="Choose a username"
-          className="input"
+          className={styles.input}
           autoComplete="username"
         />
-        <span className="hint">3-32 characters: letters, numbers, hyphens, underscores</span>
+        <span className={styles.hint}>3-32 characters: letters, numbers, hyphens, underscores</span>
       </div>
 
-      <div className="form-group">
+      <div className={styles.formGroup}>
         <label htmlFor="password">Password</label>
         <input
           id="password"
@@ -317,13 +297,13 @@ function AccountForm() {
           required
           minLength={12}
           placeholder="Choose a strong password"
-          className="input"
+          className={styles.input}
           autoComplete="new-password"
         />
-        <span className="hint">At least 12 characters</span>
+        <span className={styles.hint}>At least 12 characters</span>
       </div>
 
-      <div className="form-group">
+      <div className={styles.formGroup}>
         <label htmlFor="confirmPassword">Confirm Password</label>
         <input
           id="confirmPassword"
@@ -332,60 +312,14 @@ function AccountForm() {
           required
           minLength={12}
           placeholder="Confirm your password"
-          className="input"
+          className={styles.input}
           autoComplete="new-password"
         />
       </div>
 
-      <button type="submit" className="btn btn-primary btn-full" disabled={isSubmitting}>
+      <button type="submit" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`} disabled={isSubmitting}>
         {isSubmitting ? "Creating Account..." : "Create Account"}
       </button>
     </form>
   )
 }
-
-function RedirectScript({ url }: { url: string }) {
-  return (
-    <script
-      dangerouslySetInnerHTML={{
-        __html: `setTimeout(function(){window.location.href="${url}"},2000)`,
-      }}
-    />
-  )
-}
-
-const pageStyles = `
-  .invite-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
-  .invite-card { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 2.5rem; max-width: 480px; width: 100%; }
-  .invite-card h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
-  .invite-card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem; }
-  .subtitle { color: var(--color-text-muted); margin-bottom: 0.5rem; }
-  .groups-info { color: var(--color-text-muted); font-size: 0.875rem; margin-bottom: 1.5rem; }
-  .error-icon { color: #ef4444; margin-bottom: 1rem; }
-  .success-icon { color: #22c55e; margin-bottom: 1rem; }
-  .error-message { color: var(--color-text-muted); }
-  .password-section { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); border-radius: var(--radius-sm); padding: 1rem; margin-bottom: 1.5rem; }
-  .warning-text { color: #fbbf24; font-size: 0.8rem; margin-bottom: 0.75rem; }
-  .password-display { display: flex; align-items: center; gap: 0.75rem; }
-  .password-display code { flex: 1; background: var(--color-bg); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.8rem; word-break: break-all; color: #e5e5e5; }
-  .btn-small { padding: 0.375rem 0.75rem; font-size: 0.75rem; background: var(--color-border); color: var(--color-text); border: none; border-radius: var(--radius-sm); cursor: pointer; }
-  .cert-check { margin-bottom: 1.5rem; }
-  .cert-status { font-size: 0.875rem; padding: 0.5rem 0; }
-  .cert-status.checking { color: var(--color-text-muted); }
-  .cert-status.success { color: #22c55e; }
-  .cert-warning { background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.2); border-radius: var(--radius-sm); padding: 0.75rem 1rem; }
-  .cert-warning p { color: #fbbf24; font-size: 0.8rem; margin: 0; }
-  .account-form { margin-top: 1.5rem; }
-  .form-group { margin-bottom: 1rem; }
-  .form-group label { display: block; font-size: 0.875rem; color: var(--color-text-muted); margin-bottom: 0.375rem; }
-  .input { width: 100%; padding: 0.5rem 0.75rem; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); color: var(--color-text); font-size: 0.875rem; box-sizing: border-box; }
-  .input:focus { outline: none; border-color: var(--color-accent); }
-  .hint { font-size: 0.75rem; color: var(--color-text-muted); margin-top: 0.25rem; display: block; }
-  .btn { padding: 0.5rem 1.25rem; border-radius: var(--radius-sm); font-size: 0.875rem; font-weight: 500; cursor: pointer; border: none; transition: background-color var(--transition); }
-  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-  .btn-primary { background: var(--color-accent); color: #fff; }
-  .btn-primary:hover:not(:disabled) { background: var(--color-accent-hover); }
-  .btn-full { width: 100%; margin-top: 0.5rem; }
-  .alert { padding: 0.75rem 1rem; border-radius: var(--radius-sm); font-size: 0.875rem; margin-bottom: 1rem; }
-  .alert-error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
-`

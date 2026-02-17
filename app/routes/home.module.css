@@ -1,0 +1,41 @@
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.title {
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.adminLink {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  transition: color var(--transition);
+  text-decoration: none;
+}
+
+.adminLink:hover {
+  color: var(--color-accent);
+}
+
+.user {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}

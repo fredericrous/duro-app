@@ -1,6 +1,7 @@
 import { Context, Effect, Data, Layer } from "effect"
 import * as crypto from "node:crypto"
 import Database from "better-sqlite3"
+import { hashToken } from "~/lib/crypto.server"
 
 export interface Invite {
   id: string
@@ -56,8 +57,38 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
   }
 >() {}
 
-function hashToken(token: string): string {
-  return crypto.createHash("sha256").update(token).digest("hex")
+interface InviteRow {
+  id: string
+  token_hash: string
+  email: string
+  groups: string
+  group_names: string
+  invited_by: string
+  created_at: string
+  expires_at: string
+  used_at: string | null
+  used_by: string | null
+  step_state: string
+  attempts: number
+  last_attempt_at: string | null
+}
+
+function rowToInvite(row: InviteRow): Invite {
+  return {
+    id: row.id,
+    tokenHash: row.token_hash,
+    email: row.email,
+    groups: row.groups,
+    groupNames: row.group_names,
+    invitedBy: row.invited_by,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    usedAt: row.used_at,
+    usedBy: row.used_by,
+    stepState: row.step_state,
+    attempts: row.attempts,
+    lastAttemptAt: row.last_attempt_at,
+  }
 }
 
 export const InviteRepoLive = Layer.effect(
@@ -166,35 +197,8 @@ export const InviteRepoLive = Layer.effect(
       findByTokenHash: (tokenHash) =>
         Effect.try({
           try: () => {
-            const row = stmts.findByHash.get(tokenHash) as
-              | (Record<string, unknown> & {
-                  token_hash: string
-                  group_names: string
-                  invited_by: string
-                  created_at: string
-                  expires_at: string
-                  used_at: string | null
-                  used_by: string | null
-                  step_state: string
-                  last_attempt_at: string | null
-                })
-              | undefined
-            if (!row) return null
-            return {
-              id: row.id as string,
-              tokenHash: row.token_hash,
-              email: row.email as string,
-              groups: row.groups as string,
-              groupNames: row.group_names,
-              invitedBy: row.invited_by,
-              createdAt: row.created_at,
-              expiresAt: row.expires_at,
-              usedAt: row.used_at,
-              usedBy: row.used_by,
-              stepState: row.step_state,
-              attempts: row.attempts as number,
-              lastAttemptAt: row.last_attempt_at,
-            } satisfies Invite
+            const row = stmts.findByHash.get(tokenHash) as InviteRow | undefined
+            return row ? rowToInvite(row) : null
           },
           catch: (e) =>
             new InviteError({
@@ -221,9 +225,9 @@ export const InviteRepoLive = Layer.effect(
             })
           }
 
-          const invite = yield* Effect.try({
+          const row = yield* Effect.try({
             try: () =>
-              stmts.findByHash.get(tokenHash) as Record<string, unknown>,
+              stmts.findByHash.get(tokenHash) as InviteRow,
             catch: (e) =>
               new InviteError({
                 message: "Failed to find consumed invite",
@@ -231,21 +235,7 @@ export const InviteRepoLive = Layer.effect(
               }),
           })
 
-          return {
-            id: invite.id as string,
-            tokenHash: invite.token_hash as string,
-            email: invite.email as string,
-            groups: invite.groups as string,
-            groupNames: invite.group_names as string,
-            invitedBy: invite.invited_by as string,
-            createdAt: invite.created_at as string,
-            expiresAt: invite.expires_at as string,
-            usedAt: invite.used_at as string | null,
-            usedBy: invite.used_by as string | null,
-            stepState: invite.step_state as string,
-            attempts: invite.attempts as number,
-            lastAttemptAt: invite.last_attempt_at as string | null,
-          } satisfies Invite
+          return rowToInvite(row)
         }),
 
       markUsedBy: (id, username) =>
@@ -263,27 +253,8 @@ export const InviteRepoLive = Layer.effect(
       findPending: () =>
         Effect.try({
           try: () => {
-            const rows = stmts.findPending.all() as Array<
-              Record<string, unknown>
-            >
-            return rows.map(
-              (row) =>
-                ({
-                  id: row.id as string,
-                  tokenHash: row.token_hash as string,
-                  email: row.email as string,
-                  groups: row.groups as string,
-                  groupNames: row.group_names as string,
-                  invitedBy: row.invited_by as string,
-                  createdAt: row.created_at as string,
-                  expiresAt: row.expires_at as string,
-                  usedAt: row.used_at as string | null,
-                  usedBy: row.used_by as string | null,
-                  stepState: row.step_state as string,
-                  attempts: row.attempts as number,
-                  lastAttemptAt: row.last_attempt_at as string | null,
-                }) satisfies Invite,
-            )
+            const rows = stmts.findPending.all() as InviteRow[]
+            return rows.map(rowToInvite)
           },
           catch: (e) =>
             new InviteError({
@@ -355,25 +326,8 @@ export const InviteRepoLive = Layer.effect(
       findById: (id) =>
         Effect.try({
           try: () => {
-            const row = stmts.findById.get(id) as
-              | Record<string, unknown>
-              | undefined
-            if (!row) return null
-            return {
-              id: row.id as string,
-              tokenHash: row.token_hash as string,
-              email: row.email as string,
-              groups: row.groups as string,
-              groupNames: row.group_names as string,
-              invitedBy: row.invited_by as string,
-              createdAt: row.created_at as string,
-              expiresAt: row.expires_at as string,
-              usedAt: row.used_at as string | null,
-              usedBy: row.used_by as string | null,
-              stepState: row.step_state as string,
-              attempts: row.attempts as number,
-              lastAttemptAt: row.last_attempt_at as string | null,
-            } satisfies Invite
+            const row = stmts.findById.get(id) as InviteRow | undefined
+            return row ? rowToInvite(row) : null
           },
           catch: (e) =>
             new InviteError({

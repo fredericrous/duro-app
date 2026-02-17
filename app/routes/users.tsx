@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react"
-import { useFetcher, useRevalidator } from "react-router"
+import { Link, useFetcher, useRevalidator } from "react-router"
 import type { Route } from "./+types/users"
 import { parseAuthHeaders } from "~/lib/auth.server"
 import { runEffect } from "~/lib/runtime.server"
@@ -7,6 +7,7 @@ import { LldapClient } from "~/lib/services/LldapClient.server"
 import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
 import { queueInvite } from "~/lib/workflows/invite.server"
 import { Effect } from "effect"
+import styles from "./users.module.css"
 
 export function meta() {
   return [{ title: "Users - Duro" }]
@@ -170,17 +171,17 @@ function StepBadges({ invite }: { invite: Invite }) {
   const allDone = state.certIssued && state.emailSent
 
   if (allDone) {
-    return <span className="badge badge-success">Sent</span>
+    return <span className={`${styles.badge} ${styles.badgeSuccess}`}>Sent</span>
   }
   if (!anyStarted) {
-    return <span className="badge badge-pending">Queued</span>
+    return <span className={`${styles.badge} ${styles.badgePending}`}>Queued</span>
   }
   return (
-    <span className="badge-group">
-      {state.certIssued && <span className="badge badge-done">Cert</span>}
-      {state.prCreated && <span className="badge badge-done">PR</span>}
-      {state.emailSent && <span className="badge badge-done">Email</span>}
-      <span className="badge badge-progress">Processing...</span>
+    <span className={styles.badgeGroup}>
+      {state.certIssued && <span className={`${styles.badge} ${styles.badgeDone}`}>Cert</span>}
+      {state.prCreated && <span className={`${styles.badge} ${styles.badgeDone}`}>PR</span>}
+      {state.emailSent && <span className={`${styles.badge} ${styles.badgeDone}`}>Email</span>}
+      <span className={`${styles.badge} ${styles.badgeProgress}`}>Processing...</span>
     </span>
   )
 }
@@ -213,30 +214,30 @@ export default function UsersPage({ loaderData }: Route.ComponentProps) {
   }, [pendingInvites, revalidator])
 
   return (
-    <main className="page">
-      <header className="header">
+    <main className={styles.page}>
+      <header className={styles.header}>
         <div>
-          <h1 className="title">User Management</h1>
-          <a href="/" className="back-link">
+          <h1 className={styles.title}>User Management</h1>
+          <Link to="/" className={styles.backLink}>
             Back to Dashboard
-          </a>
+          </Link>
         </div>
-        <span className="user-label">{user}</span>
+        <span className={styles.userLabel}>{user}</span>
       </header>
 
       {/* Invite Form */}
-      <section className="card">
-        <h2 className="card-title">Send Invite</h2>
+      <section className={styles.card}>
+        <h2 className={styles.cardTitle}>Send Invite</h2>
 
         {fetcher.data && "error" in fetcher.data && (
-          <div className="alert alert-error">{fetcher.data.error}</div>
+          <div className={`${styles.alert} ${styles.alertError}`}>{fetcher.data.error}</div>
         )}
         {fetcher.data && "success" in fetcher.data && fetcher.data.success && (
-          <div className="alert alert-success">{fetcher.data.message}</div>
+          <div className={`${styles.alert} ${styles.alertSuccess}`}>{fetcher.data.message}</div>
         )}
 
         <fetcher.Form method="post" ref={formRef}>
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="email">Email</label>
             <input
               id="email"
@@ -244,15 +245,15 @@ export default function UsersPage({ loaderData }: Route.ComponentProps) {
               type="email"
               required
               placeholder="user@example.com"
-              className="input"
+              className={styles.input}
             />
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label>Groups</label>
-            <div className="checkbox-grid">
+            <div className={styles.checkboxGrid}>
               {groups.map((g) => (
-                <label key={g.id} className="checkbox-label">
+                <label key={g.id} className={styles.checkboxLabel}>
                   <input
                     type="checkbox"
                     name="groups"
@@ -264,20 +265,20 @@ export default function UsersPage({ loaderData }: Route.ComponentProps) {
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+          <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={isSubmitting}>
             {isSubmitting ? "Sending..." : "Send Invite"}
           </button>
         </fetcher.Form>
       </section>
 
       {/* Pending Invites */}
-      <section className="card">
-        <h2 className="card-title">Pending Invites ({pendingInvites.length})</h2>
+      <section className={styles.card}>
+        <h2 className={styles.cardTitle}>Pending Invites ({pendingInvites.length})</h2>
         {pendingInvites.length === 0 ? (
-          <p className="empty-state">No pending invites</p>
+          <p className={styles.emptyState}>No pending invites</p>
         ) : (
-          <div className="table-container">
-            <table className="table">
+          <div className={styles.tableContainer}>
+            <table className={styles.table}>
               <thead>
                 <tr>
                   <th>Email</th>
@@ -299,10 +300,10 @@ export default function UsersPage({ loaderData }: Route.ComponentProps) {
       </section>
 
       {/* Users List */}
-      <section className="card">
-        <h2 className="card-title">Users ({users.length})</h2>
-        <div className="table-container">
-          <table className="table">
+      <section className={styles.card}>
+        <h2 className={styles.cardTitle}>Users ({users.length})</h2>
+        <div className={styles.tableContainer}>
+          <table className={styles.table}>
             <thead>
               <tr>
                 <th>Username</th>
@@ -326,45 +327,6 @@ export default function UsersPage({ loaderData }: Route.ComponentProps) {
           </table>
         </div>
       </section>
-
-      <style>{`
-        .page { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; }
-        .title { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
-        .back-link { font-size: 0.8rem; color: var(--color-text-muted); }
-        .back-link:hover { color: var(--color-accent); }
-        .user-label { font-size: 0.875rem; color: var(--color-text-muted); }
-        .card { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 1.5rem; }
-        .card-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; }
-        .form-group { margin-bottom: 1rem; }
-        .form-group label { display: block; font-size: 0.875rem; color: var(--color-text-muted); margin-bottom: 0.375rem; }
-        .input { width: 100%; padding: 0.5rem 0.75rem; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); color: var(--color-text); font-size: 0.875rem; }
-        .input:focus { outline: none; border-color: var(--color-accent); }
-        .checkbox-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-        .checkbox-label { display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; cursor: pointer; }
-        .btn { padding: 0.5rem 1.25rem; border-radius: var(--radius-sm); font-size: 0.875rem; font-weight: 500; cursor: pointer; border: none; transition: background-color var(--transition); }
-        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn-primary { background: var(--color-accent); color: #fff; }
-        .btn-primary:hover:not(:disabled) { background: var(--color-accent-hover); }
-        .alert { padding: 0.75rem 1rem; border-radius: var(--radius-sm); font-size: 0.875rem; margin-bottom: 1rem; }
-        .alert-error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
-        .alert-success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); color: #86efac; }
-        .table-container { overflow-x: auto; }
-        .table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-        .table th { text-align: left; padding: 0.5rem 0.75rem; color: var(--color-text-muted); font-weight: 500; border-bottom: 1px solid var(--color-border); }
-        .table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(51,51,51,0.5); }
-        .empty-state { color: var(--color-text-muted); font-size: 0.875rem; }
-        .action-btns { display: flex; gap: 0.5rem; }
-        .btn-ghost { padding: 0.25rem 0.625rem; font-size: 0.75rem; background: transparent; color: var(--color-text-muted); border: 1px solid var(--color-border); border-radius: var(--radius-sm); cursor: pointer; transition: all 150ms; }
-        .btn-ghost:hover:not(:disabled) { color: var(--color-text); border-color: var(--color-text-muted); }
-        .btn-ghost.danger:hover:not(:disabled) { color: #fca5a5; border-color: rgba(239,68,68,0.4); }
-        .badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 500; }
-        .badge-success { background: rgba(34,197,94,0.15); color: #86efac; }
-        .badge-pending { background: rgba(234,179,8,0.15); color: #fde047; }
-        .badge-done { background: rgba(34,197,94,0.15); color: #86efac; }
-        .badge-progress { background: rgba(59,130,246,0.15); color: #93c5fd; }
-        .badge-group { display: inline-flex; gap: 0.25rem; align-items: center; }
-      `}</style>
     </main>
   )
 }
@@ -383,18 +345,18 @@ function PendingInviteRow({ invite }: { invite: Invite }) {
       <td>{invite.invitedBy}</td>
       <td>{new Date(invite.expiresAt + "Z").toLocaleDateString()}</td>
       <td>
-        <div className="action-btns">
+        <div className={styles.actionBtns}>
           <resendFetcher.Form method="post">
             <input type="hidden" name="intent" value="resend" />
             <input type="hidden" name="inviteId" value={invite.id} />
-            <button type="submit" className="btn-ghost" disabled={isResending || isRevoking}>
+            <button type="submit" className={styles.btnGhost} disabled={isResending || isRevoking}>
               {isResending ? "Resending..." : "Resend"}
             </button>
           </resendFetcher.Form>
           <revokeFetcher.Form method="post">
             <input type="hidden" name="intent" value="revoke" />
             <input type="hidden" name="inviteId" value={invite.id} />
-            <button type="submit" className="btn-ghost danger" disabled={isRevoking || isResending}>
+            <button type="submit" className={`${styles.btnGhost} ${styles.btnGhostDanger}`} disabled={isRevoking || isResending}>
               {isRevoking ? "Revoking..." : "Revoke"}
             </button>
           </revokeFetcher.Form>
