@@ -4,20 +4,25 @@ import { runEffect } from "~/lib/runtime.server"
 import { InviteWorkflow } from "~/lib/workflows/invite.server"
 
 export async function action({ request }: Route.ActionArgs) {
-  const event = await request.json()
+  const body = await request.json()
 
-  if (event.type !== "duro.invite.requested") {
+  // Knative delivers CloudEvents in binary mode: attributes in headers, data in body.
+  // Fall back to structured mode (full envelope in body) for direct calls.
+  const ceType = request.headers.get("ce-type") ?? body.type
+  const data = request.headers.has("ce-type") ? body : body.data
+
+  if (ceType !== "duro.invite.requested") {
     return new Response("Unknown event type", { status: 400 })
   }
 
   try {
     await runEffect(
-      InviteWorkflow.execute(event.data).pipe(
+      InviteWorkflow.execute(data).pipe(
         Effect.withSpan("processInviteEvent", {
           attributes: {
-            "cloudevents.type": event.type,
-            "invite.id": event.data?.inviteId,
-            "invite.email": event.data?.email,
+            "cloudevents.type": ceType,
+            "invite.id": data?.inviteId,
+            "invite.email": data?.email,
           },
         }),
       ),
