@@ -1,8 +1,7 @@
-import { describe, expect } from "vitest"
+import { describe, expect, vi } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { WorkflowEngine } from "@effect/workflow"
-import { queueInvite, acceptInvite, InviteWorkflowLayer } from "./invite.server"
+import { queueInvite, acceptInvite } from "./invite.server"
 import {
   InviteRepo,
   InviteError,
@@ -13,7 +12,7 @@ import {
   LldapError,
 } from "~/lib/services/LldapClient.server"
 import { VaultPki } from "~/lib/services/VaultPki.server"
-import { GitHubClient } from "~/lib/services/GitHubClient.server"
+import { GitHubClient, GitHubError } from "~/lib/services/GitHubClient.server"
 import { EmailService } from "~/lib/services/EmailService.server"
 
 // --- Mock helpers ---
@@ -21,6 +20,7 @@ import { EmailService } from "~/lib/services/EmailService.server"
 function makeInvite(overrides: Partial<Invite> = {}): Invite {
   return {
     id: "inv-1",
+    token: "tok-inv-1",
     tokenHash: "abc123",
     email: "alice@example.com",
     groups: JSON.stringify([1, 2]),
@@ -30,7 +30,11 @@ function makeInvite(overrides: Partial<Invite> = {}): Invite {
     expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
     usedAt: null,
     usedBy: null,
-    stepState: "{}",
+    certIssued: false,
+    prCreated: false,
+    prNumber: null,
+    prMerged: false,
+    emailSent: false,
     attempts: 0,
     lastAttemptAt: null,
     ...overrides,
@@ -47,6 +51,7 @@ const mockInviteRepo = (store: Map<string, Invite> = new Map()) =>
         const token = `tok-${id}`
         const invite = makeInvite({
           id,
+          token,
           email: input.email,
           groups: JSON.stringify(input.groups),
           groupNames: JSON.stringify(input.groupNames),
@@ -73,17 +78,30 @@ const mockInviteRepo = (store: Map<string, Invite> = new Map()) =>
       }),
     findPending: () => Effect.sync(() => [...store.values()].filter((i) => !i.usedAt)),
     incrementAttempt: () => Effect.void,
-    updateStepState: (id, patch) =>
+    markCertIssued: (id) =>
       Effect.sync(() => {
         const invite = store.get(id)
-        if (invite) {
-          const current = JSON.parse(invite.stepState)
-          store.set(id, {
-            ...invite,
-            stepState: JSON.stringify({ ...current, ...patch }),
-          })
-        }
+        if (invite) store.set(id, { ...invite, certIssued: true })
       }),
+    markPRCreated: (id, prNumber) =>
+      Effect.sync(() => {
+        const invite = store.get(id)
+        if (invite) store.set(id, { ...invite, prCreated: true, prNumber })
+      }),
+    markPRMerged: (id) =>
+      Effect.sync(() => {
+        const invite = store.get(id)
+        if (invite) store.set(id, { ...invite, prMerged: true })
+      }),
+    markEmailSent: (id) =>
+      Effect.sync(() => {
+        const invite = store.get(id)
+        if (invite) store.set(id, { ...invite, emailSent: true })
+      }),
+    findAwaitingMerge: () =>
+      Effect.sync(() =>
+        [...store.values()].filter((i) => i.prCreated && !i.emailSent && i.prNumber != null && !i.usedAt),
+      ),
     revoke: () => Effect.void,
     deleteById: (id) =>
       Effect.sync(() => {
@@ -122,31 +140,18 @@ const mockVaultPki = Layer.succeed(VaultPki, {
 })
 
 const mockGitHubClient = Layer.succeed(GitHubClient, {
-  createCertPR: () => Effect.succeed({ prUrl: "https://github.com/pr/1" }),
+  createCertPR: () => Effect.succeed({ prUrl: "https://github.com/pr/1", prNumber: 1 }),
+  checkPRMerged: () => Effect.succeed(false),
 })
 
 const mockEmailService = Layer.succeed(EmailService, {
   sendInviteEmail: () => Effect.void,
 })
 
-// Full layer needed for queueInvite (workflow runs in-process)
-const makeQueueLayer = (store: Map<string, Invite>) =>
-  InviteWorkflowLayer.pipe(
-    Layer.provideMerge(
-      Layer.mergeAll(
-        mockInviteRepo(store),
-        mockVaultPki,
-        mockGitHubClient,
-        mockEmailService,
-        WorkflowEngine.layerMemory,
-      ),
-    ),
-  )
-
 // --- Tests ---
 
 describe("queueInvite", () => {
-  it.effect("creates an invite and returns success", () => {
+  it.effect("creates an invite, issues cert, and creates PR", () => {
     const store = new Map<string, Invite>()
 
     return queueInvite({
@@ -160,9 +165,143 @@ describe("queueInvite", () => {
           expect(result.success).toBe(true)
           expect(result.message).toContain("alice@example.com")
           expect(store.size).toBe(1)
+
+          const invite = [...store.values()][0]
+          expect(invite.certIssued).toBe(true)
+          expect(invite.prCreated).toBe(true)
+          expect(invite.prNumber).toBe(1)
         }),
       ),
-      Effect.provide(makeQueueLayer(store)),
+      Effect.provide(
+        Layer.mergeAll(mockInviteRepo(store), mockVaultPki, mockGitHubClient),
+      ),
+    )
+  })
+
+  it.effect("continues even if PR creation fails", () => {
+    const store = new Map<string, Invite>()
+
+    const failingGitHub = Layer.succeed(GitHubClient, {
+      createCertPR: () => Effect.fail(new GitHubError({ message: "GitHub down" })),
+      checkPRMerged: () => Effect.succeed(false),
+    })
+
+    return queueInvite({
+      email: "alice@example.com",
+      groups: [1, 2],
+      groupNames: ["friends", "family"],
+      invitedBy: "admin",
+    }).pipe(
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          expect(result.success).toBe(true)
+
+          const invite = [...store.values()][0]
+          expect(invite.certIssued).toBe(true)
+          // PR not created due to failure
+          expect(invite.prCreated).toBe(false)
+        }),
+      ),
+      Effect.provide(
+        Layer.mergeAll(mockInviteRepo(store), mockVaultPki, failingGitHub),
+      ),
+    )
+  })
+})
+
+describe("reconciler logic", () => {
+  it.effect("sends email when PR is merged", () => {
+    const sendInviteEmail = vi.fn(() => Effect.void)
+    const store = new Map<string, Invite>()
+    store.set("inv-1", makeInvite({ prCreated: true, prNumber: 42, certIssued: true }))
+
+    const emailLayer = Layer.succeed(EmailService, { sendInviteEmail })
+    const ghLayer = Layer.succeed(GitHubClient, {
+      createCertPR: () => Effect.succeed({ prUrl: "", prNumber: 0 }),
+      checkPRMerged: () => Effect.succeed(true),
+    })
+
+    // Inline reconcile logic for testing (one cycle)
+    const reconcileOnce = Effect.gen(function* () {
+      const inviteRepo = yield* InviteRepo
+      const github = yield* GitHubClient
+      const vault = yield* VaultPki
+      const emailSvc = yield* EmailService
+
+      const pending = yield* inviteRepo.findAwaitingMerge()
+
+      for (const invite of pending) {
+        const merged = yield* github.checkPRMerged(invite.prNumber!).pipe(
+          Effect.catchAll(() => Effect.succeed(false)),
+        )
+        if (!merged) continue
+
+        yield* inviteRepo.markPRMerged(invite.id)
+
+        const { p12Buffer } = yield* vault.issueCertAndP12(invite.email, invite.id)
+        yield* emailSvc.sendInviteEmail(invite.email, invite.token, invite.invitedBy, p12Buffer)
+        yield* inviteRepo.markEmailSent(invite.id)
+      }
+    })
+
+    return reconcileOnce.pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          expect(sendInviteEmail).toHaveBeenCalledWith(
+            "alice@example.com",
+            "tok-inv-1",
+            "admin",
+            Buffer.from("fake"),
+          )
+
+          const invite = store.get("inv-1")!
+          expect(invite.prMerged).toBe(true)
+          expect(invite.emailSent).toBe(true)
+        }),
+      ),
+      Effect.provide(
+        Layer.mergeAll(mockInviteRepo(store), mockVaultPki, ghLayer, emailLayer),
+      ),
+    )
+  })
+
+  it.effect("skips invites whose PR is not yet merged", () => {
+    const sendInviteEmail = vi.fn(() => Effect.void)
+    const store = new Map<string, Invite>()
+    store.set("inv-1", makeInvite({ prCreated: true, prNumber: 42 }))
+
+    const emailLayer = Layer.succeed(EmailService, { sendInviteEmail })
+    const ghLayer = Layer.succeed(GitHubClient, {
+      createCertPR: () => Effect.succeed({ prUrl: "", prNumber: 0 }),
+      checkPRMerged: () => Effect.succeed(false),
+    })
+
+    const reconcileOnce = Effect.gen(function* () {
+      const inviteRepo = yield* InviteRepo
+      const github = yield* GitHubClient
+
+      const pending = yield* inviteRepo.findAwaitingMerge()
+
+      for (const invite of pending) {
+        const merged = yield* github.checkPRMerged(invite.prNumber!).pipe(
+          Effect.catchAll(() => Effect.succeed(false)),
+        )
+        if (!merged) continue
+
+        yield* inviteRepo.markEmailSent(invite.id)
+      }
+    })
+
+    return reconcileOnce.pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          expect(sendInviteEmail).not.toHaveBeenCalled()
+          expect(store.get("inv-1")!.emailSent).toBe(false)
+        }),
+      ),
+      Effect.provide(
+        Layer.mergeAll(mockInviteRepo(store), mockVaultPki, ghLayer, emailLayer),
+      ),
     )
   })
 })

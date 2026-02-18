@@ -1,11 +1,11 @@
 import { ManagedRuntime, type Effect } from "effect"
-import type { WorkflowEngine } from "@effect/workflow"
 import { AppLayer } from "./services/AppLayer.server"
 import type { LldapClient } from "./services/LldapClient.server"
 import type { VaultPki } from "./services/VaultPki.server"
 import type { GitHubClient } from "./services/GitHubClient.server"
 import type { EmailService } from "./services/EmailService.server"
 import type { InviteRepo } from "./services/InviteRepo.server"
+import { reconcileLoop } from "./reconciler.server"
 
 type AppServices =
   | LldapClient
@@ -13,9 +13,11 @@ type AppServices =
   | GitHubClient
   | EmailService
   | InviteRepo
-  | WorkflowEngine.WorkflowEngine
 
 const appRuntime = ManagedRuntime.make(AppLayer)
+
+// Start the background reconciler (polls for PR merges, sends emails)
+appRuntime.runFork(reconcileLoop)
 
 export function runEffect<A, E>(
   effect: Effect.Effect<A, E, AppServices>,

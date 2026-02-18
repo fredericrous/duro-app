@@ -48,27 +48,13 @@ export async function loader({ params }: Route.LoaderArgs) {
       }
     }
 
-    // One-time P12 password reveal
-    let p12Password: string | null = null
-    const stepState = JSON.parse(invite.stepState || "{}")
-
-    if (!stepState.passwordRevealed) {
-      p12Password = await runEffect(
-        Effect.gen(function* () {
-          const vault = yield* VaultPki
-          const password = yield* vault.consumeP12Password(invite.id)
-
-          if (password) {
-            const repo = yield* InviteRepo
-            yield* repo.updateStepState(invite.id, {
-              passwordRevealed: true,
-            })
-          }
-
-          return password
-        }),
-      )
-    }
+    // One-time P12 password reveal (consumeP12Password is atomic: read + delete)
+    const p12Password = await runEffect(
+      Effect.gen(function* () {
+        const vault = yield* VaultPki
+        return yield* vault.consumeP12Password(invite.id)
+      }),
+    )
 
     return {
       valid: true,

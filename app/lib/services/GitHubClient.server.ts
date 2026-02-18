@@ -12,7 +12,10 @@ export class GitHubClient extends Context.Tag("GitHubClient")<
       inviteId: string,
       email: string,
       username: string,
-    ) => Effect.Effect<{ prUrl: string }, GitHubError>
+    ) => Effect.Effect<{ prUrl: string; prNumber: number }, GitHubError>
+    readonly checkPRMerged: (
+      prNumber: number,
+    ) => Effect.Effect<boolean, GitHubError>
   }
 >() {}
 
@@ -87,12 +90,12 @@ spec:
             const prs = yield* ghFetch(
               `/pulls?head=fredericrous:${branch}&state=open`,
             ).pipe(
-              Effect.map((r) => r as unknown as Array<{ html_url: string }>),
-              Effect.catchAll(() => Effect.succeed([] as Array<{ html_url: string }>)),
+              Effect.map((r) => r as unknown as Array<{ html_url: string; number: number }>),
+              Effect.catchAll(() => Effect.succeed([] as Array<{ html_url: string; number: number }>)),
             )
 
             if (prs.length > 0) {
-              return { prUrl: prs[0].html_url }
+              return { prUrl: prs[0].html_url, prNumber: prs[0].number }
             }
           }
 
@@ -141,8 +144,14 @@ spec:
 
           return {
             prUrl: (pr as { html_url: string }).html_url,
+            prNumber: (pr as { number: number }).number,
           }
         }),
+
+      checkPRMerged: (prNumber: number) =>
+        ghFetch(`/pulls/${prNumber}`).pipe(
+          Effect.map((pr) => !!(pr as { merged: boolean }).merged),
+        ),
     }
   }),
 )

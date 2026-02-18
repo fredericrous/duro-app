@@ -143,47 +143,12 @@ export async function action({ request }: Route.ActionArgs) {
   }
 }
 
-function parseStepState(invite: Invite): {
-  certIssued: boolean
-  prCreated: boolean
-  emailSent: boolean
-} {
-  try {
-    const state = JSON.parse(invite.stepState || "{}")
-    return {
-      certIssued: !!state.certIssued,
-      prCreated: !!state.prCreated,
-      emailSent: !!state.emailSent,
-    }
-  } catch {
-    return { certIssued: false, prCreated: false, emailSent: false }
-  }
-}
-
-function isFullyProcessed(invite: Invite): boolean {
-  const state = parseStepState(invite)
-  return state.certIssued && state.emailSent
-}
-
 function StepBadges({ invite }: { invite: Invite }) {
-  const state = parseStepState(invite)
-  const anyStarted = state.certIssued || state.prCreated || state.emailSent
-  const allDone = state.certIssued && state.emailSent
-
-  if (allDone) {
-    return <span className={`${styles.badge} ${styles.badgeSuccess}`}>Sent</span>
-  }
-  if (!anyStarted) {
-    return <span className={`${styles.badge} ${styles.badgePending}`}>Queued</span>
-  }
-  return (
-    <span className={styles.badgeGroup}>
-      {state.certIssued && <span className={`${styles.badge} ${styles.badgeDone}`}>Cert</span>}
-      {state.prCreated && <span className={`${styles.badge} ${styles.badgeDone}`}>PR</span>}
-      {state.emailSent && <span className={`${styles.badge} ${styles.badgeDone}`}>Email</span>}
-      <span className={`${styles.badge} ${styles.badgeProgress}`}>Processing...</span>
-    </span>
-  )
+  if (invite.emailSent) return <span className={`${styles.badge} ${styles.badgeSuccess}`}>Sent</span>
+  if (invite.prMerged) return <span className={`${styles.badge} ${styles.badgeProgress}`}>Sending email...</span>
+  if (invite.prCreated) return <span className={`${styles.badge} ${styles.badgePending}`}>Awaiting PR merge</span>
+  if (invite.certIssued) return <span className={`${styles.badge} ${styles.badgeDone}`}>Cert issued</span>
+  return <span className={`${styles.badge} ${styles.badgePending}`}>Processing...</span>
 }
 
 export default function UsersPage({ loaderData }: Route.ComponentProps) {
@@ -201,7 +166,7 @@ export default function UsersPage({ loaderData }: Route.ComponentProps) {
 
   // Auto-refresh while invites are still processing
   useEffect(() => {
-    const hasIncomplete = pendingInvites.some((inv) => !isFullyProcessed(inv))
+    const hasIncomplete = pendingInvites.some((inv) => !inv.emailSent)
     if (!hasIncomplete) return
 
     const interval = setInterval(() => {

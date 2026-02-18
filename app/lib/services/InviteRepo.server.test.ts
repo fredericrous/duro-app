@@ -33,6 +33,24 @@ describe("InviteRepo", () => {
         expect(invite!.groupNames).toBe(JSON.stringify(["friends", "family"]))
         expect(invite!.usedAt).toBeNull()
         expect(invite!.attempts).toBe(0)
+        expect(invite!.token).toBeDefined()
+        expect(invite!.token.length).toBeGreaterThan(0)
+      }),
+    )
+
+    it.effect("stores token for deferred email URL construction", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id } = yield* repo.create({
+          email: "token-test@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+
+        const invite = yield* repo.findById(id)
+        expect(invite!.token).toBeDefined()
+        expect(invite!.token.length).toBeGreaterThan(0)
       }),
     )
 
@@ -82,6 +100,146 @@ describe("InviteRepo", () => {
 
         expect(result).toBeInstanceOf(InviteError)
         expect(result.message).toContain("Pending invite already exists")
+      }),
+    )
+  })
+
+  it.layer(InviteRepoLive)("typed columns default values", (it) => {
+    it.effect("default typed columns are false/null", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id } = yield* repo.create({
+          email: "defaults@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+
+        const invite = yield* repo.findById(id)
+        expect(invite).not.toBeNull()
+        expect(invite!.certIssued).toBe(false)
+        expect(invite!.prCreated).toBe(false)
+        expect(invite!.prNumber).toBeNull()
+        expect(invite!.prMerged).toBe(false)
+        expect(invite!.emailSent).toBe(false)
+      }),
+    )
+  })
+
+  it.layer(InviteRepoLive)("typed mark methods", (it) => {
+    it.effect("markCertIssued sets cert_issued to true", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id } = yield* repo.create({
+          email: "cert@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+
+        yield* repo.markCertIssued(id)
+        const invite = yield* repo.findById(id)
+        expect(invite!.certIssued).toBe(true)
+      }),
+    )
+
+    it.effect("markPRCreated sets pr_created and pr_number", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id } = yield* repo.create({
+          email: "pr@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+
+        yield* repo.markPRCreated(id, 42)
+        const invite = yield* repo.findById(id)
+        expect(invite!.prCreated).toBe(true)
+        expect(invite!.prNumber).toBe(42)
+      }),
+    )
+
+    it.effect("markPRMerged sets pr_merged to true", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id } = yield* repo.create({
+          email: "merged@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+
+        yield* repo.markPRCreated(id, 42)
+        yield* repo.markPRMerged(id)
+        const invite = yield* repo.findById(id)
+        expect(invite!.prMerged).toBe(true)
+      }),
+    )
+
+    it.effect("markEmailSent sets email_sent to true", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id } = yield* repo.create({
+          email: "email@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+
+        yield* repo.markEmailSent(id)
+        const invite = yield* repo.findById(id)
+        expect(invite!.emailSent).toBe(true)
+      }),
+    )
+  })
+
+  it.layer(InviteRepoLive)("findAwaitingMerge", (it) => {
+    it.effect("returns invites with PR but no email", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+
+        // Invite 1: PR created, no email -> should match
+        const { id: id1 } = yield* repo.create({
+          email: "awaiting1@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+        yield* repo.markPRCreated(id1, 10)
+
+        // Invite 2: PR created + email sent -> should NOT match
+        const { id: id2 } = yield* repo.create({
+          email: "awaiting2@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+        yield* repo.markPRCreated(id2, 11)
+        yield* repo.markEmailSent(id2)
+
+        const result = yield* repo.findAwaitingMerge()
+        expect(result).toHaveLength(1)
+        expect(result[0].prNumber).toBe(10)
+      }),
+    )
+
+    it.effect("excludes used invites", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id } = yield* repo.create({
+          email: "revoked@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+        yield* repo.markPRCreated(id, 10)
+        yield* repo.revoke(id)
+
+        const result = yield* repo.findAwaitingMerge()
+        // The revoked invite should not appear
+        const revokedInResult = result.find((inv) => inv.id === id)
+        expect(revokedInResult).toBeUndefined()
       }),
     )
   })
@@ -184,31 +342,6 @@ describe("InviteRepo", () => {
         const invite = yield* repo.findByTokenHash(tokenHash)
         expect(invite!.attempts).toBe(2)
         expect(invite!.lastAttemptAt).not.toBeNull()
-      }),
-    )
-  })
-
-  it.layer(InviteRepoLive)("updateStepState", (it) => {
-    it.effect("patches step state JSON", () =>
-      Effect.gen(function* () {
-        const repo = yield* InviteRepo
-        const { id } = yield* repo.create({
-          email: "step@example.com",
-          groups: [1],
-          groupNames: ["friends"],
-          invitedBy: "admin",
-        })
-
-        yield* repo.updateStepState(id, { certIssued: true })
-        let invite = yield* repo.findById(id)
-        expect(JSON.parse(invite!.stepState)).toEqual({ certIssued: true })
-
-        yield* repo.updateStepState(id, { emailSent: true })
-        invite = yield* repo.findById(id)
-        expect(JSON.parse(invite!.stepState)).toEqual({
-          certIssued: true,
-          emailSent: true,
-        })
       }),
     )
   })

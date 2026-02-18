@@ -5,6 +5,7 @@ import { hashToken } from "~/lib/crypto.server"
 
 export interface Invite {
   id: string
+  token: string
   tokenHash: string
   email: string
   groups: string
@@ -14,7 +15,11 @@ export interface Invite {
   expiresAt: string
   usedAt: string | null
   usedBy: string | null
-  stepState: string
+  certIssued: boolean
+  prCreated: boolean
+  prNumber: number | null
+  prMerged: boolean
+  emailSent: boolean
   attempts: number
   lastAttemptAt: string | null
 }
@@ -47,10 +52,14 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
     readonly incrementAttempt: (
       tokenHash: string,
     ) => Effect.Effect<void, InviteError>
-    readonly updateStepState: (
+    readonly markCertIssued: (id: string) => Effect.Effect<void, InviteError>
+    readonly markPRCreated: (
       id: string,
-      patch: Record<string, boolean>,
+      prNumber: number,
     ) => Effect.Effect<void, InviteError>
+    readonly markPRMerged: (id: string) => Effect.Effect<void, InviteError>
+    readonly markEmailSent: (id: string) => Effect.Effect<void, InviteError>
+    readonly findAwaitingMerge: () => Effect.Effect<Invite[], InviteError>
     readonly revoke: (id: string) => Effect.Effect<void, InviteError>
     readonly deleteById: (id: string) => Effect.Effect<void, InviteError>
     readonly findById: (id: string) => Effect.Effect<Invite | null, InviteError>
@@ -59,6 +68,7 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
 
 interface InviteRow {
   id: string
+  token: string
   token_hash: string
   email: string
   groups: string
@@ -68,7 +78,11 @@ interface InviteRow {
   expires_at: string
   used_at: string | null
   used_by: string | null
-  step_state: string
+  cert_issued: number
+  pr_created: number
+  pr_number: number | null
+  pr_merged: number
+  email_sent: number
   attempts: number
   last_attempt_at: string | null
 }
@@ -76,6 +90,7 @@ interface InviteRow {
 function rowToInvite(row: InviteRow): Invite {
   return {
     id: row.id,
+    token: row.token,
     tokenHash: row.token_hash,
     email: row.email,
     groups: row.groups,
@@ -85,7 +100,11 @@ function rowToInvite(row: InviteRow): Invite {
     expiresAt: row.expires_at,
     usedAt: row.used_at,
     usedBy: row.used_by,
-    stepState: row.step_state,
+    certIssued: !!row.cert_issued,
+    prCreated: !!row.pr_created,
+    prNumber: row.pr_number ?? null,
+    prMerged: !!row.pr_merged,
+    emailSent: !!row.email_sent,
     attempts: row.attempts,
     lastAttemptAt: row.last_attempt_at,
   }
@@ -103,6 +122,7 @@ export const InviteRepoLive = Layer.effect(
     db.exec(`
       CREATE TABLE IF NOT EXISTS invites (
         id TEXT PRIMARY KEY,
+        token TEXT NOT NULL,
         token_hash TEXT NOT NULL UNIQUE,
         email TEXT NOT NULL,
         groups TEXT NOT NULL,
@@ -112,7 +132,11 @@ export const InviteRepoLive = Layer.effect(
         expires_at TEXT NOT NULL,
         used_at TEXT,
         used_by TEXT,
-        step_state TEXT NOT NULL DEFAULT '{}',
+        cert_issued INTEGER NOT NULL DEFAULT 0,
+        pr_created INTEGER NOT NULL DEFAULT 0,
+        pr_number INTEGER,
+        pr_merged INTEGER NOT NULL DEFAULT 0,
+        email_sent INTEGER NOT NULL DEFAULT 0,
         attempts INTEGER NOT NULL DEFAULT 0,
         last_attempt_at TEXT
       )
@@ -120,8 +144,8 @@ export const InviteRepoLive = Layer.effect(
 
     const stmts = {
       insert: db.prepare(`
-        INSERT INTO invites (id, token_hash, email, groups, group_names, invited_by, expires_at)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now', '+48 hours'))
+        INSERT INTO invites (id, token, token_hash, email, groups, group_names, invited_by, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', '+48 hours'))
       `),
       findByHash: db.prepare(
         `SELECT * FROM invites WHERE token_hash = ?`,
@@ -141,10 +165,22 @@ export const InviteRepoLive = Layer.effect(
         UPDATE invites SET attempts = attempts + 1, last_attempt_at = datetime('now')
         WHERE token_hash = ?
       `),
-      getStepState: db.prepare(`SELECT step_state FROM invites WHERE id = ?`),
-      updateStepState: db.prepare(
-        `UPDATE invites SET step_state = ? WHERE id = ?`,
+      markCertIssued: db.prepare(
+        `UPDATE invites SET cert_issued = 1 WHERE id = ?`,
       ),
+      markPRCreated: db.prepare(
+        `UPDATE invites SET pr_created = 1, pr_number = ? WHERE id = ?`,
+      ),
+      markPRMerged: db.prepare(
+        `UPDATE invites SET pr_merged = 1 WHERE id = ?`,
+      ),
+      markEmailSent: db.prepare(
+        `UPDATE invites SET email_sent = 1 WHERE id = ?`,
+      ),
+      findAwaitingMerge: db.prepare(`
+        SELECT * FROM invites
+        WHERE pr_created = 1 AND email_sent = 0 AND pr_number IS NOT NULL AND used_at IS NULL
+      `),
       findPendingByEmail: db.prepare(`
         SELECT * FROM invites WHERE email = ? AND used_at IS NULL AND expires_at > datetime('now')
       `),
@@ -160,9 +196,8 @@ export const InviteRepoLive = Layer.effect(
       create: (input) =>
         Effect.try({
           try: () => {
-            // Check for existing pending invite
             const existing = stmts.findPendingByEmail.get(input.email) as
-              | Invite
+              | InviteRow
               | undefined
             if (existing) {
               throw new InviteError({
@@ -176,6 +211,7 @@ export const InviteRepoLive = Layer.effect(
 
             stmts.insert.run(
               id,
+              token,
               tokenHash,
               input.email,
               JSON.stringify(input.groups),
@@ -275,19 +311,63 @@ export const InviteRepoLive = Layer.effect(
             }),
         }),
 
-      updateStepState: (id, patch) =>
+      markCertIssued: (id) =>
         Effect.try({
           try: () => {
-            const row = stmts.getStepState.get(id) as
-              | { step_state: string }
-              | undefined
-            const current = row ? JSON.parse(row.step_state) : {}
-            const updated = { ...current, ...patch }
-            stmts.updateStepState.run(JSON.stringify(updated), id)
+            stmts.markCertIssued.run(id)
           },
           catch: (e) =>
             new InviteError({
-              message: "Failed to update step state",
+              message: "Failed to mark cert issued",
+              cause: e,
+            }),
+        }),
+
+      markPRCreated: (id, prNumber) =>
+        Effect.try({
+          try: () => {
+            stmts.markPRCreated.run(prNumber, id)
+          },
+          catch: (e) =>
+            new InviteError({
+              message: "Failed to mark PR created",
+              cause: e,
+            }),
+        }),
+
+      markPRMerged: (id) =>
+        Effect.try({
+          try: () => {
+            stmts.markPRMerged.run(id)
+          },
+          catch: (e) =>
+            new InviteError({
+              message: "Failed to mark PR merged",
+              cause: e,
+            }),
+        }),
+
+      markEmailSent: (id) =>
+        Effect.try({
+          try: () => {
+            stmts.markEmailSent.run(id)
+          },
+          catch: (e) =>
+            new InviteError({
+              message: "Failed to mark email sent",
+              cause: e,
+            }),
+        }),
+
+      findAwaitingMerge: () =>
+        Effect.try({
+          try: () => {
+            const rows = stmts.findAwaitingMerge.all() as InviteRow[]
+            return rows.map(rowToInvite)
+          },
+          catch: (e) =>
+            new InviteError({
+              message: "Failed to find invites awaiting merge",
               cause: e,
             }),
         }),
