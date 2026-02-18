@@ -142,6 +142,7 @@ const mockVaultPki = Layer.succeed(VaultPki, {
 const mockGitHubClient = Layer.succeed(GitHubClient, {
   createCertPR: () => Effect.succeed({ prUrl: "https://github.com/pr/1", prNumber: 1 }),
   checkPRMerged: () => Effect.succeed(false),
+  mergePR: () => Effect.void,
 })
 
 const mockEmailService = Layer.succeed(EmailService, {
@@ -184,6 +185,7 @@ describe("queueInvite", () => {
     const failingGitHub = Layer.succeed(GitHubClient, {
       createCertPR: () => Effect.fail(new GitHubError({ message: "GitHub down" })),
       checkPRMerged: () => Effect.succeed(false),
+      mergePR: () => Effect.void,
     })
 
     return queueInvite({
@@ -210,15 +212,17 @@ describe("queueInvite", () => {
 })
 
 describe("reconciler logic", () => {
-  it.effect("sends email when PR is merged", () => {
+  it.effect("auto-merges PR and sends email", () => {
     const sendInviteEmail = vi.fn(() => Effect.void)
+    const mergePR = vi.fn(() => Effect.void)
     const store = new Map<string, Invite>()
     store.set("inv-1", makeInvite({ prCreated: true, prNumber: 42, certIssued: true }))
 
     const emailLayer = Layer.succeed(EmailService, { sendInviteEmail })
     const ghLayer = Layer.succeed(GitHubClient, {
       createCertPR: () => Effect.succeed({ prUrl: "", prNumber: 0 }),
-      checkPRMerged: () => Effect.succeed(true),
+      checkPRMerged: () => Effect.succeed(false),
+      mergePR,
     })
 
     // Inline reconcile logic for testing (one cycle)
@@ -231,9 +235,17 @@ describe("reconciler logic", () => {
       const pending = yield* inviteRepo.findAwaitingMerge()
 
       for (const invite of pending) {
-        const merged = yield* github.checkPRMerged(invite.prNumber!).pipe(
+        let merged = yield* github.checkPRMerged(invite.prNumber!).pipe(
           Effect.catchAll(() => Effect.succeed(false)),
         )
+
+        if (!merged) {
+          merged = yield* github.mergePR(invite.prNumber!).pipe(
+            Effect.map(() => true),
+            Effect.catchAll(() => Effect.succeed(false)),
+          )
+        }
+
         if (!merged) continue
 
         yield* inviteRepo.markPRMerged(invite.id)
@@ -247,6 +259,7 @@ describe("reconciler logic", () => {
     return reconcileOnce.pipe(
       Effect.tap(() =>
         Effect.sync(() => {
+          expect(mergePR).toHaveBeenCalledWith(42)
           expect(sendInviteEmail).toHaveBeenCalledWith(
             "alice@example.com",
             "tok-inv-1",
@@ -265,7 +278,7 @@ describe("reconciler logic", () => {
     )
   })
 
-  it.effect("skips invites whose PR is not yet merged", () => {
+  it.effect("skips invite when merge fails", () => {
     const sendInviteEmail = vi.fn(() => Effect.void)
     const store = new Map<string, Invite>()
     store.set("inv-1", makeInvite({ prCreated: true, prNumber: 42 }))
@@ -274,6 +287,7 @@ describe("reconciler logic", () => {
     const ghLayer = Layer.succeed(GitHubClient, {
       createCertPR: () => Effect.succeed({ prUrl: "", prNumber: 0 }),
       checkPRMerged: () => Effect.succeed(false),
+      mergePR: () => Effect.fail(new GitHubError({ message: "checks pending" })),
     })
 
     const reconcileOnce = Effect.gen(function* () {
@@ -283,9 +297,17 @@ describe("reconciler logic", () => {
       const pending = yield* inviteRepo.findAwaitingMerge()
 
       for (const invite of pending) {
-        const merged = yield* github.checkPRMerged(invite.prNumber!).pipe(
+        let merged = yield* github.checkPRMerged(invite.prNumber!).pipe(
           Effect.catchAll(() => Effect.succeed(false)),
         )
+
+        if (!merged) {
+          merged = yield* github.mergePR(invite.prNumber!).pipe(
+            Effect.map(() => true),
+            Effect.catchAll(() => Effect.succeed(false)),
+          )
+        }
+
         if (!merged) continue
 
         yield* inviteRepo.markEmailSent(invite.id)

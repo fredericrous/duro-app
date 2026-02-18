@@ -16,6 +16,9 @@ export class GitHubClient extends Context.Tag("GitHubClient")<
     readonly checkPRMerged: (
       prNumber: number,
     ) => Effect.Effect<boolean, GitHubError>
+    readonly mergePR: (
+      prNumber: number,
+    ) => Effect.Effect<void, GitHubError>
   }
 >() {}
 
@@ -152,6 +155,12 @@ spec:
         ghFetch(`/pulls/${prNumber}`).pipe(
           Effect.map((pr) => !!(pr as { merged: boolean }).merged),
         ),
+
+      mergePR: (prNumber: number) =>
+        ghFetch(`/pulls/${prNumber}/merge`, {
+          method: "PUT",
+          body: JSON.stringify({ merge_method: "squash" }),
+        }).pipe(Effect.asVoid),
     }
   }),
 )
