@@ -173,11 +173,14 @@ export const queueInvite = (input: InviteInput) =>
       invitedBy: input.invitedBy,
       token: invite.token,
     }).pipe(
+      Effect.tap(() =>
+        Effect.sync(() => console.log(`[invite-workflow] completed for ${input.email}`)),
+      ),
       Effect.tapError((e) =>
-        Effect.logError("Invite workflow failed", e),
+        Effect.sync(() => console.error(`[invite-workflow] failed for ${input.email}:`, e)),
       ),
       Effect.ignore,
-      Effect.fork,
+      Effect.forkDaemon,
     )
 
     return {
