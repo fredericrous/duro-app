@@ -7,6 +7,9 @@ import { VaultPki } from "~/lib/services/VaultPki.server"
 import { acceptInvite } from "~/lib/workflows/invite.server"
 import { hashToken } from "~/lib/crypto.server"
 import { Effect } from "effect"
+import { Button } from "@base-ui/react/button"
+import { Field } from "@base-ui/react/field"
+import { Input } from "@base-ui/react/input"
 import styles from "./invite.module.css"
 
 export function meta() {
@@ -207,8 +210,7 @@ function PasswordReveal({ password }: { password: string }) {
       </p>
       <div className={styles.passwordDisplay}>
         <code>{password}</code>
-        <button
-          type="button"
+        <Button
           className={styles.btnSmall}
           onClick={() => {
             navigator.clipboard.writeText(password)
@@ -218,7 +220,7 @@ function PasswordReveal({ password }: { password: string }) {
           }}
         >
           {copied ? "Copied!" : "Copy"}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -259,25 +261,23 @@ function AccountForm() {
     <form method="post" className={styles.accountForm}>
       <h2>Create Your Account</h2>
 
-      <div className={styles.formGroup}>
-        <label htmlFor="username">Username</label>
-        <input
-          id="username"
+      <Field.Root className={styles.formGroup}>
+        <Field.Label className={styles.label}>Username</Field.Label>
+        <Input
           name="username"
-          type="text"
           required
           pattern="^[a-zA-Z0-9_-]{3,32}$"
           placeholder="Choose a username"
           className={styles.input}
           autoComplete="username"
         />
-        <span className={styles.hint}>3-32 characters: letters, numbers, hyphens, underscores</span>
-      </div>
+        <Field.Description className={styles.hint}>3-32 characters: letters, numbers, hyphens, underscores</Field.Description>
+        <Field.Error className={styles.fieldError} />
+      </Field.Root>
 
-      <div className={styles.formGroup}>
-        <label htmlFor="password">Password</label>
-        <input
-          id="password"
+      <Field.Root className={styles.formGroup}>
+        <Field.Label className={styles.label}>Password</Field.Label>
+        <Input
           name="password"
           type="password"
           required
@@ -286,13 +286,13 @@ function AccountForm() {
           className={styles.input}
           autoComplete="new-password"
         />
-        <span className={styles.hint}>At least 12 characters</span>
-      </div>
+        <Field.Description className={styles.hint}>At least 12 characters</Field.Description>
+        <Field.Error className={styles.fieldError} />
+      </Field.Root>
 
-      <div className={styles.formGroup}>
-        <label htmlFor="confirmPassword">Confirm Password</label>
-        <input
-          id="confirmPassword"
+      <Field.Root className={styles.formGroup}>
+        <Field.Label className={styles.label}>Confirm Password</Field.Label>
+        <Input
           name="confirmPassword"
           type="password"
           required
@@ -301,11 +301,12 @@ function AccountForm() {
           className={styles.input}
           autoComplete="new-password"
         />
-      </div>
+        <Field.Error className={styles.fieldError} />
+      </Field.Root>
 
-      <button type="submit" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`} disabled={isSubmitting}>
+      <Button type="submit" disabled={isSubmitting} className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}>
         {isSubmitting ? "Creating Account..." : "Create Account"}
-      </button>
+      </Button>
     </form>
   )
 }

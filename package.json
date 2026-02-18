@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@base-ui/react": "^1.2.0",
     "@effect/opentelemetry": "^0.61.0",
     "@effect/platform": "^0.94.5",
     "@opentelemetry/api": "^1.9.0",

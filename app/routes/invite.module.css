@@ -125,7 +125,8 @@
   margin-bottom: 1rem;
 }
 
-.formGroup label {
+.formGroup label,
+.label {
   display: block;
   font-size: 0.875rem;
   color: var(--color-text-muted);
@@ -143,7 +144,8 @@
   box-sizing: border-box;
 }
 
-.input:focus {
+.input:focus,
+.input[data-focused] {
   outline: none;
   border-color: var(--color-accent);
 }
@@ -165,7 +167,8 @@
   transition: background-color var(--transition);
 }
 
-.btn:disabled {
+.btn:disabled,
+.btn[data-disabled] {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -175,7 +178,7 @@
   color: #fff;
 }
 
-.btnPrimary:hover:not(:disabled) {
+.btnPrimary:hover:not(:disabled):not([data-disabled]) {
   background: var(--color-accent-hover);
 }
 
@@ -195,4 +198,10 @@
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
   color: #fca5a5;
+}
+
+.fieldError {
+  font-size: 0.75rem;
+  color: #ef4444;
+  margin-top: 0.25rem;
 }
