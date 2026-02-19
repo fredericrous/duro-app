@@ -1,41 +1,75 @@
-import { describe, it, expect } from "vitest"
-import { parseAuthHeaders } from "./auth.server"
+// @vitest-environment node
+import { describe, it, expect, beforeAll } from "vitest"
+import { getAuth } from "./auth.server"
+import { createSessionCookie } from "./session.server"
 
-function makeRequest(headers: Record<string, string> = {}): Request {
-  return new Request("http://localhost/", { headers })
+beforeAll(() => {
+  process.env.SESSION_SECRET = "test-session-secret-must-be-32ch"
+})
+
+async function makeAuthenticatedRequest(session: {
+  sub: string
+  name: string
+  email: string
+  groups: string[]
+}): Promise<Request> {
+  const setCookie = await createSessionCookie(session)
+  // Extract "name=value" from "name=value; HttpOnly; Secure; ..."
+  const cookieValue = setCookie.split(";")[0]
+  return new Request("http://localhost/", {
+    headers: { cookie: cookieValue },
+  })
 }
 
-describe("parseAuthHeaders", () => {
-  it("extracts user and groups from headers", () => {
-    const req = makeRequest({
-      "Remote-User": "alice",
-      "Remote-Groups": "lldap_admin,media_users",
+describe("getAuth", () => {
+  it("returns user and groups from session", async () => {
+    const req = await makeAuthenticatedRequest({
+      sub: "abc123",
+      name: "alice",
+      email: "alice@example.com",
+      groups: ["lldap_admin", "media_users"],
     })
-    const auth = parseAuthHeaders(req)
+    const auth = await getAuth(req)
     expect(auth.user).toBe("alice")
     expect(auth.groups).toEqual(["lldap_admin", "media_users"])
   })
 
-  it("returns null user when Remote-User is missing", () => {
-    const req = makeRequest()
-    const auth = parseAuthHeaders(req)
+  it("returns null user when no session cookie", async () => {
+    const req = new Request("http://localhost/")
+    const auth = await getAuth(req)
     expect(auth.user).toBeNull()
     expect(auth.groups).toEqual([])
   })
 
-  it("handles empty groups header", () => {
-    const req = makeRequest({ "Remote-User": "bob", "Remote-Groups": "" })
-    const auth = parseAuthHeaders(req)
-    expect(auth.user).toBe("bob")
+  it("returns null user when session cookie is invalid", async () => {
+    const req = new Request("http://localhost/", {
+      headers: { cookie: "__duro_session=invalid-token" },
+    })
+    const auth = await getAuth(req)
+    expect(auth.user).toBeNull()
     expect(auth.groups).toEqual([])
   })
 
-  it("trims whitespace from group names", () => {
-    const req = makeRequest({
-      "Remote-User": "alice",
-      "Remote-Groups": " admin , users , ",
+  it("returns correct groups for admin user", async () => {
+    const req = await makeAuthenticatedRequest({
+      sub: "admin1",
+      name: "admin",
+      email: "admin@example.com",
+      groups: ["lldap_admin", "users"],
     })
-    const auth = parseAuthHeaders(req)
-    expect(auth.groups).toEqual(["admin", "users"])
+    const auth = await getAuth(req)
+    expect(auth.groups.includes("lldap_admin")).toBe(true)
+  })
+
+  it("handles empty groups", async () => {
+    const req = await makeAuthenticatedRequest({
+      sub: "user1",
+      name: "bob",
+      email: "bob@example.com",
+      groups: [],
+    })
+    const auth = await getAuth(req)
+    expect(auth.user).toBe("bob")
+    expect(auth.groups).toEqual([])
   })
 })

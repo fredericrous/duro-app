@@ -5,7 +5,6 @@ import type { VaultPki } from "./services/VaultPki.server"
 import type { GitHubClient } from "./services/GitHubClient.server"
 import type { EmailService } from "./services/EmailService.server"
 import type { InviteRepo } from "./services/InviteRepo.server"
-import { reconcileLoop } from "./reconciler.server"
 
 type AppServices =
   | LldapClient
@@ -16,9 +15,12 @@ type AppServices =
 
 const appRuntime = ManagedRuntime.make(AppLayer)
 
-// Start the background reconciler (polls for PR merges, sends emails)
-appRuntime.runFork(reconcileLoop)
-
+/**
+ * Run an Effect with the app's service layer. Call this ONLY at route handler
+ * level (loader/action). Never call runEffect from inside an Effect.gen — use
+ * `yield*` to compose effects instead. Nesting runEffect creates a second
+ * runtime context which can double-initialize services.
+ */
 export function runEffect<A, E>(
   effect: Effect.Effect<A, E, AppServices>,
 ): Promise<A> {

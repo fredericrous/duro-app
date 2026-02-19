@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import type { Route } from "./+types/home";
-import { parseAuthHeaders } from "~/lib/auth.server";
+import { getAuth } from "~/lib/auth.server";
 import { getVisibleApps } from "~/lib/apps.server";
 import { AppGrid } from "~/components/AppGrid/AppGrid";
 import { NoAccess } from "~/components/NoAccess/NoAccess";
@@ -14,7 +14,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const auth = parseAuthHeaders(request);
+  const auth = await getAuth(request);
   const visibleApps = getVisibleApps(auth.groups);
 
   return {
@@ -32,8 +32,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       <header className={styles.header}>
         <h1 className={styles.title}>Duro</h1>
         <div className={styles.headerRight}>
-          {isAdmin && <Link to="/users" className={styles.adminLink}>Users</Link>}
-          {user && <span className={styles.user}>Welcome, {user}</span>}
+          {isAdmin && <Link to="/admin" className={styles.adminLink}>Admin</Link>}
+          {user && (
+            <>
+              <span className={styles.user}>Welcome, {user}</span>
+              <Link to="/auth/logout" className={styles.adminLink}>Logout</Link>
+            </>
+          )}
         </div>
       </header>
 

@@ -37,6 +37,13 @@ function makeInvite(overrides: Partial<Invite> = {}): Invite {
     emailSent: false,
     attempts: 0,
     lastAttemptAt: null,
+    reconcileAttempts: 0,
+    lastReconcileAt: null,
+    lastError: null,
+    failedAt: null,
+    certUsername: null,
+    certVerified: false,
+    certVerifiedAt: null,
     ...overrides,
   }
 }
@@ -100,13 +107,46 @@ const mockInviteRepo = (store: Map<string, Invite> = new Map()) =>
       }),
     findAwaitingMerge: () =>
       Effect.sync(() =>
-        [...store.values()].filter((i) => i.prCreated && !i.emailSent && i.prNumber != null && !i.usedAt),
+        [...store.values()].filter((i) => i.prCreated && !i.emailSent && i.prNumber != null && !i.usedAt && !i.failedAt),
       ),
     revoke: () => Effect.void,
     deleteById: (id) =>
       Effect.sync(() => {
         store.delete(id)
       }),
+    recordReconcileError: (id, error) =>
+      Effect.sync(() => {
+        const invite = store.get(id)
+        if (invite) store.set(id, { ...invite, reconcileAttempts: invite.reconcileAttempts + 1, lastReconcileAt: new Date().toISOString(), lastError: error })
+      }),
+    markFailed: (id, error) =>
+      Effect.sync(() => {
+        const invite = store.get(id)
+        if (invite) store.set(id, { ...invite, failedAt: new Date().toISOString(), lastError: error })
+      }),
+    clearReconcileError: (id) =>
+      Effect.sync(() => {
+        const invite = store.get(id)
+        if (invite) store.set(id, { ...invite, reconcileAttempts: 0, lastReconcileAt: null, lastError: null, failedAt: null })
+      }),
+    findFailed: () =>
+      Effect.sync(() =>
+        [...store.values()].filter((i) => i.failedAt != null && !i.usedAt),
+      ),
+    setCertUsername: (id, username) =>
+      Effect.sync(() => {
+        const invite = store.get(id)
+        if (invite) store.set(id, { ...invite, certUsername: username })
+      }),
+    markCertVerified: (id) =>
+      Effect.sync(() => {
+        const invite = store.get(id)
+        if (invite) store.set(id, { ...invite, certVerified: true, certVerifiedAt: new Date().toISOString() })
+      }),
+    findAwaitingCertVerification: () =>
+      Effect.sync(() =>
+        [...store.values()].filter((i) => i.emailSent && !i.certVerified && i.certUsername != null && !i.usedAt && !i.failedAt),
+      ),
   })
 
 const mockLldapClient = (
@@ -137,12 +177,15 @@ const mockVaultPki = Layer.succeed(VaultPki, {
   issueCertAndP12: () => Effect.succeed({ p12Buffer: Buffer.from("fake"), password: "pass" }),
   getP12Password: () => Effect.succeed("pass"),
   consumeP12Password: () => Effect.succeed("pass"),
+  deleteP12Secret: () => Effect.void,
+  checkCertProcessed: () => Effect.succeed(false),
 })
 
 const mockGitHubClient = Layer.succeed(GitHubClient, {
-  createCertPR: () => Effect.succeed({ prUrl: "https://github.com/pr/1", prNumber: 1 }),
+  createCertPR: () => Effect.succeed({ prUrl: "https://github.com/pr/1", prNumber: 1, certUsername: "alice" }),
   checkPRMerged: () => Effect.succeed(false),
   mergePR: () => Effect.void,
+  checkWebhookSecret: () => Effect.succeed(false),
 })
 
 const mockEmailService = Layer.succeed(EmailService, {
@@ -171,6 +214,7 @@ describe("queueInvite", () => {
           expect(invite.certIssued).toBe(true)
           expect(invite.prCreated).toBe(true)
           expect(invite.prNumber).toBe(1)
+          expect(invite.certUsername).toBe("alice")
         }),
       ),
       Effect.provide(
@@ -186,6 +230,7 @@ describe("queueInvite", () => {
       createCertPR: () => Effect.fail(new GitHubError({ message: "GitHub down" })),
       checkPRMerged: () => Effect.succeed(false),
       mergePR: () => Effect.void,
+      checkWebhookSecret: () => Effect.succeed(false),
     })
 
     return queueInvite({
@@ -220,9 +265,10 @@ describe("reconciler logic", () => {
 
     const emailLayer = Layer.succeed(EmailService, { sendInviteEmail })
     const ghLayer = Layer.succeed(GitHubClient, {
-      createCertPR: () => Effect.succeed({ prUrl: "", prNumber: 0 }),
+      createCertPR: () => Effect.succeed({ prUrl: "", prNumber: 0, certUsername: "" }),
       checkPRMerged: () => Effect.succeed(false),
       mergePR,
+      checkWebhookSecret: () => Effect.succeed(false),
     })
 
     // Inline reconcile logic for testing (one cycle)
@@ -285,9 +331,10 @@ describe("reconciler logic", () => {
 
     const emailLayer = Layer.succeed(EmailService, { sendInviteEmail })
     const ghLayer = Layer.succeed(GitHubClient, {
-      createCertPR: () => Effect.succeed({ prUrl: "", prNumber: 0 }),
+      createCertPR: () => Effect.succeed({ prUrl: "", prNumber: 0, certUsername: "" }),
       checkPRMerged: () => Effect.succeed(false),
       mergePR: () => Effect.fail(new GitHubError({ message: "checks pending" })),
+      checkWebhookSecret: () => Effect.succeed(false),
     })
 
     const reconcileOnce = Effect.gen(function* () {
@@ -336,9 +383,10 @@ describe("acceptInvite", () => {
       store.set("inv-1", makeInvite())
       const lldapCalls: { method: string; args: unknown[] }[] = []
 
-      const layer = Layer.merge(
+      const layer = Layer.mergeAll(
         mockInviteRepo(store),
         mockLldapClient(lldapCalls),
+        mockVaultPki,
       )
 
       return acceptInvite("tok-inv-1", {
@@ -374,7 +422,7 @@ describe("acceptInvite", () => {
     store.set("inv-1", makeInvite())
     const lldapCalls: { method: string; args: unknown[] }[] = []
 
-    const layer = Layer.merge(
+    const layer = Layer.mergeAll(
       mockInviteRepo(store),
       Layer.succeed(LldapClient, {
         getUsers: Effect.succeed([]),
@@ -393,6 +441,7 @@ describe("acceptInvite", () => {
             lldapCalls.push({ method: "deleteUser", args: [userId] })
           }),
       }),
+      mockVaultPki,
     )
 
     return acceptInvite("tok-inv-1", {

@@ -1,7 +1,18 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, Schema } from "effect"
+import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlError from "@effect/sql/SqlError"
 import * as crypto from "node:crypto"
-import Database from "better-sqlite3"
 import { hashToken } from "~/lib/crypto.server"
+import { MigrationsRan, currentDialect } from "~/lib/db/client.server"
+
+const now = () => new Date().toISOString()
+const addDays = (days: number) => {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  return d.toISOString()
+}
+const TRUE = currentDialect === "sqlite" ? 1 : true
+const FALSE = currentDialect === "sqlite" ? 0 : false
 
 export interface Invite {
   id: string
@@ -22,6 +33,13 @@ export interface Invite {
   emailSent: boolean
   attempts: number
   lastAttemptAt: string | null
+  reconcileAttempts: number
+  lastReconcileAt: string | null
+  lastError: string | null
+  failedAt: string | null
+  certUsername: string | null
+  certVerified: boolean
+  certVerifiedAt: string | null
 }
 
 export class InviteError extends Data.TaggedError("InviteError")<{
@@ -63,358 +81,282 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
     readonly revoke: (id: string) => Effect.Effect<void, InviteError>
     readonly deleteById: (id: string) => Effect.Effect<void, InviteError>
     readonly findById: (id: string) => Effect.Effect<Invite | null, InviteError>
+    readonly recordReconcileError: (
+      id: string,
+      error: string,
+    ) => Effect.Effect<void, InviteError>
+    readonly markFailed: (
+      id: string,
+      error: string,
+    ) => Effect.Effect<void, InviteError>
+    readonly clearReconcileError: (
+      id: string,
+    ) => Effect.Effect<void, InviteError>
+    readonly findFailed: () => Effect.Effect<Invite[], InviteError>
+    readonly setCertUsername: (
+      id: string,
+      username: string,
+    ) => Effect.Effect<void, InviteError>
+    readonly markCertVerified: (id: string) => Effect.Effect<void, InviteError>
+    readonly findAwaitingCertVerification: () => Effect.Effect<
+      Invite[],
+      InviteError
+    >
   }
 >() {}
 
-interface InviteRow {
-  id: string
-  token: string
-  token_hash: string
-  email: string
-  groups: string
-  group_names: string
-  invited_by: string
-  created_at: string
-  expires_at: string
-  used_at: string | null
-  used_by: string | null
-  cert_issued: number
-  pr_created: number
-  pr_number: number | null
-  pr_merged: number
-  email_sent: number
-  attempts: number
-  last_attempt_at: string | null
+const Coerced = {
+  Boolean: Schema.transform(Schema.Unknown, Schema.Boolean, {
+    decode: (v) => !!v,
+    encode: (v) => v,
+  }),
+  NullableString: Schema.NullOr(Schema.String),
+  NullableNumber: Schema.NullOr(Schema.Number),
 }
 
-function rowToInvite(row: InviteRow): Invite {
-  return {
-    id: row.id,
-    token: row.token,
-    tokenHash: row.token_hash,
-    email: row.email,
-    groups: row.groups,
-    groupNames: row.group_names,
-    invitedBy: row.invited_by,
-    createdAt: row.created_at,
-    expiresAt: row.expires_at,
-    usedAt: row.used_at,
-    usedBy: row.used_by,
-    certIssued: !!row.cert_issued,
-    prCreated: !!row.pr_created,
-    prNumber: row.pr_number ?? null,
-    prMerged: !!row.pr_merged,
-    emailSent: !!row.email_sent,
-    attempts: row.attempts,
-    lastAttemptAt: row.last_attempt_at,
-  }
+const InviteRow = Schema.Struct({
+  id: Schema.String,
+  token: Schema.String,
+  tokenHash: Schema.String,
+  email: Schema.String,
+  groups: Schema.String,
+  groupNames: Schema.String,
+  invitedBy: Schema.String,
+  createdAt: Schema.String,
+  expiresAt: Schema.String,
+  usedAt: Coerced.NullableString,
+  usedBy: Coerced.NullableString,
+  certIssued: Coerced.Boolean,
+  prCreated: Coerced.Boolean,
+  prNumber: Coerced.NullableNumber,
+  prMerged: Coerced.Boolean,
+  emailSent: Coerced.Boolean,
+  attempts: Schema.optionalWith(Schema.Number, { default: () => 0 }),
+  lastAttemptAt: Coerced.NullableString,
+  reconcileAttempts: Schema.optionalWith(Schema.Number, { default: () => 0 }),
+  lastReconcileAt: Coerced.NullableString,
+  lastError: Coerced.NullableString,
+  failedAt: Coerced.NullableString,
+  certUsername: Coerced.NullableString,
+  certVerified: Coerced.Boolean,
+  certVerifiedAt: Coerced.NullableString,
+})
+
+const decodeInviteRow = Schema.decodeUnknownSync(InviteRow)
+
+function rowToInvite(row: unknown): Invite {
+  return decodeInviteRow(row) as Invite
 }
+
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
+  effect.pipe(Effect.mapError((e) => new InviteError({ message, cause: e })))
 
 export const InviteRepoLive = Layer.effect(
   InviteRepo,
-  Effect.sync(() => {
-    const dbPath = process.env.DURO_DB_PATH ?? "/db/duro.sqlite"
-    const db = new Database(dbPath)
-
-    db.pragma("journal_mode = WAL")
-    db.pragma("busy_timeout = 5000")
-
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS invites (
-        id TEXT PRIMARY KEY,
-        token TEXT NOT NULL,
-        token_hash TEXT NOT NULL UNIQUE,
-        email TEXT NOT NULL,
-        groups TEXT NOT NULL,
-        group_names TEXT NOT NULL,
-        invited_by TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        expires_at TEXT NOT NULL,
-        used_at TEXT,
-        used_by TEXT,
-        cert_issued INTEGER NOT NULL DEFAULT 0,
-        pr_created INTEGER NOT NULL DEFAULT 0,
-        pr_number INTEGER,
-        pr_merged INTEGER NOT NULL DEFAULT 0,
-        email_sent INTEGER NOT NULL DEFAULT 0,
-        attempts INTEGER NOT NULL DEFAULT 0,
-        last_attempt_at TEXT
-      )
-    `)
-
-    const stmts = {
-      insert: db.prepare(`
-        INSERT INTO invites (id, token, token_hash, email, groups, group_names, invited_by, expires_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', '+48 hours'))
-      `),
-      findByHash: db.prepare(
-        `SELECT * FROM invites WHERE token_hash = ?`,
-      ),
-      consume: db.prepare(`
-        UPDATE invites SET used_at = datetime('now')
-        WHERE token_hash = ? AND used_at IS NULL AND expires_at > datetime('now')
-      `),
-      markUsedBy: db.prepare(
-        `UPDATE invites SET used_by = ? WHERE id = ?`,
-      ),
-      findPending: db.prepare(`
-        SELECT * FROM invites WHERE used_at IS NULL AND expires_at > datetime('now')
-        ORDER BY created_at DESC
-      `),
-      incrementAttempt: db.prepare(`
-        UPDATE invites SET attempts = attempts + 1, last_attempt_at = datetime('now')
-        WHERE token_hash = ?
-      `),
-      markCertIssued: db.prepare(
-        `UPDATE invites SET cert_issued = 1 WHERE id = ?`,
-      ),
-      markPRCreated: db.prepare(
-        `UPDATE invites SET pr_created = 1, pr_number = ? WHERE id = ?`,
-      ),
-      markPRMerged: db.prepare(
-        `UPDATE invites SET pr_merged = 1 WHERE id = ?`,
-      ),
-      markEmailSent: db.prepare(
-        `UPDATE invites SET email_sent = 1 WHERE id = ?`,
-      ),
-      findAwaitingMerge: db.prepare(`
-        SELECT * FROM invites
-        WHERE pr_created = 1 AND email_sent = 0 AND pr_number IS NOT NULL AND used_at IS NULL
-      `),
-      findPendingByEmail: db.prepare(`
-        SELECT * FROM invites WHERE email = ? AND used_at IS NULL AND expires_at > datetime('now')
-      `),
-      revoke: db.prepare(`
-        UPDATE invites SET used_at = datetime('now'), used_by = '__revoked__'
-        WHERE id = ? AND used_at IS NULL
-      `),
-      deleteById: db.prepare(`DELETE FROM invites WHERE id = ?`),
-      findById: db.prepare(`SELECT * FROM invites WHERE id = ?`),
-    }
+  Effect.gen(function* () {
+    yield* MigrationsRan
+    const sql = yield* SqlClient.SqlClient
 
     return {
       create: (input) =>
-        Effect.try({
-          try: () => {
-            const existing = stmts.findPendingByEmail.get(input.email) as
-              | InviteRow
-              | undefined
-            if (existing) {
-              throw new InviteError({
-                message: `Pending invite already exists for ${input.email}`,
-              })
-            }
+        Effect.gen(function* () {
+          const ts = now()
+          const expires = addDays(7)
 
-            const id = crypto.randomUUID()
-            const token = crypto.randomBytes(32).toString("base64url")
-            const tokenHash = hashToken(token)
-
-            stmts.insert.run(
-              id,
-              token,
-              tokenHash,
-              input.email,
-              JSON.stringify(input.groups),
-              JSON.stringify(input.groupNames),
-              input.invitedBy,
-            )
-
-            return { id, token }
-          },
-          catch: (e) => {
-            if (e instanceof InviteError) return e
-            return new InviteError({
-              message: "Failed to create invite",
-              cause: e,
+          const existing = yield* withErr(
+            sql`SELECT id FROM invites WHERE email = ${input.email} AND used_at IS NULL AND expires_at > ${ts}`,
+            "Failed to check existing invite",
+          )
+          if (existing.length > 0) {
+            return yield* new InviteError({
+              message: `Pending invite already exists for ${input.email}`,
             })
-          },
+          }
+
+          const id = crypto.randomUUID()
+          const token = crypto.randomBytes(32).toString("base64url")
+          const tokenHash = hashToken(token)
+
+          yield* withErr(
+            sql`INSERT INTO invites (id, token, token_hash, email, groups, group_names, invited_by, created_at, expires_at)
+                VALUES (${id}, ${token}, ${tokenHash}, ${input.email}, ${JSON.stringify(input.groups)}, ${JSON.stringify(input.groupNames)}, ${input.invitedBy}, ${ts}, ${expires})`,
+            "Failed to create invite",
+          )
+
+          return { id, token }
         }),
 
       findByTokenHash: (tokenHash) =>
-        Effect.try({
-          try: () => {
-            const row = stmts.findByHash.get(tokenHash) as InviteRow | undefined
-            return row ? rowToInvite(row) : null
-          },
-          catch: (e) =>
-            new InviteError({
-              message: "Failed to find invite",
-              cause: e,
-            }),
-        }),
+        withErr(
+          sql`SELECT * FROM invites WHERE token_hash = ${tokenHash}`.pipe(
+            Effect.map((rows) => (rows.length > 0 ? rowToInvite(rows[0]) : null)),
+          ),
+          "Failed to find invite",
+        ),
 
       consumeByToken: (rawToken) =>
         Effect.gen(function* () {
+          const ts = now()
           const tokenHash = hashToken(rawToken)
-          const result = yield* Effect.try({
-            try: () => stmts.consume.run(tokenHash),
-            catch: (e) =>
-              new InviteError({
-                message: "Failed to consume invite",
-                cause: e,
-              }),
-          })
+          const rows = yield* withErr(
+            sql`UPDATE invites SET used_at = ${ts}
+                WHERE token_hash = ${tokenHash} AND used_at IS NULL AND expires_at > ${ts}
+                RETURNING *`,
+            "Failed to consume invite",
+          )
 
-          if (result.changes === 0) {
+          if (rows.length === 0) {
             return yield* new InviteError({
               message: "Invite is invalid, expired, or already used",
             })
           }
 
-          const row = yield* Effect.try({
-            try: () =>
-              stmts.findByHash.get(tokenHash) as InviteRow,
-            catch: (e) =>
-              new InviteError({
-                message: "Failed to find consumed invite",
-                cause: e,
-              }),
-          })
-
-          return rowToInvite(row)
+          return rowToInvite(rows[0])
         }),
 
       markUsedBy: (id, username) =>
-        Effect.try({
-          try: () => {
-            stmts.markUsedBy.run(username, id)
-          },
-          catch: (e) =>
-            new InviteError({
-              message: "Failed to mark invite as used",
-              cause: e,
-            }),
-        }),
+        withErr(
+          sql`UPDATE invites SET used_by = ${username} WHERE id = ${id}`.pipe(
+            Effect.asVoid,
+          ),
+          "Failed to mark invite as used",
+        ),
 
       findPending: () =>
-        Effect.try({
-          try: () => {
-            const rows = stmts.findPending.all() as InviteRow[]
-            return rows.map(rowToInvite)
-          },
-          catch: (e) =>
-            new InviteError({
-              message: "Failed to find pending invites",
-              cause: e,
-            }),
-        }),
+        withErr(
+          sql`SELECT * FROM invites WHERE used_at IS NULL AND expires_at > ${now()} ORDER BY created_at DESC`.pipe(
+            Effect.map((rows) => rows.map(rowToInvite)),
+          ),
+          "Failed to find pending invites",
+        ),
 
       incrementAttempt: (tokenHash) =>
-        Effect.try({
-          try: () => {
-            stmts.incrementAttempt.run(tokenHash)
-          },
-          catch: (e) =>
-            new InviteError({
-              message: "Failed to increment attempt",
-              cause: e,
-            }),
-        }),
+        withErr(
+          sql`UPDATE invites SET attempts = attempts + 1, last_attempt_at = ${now()} WHERE token_hash = ${tokenHash}`.pipe(
+            Effect.asVoid,
+          ),
+          "Failed to increment attempt",
+        ),
 
       markCertIssued: (id) =>
-        Effect.try({
-          try: () => {
-            stmts.markCertIssued.run(id)
-          },
-          catch: (e) =>
-            new InviteError({
-              message: "Failed to mark cert issued",
-              cause: e,
-            }),
-        }),
+        withErr(
+          sql`UPDATE invites SET cert_issued = ${TRUE} WHERE id = ${id}`.pipe(Effect.asVoid),
+          "Failed to mark cert issued",
+        ),
 
       markPRCreated: (id, prNumber) =>
-        Effect.try({
-          try: () => {
-            stmts.markPRCreated.run(prNumber, id)
-          },
-          catch: (e) =>
-            new InviteError({
-              message: "Failed to mark PR created",
-              cause: e,
-            }),
-        }),
+        withErr(
+          sql`UPDATE invites SET pr_created = ${TRUE}, pr_number = ${prNumber} WHERE id = ${id}`.pipe(
+            Effect.asVoid,
+          ),
+          "Failed to mark PR created",
+        ),
 
       markPRMerged: (id) =>
-        Effect.try({
-          try: () => {
-            stmts.markPRMerged.run(id)
-          },
-          catch: (e) =>
-            new InviteError({
-              message: "Failed to mark PR merged",
-              cause: e,
-            }),
-        }),
+        withErr(
+          sql`UPDATE invites SET pr_merged = ${TRUE} WHERE id = ${id}`.pipe(Effect.asVoid),
+          "Failed to mark PR merged",
+        ),
 
       markEmailSent: (id) =>
-        Effect.try({
-          try: () => {
-            stmts.markEmailSent.run(id)
-          },
-          catch: (e) =>
-            new InviteError({
-              message: "Failed to mark email sent",
-              cause: e,
-            }),
-        }),
+        withErr(
+          sql`UPDATE invites SET email_sent = ${TRUE} WHERE id = ${id}`.pipe(Effect.asVoid),
+          "Failed to mark email sent",
+        ),
 
       findAwaitingMerge: () =>
-        Effect.try({
-          try: () => {
-            const rows = stmts.findAwaitingMerge.all() as InviteRow[]
-            return rows.map(rowToInvite)
-          },
-          catch: (e) =>
-            new InviteError({
-              message: "Failed to find invites awaiting merge",
-              cause: e,
-            }),
-        }),
+        withErr(
+          sql`SELECT * FROM invites
+              WHERE pr_created = ${TRUE} AND email_sent = ${FALSE} AND pr_number IS NOT NULL AND used_at IS NULL AND failed_at IS NULL`.pipe(
+            Effect.map((rows) => rows.map(rowToInvite)),
+          ),
+          "Failed to find invites awaiting merge",
+        ),
 
       revoke: (id) =>
-        Effect.try({
-          try: () => {
-            const result = stmts.revoke.run(id)
-            if (result.changes === 0) {
-              throw new InviteError({
-                message: "Invite not found or already used",
-              })
-            }
-          },
-          catch: (e) => {
-            if (e instanceof InviteError) return e
-            return new InviteError({
-              message: "Failed to revoke invite",
-              cause: e,
+        Effect.gen(function* () {
+          const rows = yield* withErr(
+            sql`UPDATE invites SET used_at = ${now()}, used_by = '__revoked__'
+                WHERE id = ${id} AND used_at IS NULL
+                RETURNING id`,
+            "Failed to revoke invite",
+          )
+          if (rows.length === 0) {
+            return yield* new InviteError({
+              message: "Invite not found or already used",
             })
-          },
+          }
         }),
 
       deleteById: (id) =>
-        Effect.try({
-          try: () => {
-            stmts.deleteById.run(id)
-          },
-          catch: (e) =>
-            new InviteError({
-              message: "Failed to delete invite",
-              cause: e,
-            }),
-        }),
+        withErr(
+          sql`DELETE FROM invites WHERE id = ${id}`.pipe(Effect.asVoid),
+          "Failed to delete invite",
+        ),
 
       findById: (id) =>
-        Effect.try({
-          try: () => {
-            const row = stmts.findById.get(id) as InviteRow | undefined
-            return row ? rowToInvite(row) : null
-          },
-          catch: (e) =>
-            new InviteError({
-              message: "Failed to find invite",
-              cause: e,
-            }),
-        }),
+        withErr(
+          sql`SELECT * FROM invites WHERE id = ${id}`.pipe(
+            Effect.map((rows) => (rows.length > 0 ? rowToInvite(rows[0]) : null)),
+          ),
+          "Failed to find invite",
+        ),
+
+      recordReconcileError: (id, error) =>
+        withErr(
+          sql`UPDATE invites SET reconcile_attempts = reconcile_attempts + 1, last_reconcile_at = ${now()}, last_error = ${error} WHERE id = ${id}`.pipe(
+            Effect.asVoid,
+          ),
+          "Failed to record reconcile error",
+        ),
+
+      markFailed: (id, error) =>
+        withErr(
+          sql`UPDATE invites SET failed_at = ${now()}, last_error = ${error} WHERE id = ${id}`.pipe(
+            Effect.asVoid,
+          ),
+          "Failed to mark invite as failed",
+        ),
+
+      clearReconcileError: (id) =>
+        withErr(
+          sql`UPDATE invites SET reconcile_attempts = 0, last_reconcile_at = NULL, last_error = NULL, failed_at = NULL WHERE id = ${id}`.pipe(
+            Effect.asVoid,
+          ),
+          "Failed to clear reconcile error",
+        ),
+
+      findFailed: () =>
+        withErr(
+          sql`SELECT * FROM invites WHERE failed_at IS NOT NULL AND used_at IS NULL ORDER BY failed_at DESC`.pipe(
+            Effect.map((rows) => rows.map(rowToInvite)),
+          ),
+          "Failed to find failed invites",
+        ),
+
+      setCertUsername: (id, username) =>
+        withErr(
+          sql`UPDATE invites SET cert_username = ${username} WHERE id = ${id}`.pipe(
+            Effect.asVoid,
+          ),
+          "Failed to set cert username",
+        ),
+
+      markCertVerified: (id) =>
+        withErr(
+          sql`UPDATE invites SET cert_verified = ${TRUE}, cert_verified_at = ${now()} WHERE id = ${id}`.pipe(
+            Effect.asVoid,
+          ),
+          "Failed to mark cert verified",
+        ),
+
+      findAwaitingCertVerification: () =>
+        withErr(
+          sql`SELECT * FROM invites WHERE email_sent = ${TRUE} AND cert_verified = ${FALSE} AND cert_username IS NOT NULL AND used_at IS NULL AND failed_at IS NULL`.pipe(
+            Effect.map((rows) => rows.map(rowToInvite)),
+          ),
+          "Failed to find invites awaiting cert verification",
+        ),
     }
   }),
 )

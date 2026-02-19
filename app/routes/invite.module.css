@@ -1,26 +1,3 @@
-.page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-}
-
-.card {
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 2.5rem;
-  max-width: 480px;
-  width: 100%;
-}
-
-.card h1 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-}
-
 .card h2 {
   font-size: 1.1rem;
   font-weight: 600;
@@ -36,11 +13,6 @@
   color: var(--color-text-muted);
   font-size: 0.875rem;
   margin-bottom: 1.5rem;
-}
-
-.errorIcon {
-  color: #ef4444;
-  margin-bottom: 1rem;
 }
 
 .errorMessage {
@@ -59,6 +31,26 @@
   color: #fbbf24;
   font-size: 0.8rem;
   margin-bottom: 0.75rem;
+}
+
+.infoText {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.passwordPlaceholder {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 0.75rem;
+  background: var(--color-bg);
+}
+
+.passwordPlaceholder code {
+  font-size: 0.8rem;
+  color: #666;
+  letter-spacing: 0.1em;
 }
 
 .passwordDisplay {
@@ -155,49 +147,6 @@
   color: var(--color-text-muted);
   margin-top: 0.25rem;
   display: block;
-}
-
-.btn {
-  padding: 0.5rem 1.25rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: background-color var(--transition);
-}
-
-.btn:disabled,
-.btn[data-disabled] {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btnPrimary {
-  background: var(--color-accent);
-  color: #fff;
-}
-
-.btnPrimary:hover:not(:disabled):not([data-disabled]) {
-  background: var(--color-accent-hover);
-}
-
-.btnFull {
-  width: 100%;
-  margin-top: 0.5rem;
-}
-
-.alert {
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.875rem;
-  margin-bottom: 1rem;
-}
-
-.alertError {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #fca5a5;
 }
 
 .fieldError {

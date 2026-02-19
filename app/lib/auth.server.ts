@@ -1,21 +1,39 @@
-// Trust boundary: Remote-User/Remote-Groups headers are set by Authelia forward-auth
-// via Envoy Gateway SecurityPolicy. Direct pod access is prevented by Istio ambient mTLS.
-// The public invite routes (join.daddyshome.fr) do NOT use these headers — they are
-// authenticated via invite token only. The /welcome route is behind Authelia on
-// home.daddyshome.fr, so headers there are trustworthy.
+import { redirect } from "react-router"
+import { getSession, createPkceCookie } from "./session.server"
+import { buildAuthRequest } from "./oidc.server"
 
 export interface AuthInfo {
-  user: string | null;
-  groups: string[];
+  user: string | null
+  groups: string[]
 }
 
-export function parseAuthHeaders(request: Request): AuthInfo {
-  const user = request.headers.get("Remote-User");
-  const groupsHeader = request.headers.get("Remote-Groups");
+/**
+ * Require authentication. Returns AuthInfo if the user has a valid session,
+ * or throws a redirect to the OIDC login flow.
+ */
+export async function requireAuth(request: Request): Promise<AuthInfo> {
+  const session = await getSession(request)
+  if (session) {
+    return { user: session.name, groups: session.groups }
+  }
 
-  const groups = groupsHeader
-    ? groupsHeader.split(",").map((g) => g.trim()).filter(Boolean)
-    : [];
+  const { authorizationUrl, codeVerifier, state } = await buildAuthRequest()
+  const returnUrl = new URL(request.url).pathname
+  const pkceCookie = await createPkceCookie({ codeVerifier, state, returnUrl })
 
-  return { user, groups };
+  throw redirect(authorizationUrl.toString(), {
+    headers: { "Set-Cookie": pkceCookie },
+  })
+}
+
+/**
+ * Get auth info from session without redirecting.
+ * Use in child routes where the parent layout already called requireAuth.
+ */
+export async function getAuth(request: Request): Promise<AuthInfo> {
+  const session = await getSession(request)
+  return {
+    user: session?.name ?? null,
+    groups: session?.groups ?? [],
+  }
 }

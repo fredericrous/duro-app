@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "duro-app.fullname" . }}
+  labels:
+    {{- include "duro-app.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "duro-app.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: web

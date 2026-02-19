@@ -1,6 +1,8 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, Config, Redacted } from "effect"
+import * as HttpClient from "@effect/platform/HttpClient"
 import * as crypto from "node:crypto"
 import forge from "node-forge"
+import { makeJsonApi } from "~/lib/http.server"
 
 export class VaultPkiError extends Data.TaggedError("VaultPkiError")<{
   readonly message: string
@@ -20,35 +22,31 @@ export class VaultPki extends Context.Tag("VaultPki")<
     readonly consumeP12Password: (
       inviteId: string,
     ) => Effect.Effect<string | null, VaultPkiError>
+    readonly deleteP12Secret: (
+      inviteId: string,
+    ) => Effect.Effect<void, VaultPkiError>
+    readonly checkCertProcessed: (
+      username: string,
+    ) => Effect.Effect<boolean, VaultPkiError>
   }
 >() {}
 
 export const VaultPkiLive = Layer.effect(
   VaultPki,
   Effect.gen(function* () {
-    const vaultAddr = process.env.NAS_VAULT_ADDR ?? ""
-    const vaultToken = process.env.NAS_VAULT_TOKEN ?? ""
+    const vaultAddr = yield* Config.string("NAS_VAULT_ADDR")
+    const vaultToken = Redacted.value(yield* Config.redacted("NAS_VAULT_TOKEN"))
+    const http = yield* HttpClient.HttpClient
 
-    const vaultFetch = (path: string, options?: RequestInit) =>
-      Effect.tryPromise({
-        try: () =>
-          fetch(`${vaultAddr}/v1${path}`, {
-            ...options,
-            headers: {
-              "X-Vault-Token": vaultToken,
-              "Content-Type": "application/json",
-              ...options?.headers,
-            },
-          }).then(async (r) => {
-            if (!r.ok) {
-              const body = await r.text().catch(() => "")
-              throw new Error(`Vault HTTP ${r.status}: ${body}`)
-            }
-            return r.json() as Promise<Record<string, unknown>>
-          }),
-        catch: (e) =>
-          new VaultPkiError({ message: "Vault request failed", cause: e }),
-      })
+    const vault = makeJsonApi(
+      http,
+      `${vaultAddr}/v1`,
+      {
+        "X-Vault-Token": vaultToken,
+        "Content-Type": "application/json",
+      },
+      (e) => new VaultPkiError({ message: "Vault request failed", cause: e }),
+    )
 
     const createP12 = (
       cert: string,
@@ -75,10 +73,11 @@ export const VaultPkiLive = Layer.effect(
       issueCertAndP12: (email: string, inviteId: string) =>
         Effect.gen(function* () {
           // Check if P12 already exists (idempotency)
-          const existing = yield* vaultFetch(
+          const existing = yield* vault.get(
             `/secret/data/pki/clients/${inviteId}`,
           ).pipe(
             Effect.map((r) => r as { data?: { data?: { p12?: string; password?: string } } }),
+            Effect.tapError((e) => Effect.logDebug("No existing P12 in Vault (expected on first issue)", { error: String(e) })),
             Effect.catchAll(() => Effect.succeed(null)),
           )
 
@@ -90,14 +89,11 @@ export const VaultPkiLive = Layer.effect(
           }
 
           // Issue cert from NAS Vault PKI
-          const certResponse = yield* vaultFetch(
+          const certResponse = yield* vault.post(
             `/pki-client/issue/client-cert`,
             {
-              method: "POST",
-              body: JSON.stringify({
-                common_name: email,
-                ttl: "2160h",
-              }),
+              common_name: email,
+              ttl: "2160h",
             },
           )
 
@@ -128,15 +124,12 @@ export const VaultPkiLive = Layer.effect(
           )
 
           // Store P12 + password in Vault
-          yield* vaultFetch(`/secret/data/pki/clients/${inviteId}`, {
-            method: "POST",
-            body: JSON.stringify({
-              data: {
-                p12: p12Buffer.toString("base64"),
-                password,
-                email,
-              },
-            }),
+          yield* vault.post(`/secret/data/pki/clients/${inviteId}`, {
+            data: {
+              p12: p12Buffer.toString("base64"),
+              password,
+              email,
+            },
           })
 
           return { p12Buffer, password }
@@ -144,10 +137,11 @@ export const VaultPkiLive = Layer.effect(
 
       getP12Password: (inviteId: string) =>
         Effect.gen(function* () {
-          const res = yield* vaultFetch(
+          const res = yield* vault.get(
             `/secret/data/pki/clients/${inviteId}`,
           ).pipe(
             Effect.map((r) => r as { data?: { data?: { password?: string } } }),
+            Effect.tapError((e) => Effect.logDebug("Failed to read P12 password from Vault", { inviteId, error: String(e) })),
             Effect.catchAll(() => Effect.succeed(null)),
           )
 
@@ -157,7 +151,7 @@ export const VaultPkiLive = Layer.effect(
       consumeP12Password: (inviteId: string) =>
         Effect.gen(function* () {
           // Read current secret
-          const res = yield* vaultFetch(
+          const res = yield* vault.get(
             `/secret/data/pki/clients/${inviteId}`,
           ).pipe(
             Effect.map(
@@ -168,6 +162,7 @@ export const VaultPkiLive = Layer.effect(
                   }
                 },
             ),
+            Effect.tapError((e) => Effect.logDebug("Failed to read P12 for consume", { inviteId, error: String(e) })),
             Effect.catchAll(() => Effect.succeed(null)),
           )
 
@@ -176,13 +171,33 @@ export const VaultPkiLive = Layer.effect(
 
           // Write back without password (one-time reveal)
           const { password: _, ...rest } = res!.data!.data!
-          yield* vaultFetch(`/secret/data/pki/clients/${inviteId}`, {
-            method: "POST",
-            body: JSON.stringify({ data: rest }),
-          }).pipe(Effect.catchAll(() => Effect.void))
+          yield* vault.post(`/secret/data/pki/clients/${inviteId}`, {
+            data: rest,
+          }).pipe(
+            Effect.tapError((e) => Effect.logWarning("Failed to remove password from Vault after consume", { inviteId, error: String(e) })),
+            Effect.catchAll(() => Effect.void),
+          )
 
           return password
         }),
+
+      deleteP12Secret: (inviteId: string) =>
+        vault.del(`/secret/metadata/pki/clients/${inviteId}`).pipe(
+          Effect.asVoid,
+          Effect.tapError((e) => Effect.logDebug("Failed to delete P12 secret from Vault", { inviteId, error: String(e) })),
+          Effect.catchAll(() => Effect.void),
+        ),
+
+      checkCertProcessed: (username: string) =>
+        vault.get(`/secret/data/pki/clients/${username}`).pipe(
+          Effect.map((r) => {
+            const data = (r as { data?: { data?: { source?: string } } })?.data
+              ?.data
+            return data?.source === "p12-generator-controller"
+          }),
+          Effect.tapError((e) => Effect.logDebug("Failed to check cert processed", { username, error: String(e) })),
+          Effect.catchAll(() => Effect.succeed(false)),
+        ),
     }
   }),
 )

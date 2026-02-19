@@ -1,0 +1,143 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "duro-app.fullname" . }}
+  labels:
+    {{- include "duro-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "duro-app.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "duro-app.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: web
+        app: {{ include "duro-app.fullname" . }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "duro-app.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if and .Values.worker.enabled (ne .Values.database.mode "postgres") }}
+      affinity:
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    {{- include "duro-app.selectorLabels" . | nindent 20 }}
+                    app.kubernetes.io/component: worker
+                topologyKey: kubernetes.io/hostname
+      {{- else if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.web.port }}
+              protocol: TCP
+          env:
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- range $key, $value := .Values.web.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.web.otelServiceName | quote }}
+          {{- with .Values.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}
+          livenessProbe:
+            exec:
+              command:
+                - wget
+                - -qO-
+                - http://localhost:{{ .Values.web.port }}/health
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - wget
+                - -qO-
+                - http://localhost:{{ .Values.web.port }}/health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if ne .Values.database.mode "postgres" }}
+            - name: db
+              mountPath: /db
+            {{- end }}
+            {{- if .Values.web.appsConfig.enabled }}
+            - name: apps-config
+              mountPath: /data
+              readOnly: true
+            {{- end }}
+            {{- if .Values.internalCA.enabled }}
+            - name: internal-ca
+              mountPath: /certs
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 10Mi
+        {{- if ne .Values.database.mode "postgres" }}
+        {{- if .Values.persistence.enabled }}
+        - name: db
+          persistentVolumeClaim:
+            claimName: {{ include "duro-app.fullname" . }}-db
+        {{- else }}
+        - name: db
+          emptyDir: {}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.web.appsConfig.enabled }}
+        - name: apps-config
+          configMap:
+            name: {{ .Values.web.appsConfig.configMapName }}
+            optional: true
+        {{- end }}
+        {{- if .Values.internalCA.enabled }}
+        - name: internal-ca
+          secret:
+            secretName: {{ .Values.internalCA.secretName }}
+            optional: true
+        {{- end }}

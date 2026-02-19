@@ -1,0 +1,93 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/fredericrous/duro-app
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 1001
+
+securityContext:
+  runAsUser: 1001
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# Shared env vars (applied to both web and worker)
+env:
+  NODE_TLS_REJECT_UNAUTHORIZED: "0"
+  SMTP_HOST: "stalwart.stalwart.svc.cluster.local."
+  SMTP_PORT: "587"
+  SMTP_USER: "admin"
+  SMTP_FROM: "noreply@daddyshome.fr"
+  INVITE_BASE_URL: "https://join.daddyshome.fr"
+  NAS_VAULT_ADDR: "https://vault.vault.mesh:15443"
+  GITHUB_REPO: "fredericrous/homelab"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy.monitoring.svc.cluster.local.:4318"
+  DURO_DB_PATH: "/db/duro.sqlite"
+
+envFrom: []
+
+# Web-specific config
+web:
+  port: 3000
+  otelServiceName: "duro"
+  env:
+    LLDAP_URL: "http://lldap.lldap.svc.cluster.local.:17170"
+    LLDAP_ADMIN_USER: "admin"
+  resources:
+    requests:
+      memory: "96Mi"
+      cpu: "50m"
+    limits:
+      memory: "192Mi"
+      cpu: "300m"
+  appsConfig:
+    enabled: true
+    configMapName: "duro-apps"
+
+# Worker config
+worker:
+  enabled: true
+  port: 3001
+  otelServiceName: "duro-worker"
+  env: {}
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "20m"
+    limits:
+      memory: "128Mi"
+      cpu: "200m"
+
+database:
+  mode: sqlite  # "sqlite" or "postgres"
+
+persistence:
+  enabled: true
+  storageClass: ""
+  size: 1Gi
+  accessModes:
+    - ReadWriteOnce
+
+internalCA:
+  enabled: true
+  secretName: "duro-internal-ca"
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

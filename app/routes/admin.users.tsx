@@ -1,25 +1,15 @@
 import { useEffect, useRef } from "react"
-import { Link, useFetcher, useRevalidator } from "react-router"
-import type { Route } from "./+types/users"
-import { parseAuthHeaders } from "~/lib/auth.server"
+import { useFetcher, useRevalidator } from "react-router"
+import type { Route } from "./+types/admin.users"
 import { runEffect } from "~/lib/runtime.server"
 import { LldapClient } from "~/lib/services/LldapClient.server"
 import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
 import { queueInvite } from "~/lib/workflows/invite.server"
 import { Effect } from "effect"
-import styles from "./users.module.css"
+import styles from "./admin.users.module.css"
 
-export function meta() {
-  return [{ title: "Users - Duro" }]
-}
-
-export async function loader({ request }: Route.LoaderArgs) {
-  const auth = parseAuthHeaders(request)
-  if (!auth.groups.includes("lldap_admin")) {
-    throw new Response("Forbidden", { status: 403 })
-  }
-
-  const [users, groups, pendingInvites] = await Promise.all([
+export async function loader() {
+  const [users, groups, pendingInvites, failedInvites] = await Promise.all([
     runEffect(
       Effect.gen(function* () {
         const lldap = yield* LldapClient
@@ -38,17 +28,18 @@ export async function loader({ request }: Route.LoaderArgs) {
         return yield* repo.findPending()
       }),
     ),
+    runEffect(
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        return yield* repo.findFailed()
+      }),
+    ),
   ])
 
-  return { user: auth.user, users, groups, pendingInvites }
+  return { users, groups, pendingInvites, failedInvites }
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const auth = parseAuthHeaders(request)
-  if (!auth.groups.includes("lldap_admin")) {
-    throw new Response("Forbidden", { status: 403 })
-  }
-
   // CSRF: verify origin
   const origin = request.headers.get("Origin")
   if (origin && !origin.endsWith("daddyshome.fr")) {
@@ -75,28 +66,40 @@ export async function action({ request }: Route.ActionArgs) {
     }
   }
 
+  if (intent === "retry") {
+    const inviteId = formData.get("inviteId") as string
+    if (!inviteId) return { error: "Missing invite ID" }
+    try {
+      await runEffect(
+        Effect.gen(function* () {
+          const repo = yield* InviteRepo
+          yield* repo.clearReconcileError(inviteId)
+        }),
+      )
+      return { success: true, message: "Invite queued for retry" }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to retry invite"
+      return { error: message }
+    }
+  }
+
   if (intent === "resend") {
     const inviteId = formData.get("inviteId") as string
     if (!inviteId) return { error: "Missing invite ID" }
     try {
-      // Revoke old invite, then queue a new one with same email/groups
-      const invite = await runEffect(
+      const result = await runEffect(
         Effect.gen(function* () {
           const repo = yield* InviteRepo
-          const inv = yield* repo.findById(inviteId)
-          if (!inv) return null
+          const invite = yield* repo.findById(inviteId)
+          if (!invite) return { error: "Invite not found" as const }
           yield* repo.revoke(inviteId)
-          return inv
-        }),
-      )
-      if (!invite) return { error: "Invite not found" }
 
-      const result = await runEffect(
-        queueInvite({
-          email: invite.email,
-          groups: JSON.parse(invite.groups) as number[],
-          groupNames: JSON.parse(invite.groupNames) as string[],
-          invitedBy: auth.user ?? "admin",
+          return yield* queueInvite({
+            email: invite.email,
+            groups: JSON.parse(invite.groups) as number[],
+            groupNames: JSON.parse(invite.groupNames) as string[],
+            invitedBy: invite.invitedBy,
+          })
         }),
       )
       return result
@@ -132,7 +135,7 @@ export async function action({ request }: Route.ActionArgs) {
         email,
         groups: groupIds,
         groupNames,
-        invitedBy: auth.user ?? "admin",
+        invitedBy: "admin",
       }),
     )
     return result
@@ -144,15 +147,21 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 function StepBadges({ invite }: { invite: Invite }) {
-  if (invite.emailSent) return <span className={`${styles.badge} ${styles.badgeSuccess}`}>Sent</span>
+  if (invite.failedAt) return <span className={`${styles.badge} ${styles.badgeError}`}>Failed</span>
+  if (invite.emailSent && invite.certVerified) return <span className={`${styles.badge} ${styles.badgeSuccess}`}>Sent</span>
+  if (invite.emailSent && !invite.certVerified) return (
+    <span className={`${styles.badge} ${styles.badgePending}`} title="Email sent, cert-manager pending">
+      Sent (cert pending)
+    </span>
+  )
   if (invite.prMerged) return <span className={`${styles.badge} ${styles.badgeProgress}`}>Sending email...</span>
   if (invite.prCreated) return <span className={`${styles.badge} ${styles.badgePending}`}>Awaiting PR merge</span>
   if (invite.certIssued) return <span className={`${styles.badge} ${styles.badgeDone}`}>Cert issued</span>
   return <span className={`${styles.badge} ${styles.badgePending}`}>Processing...</span>
 }
 
-export default function UsersPage({ loaderData }: Route.ComponentProps) {
-  const { user, users, groups, pendingInvites } = loaderData
+export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
+  const { users, groups, pendingInvites, failedInvites } = loaderData
   const fetcher = useFetcher<typeof action>()
   const formRef = useRef<HTMLFormElement>(null)
   const isSubmitting = fetcher.state !== "idle"
@@ -166,7 +175,7 @@ export default function UsersPage({ loaderData }: Route.ComponentProps) {
 
   // Auto-refresh while invites are still processing
   useEffect(() => {
-    const hasIncomplete = pendingInvites.some((inv) => !inv.emailSent)
+    const hasIncomplete = pendingInvites.some((inv) => !inv.emailSent || (inv.emailSent && !inv.certVerified))
     if (!hasIncomplete) return
 
     const interval = setInterval(() => {
@@ -179,17 +188,7 @@ export default function UsersPage({ loaderData }: Route.ComponentProps) {
   }, [pendingInvites, revalidator])
 
   return (
-    <main className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>User Management</h1>
-          <Link to="/" className={styles.backLink}>
-            Back to Dashboard
-          </Link>
-        </div>
-        <span className={styles.userLabel}>{user}</span>
-      </header>
-
+    <>
       {/* Invite Form */}
       <section className={styles.card}>
         <h2 className={styles.cardTitle}>Send Invite</h2>
@@ -235,6 +234,30 @@ export default function UsersPage({ loaderData }: Route.ComponentProps) {
           </button>
         </fetcher.Form>
       </section>
+
+      {/* Failed Invites */}
+      {failedInvites.length > 0 && (
+        <section className={styles.card}>
+          <h2 className={styles.cardTitle}>Failed Invites ({failedInvites.length})</h2>
+          <div className={styles.tableContainer}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Error</th>
+                  <th>Failed At</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {failedInvites.map((inv) => (
+                  <FailedInviteRow key={inv.id} invite={inv} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Pending Invites */}
       <section className={styles.card}>
@@ -292,7 +315,7 @@ export default function UsersPage({ loaderData }: Route.ComponentProps) {
           </table>
         </div>
       </section>
-    </main>
+    </>
   )
 }
 
@@ -322,6 +345,39 @@ function PendingInviteRow({ invite }: { invite: Invite }) {
             <input type="hidden" name="intent" value="revoke" />
             <input type="hidden" name="inviteId" value={invite.id} />
             <button type="submit" className={`${styles.btnGhost} ${styles.btnGhostDanger}`} disabled={isRevoking || isResending}>
+              {isRevoking ? "Revoking..." : "Revoke"}
+            </button>
+          </revokeFetcher.Form>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+function FailedInviteRow({ invite }: { invite: Invite }) {
+  const retryFetcher = useFetcher()
+  const revokeFetcher = useFetcher()
+  const isRetrying = retryFetcher.state !== "idle"
+  const isRevoking = revokeFetcher.state !== "idle"
+
+  return (
+    <tr>
+      <td>{invite.email}</td>
+      <td className={styles.errorText}>{invite.lastError ?? "Unknown error"}</td>
+      <td>{invite.failedAt ? new Date(invite.failedAt + "Z").toLocaleString() : "—"}</td>
+      <td>
+        <div className={styles.actionBtns}>
+          <retryFetcher.Form method="post">
+            <input type="hidden" name="intent" value="retry" />
+            <input type="hidden" name="inviteId" value={invite.id} />
+            <button type="submit" className={styles.btnGhost} disabled={isRetrying || isRevoking}>
+              {isRetrying ? "Retrying..." : "Retry"}
+            </button>
+          </retryFetcher.Form>
+          <revokeFetcher.Form method="post">
+            <input type="hidden" name="intent" value="revoke" />
+            <input type="hidden" name="inviteId" value={invite.id} />
+            <button type="submit" className={`${styles.btnGhost} ${styles.btnGhostDanger}`} disabled={isRevoking || isRetrying}>
               {isRevoking ? "Revoking..." : "Revoke"}
             </button>
           </revokeFetcher.Form>

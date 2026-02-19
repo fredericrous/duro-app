@@ -14,10 +14,11 @@ import {
 
 interface InviteEmailProps {
   inviteUrl: string
+  reinviteUrl: string
   invitedBy: string
 }
 
-export function InviteEmail({ inviteUrl, invitedBy }: InviteEmailProps) {
+export function InviteEmail({ inviteUrl, reinviteUrl, invitedBy }: InviteEmailProps) {
   return (
     <Html>
       <Head />
@@ -73,8 +74,12 @@ export function InviteEmail({ inviteUrl, invitedBy }: InviteEmailProps) {
           <Hr style={hr} />
 
           <Text style={footer}>
-            This link expires in 48 hours. If you didn't expect this invitation,
-            you can safely ignore this email.
+            This link expires in 7 days. Need a new invite?{" "}
+            <Link href={reinviteUrl} style={footerLink}>
+              Request one here
+            </Link>
+            . If you didn't expect this invitation, you can safely ignore this
+            email.
           </Text>
         </Container>
       </Body>
@@ -156,4 +161,9 @@ const footer = {
   fontSize: "12px",
   lineHeight: "1.5",
   margin: "0",
+}
+
+const footerLink = {
+  color: "#3b82f6",
+  textDecoration: "underline",
 }

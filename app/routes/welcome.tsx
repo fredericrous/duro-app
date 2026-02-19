@@ -1,5 +1,5 @@
 import type { Route } from "./+types/welcome"
-import { parseAuthHeaders } from "~/lib/auth.server"
+import { requireAuth } from "~/lib/auth.server"
 import { ButtonLink } from "~/components/ButtonLink/ButtonLink"
 import styles from "./welcome.module.css"
 
@@ -8,10 +8,7 @@ export function meta() {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const auth = parseAuthHeaders(request)
-  if (!auth.user) {
-    throw new Response("Unauthorized", { status: 401 })
-  }
+  const auth = await requireAuth(request)
   return { user: auth.user }
 }
 

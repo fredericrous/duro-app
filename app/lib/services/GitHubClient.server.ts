@@ -1,4 +1,6 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, Config, Redacted } from "effect"
+import * as HttpClient from "@effect/platform/HttpClient"
+import { makeJsonApi } from "~/lib/http.server"
 
 export class GitHubError extends Data.TaggedError("GitHubError")<{
   readonly message: string
@@ -12,66 +14,69 @@ export class GitHubClient extends Context.Tag("GitHubClient")<
       inviteId: string,
       email: string,
       username: string,
-    ) => Effect.Effect<{ prUrl: string; prNumber: number }, GitHubError>
+    ) => Effect.Effect<{ prUrl: string; prNumber: number; certUsername: string }, GitHubError>
     readonly checkPRMerged: (
       prNumber: number,
     ) => Effect.Effect<boolean, GitHubError>
     readonly mergePR: (
       prNumber: number,
     ) => Effect.Effect<void, GitHubError>
+    readonly checkWebhookSecret: () => Effect.Effect<boolean, GitHubError>
   }
 >() {}
 
 export const GitHubClientLive = Layer.effect(
   GitHubClient,
   Effect.gen(function* () {
-    const token = process.env.GITHUB_TOKEN ?? ""
-    const repo = process.env.GITHUB_REPO ?? "fredericrous/homelab"
+    const token = Redacted.value(yield* Config.redacted("GITHUB_TOKEN"))
+    const repo = yield* Config.string("GITHUB_REPO").pipe(Config.withDefault("fredericrous/homelab"))
+    const http = yield* HttpClient.HttpClient
 
-    const ghFetch = (path: string, options?: RequestInit) =>
-      Effect.tryPromise({
-        try: () =>
-          fetch(`https://api.github.com/repos/${repo}${path}`, {
-            ...options,
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/vnd.github+json",
-              "X-GitHub-Api-Version": "2022-11-28",
-              "Content-Type": "application/json",
-              ...options?.headers,
-            },
-          }).then(async (r) => {
-            const body = await r.json().catch(() => ({}))
-            if (!r.ok) {
-              throw new Error(
-                `GitHub API ${r.status}: ${JSON.stringify(body)}`,
-              )
-            }
-            return body as Record<string, unknown>
-          }),
-        catch: (e) =>
-          new GitHubError({ message: "GitHub API request failed", cause: e }),
-      })
+    const gh = makeJsonApi(
+      http,
+      `https://api.github.com/repos/${repo}`,
+      {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+      },
+      (e) => new GitHubError({ message: "GitHub API request failed", cause: e }),
+    )
 
     const certYaml = (username: string, email: string) =>
       `apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: client-cert-${username}
+  name: ${username}
   namespace: vault
+  labels:
+    homelab.io/pki-domain: client
+    homelab.io/generate-p12: "true"
+    homelab.io/username: ${username}
+  annotations:
+    homelab.io/description: "Client certificate for ${email}"
 spec:
-  secretName: client-cert-${username}
+  secretName: ${username}-client-cert
   issuerRef:
-    name: vault-pki-client
+    name: vault-client-pki
     kind: ClusterIssuer
+    group: cert-manager.io
   commonName: ${email}
-  duration: 2160h
+  duration: 8760h
   renewBefore: 720h
+  subject:
+    organizations:
+      - DaddysHome
+    organizationalUnits:
+      - Users
+  usages:
+    - client auth
+    - digital signature
+    - key encipherment
   privateKey:
     algorithm: RSA
     size: 2048
-  usages:
-    - client auth
 `
 
     return {
@@ -81,41 +86,42 @@ spec:
           const filePath = `kubernetes/nas/platform-foundation/vault/client-certs/certificates/${username}.yaml`
 
           // Check if branch already exists (idempotency)
-          const branchExists = yield* ghFetch(
+          const branchExists = yield* gh.get(
             `/git/refs/heads/${branch}`,
           ).pipe(
             Effect.map(() => true),
             Effect.catchAll(() => Effect.succeed(false)),
-          )
+          ) // 404 = branch doesn't exist, expected
 
           if (branchExists) {
             // Branch exists, check for existing PR
-            const prs = yield* ghFetch(
+            const prs = yield* gh.get(
               `/pulls?head=fredericrous:${branch}&state=open`,
             ).pipe(
               Effect.map((r) => r as unknown as Array<{ html_url: string; number: number }>),
+              Effect.tapError((e) => Effect.logDebug("Failed to list PRs for branch", { error: String(e), branch })),
               Effect.catchAll(() => Effect.succeed([] as Array<{ html_url: string; number: number }>)),
             )
 
             if (prs.length > 0) {
-              return { prUrl: prs[0].html_url, prNumber: prs[0].number }
+              const certUsername = username
+                .toLowerCase()
+                .replace(/[^a-z0-9_-]/g, "")
+              return { prUrl: prs[0].html_url, prNumber: prs[0].number, certUsername }
             }
           }
 
           // Get main branch SHA
-          const mainRef = yield* ghFetch(`/git/refs/heads/main`)
+          const mainRef = yield* gh.get(`/git/refs/heads/main`)
           const mainSha = (
             mainRef as { object: { sha: string } }
           ).object.sha
 
           // Create branch
           if (!branchExists) {
-            yield* ghFetch(`/git/refs`, {
-              method: "POST",
-              body: JSON.stringify({
-                ref: `refs/heads/${branch}`,
-                sha: mainSha,
-              }),
+            yield* gh.post(`/git/refs`, {
+              ref: `refs/heads/${branch}`,
+              sha: mainSha,
             })
           }
 
@@ -125,42 +131,42 @@ spec:
             .replace(/[^a-z0-9_-]/g, "")
           const content = certYaml(normalizedUsername, email)
 
-          yield* ghFetch(`/contents/${filePath}`, {
-            method: "PUT",
-            body: JSON.stringify({
-              message: `feat: add client certificate for ${email}`,
-              content: Buffer.from(content).toString("base64"),
-              branch,
-            }),
+          yield* gh.put(`/contents/${filePath}`, {
+            message: `feat: add client certificate for ${email}`,
+            content: Buffer.from(content).toString("base64"),
+            branch,
           })
 
           // Create PR
-          const pr = yield* ghFetch(`/pulls`, {
-            method: "POST",
-            body: JSON.stringify({
-              title: `feat: add client certificate for ${email}`,
-              body: "Auto-generated by Duro invite system.\n\nThis PR adds a cert-manager Certificate for automatic renewal of the client certificate.",
-              head: branch,
-              base: "main",
-            }),
+          const pr = yield* gh.post(`/pulls`, {
+            title: `feat: add client certificate for ${email}`,
+            body: "Auto-generated by Duro invite system.\n\nThis PR adds a cert-manager Certificate for automatic renewal of the client certificate.",
+            head: branch,
+            base: "main",
           })
 
           return {
             prUrl: (pr as { html_url: string }).html_url,
             prNumber: (pr as { number: number }).number,
+            certUsername: normalizedUsername,
           }
         }),
 
       checkPRMerged: (prNumber: number) =>
-        ghFetch(`/pulls/${prNumber}`).pipe(
+        gh.get(`/pulls/${prNumber}`).pipe(
           Effect.map((pr) => !!(pr as { merged: boolean }).merged),
         ),
 
       mergePR: (prNumber: number) =>
-        ghFetch(`/pulls/${prNumber}/merge`, {
-          method: "PUT",
-          body: JSON.stringify({ merge_method: "squash" }),
-        }).pipe(Effect.asVoid),
+        gh.put(`/pulls/${prNumber}/merge`, { merge_method: "squash" }).pipe(
+          Effect.asVoid,
+        ),
+
+      checkWebhookSecret: () =>
+        gh.get(`/actions/secrets/DURO_WEBHOOK_SECRET`).pipe(
+          Effect.as(true),
+          Effect.catchAll(() => Effect.succeed(false)),
+        ),
     }
   }),
 )

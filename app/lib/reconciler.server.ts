@@ -1,42 +1,40 @@
 import { Effect, Schedule } from "effect"
-import { InviteRepo } from "./services/InviteRepo.server"
+import { InviteRepo, type Invite } from "./services/InviteRepo.server"
 import { GitHubClient } from "./services/GitHubClient.server"
 import { VaultPki } from "./services/VaultPki.server"
 import { EmailService } from "./services/EmailService.server"
 
-const STALE_THRESHOLD_MS = 15 * 60 * 1000 // 15 minutes
+const MAX_RECONCILE_ATTEMPTS = 5
 
-const reconcileOnce = Effect.gen(function* () {
-  const inviteRepo = yield* InviteRepo
-  const github = yield* GitHubClient
-  const vault = yield* VaultPki
-  const emailSvc = yield* EmailService
+const processInvite = (invite: Invite) =>
+  Effect.gen(function* () {
+    const inviteRepo = yield* InviteRepo
+    const github = yield* GitHubClient
+    const vault = yield* VaultPki
+    const emailSvc = yield* EmailService
 
-  const pending = yield* inviteRepo.findAwaitingMerge()
-
-  for (const invite of pending) {
-    const ageMs = Date.now() - new Date(invite.createdAt + "Z").getTime()
-    if (ageMs > STALE_THRESHOLD_MS) {
-      console.error(`[reconciler] invite ${invite.id} (${invite.email}) stale — PR #${invite.prNumber} not merged after 15min, skipping`)
-      continue
-    }
-
+    // Check/attempt merge
     let merged = yield* github.checkPRMerged(invite.prNumber!).pipe(
+      Effect.tapError((e) => Effect.logDebug("Failed to check PR merged status", { prNumber: invite.prNumber, error: String(e) })),
       Effect.catchAll(() => Effect.succeed(false)),
     )
 
     if (!merged) {
       merged = yield* github.mergePR(invite.prNumber!).pipe(
         Effect.map(() => true),
+        Effect.tapError((e) => Effect.logDebug("Failed to merge PR", { prNumber: invite.prNumber, error: String(e) })),
         Effect.catchAll(() => Effect.succeed(false)),
       )
     }
 
-    if (!merged) continue
+    if (!merged) return
 
     yield* inviteRepo.markPRMerged(invite.id)
 
+    // Issue cert and P12
     const { p12Buffer } = yield* vault.issueCertAndP12(invite.email, invite.id)
+
+    // Send email
     yield* emailSvc.sendInviteEmail(
       invite.email,
       invite.token,
@@ -44,12 +42,65 @@ const reconcileOnce = Effect.gen(function* () {
       p12Buffer,
     )
     yield* inviteRepo.markEmailSent(invite.id)
+    yield* inviteRepo.clearReconcileError(invite.id)
 
-    console.log(`[reconciler] email sent for ${invite.email}`)
+    yield* Effect.log(`email sent for ${invite.email}`)
+  })
+
+const verifyCerts = Effect.gen(function* () {
+  const inviteRepo = yield* InviteRepo
+  const vault = yield* VaultPki
+
+  const pending = yield* inviteRepo.findAwaitingCertVerification()
+
+  for (const invite of pending) {
+    if (!invite.certUsername) continue
+
+    const processed = yield* vault.checkCertProcessed(invite.certUsername)
+    if (processed) {
+      yield* inviteRepo.markCertVerified(invite.id)
+      yield* Effect.log(`cert verified for ${invite.email} (${invite.certUsername})`)
+    }
   }
 }).pipe(
   Effect.catchAll((e) =>
-    Effect.sync(() => console.error("[reconciler] error:", e)),
+    Effect.logError("cert verify error").pipe(Effect.annotateLogs("error", String(e))),
+  ),
+)
+
+const reconcileOnce = Effect.gen(function* () {
+  const inviteRepo = yield* InviteRepo
+
+  const pending = yield* inviteRepo.findAwaitingMerge()
+
+  for (const invite of pending) {
+    // Backoff: skip if too soon since last attempt
+    if (invite.reconcileAttempts > 0 && invite.lastReconcileAt) {
+      const backoffMs = Math.min(Math.pow(2, invite.reconcileAttempts) * 30_000, 600_000)
+      const elapsed = Date.now() - new Date(invite.lastReconcileAt + "Z").getTime()
+      if (elapsed < backoffMs) continue
+    }
+
+    yield* processInvite(invite).pipe(
+      Effect.catchAll((e) =>
+        Effect.gen(function* () {
+          const msg = e instanceof Error ? e.message : String(e)
+          if (invite.reconcileAttempts + 1 >= MAX_RECONCILE_ATTEMPTS) {
+            yield* inviteRepo.markFailed(invite.id, msg)
+            yield* Effect.logError(`invite ${invite.id} (${invite.email}) permanently failed after ${MAX_RECONCILE_ATTEMPTS} attempts: ${msg}`)
+          } else {
+            yield* inviteRepo.recordReconcileError(invite.id, msg)
+            yield* Effect.logWarning(`invite ${invite.id} (${invite.email}) attempt ${invite.reconcileAttempts + 1} failed: ${msg}`)
+          }
+        }),
+      ),
+    )
+  }
+
+  yield* verifyCerts
+}).pipe(
+  Effect.catchAll((e) =>
+    Effect.logError("reconciler error").pipe(Effect.annotateLogs("error", String(e))),
   ),
 )
 

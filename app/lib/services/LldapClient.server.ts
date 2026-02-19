@@ -1,4 +1,7 @@
-import { Context, Effect, Data, Layer, Ref } from "effect"
+import { Context, Effect, Data, Layer, Ref, Config, Redacted } from "effect"
+import * as HttpClient from "@effect/platform/HttpClient"
+import * as HttpClientRequest from "@effect/platform/HttpClientRequest"
+import * as HttpClientResponse from "@effect/platform/HttpClientResponse"
 
 export interface LldapUser {
   id: string
@@ -46,16 +49,20 @@ export class LldapClient extends Context.Tag("LldapClient")<
 export const LldapClientLive = Layer.effect(
   LldapClient,
   Effect.gen(function* () {
-    const url =
-      process.env.LLDAP_URL ??
-      "http://lldap.lldap.svc.cluster.local.:17170"
-    const adminUser = process.env.LLDAP_ADMIN_USER ?? "admin"
-    const adminPass = process.env.LLDAP_ADMIN_PASS ?? ""
+    const url = yield* Config.string("LLDAP_URL").pipe(Config.withDefault("http://lldap.lldap.svc.cluster.local.:17170"))
+    const adminUser = yield* Config.string("LLDAP_ADMIN_USER").pipe(Config.withDefault("admin"))
+    const adminPass = Redacted.value(yield* Config.redacted("LLDAP_ADMIN_PASS"))
+    const http = yield* HttpClient.HttpClient
 
     const tokenRef = yield* Ref.make<{
       token: string
       expiresAt: number
     } | null>(null)
+
+    const mapError = (cause: unknown) =>
+      cause instanceof LldapError
+        ? cause
+        : new LldapError({ message: "LLDAP request failed", cause })
 
     const getToken = Effect.gen(function* () {
       const cached = yield* Ref.get(tokenRef)
@@ -63,34 +70,36 @@ export const LldapClientLive = Layer.effect(
         return cached.token
       }
 
-      const res = yield* Effect.tryPromise({
-        try: () =>
-          fetch(`${url}/auth/simple/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              username: adminUser,
-              password: adminPass,
-            }),
-          }).then((r) => r.json() as Promise<{ token: string }>),
-        catch: (e) =>
-          new LldapError({
-            message: "Failed to authenticate with LLDAP",
-            cause: e,
+      const res = yield* http.execute(
+        HttpClientRequest.post(`${url}/auth/simple/login`).pipe(
+          HttpClientRequest.setHeaders({ "Content-Type": "application/json" }),
+          HttpClientRequest.bodyUnsafeJson({
+            username: adminUser,
+            password: adminPass,
           }),
-      })
+        ),
+      ).pipe(
+        Effect.flatMap(HttpClientResponse.filterStatusOk),
+        Effect.flatMap((r) => r.json),
+        Effect.mapError((e) =>
+          new LldapError({ message: "Failed to authenticate with LLDAP", cause: e }),
+        ),
+        Effect.scoped,
+      )
 
-      if (!res.token) {
+      const { token } = res as { token: string }
+
+      if (!token) {
         return yield* new LldapError({
           message: "No token in LLDAP login response",
         })
       }
 
       yield* Ref.set(tokenRef, {
-        token: res.token,
+        token,
         expiresAt: Date.now() + 50 * 60 * 1000,
       })
-      return res.token
+      return token
     })
 
     const graphql = <T = Record<string, unknown>>(
@@ -99,36 +108,31 @@ export const LldapClientLive = Layer.effect(
     ) =>
       Effect.gen(function* () {
         const token = yield* getToken
-        const res = yield* Effect.tryPromise({
-          try: () =>
-            fetch(`${url}/api/graphql`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ query, variables }),
-            }).then(
-              (r) =>
-                r.json() as Promise<{
-                  data?: T
-                  errors?: Array<{ message: string }>
-                }>,
-            ),
-          catch: (e) =>
-            new LldapError({
-              message: "LLDAP GraphQL request failed",
-              cause: e,
-            }),
-        })
+        const res = yield* http.execute(
+          HttpClientRequest.post(`${url}/api/graphql`).pipe(
+            HttpClientRequest.setHeaders({ "Content-Type": "application/json" }),
+            HttpClientRequest.bearerToken(token),
+            HttpClientRequest.bodyUnsafeJson({ query, variables }),
+          ),
+        ).pipe(
+          Effect.flatMap(HttpClientResponse.filterStatusOk),
+          Effect.flatMap((r) => r.json),
+          Effect.mapError(mapError),
+          Effect.scoped,
+        )
 
-        if (res.errors?.length) {
+        const body = res as {
+          data?: T
+          errors?: Array<{ message: string }>
+        }
+
+        if (body.errors?.length) {
           return yield* new LldapError({
-            message: `LLDAP GraphQL error: ${res.errors[0].message}`,
+            message: `LLDAP GraphQL error: ${body.errors[0].message}`,
           })
         }
 
-        return res.data as T
+        return body.data as T
       })
 
     return {
@@ -155,27 +159,21 @@ export const LldapClientLive = Layer.effect(
       setUserPassword: (userId: string, password: string) =>
         Effect.gen(function* () {
           const token = yield* getToken
-          yield* Effect.tryPromise({
-            try: () =>
-              fetch(
-                `${url}/api/user/${encodeURIComponent(userId)}/password`,
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({ password }),
-                },
-              ).then((r) => {
-                if (!r.ok) throw new Error(`HTTP ${r.status}`)
-              }),
-            catch: (e) =>
-              new LldapError({
-                message: "Failed to set user password",
-                cause: e,
-              }),
-          })
+          yield* http.execute(
+            HttpClientRequest.post(
+              `${url}/api/user/${encodeURIComponent(userId)}/password`,
+            ).pipe(
+              HttpClientRequest.setHeaders({ "Content-Type": "application/json" }),
+              HttpClientRequest.bearerToken(token),
+              HttpClientRequest.bodyUnsafeJson({ password }),
+            ),
+          ).pipe(
+            Effect.flatMap(HttpClientResponse.filterStatusOk),
+            Effect.mapError((e) =>
+              new LldapError({ message: "Failed to set user password", cause: e }),
+            ),
+            Effect.scoped,
+          )
         }),
 
       addUserToGroup: (userId: string, groupId: number) =>

@@ -1,0 +1,177 @@
+name: Update Helm Chart
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to update (without v prefix)'
+        required: true
+        type: string
+
+jobs:
+  update-chart:
+    name: Update Helm Chart Version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.CHARTS_REPO_TOKEN }}" ]; then
+            echo "::error::CHARTS_REPO_TOKEN secret is not set. This secret is required to create PRs on the charts repository."
+            echo "::error::Please add a Personal Access Token with 'repo' scope as CHARTS_REPO_TOKEN in repository secrets."
+            exit 1
+          fi
+
+      - name: Determine version
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Checkout charts repository
+        uses: actions/checkout@v4
+        with:
+          repository: fredericrous/charts
+          token: ${{ secrets.CHARTS_REPO_TOKEN }}
+          path: charts
+
+      - name: Sync chart from source to charts repo
+        run: |
+          CHART_NAME="duro-app"
+          CHART_DIR="charts/charts/${CHART_NAME}"
+
+          # Create chart directory if it doesn't exist
+          mkdir -p "${CHART_DIR}"
+
+          # Sync entire chart (templates, values, helpers)
+          cp -rv source/chart/${CHART_NAME}/* "${CHART_DIR}/"
+
+      - name: Update Chart.yaml
+        id: update-chart
+        run: |
+          cd charts
+          CHART_NAME="duro-app"
+          CHART_PATH="charts/${CHART_NAME}/Chart.yaml"
+
+          if [ ! -f "$CHART_PATH" ]; then
+            echo "::error::Chart not found at $CHART_PATH"
+            exit 1
+          fi
+
+          CURRENT_CHART_VERSION=$(yq '.version' "$CHART_PATH")
+          CURRENT_APP_VERSION=$(yq '.appVersion' "$CHART_PATH")
+          NEW_VERSION="${{ steps.version.outputs.version }}"
+
+          echo "Current state:"
+          echo "- Chart version: $CURRENT_CHART_VERSION"
+          echo "- App version: $CURRENT_APP_VERSION"
+          echo "New version: $NEW_VERSION (chart and app will be synced)"
+
+          # Keep chart version = app version
+          yq -i ".version = \"$NEW_VERSION\"" "$CHART_PATH"
+          yq -i ".appVersion = \"$NEW_VERSION\"" "$CHART_PATH"
+
+          CHART_DESCRIPTION=$(yq '.description' "$CHART_PATH")
+
+          echo "chart_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "chart_name=$CHART_NAME" >> $GITHUB_OUTPUT
+          echo "chart_description=$CHART_DESCRIPTION" >> $GITHUB_OUTPUT
+
+          echo "Updated Chart.yaml:"
+          cat "$CHART_PATH"
+
+      - name: Update README.md Chart Table
+        run: |
+          cd charts
+          README_FILE="README.md"
+          CHART_NAME="${{ steps.update-chart.outputs.chart_name }}"
+          CHART_VERSION="${{ steps.update-chart.outputs.chart_version }}"
+          APP_VERSION="${{ steps.version.outputs.version }}"
+          CHART_DESCRIPTION="${{ steps.update-chart.outputs.chart_description }}"
+
+          if [ -f "$README_FILE" ]; then
+            if grep -q "\[${CHART_NAME}\]" "$README_FILE"; then
+              echo "Updating existing chart entry in README.md"
+              while IFS= read -r line; do
+                if [[ "$line" == *"[${CHART_NAME}]"* ]]; then
+                  echo "| [${CHART_NAME}](charts/${CHART_NAME}/) | ${CHART_VERSION} | ${APP_VERSION} | ${CHART_DESCRIPTION} |"
+                else
+                  echo "$line"
+                fi
+              done < "$README_FILE" > "$README_FILE.tmp" && mv "$README_FILE.tmp" "$README_FILE"
+            else
+              echo "Adding new chart entry to README.md"
+              sed -i "/^| \[/a | [${CHART_NAME}](charts/${CHART_NAME}/) | ${CHART_VERSION} | ${APP_VERSION} | ${CHART_DESCRIPTION} |" "$README_FILE" 2>/dev/null || true
+            fi
+          fi
+
+      - name: Create Pull Request
+        id: create-pr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.CHARTS_REPO_TOKEN }}
+          path: charts
+          add-paths: |
+            charts/${{ steps.update-chart.outputs.chart_name }}/**
+            README.md
+          commit-message: "chore: update ${{ steps.update-chart.outputs.chart_name }} to ${{ steps.version.outputs.version }}"
+          title: "chore: update ${{ steps.update-chart.outputs.chart_name }} to ${{ steps.version.outputs.version }}"
+          body: |
+            ## Automated Chart Update
+
+            This PR updates the ${{ steps.update-chart.outputs.chart_name }} Helm chart:
+            - **Version**: `${{ steps.update-chart.outputs.chart_version }}` (chart and app synced)
+
+            ### Files Updated
+            - `charts/${{ steps.update-chart.outputs.chart_name }}/` - Synced chart from source repository
+            - `README.md` - Updated chart version and app version in charts table
+
+            ### What's Changed
+
+            See [release notes](https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}) for details.
+
+            ---
+            *This PR was automatically generated when [version ${{ steps.version.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}) was released.*
+          branch: update-${{ steps.update-chart.outputs.chart_name }}-${{ steps.version.outputs.version }}
+          base: main
+          labels: |
+            chart-update
+            automated
+
+      - name: Add PR comment with testing instructions
+        if: steps.create-pr.outputs.pull-request-number
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.CHARTS_REPO_TOKEN }}
+          repository: fredericrous/charts
+          issue-number: ${{ steps.create-pr.outputs.pull-request-number }}
+          body: |
+            ### Testing Instructions
+
+            Test the updated chart locally:
+            ```bash
+            git clone https://github.com/fredericrous/charts.git
+            cd charts
+            git checkout update-${{ steps.update-chart.outputs.chart_name }}-${{ steps.version.outputs.version }}
+
+            helm template ${{ steps.update-chart.outputs.chart_name }} ./charts/${{ steps.update-chart.outputs.chart_name }}
+            helm lint ./charts/${{ steps.update-chart.outputs.chart_name }}
+            helm install test-release ./charts/${{ steps.update-chart.outputs.chart_name }} --dry-run --debug
+            ```
+
+      - name: Enable auto-merge
+        if: steps.create-pr.outputs.pull-request-number
+        continue-on-error: true
+        run: |
+          sleep 5
+          gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} \
+            --repo fredericrous/charts \
+            --auto \
+            --squash
+        env:
+          GH_TOKEN: ${{ secrets.CHARTS_REPO_TOKEN }}

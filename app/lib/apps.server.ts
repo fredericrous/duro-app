@@ -1,23 +1,23 @@
-import { readFileSync, statSync } from "fs";
+import { readFileSync } from "fs";
+import { createHash } from "crypto";
 import type { AppDefinition } from "./apps";
 
 const APPS_JSON_PATH = "/data/apps.json";
 
 let cachedApps: AppDefinition[] | null = null;
-let cachedMtime: number = 0;
+let cachedHash: string = "";
 
 export function loadApps(): AppDefinition[] {
   try {
-    const stat = statSync(APPS_JSON_PATH);
-    const mtime = stat.mtimeMs;
+    const raw = readFileSync(APPS_JSON_PATH, "utf-8");
+    const hash = createHash("sha256").update(raw).digest("hex");
 
-    if (cachedApps && mtime === cachedMtime) {
+    if (cachedApps && hash === cachedHash) {
       return cachedApps;
     }
 
-    const raw = readFileSync(APPS_JSON_PATH, "utf-8");
     cachedApps = JSON.parse(raw) as AppDefinition[];
-    cachedMtime = mtime;
+    cachedHash = hash;
     return cachedApps;
   } catch {
     return getDefaultApps();

@@ -10,6 +10,8 @@ import { Effect } from "effect"
 import { Button } from "@base-ui/react/button"
 import { Field } from "@base-ui/react/field"
 import { Input } from "@base-ui/react/input"
+import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
+import shared from "./shared.module.css"
 import styles from "./invite.module.css"
 
 export function meta() {
@@ -19,54 +21,48 @@ export function meta() {
 export async function loader({ params }: Route.LoaderArgs) {
   const token = params.token
   if (!token) {
-    return { valid: false, error: "Missing invite token" }
+    return { valid: false as const, error: "Missing invite token" }
   }
 
   try {
     const tokenHash = hashToken(token)
 
-    const invite = await runEffect(
+    return await runEffect(
       Effect.gen(function* () {
         const repo = yield* InviteRepo
-        return yield* repo.findByTokenHash(tokenHash)
-      }),
-    )
-
-    if (!invite) {
-      return { valid: false, error: "Invalid invite link" }
-    }
-
-    if (invite.usedAt) {
-      return { valid: false, error: "This invite has already been used" }
-    }
-
-    if (new Date(invite.expiresAt + "Z") < new Date()) {
-      return { valid: false, error: "This invite has expired" }
-    }
-
-    if (invite.attempts >= 5) {
-      return {
-        valid: false,
-        error: "Too many attempts. Please contact an administrator.",
-      }
-    }
-
-    // One-time P12 password reveal (consumeP12Password is atomic: read + delete)
-    const p12Password = await runEffect(
-      Effect.gen(function* () {
         const vault = yield* VaultPki
-        return yield* vault.consumeP12Password(invite.id)
+
+        const invite = yield* repo.findByTokenHash(tokenHash)
+        if (!invite) {
+          return { valid: false as const, error: "Invalid invite link" }
+        }
+
+        if (invite.usedAt) {
+          return { valid: false as const, error: "already_used" }
+        }
+
+        if (new Date(invite.expiresAt + "Z") < new Date()) {
+          return { valid: false as const, error: "expired" }
+        }
+
+        if (invite.attempts >= 5) {
+          return { valid: false as const, error: "Too many attempts. Please contact an administrator." }
+        }
+
+        // Check if P12 password is still available (read-only — don't consume yet)
+        const pw = yield* vault.getP12Password(invite.id)
+        const passwordAvailable = pw !== null
+
+        return {
+          valid: true as const,
+          email: invite.email,
+          groupNames: JSON.parse(invite.groupNames) as string[],
+          passwordAvailable,
+        }
       }),
     )
-
-    return {
-      valid: true,
-      email: invite.email,
-      groupNames: JSON.parse(invite.groupNames) as string[],
-      p12Password,
-    }
   } catch {
-    return { valid: false, error: "Something went wrong" }
+    return { valid: false as const, error: "Something went wrong" }
   }
 }
 
@@ -83,6 +79,30 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   const formData = await request.formData()
+  const intent = formData.get("intent") as string | null
+
+  // Handle scratch-to-reveal: consume password from Vault
+  if (intent === "reveal") {
+    try {
+      const tokenHash = hashToken(token)
+      const result = await runEffect(
+        Effect.gen(function* () {
+          const repo = yield* InviteRepo
+          const invite = yield* repo.findByTokenHash(tokenHash)
+          if (!invite) return { password: null }
+
+          const vault = yield* VaultPki
+          const password = yield* vault.consumeP12Password(invite.id)
+          return { password }
+        }),
+      )
+      return result
+    } catch {
+      return { password: null }
+    }
+  }
+
+  // Handle account creation
   const username = (formData.get("username") as string)?.trim()
   const password = formData.get("password") as string
   const confirmPassword = formData.get("confirmPassword") as string
@@ -90,8 +110,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   // Validate
   if (!username || !/^[a-zA-Z0-9_-]{3,32}$/.test(username)) {
     return {
-      error:
-        "Username must be 3-32 characters (letters, numbers, hyphens, underscores)",
+      error: "Username must be 3-32 characters (letters, numbers, hyphens, underscores)",
     }
   }
   if (!password || password.length < 12) {
@@ -101,17 +120,16 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { error: "Passwords do not match" }
   }
 
-  // Rate limit: increment attempt counter
-  const tokenHash = hashToken(token)
-  await runEffect(
-    Effect.gen(function* () {
-      const repo = yield* InviteRepo
-      yield* repo.incrementAttempt(tokenHash)
-    }),
-  ).catch(() => {})
-
   try {
-    await runEffect(acceptInvite(token, { username, password }))
+    const tokenHash = hashToken(token)
+    await runEffect(
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        // Rate limit: increment attempt counter (best-effort)
+        yield* repo.incrementAttempt(tokenHash).pipe(Effect.ignore)
+        yield* acceptInvite(token, { username, password })
+      }),
+    )
     return redirect("https://home.daddyshome.fr/welcome")
   } catch (e) {
     const message =
@@ -133,33 +151,68 @@ export default function InvitePage({
   const [certPromise] = useState(() => checkCert())
 
   if (!loaderData.valid) {
+    const { error } = loaderData
+
+    if (error === "expired") {
+      return (
+        <main className={shared.page}>
+          <div className={shared.card}>
+            <div className={shared.errorIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="48" height="48">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+            </div>
+            <h1>Invite Expired</h1>
+            <p className={styles.errorMessage}>
+              This invite has expired. Use the link in your invitation email to
+              request a new one.
+            </p>
+          </div>
+        </main>
+      )
+    }
+
+    if (error === "already_used") {
+      return (
+        <main className={shared.page}>
+          <div className={shared.card}>
+            <div className={shared.errorIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="48" height="48">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            </div>
+            <h1>Already Joined</h1>
+            <p className={styles.errorMessage}>
+              This invite has already been used. If you need help, contact the
+              person who invited you.
+            </p>
+          </div>
+        </main>
+      )
+    }
+
     return (
-      <main className={styles.page}>
-        <div className={styles.card}>
-          <div className={styles.errorIcon}>
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              width="48"
-              height="48"
-            >
+      <main className={shared.page}>
+        <div className={shared.card}>
+          <div className={shared.errorIcon}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="48" height="48">
               <circle cx="12" cy="12" r="10" />
               <line x1="15" y1="9" x2="9" y2="15" />
               <line x1="9" y1="9" x2="15" y2="15" />
             </svg>
           </div>
           <h1>Unable to Join</h1>
-          <p className={styles.errorMessage}>{"error" in loaderData ? loaderData.error : "Invalid invite"}</p>
+          <p className={styles.errorMessage}>{error}</p>
         </div>
       </main>
     )
   }
 
   return (
-    <main className={styles.page}>
-      <div className={styles.card}>
+    <main className={shared.page}>
+      <div className={shared.card}>
         <h1>Join Daddyshome</h1>
         <p className={styles.subtitle}>
           You've been invited as <strong>{loaderData.email}</strong>
@@ -172,7 +225,7 @@ export default function InvitePage({
         )}
 
         {/* P12 Password Section */}
-        {loaderData.p12Password && <PasswordReveal password={loaderData.p12Password} />}
+        <PasswordReveal passwordAvailable={loaderData.passwordAvailable} />
 
         {/* Cert Check */}
         <Suspense fallback={<CertCheckLoading />}>
@@ -181,7 +234,7 @@ export default function InvitePage({
 
         {/* Error */}
         {actionData && "error" in actionData && (
-          <div className={`${styles.alert} ${styles.alertError}`}>{actionData.error}</div>
+          <div className={shared.alertError}>{actionData.error}</div>
         )}
 
         {/* Account Creation Form */}
@@ -191,7 +244,9 @@ export default function InvitePage({
   )
 }
 
-function PasswordReveal({ password }: { password: string }) {
+function PasswordReveal({ passwordAvailable }: { passwordAvailable: boolean }) {
+  const [password, setPassword] = useState<string | null>(null)
+  const [revealed, setRevealed] = useState(false)
   const [copied, setCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
 
@@ -201,27 +256,59 @@ function PasswordReveal({ password }: { password: string }) {
     }
   }, [])
 
+  const handleReveal = async () => {
+    const res = await fetch("", {
+      method: "POST",
+      body: new URLSearchParams({ intent: "reveal" }),
+    })
+    const result = await res.json()
+    if (result.password) {
+      setPassword(result.password)
+      setRevealed(true)
+    }
+  }
+
+  if (!passwordAvailable) {
+    return (
+      <div className={styles.passwordSection}>
+        <h2>Certificate Password</h2>
+        <p className={styles.infoText}>
+          The certificate password has already been revealed. If you need a new
+          invite, use the link in your original invitation email.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className={styles.passwordSection}>
       <h2>Certificate Password</h2>
       <p className={styles.warningText}>
-        Save this password — you'll need it to install the certificate from your
-        email. It won't be shown again.
+        Scratch to reveal your certificate password. Save it — you'll need it
+        to install the certificate from your email.
       </p>
-      <div className={styles.passwordDisplay}>
-        <code>{password}</code>
-        <Button
-          className={styles.btnSmall}
-          onClick={() => {
-            navigator.clipboard.writeText(password)
-            setCopied(true)
-            if (timerRef.current) clearTimeout(timerRef.current)
-            timerRef.current = setTimeout(() => setCopied(false), 2000)
-          }}
-        >
-          {copied ? "Copied!" : "Copy"}
-        </Button>
-      </div>
+      {revealed && password ? (
+        <div className={styles.passwordDisplay}>
+          <code>{password}</code>
+          <Button
+            className={styles.btnSmall}
+            onClick={() => {
+              navigator.clipboard.writeText(password)
+              setCopied(true)
+              if (timerRef.current) clearTimeout(timerRef.current)
+              timerRef.current = setTimeout(() => setCopied(false), 2000)
+            }}
+          >
+            {copied ? "Copied!" : "Copy"}
+          </Button>
+        </div>
+      ) : (
+        <ScratchCard width={320} height={48} onReveal={handleReveal}>
+          <div className={styles.passwordPlaceholder}>
+            <code>{"•".repeat(32)}</code>
+          </div>
+        </ScratchCard>
+      )}
     </div>
   )
 }
@@ -304,7 +391,7 @@ function AccountForm() {
         <Field.Error className={styles.fieldError} />
       </Field.Root>
 
-      <Button type="submit" disabled={isSubmitting} className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}>
+      <Button type="submit" disabled={isSubmitting} className={`${shared.btn} ${shared.btnPrimary} ${shared.btnFull}`}>
         {isSubmitting ? "Creating Account..." : "Create Account"}
       </Button>
     </form>

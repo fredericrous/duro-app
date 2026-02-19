@@ -33,11 +33,14 @@ export const queueInvite = (input: InviteInput) =>
     // Step 2: Create PR (seconds, non-critical)
     const username = input.email.split("@")[0].replace(/[^a-z0-9_-]/gi, "")
     yield* github.createCertPR(invite.id, input.email, username).pipe(
-      Effect.tap(({ prNumber }) =>
-        inviteRepo.markPRCreated(invite.id, prNumber),
+      Effect.tap(({ prNumber, certUsername }) =>
+        Effect.all([
+          inviteRepo.markPRCreated(invite.id, prNumber),
+          inviteRepo.setCertUsername(invite.id, certUsername),
+        ]),
       ),
       Effect.catchAll((e) =>
-        Effect.sync(() => console.warn("[invite] PR creation failed:", e)),
+        Effect.logWarning("PR creation failed").pipe(Effect.annotateLogs("error", String(e))),
       ),
     )
 
@@ -51,11 +54,15 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
   Effect.gen(function* () {
     const inviteRepo = yield* InviteRepo
     const lldap = yield* LldapClient
+    const vault = yield* VaultPki
 
     // Atomic consume — marks invite as used
     const invite = yield* inviteRepo.consumeByToken(token)
 
-    const groups: number[] = JSON.parse(invite.groups)
+    const groups = yield* Effect.try({
+      try: () => JSON.parse(invite.groups) as number[],
+      catch: () => new Error("Invalid groups JSON in invite"),
+    })
 
     // Create user with compensating rollback on failure
     yield* lldap.createUser({
@@ -88,6 +95,9 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
     )
 
     yield* inviteRepo.markUsedBy(invite.id, input.username)
+
+    // Clean up P12 secret from Vault
+    yield* vault.deleteP12Secret(invite.id)
 
     return { success: true as const }
   }).pipe(Effect.withSpan("acceptInvite", { attributes: { username: input.username } }))
