@@ -1,3 +1,5 @@
+"use no memo"
+
 import { Body, Container, Head, Heading, Html, Preview, Section, Text, Hr } from "@react-email/components"
 
 export function CertRenewalEmail() {

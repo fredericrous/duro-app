@@ -1,3 +1,5 @@
+"use no memo"
+
 import { Body, Container, Head, Heading, Html, Link, Preview, Section, Text, Button, Hr } from "@react-email/components"
 
 interface InviteEmailProps {
