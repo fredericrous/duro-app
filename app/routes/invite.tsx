@@ -239,6 +239,7 @@ function PasswordReveal({ passwordAvailable }: { passwordAvailable: boolean }) {
   const [revealed, setRevealed] = useState(false)
   const [copied, setCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
+  const fetchingRef = useRef(false)
 
   useEffect(() => {
     return () => {
@@ -246,16 +247,26 @@ function PasswordReveal({ passwordAvailable }: { passwordAvailable: boolean }) {
     }
   }, [])
 
-  const handleReveal = async () => {
-    const res = await fetch("", {
-      method: "POST",
-      body: new URLSearchParams({ intent: "reveal" }),
-    })
-    const result = await res.json()
-    if (result.password) {
-      setPassword(result.password)
-      setRevealed(true)
+  const fetchPassword = async () => {
+    if (fetchingRef.current || password) return
+    fetchingRef.current = true
+    try {
+      const res = await fetch("", {
+        method: "POST",
+        body: new URLSearchParams({ intent: "reveal" }),
+      })
+      const result = await res.json()
+      if (result.password) {
+        setPassword(result.password)
+      }
+    } finally {
+      fetchingRef.current = false
     }
+  }
+
+  const handleReveal = () => {
+    setRevealed(true)
+    if (!password && !fetchingRef.current) fetchPassword()
   }
 
   if (!passwordAvailable) {
@@ -277,9 +288,13 @@ function PasswordReveal({ passwordAvailable }: { passwordAvailable: boolean }) {
         Scratch to reveal your certificate password. Save it — you'll need it to install the certificate from your
         email.
       </p>
-      {revealed && password ? (
-        <div className={styles.passwordDisplay}>
-          <code>{password}</code>
+      <ScratchCard width={320} height={48} onReveal={handleReveal} onScratchStart={fetchPassword}>
+        <div className={styles.passwordPlaceholder}>
+          <code>{password || "•".repeat(32)}</code>
+        </div>
+      </ScratchCard>
+      {revealed && password && (
+        <div className={styles.passwordCopyRow}>
           <Button
             className={styles.btnSmall}
             onClick={() => {
@@ -292,12 +307,6 @@ function PasswordReveal({ passwordAvailable }: { passwordAvailable: boolean }) {
             {copied ? "Copied!" : "Copy"}
           </Button>
         </div>
-      ) : (
-        <ScratchCard width={320} height={48} onReveal={handleReveal}>
-          <div className={styles.passwordPlaceholder}>
-            <code>{"•".repeat(32)}</code>
-          </div>
-        </ScratchCard>
       )}
     </div>
   )

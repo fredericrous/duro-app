@@ -6,6 +6,7 @@ interface ScratchCardProps {
   height: number
   revealThreshold?: number
   onReveal: () => void
+  onScratchStart?: () => void
   label?: string
   children: ReactNode
 }
@@ -15,12 +16,14 @@ export function ScratchCard({
   height,
   revealThreshold = 0.5,
   onReveal,
+  onScratchStart,
   label = "Scratch to reveal",
   children,
 }: ScratchCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const isDrawing = useRef(false)
   const revealed = useRef(false)
+  const scratchStarted = useRef(false)
   const [fadeOut, setFadeOut] = useState(false)
 
   useEffect(() => {
@@ -91,12 +94,16 @@ export function ScratchCard({
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       if (revealed.current) return
+      if (!scratchStarted.current) {
+        scratchStarted.current = true
+        onScratchStart?.()
+      }
       isDrawing.current = true
       canvasRef.current?.setPointerCapture(e.pointerId)
       const pos = getPos(e)
       scratch(pos.x, pos.y)
     },
-    [getPos, scratch],
+    [getPos, scratch, onScratchStart],
   )
 
   const onPointerMove = useCallback(
@@ -114,19 +121,19 @@ export function ScratchCard({
     checkReveal()
   }, [checkReveal])
 
-  if (fadeOut) return null
-
   return (
     <div className={styles.container} style={{ width, height }}>
       {children}
-      <canvas
-        ref={canvasRef}
-        className={styles.canvas}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerLeave={onPointerUp}
-      />
+      {!fadeOut && (
+        <canvas
+          ref={canvasRef}
+          className={styles.canvas}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerLeave={onPointerUp}
+        />
+      )}
     </div>
   )
 }

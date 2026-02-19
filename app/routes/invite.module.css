@@ -49,8 +49,15 @@
 
 .passwordPlaceholder code {
   font-size: 0.8rem;
-  color: #666;
-  letter-spacing: 0.1em;
+  color: #e5e5e5;
+  letter-spacing: 0.05em;
+  word-break: break-all;
+}
+
+.passwordCopyRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
 }
 
 .passwordDisplay {
