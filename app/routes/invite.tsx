@@ -49,15 +49,14 @@ export async function loader({ params }: Route.LoaderArgs) {
           return { valid: false as const, error: "Too many attempts. Please contact an administrator." }
         }
 
-        // Check if P12 password is still available (read-only — don't consume yet)
-        const pw = yield* vault.getP12Password(invite.id)
-        const passwordAvailable = pw !== null
+        // Read P12 password (non-destructive). Consumed via "reveal" action on scratch.
+        const p12Password = yield* vault.getP12Password(invite.id)
 
         return {
           valid: true as const,
           email: invite.email,
           groupNames: JSON.parse(invite.groupNames) as string[],
-          passwordAvailable,
+          p12Password,
         }
       }),
     )
@@ -145,6 +144,7 @@ function checkCert(): Promise<boolean> {
 
 export default function InvitePage({ loaderData, actionData }: Route.ComponentProps) {
   const [certPromise] = useState(() => checkCert())
+  const [certInstalled, setCertInstalled] = useState(false)
 
   if (!loaderData.valid) {
     const { error } = loaderData
@@ -217,29 +217,27 @@ export default function InvitePage({ loaderData, actionData }: Route.ComponentPr
         )}
 
         {/* P12 Password Section */}
-        <PasswordReveal passwordAvailable={loaderData.passwordAvailable} />
+        <PasswordReveal p12Password={loaderData.p12Password} />
 
         {/* Cert Check */}
         <Suspense fallback={<CertCheckLoading />}>
-          <CertCheckResult certPromise={certPromise} />
+          <CertCheckResult certPromise={certPromise} onResult={setCertInstalled} />
         </Suspense>
 
         {/* Error */}
         {actionData && "error" in actionData && <div className={shared.alertError}>{actionData.error}</div>}
 
         {/* Account Creation Form */}
-        <AccountForm />
+        <AccountForm disabled={!certInstalled} />
       </div>
     </main>
   )
 }
 
-function PasswordReveal({ passwordAvailable }: { passwordAvailable: boolean }) {
-  const [password, setPassword] = useState<string | null>(null)
+function PasswordReveal({ p12Password }: { p12Password: string | null }) {
   const [revealed, setRevealed] = useState(false)
   const [copied, setCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
-  const fetchingRef = useRef(false)
 
   useEffect(() => {
     return () => {
@@ -247,29 +245,16 @@ function PasswordReveal({ passwordAvailable }: { passwordAvailable: boolean }) {
     }
   }, [])
 
-  const fetchPassword = async () => {
-    if (fetchingRef.current || password) return
-    fetchingRef.current = true
-    try {
-      const res = await fetch("", {
-        method: "POST",
-        body: new URLSearchParams({ intent: "reveal" }),
-      })
-      const result = await res.json()
-      if (result.password) {
-        setPassword(result.password)
-      }
-    } finally {
-      fetchingRef.current = false
-    }
-  }
-
   const handleReveal = () => {
     setRevealed(true)
-    if (!password && !fetchingRef.current) fetchPassword()
+    // Consume the password in Vault so it's gone on next page load
+    fetch("", {
+      method: "POST",
+      body: new URLSearchParams({ intent: "reveal" }),
+    }).catch(() => {})
   }
 
-  if (!passwordAvailable) {
+  if (!p12Password) {
     return (
       <div className={styles.passwordSection}>
         <h2>Certificate Password</h2>
@@ -288,17 +273,17 @@ function PasswordReveal({ passwordAvailable }: { passwordAvailable: boolean }) {
         Scratch to reveal your certificate password. Save it — you'll need it to install the certificate from your
         email.
       </p>
-      <ScratchCard width={320} height={48} onReveal={handleReveal} onScratchStart={fetchPassword}>
+      <ScratchCard width={320} height={48} onReveal={handleReveal}>
         <div className={styles.passwordPlaceholder}>
-          <code>{password || "•".repeat(32)}</code>
+          <code>{p12Password}</code>
         </div>
       </ScratchCard>
-      {revealed && password && (
+      {revealed && (
         <div className={styles.passwordCopyRow}>
           <Button
             className={styles.btnSmall}
             onClick={() => {
-              navigator.clipboard.writeText(password)
+              navigator.clipboard.writeText(p12Password)
               setCopied(true)
               if (timerRef.current) clearTimeout(timerRef.current)
               timerRef.current = setTimeout(() => setCopied(false), 2000)
@@ -320,8 +305,18 @@ function CertCheckLoading() {
   )
 }
 
-function CertCheckResult({ certPromise }: { certPromise: Promise<boolean> }) {
+function CertCheckResult({
+  certPromise,
+  onResult,
+}: {
+  certPromise: Promise<boolean>
+  onResult: (installed: boolean) => void
+}) {
   const installed = use(certPromise)
+
+  useEffect(() => {
+    onResult(installed)
+  }, [installed, onResult])
 
   return (
     <div className={styles.certCheck}>
@@ -339,62 +334,71 @@ function CertCheckResult({ certPromise }: { certPromise: Promise<boolean> }) {
   )
 }
 
-function AccountForm() {
+function AccountForm({ disabled }: { disabled: boolean }) {
   const navigation = useNavigation()
   const isSubmitting = navigation.state === "submitting"
 
   return (
-    <form method="post" className={styles.accountForm}>
+    <form method="post" className={`${styles.accountForm} ${disabled ? styles.formDisabled : ""}`}>
       <h2>Create Your Account</h2>
+      {disabled && (
+        <p className={styles.formDisabledHint}>Install your certificate first, then refresh this page.</p>
+      )}
 
-      <Field.Root className={styles.formGroup}>
-        <Field.Label className={styles.label}>Username</Field.Label>
-        <Input
-          name="username"
-          required
-          pattern="^[a-zA-Z0-9_-]{3,32}$"
-          placeholder="Choose a username"
-          className={styles.input}
-          autoComplete="username"
-        />
-        <Field.Description className={styles.hint}>
-          3-32 characters: letters, numbers, hyphens, underscores
-        </Field.Description>
-        <Field.Error className={styles.fieldError} />
-      </Field.Root>
+      <fieldset disabled={disabled || isSubmitting}>
+        <Field.Root className={styles.formGroup}>
+          <Field.Label className={styles.label}>Username</Field.Label>
+          <Input
+            name="username"
+            required
+            pattern="^[a-zA-Z0-9_-]{3,32}$"
+            placeholder="Choose a username"
+            className={styles.input}
+            autoComplete="username"
+          />
+          <Field.Description className={styles.hint}>
+            3-32 characters: letters, numbers, hyphens, underscores
+          </Field.Description>
+          <Field.Error className={styles.fieldError} />
+        </Field.Root>
 
-      <Field.Root className={styles.formGroup}>
-        <Field.Label className={styles.label}>Password</Field.Label>
-        <Input
-          name="password"
-          type="password"
-          required
-          minLength={12}
-          placeholder="Choose a strong password"
-          className={styles.input}
-          autoComplete="new-password"
-        />
-        <Field.Description className={styles.hint}>At least 12 characters</Field.Description>
-        <Field.Error className={styles.fieldError} />
-      </Field.Root>
+        <Field.Root className={styles.formGroup}>
+          <Field.Label className={styles.label}>Password</Field.Label>
+          <Input
+            name="password"
+            type="password"
+            required
+            minLength={12}
+            placeholder="Choose a strong password"
+            className={styles.input}
+            autoComplete="new-password"
+          />
+          <Field.Description className={styles.hint}>At least 12 characters</Field.Description>
+          <Field.Error className={styles.fieldError} />
+        </Field.Root>
 
-      <Field.Root className={styles.formGroup}>
-        <Field.Label className={styles.label}>Confirm Password</Field.Label>
-        <Input
-          name="confirmPassword"
-          type="password"
-          required
-          minLength={12}
-          placeholder="Confirm your password"
-          className={styles.input}
-          autoComplete="new-password"
-        />
-        <Field.Error className={styles.fieldError} />
-      </Field.Root>
+        <Field.Root className={styles.formGroup}>
+          <Field.Label className={styles.label}>Confirm Password</Field.Label>
+          <Input
+            name="confirmPassword"
+            type="password"
+            required
+            minLength={12}
+            placeholder="Confirm your password"
+            className={styles.input}
+            autoComplete="new-password"
+          />
+          <Field.Error className={styles.fieldError} />
+        </Field.Root>
 
-      <Button type="submit" disabled={isSubmitting} className={`${shared.btn} ${shared.btnPrimary} ${shared.btnFull}`}>
-        {isSubmitting ? "Creating Account..." : "Create Account"}
-      </Button>
+        <Button
+          type="submit"
+          disabled={disabled || isSubmitting}
+          className={`${shared.btn} ${shared.btnPrimary} ${shared.btnFull}`}
+        >
+          {isSubmitting ? "Creating Account..." : "Create Account"}
+        </Button>
+      </fieldset>
     </form>
   )
 }
