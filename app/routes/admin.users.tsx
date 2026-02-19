@@ -11,7 +11,7 @@ import styles from "./admin.users.module.css"
 const SYSTEM_USERS = ["admin", "gitea-service"]
 
 export async function loader() {
-  const [users, groups, pendingInvites, failedInvites, revocations] = await Promise.all([
+  const [users, groups, pendingInvites, failedInvites, revocations, revokingInvites] = await Promise.all([
     runEffect(
       Effect.gen(function* () {
         const lldap = yield* LldapClient
@@ -42,9 +42,15 @@ export async function loader() {
         return yield* repo.findRevocations()
       }),
     ),
+    runEffect(
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        return yield* repo.findAwaitingRevertMerge()
+      }),
+    ),
   ])
 
-  return { users, groups, pendingInvites, failedInvites, revocations }
+  return { users, groups, pendingInvites, failedInvites, revocations, revokingInvites }
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -232,6 +238,7 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 function StepBadges({ invite }: { invite: Invite }) {
+  if (invite.usedBy === "__revoking__") return <span className={`${styles.badge} ${styles.badgeProgress}`}>Revoking (PR #{invite.revertPrNumber})...</span>
   if (invite.failedAt) return <span className={`${styles.badge} ${styles.badgeError}`}>Failed</span>
   if (invite.emailSent && invite.certVerified) return <span className={`${styles.badge} ${styles.badgeSuccess}`}>Sent</span>
   if (invite.emailSent && !invite.certVerified) return (
@@ -246,7 +253,7 @@ function StepBadges({ invite }: { invite: Invite }) {
 }
 
 export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
-  const { users, groups, pendingInvites, failedInvites, revocations } = loaderData
+  const { users, groups, pendingInvites, failedInvites, revocations, revokingInvites } = loaderData
   const fetcher = useFetcher<typeof action>()
   const formRef = useRef<HTMLFormElement>(null)
   const isSubmitting = fetcher.state !== "idle"
@@ -258,10 +265,10 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
     }
   }, [fetcher.data])
 
-  // Auto-refresh while invites are still processing
+  // Auto-refresh while invites are still processing or revoking
   useEffect(() => {
     const hasIncomplete = pendingInvites.some((inv) => !inv.emailSent || (inv.emailSent && !inv.certVerified))
-    if (!hasIncomplete) return
+    if (!hasIncomplete && revokingInvites.length === 0) return
 
     const interval = setInterval(() => {
       if (revalidator.state === "idle") {
@@ -270,7 +277,7 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
     }, 5000)
 
     return () => clearInterval(interval)
-  }, [pendingInvites, revalidator])
+  }, [pendingInvites, revokingInvites, revalidator])
 
   const actionData = fetcher.data
   const hasWarning = actionData && "warning" in actionData
@@ -363,11 +370,11 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
         </section>
       )}
 
-      {/* Pending Invites */}
+      {/* Active Invites */}
       <section className={styles.card}>
-        <h2 className={styles.cardTitle}>Pending Invites ({pendingInvites.length})</h2>
-        {pendingInvites.length === 0 ? (
-          <p className={styles.emptyState}>No pending invites</p>
+        <h2 className={styles.cardTitle}>Active Invites ({pendingInvites.length + revokingInvites.length})</h2>
+        {pendingInvites.length === 0 && revokingInvites.length === 0 ? (
+          <p className={styles.emptyState}>No active invites</p>
         ) : (
           <div className={styles.tableContainer}>
             <table className={styles.table}>
@@ -382,6 +389,16 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
                 </tr>
               </thead>
               <tbody>
+                {revokingInvites.map((inv) => (
+                  <tr key={inv.id}>
+                    <td>{inv.email}</td>
+                    <td>{JSON.parse(inv.groupNames).join(", ")}</td>
+                    <td><StepBadges invite={inv} /></td>
+                    <td>{inv.invitedBy}</td>
+                    <td>{new Date(inv.expiresAt + "Z").toLocaleDateString()}</td>
+                    <td />
+                  </tr>
+                ))}
                 {pendingInvites.map((inv) => (
                   <PendingInviteRow key={inv.id} invite={inv} />
                 ))}

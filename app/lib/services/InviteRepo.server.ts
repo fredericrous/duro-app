@@ -40,6 +40,8 @@ export interface Invite {
   certUsername: string | null
   certVerified: boolean
   certVerifiedAt: string | null
+  revertPrNumber: number | null
+  revertPrMerged: boolean
 }
 
 export interface Revocation {
@@ -111,6 +113,15 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
       Invite[],
       InviteError
     >
+    readonly markRevoking: (id: string) => Effect.Effect<void, InviteError>
+    readonly markRevertPRCreated: (
+      id: string,
+      prNumber: number,
+    ) => Effect.Effect<void, InviteError>
+    readonly markRevertPRMerged: (
+      id: string,
+    ) => Effect.Effect<void, InviteError>
+    readonly findAwaitingRevertMerge: () => Effect.Effect<Invite[], InviteError>
     readonly recordRevocation: (
       email: string,
       username: string,
@@ -168,6 +179,8 @@ const InviteRow = Schema.Struct({
   certUsername: Coerced.NullableString,
   certVerified: Coerced.Boolean,
   certVerifiedAt: Coerced.NullableDateString,
+  revertPrNumber: Coerced.NullableNumber,
+  revertPrMerged: Coerced.Boolean,
 })
 
 const decodeInviteRow = Schema.decodeUnknownSync(InviteRow)
@@ -399,6 +412,32 @@ export const InviteRepoLive = Layer.effect(
             Effect.map((rows) => rows.map(rowToInvite)),
           ),
           "Failed to find invites awaiting cert verification",
+        ),
+
+      markRevoking: (id) =>
+        withErr(
+          sql`UPDATE invites SET used_at = ${now()}, used_by = '__revoking__' WHERE id = ${id}`.pipe(Effect.asVoid),
+          "Failed to mark invite as revoking",
+        ),
+
+      markRevertPRCreated: (id, prNumber) =>
+        withErr(
+          sql`UPDATE invites SET revert_pr_number = ${prNumber} WHERE id = ${id}`.pipe(Effect.asVoid),
+          "Failed to mark revert PR created",
+        ),
+
+      markRevertPRMerged: (id) =>
+        withErr(
+          sql`UPDATE invites SET revert_pr_merged = ${TRUE}, used_by = '__revoked__' WHERE id = ${id}`.pipe(Effect.asVoid),
+          "Failed to mark revert PR merged",
+        ),
+
+      findAwaitingRevertMerge: () =>
+        withErr(
+          sql`SELECT * FROM invites WHERE used_by = '__revoking__' AND revert_pr_number IS NOT NULL AND revert_pr_merged = ${FALSE}`.pipe(
+            Effect.map((rows) => rows.map(rowToInvite)),
+          ),
+          "Failed to find invites awaiting revert merge",
         ),
 
       recordRevocation: (email, username, revokedBy, reason?) =>

@@ -137,14 +137,23 @@ export const revokeInvite = (inviteId: string) =>
       )
     }
 
-    // If PR was merged, revert the cert file
+    // If PR was merged, create revert PR and let worker wait for merge
     if (invite.prMerged && invite.certUsername) {
-      yield* github.revertCertFile(invite.certUsername, invite.email).pipe(
-        Effect.catchAll((e) => Effect.logWarning("revokeInvite: failed to revert cert file", { error: String(e) })),
+      const result = yield* github.revertCertFile(invite.certUsername, invite.email).pipe(
+        Effect.catchAll((e) => {
+          Effect.logWarning("revokeInvite: failed to revert cert file", { error: String(e) })
+          return Effect.succeed(null as { prNumber: number } | null)
+        }),
       )
+
+      if (result) {
+        yield* inviteRepo.markRevoking(inviteId)
+        yield* inviteRepo.markRevertPRCreated(inviteId, result.prNumber)
+        return // worker will finalize to __revoked__ after revert PR merges
+      }
     }
 
-    // Mark as revoked in DB
+    // No revert PR needed — revoke immediately
     yield* inviteRepo.revoke(inviteId)
   }).pipe(Effect.withSpan("revokeInvite", { attributes: { inviteId } }))
 

@@ -242,13 +242,6 @@ spec:
           })
           const prNumber = (pr as { number: number }).number
 
-          // Auto-merge with squash
-          yield* gh.put(`/pulls/${prNumber}/merge`, { merge_method: "squash" }).pipe(
-            Effect.catchAll((e) =>
-              Effect.logWarning("Failed to auto-merge revocation PR", { prNumber, error: String(e) }),
-            ),
-          )
-
           return { prNumber }
         }),
     }

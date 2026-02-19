@@ -13,4 +13,6 @@ export default Effect.gen(function* () {
       revoked_by TEXT NOT NULL
     )
   `
+  yield* sql`ALTER TABLE invites ADD COLUMN revert_pr_number INTEGER`
+  yield* sql`ALTER TABLE invites ADD COLUMN revert_pr_merged INTEGER NOT NULL DEFAULT 0`
 })

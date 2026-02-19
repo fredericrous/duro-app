@@ -45,6 +45,8 @@ function makeInvite(overrides: Partial<Invite> = {}): Invite {
     certUsername: null,
     certVerified: false,
     certVerifiedAt: null,
+    revertPrNumber: null,
+    revertPrMerged: false,
     ...overrides,
   }
 }
@@ -170,6 +172,25 @@ const mockInviteRepo = (
       }),
     findRevocationByEmail: (email) =>
       Effect.sync(() => revocations.find((r) => r.email === email) ?? null),
+    markRevoking: (id) =>
+      Effect.sync(() => {
+        const invite = store.get(id)
+        if (invite) store.set(id, { ...invite, usedAt: new Date().toISOString(), usedBy: "__revoking__" })
+      }),
+    markRevertPRCreated: (id, prNumber) =>
+      Effect.sync(() => {
+        const invite = store.get(id)
+        if (invite) store.set(id, { ...invite, revertPrNumber: prNumber })
+      }),
+    markRevertPRMerged: (id) =>
+      Effect.sync(() => {
+        const invite = store.get(id)
+        if (invite) store.set(id, { ...invite, revertPrMerged: true, usedBy: "__revoked__" })
+      }),
+    findAwaitingRevertMerge: () =>
+      Effect.sync(() =>
+        [...store.values()].filter((i) => i.usedBy === "__revoking__" && i.revertPrNumber != null && !i.revertPrMerged),
+      ),
   })
 
 const mockLldapClient = (
@@ -570,7 +591,7 @@ describe("revokeInvite", () => {
     )
   })
 
-  it.effect("reverts cert file when PR was already merged", () => {
+  it.effect("creates revert PR and marks as revoking when PR was already merged", () => {
     const store = new Map<string, Invite>()
     store.set("inv-1", makeInvite({
       certIssued: true,
@@ -590,6 +611,11 @@ describe("revokeInvite", () => {
 
           // Should revert cert file
           expect(ghCalls.find((c) => c.method === "revertCertFile" && c.args[0] === "alice")).toBeDefined()
+
+          // Should be in revoking state, not revoked — worker will finalize
+          const invite = store.get("inv-1")!
+          expect(invite.usedBy).toBe("__revoking__")
+          expect(invite.revertPrNumber).toBe(99) // from mock
         }),
       ),
       Effect.provide(
