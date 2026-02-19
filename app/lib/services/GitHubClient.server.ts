@@ -116,14 +116,20 @@ spec:
             })
           }
 
-          // Create file
+          // Create or update file (supply sha if it already exists)
           const normalizedUsername = username.toLowerCase().replace(/[^a-z0-9_-]/g, "")
           const content = certYaml(normalizedUsername, email)
+
+          const existingSha = yield* gh.get(`/contents/${filePath}?ref=${branch}`).pipe(
+            Effect.map((f) => (f as { sha: string }).sha),
+            Effect.catchAll(() => Effect.succeed(undefined)),
+          )
 
           yield* gh.put(`/contents/${filePath}`, {
             message: `feat: add client certificate for ${email}`,
             content: Buffer.from(content).toString("base64"),
             branch,
+            ...(existingSha ? { sha: existingSha } : {}),
           })
 
           // Create PR
