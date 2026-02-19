@@ -2,7 +2,6 @@ import { Effect } from "effect"
 import * as crypto from "node:crypto"
 import { LldapClient } from "~/lib/services/LldapClient.server"
 import { VaultPki } from "~/lib/services/VaultPki.server"
-import { GitHubClient } from "~/lib/services/GitHubClient.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { EmailService } from "~/lib/services/EmailService.server"
 
@@ -24,35 +23,33 @@ export const queueInvite = (input: InviteInput) =>
   Effect.gen(function* () {
     const inviteRepo = yield* InviteRepo
     const vault = yield* VaultPki
-    const github = yield* GitHubClient
+    const emailSvc = yield* EmailService
 
     const invite = yield* inviteRepo.create(input)
 
-    // Step 1: Issue cert (seconds)
-    yield* vault.issueCertAndP12(input.email, invite.id)
+    // Derive certUsername for revocation cleanup
+    const certUsername = input.email
+      .split("@")[0]
+      .replace(/[^a-z0-9_-]/gi, "")
+      .toLowerCase()
+    yield* inviteRepo.setCertUsername(invite.id, certUsername)
+
+    // Issue cert directly from Vault PKI
+    const { p12Buffer } = yield* vault.issueCertAndP12(input.email, invite.id)
     yield* inviteRepo.markCertIssued(invite.id)
 
-    // Step 2: Create PR (seconds, non-critical)
-    const username = input.email.split("@")[0].replace(/[^a-z0-9_-]/gi, "")
-    let warning: string | undefined
-    yield* github.createCertPR(invite.id, input.email, username).pipe(
-      Effect.tap(({ prNumber, certUsername }) =>
-        Effect.all([
-          inviteRepo.markPRCreated(invite.id, prNumber),
-          inviteRepo.setCertUsername(invite.id, certUsername),
-        ]),
-      ),
+    // Send email inline
+    yield* emailSvc.sendInviteEmail(input.email, invite.token, input.invitedBy, p12Buffer).pipe(
+      Effect.tap(() => inviteRepo.markEmailSent(invite.id)),
       Effect.catchAll((e) =>
         Effect.gen(function* () {
-          warning = "PR creation failed — the reconciler will retry automatically"
-          yield* inviteRepo.recordReconcileError(invite.id, e.message).pipe(Effect.ignore)
-          yield* Effect.logWarning("PR creation failed", { error: String(e) })
+          yield* inviteRepo.markFailed(invite.id, e.message)
+          yield* Effect.fail(e)
         }),
       ),
     )
 
-    // Email sent by reconciler after PR merge
-    return { success: true as const, message: `Invite queued for ${input.email}`, warning }
+    return { success: true as const, message: `Invite sent to ${input.email}` }
   }).pipe(Effect.withSpan("queueInvite", { attributes: { email: input.email } }))
 
 // --- Accept Invite (unchanged) ---
@@ -109,7 +106,6 @@ export const revokeInvite = (inviteId: string) =>
   Effect.gen(function* () {
     const inviteRepo = yield* InviteRepo
     const vault = yield* VaultPki
-    const github = yield* GitHubClient
 
     const invite = yield* inviteRepo.findById(inviteId)
     if (!invite) return
@@ -121,44 +117,21 @@ export const revokeInvite = (inviteId: string) =>
         Effect.catchAll((e) => Effect.logWarning("revokeInvite: failed to delete P12 secret", { error: String(e) })),
       )
 
-    // Clean up p12-generator-controller secret
-    if (invite.certUsername) {
-      yield* vault
-        .deleteCertByUsername(invite.certUsername)
-        .pipe(
-          Effect.catchAll((e) =>
-            Effect.logWarning("revokeInvite: failed to delete cert by username", { error: String(e) }),
-          ),
-        )
-    }
-
-    // Close PR and delete branch if PR exists and not merged
-    if (invite.prNumber && !invite.prMerged) {
-      yield* github
-        .closePR(invite.prNumber)
-        .pipe(Effect.catchAll((e) => Effect.logWarning("revokeInvite: failed to close PR", { error: String(e) })))
-      yield* github
-        .deleteBranch(inviteId)
-        .pipe(Effect.catchAll((e) => Effect.logWarning("revokeInvite: failed to delete branch", { error: String(e) })))
-    }
-
-    // If PR was merged, create revert PR and let worker wait for merge
-    if (invite.prMerged && invite.certUsername) {
-      const result = yield* github.revertCertFile(invite.certUsername, invite.email).pipe(
-        Effect.catchAll((e) => {
-          Effect.logWarning("revokeInvite: failed to revert cert file", { error: String(e) })
-          return Effect.succeed(null as { prNumber: number } | null)
-        }),
+    // Clean up cert secret by username
+    const certUsername =
+      invite.certUsername ??
+      invite.email
+        .split("@")[0]
+        .replace(/[^a-z0-9_-]/gi, "")
+        .toLowerCase()
+    yield* vault
+      .deleteCertByUsername(certUsername)
+      .pipe(
+        Effect.catchAll((e) =>
+          Effect.logWarning("revokeInvite: failed to delete cert by username", { error: String(e) }),
+        ),
       )
 
-      if (result) {
-        yield* inviteRepo.markRevoking(inviteId)
-        yield* inviteRepo.markRevertPRCreated(inviteId, result.prNumber)
-        return // worker will finalize to __revoked__ after revert PR merges
-      }
-    }
-
-    // No revert PR needed — revoke immediately
     yield* inviteRepo.revoke(inviteId)
   }).pipe(Effect.withSpan("revokeInvite", { attributes: { inviteId } }))
 
@@ -168,7 +141,6 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
   Effect.gen(function* () {
     const lldap = yield* LldapClient
     const vault = yield* VaultPki
-    const github = yield* GitHubClient
     const inviteRepo = yield* InviteRepo
 
     // Remove from LLDAP
@@ -186,11 +158,6 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
     yield* vault
       .deleteCertByUsername(certUsername)
       .pipe(Effect.catchAll((e) => Effect.logWarning("revokeUser: failed to delete cert secret", { error: String(e) })))
-
-    // PR to remove cert-manager Certificate
-    yield* github
-      .revertCertFile(certUsername, email)
-      .pipe(Effect.catchAll((e) => Effect.logWarning("revokeUser: failed to revert cert file", { error: String(e) })))
 
     // Record revocation in audit log
     yield* inviteRepo.recordRevocation(email, username, revokedBy, reason)

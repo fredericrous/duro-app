@@ -5,10 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "react-router dev",
-    "build": "react-router build && vite build -c vite.worker.config.ts",
-    "build:worker": "vite build -c vite.worker.config.ts",
+    "build": "react-router build",
     "start": "react-router-serve ./build/server/index.js",
-    "start:worker": "node ./build/worker/worker.js",
     "lint": "eslint app/",
     "format": "prettier --write app/",
     "format:check": "prettier --check app/",

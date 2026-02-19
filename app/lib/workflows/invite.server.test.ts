@@ -1,11 +1,10 @@
-import { describe, expect, vi } from "vitest"
+import { describe, expect } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { queueInvite, acceptInvite, revokeInvite, revokeUser, resendCert } from "./invite.server"
 import { InviteRepo, InviteError, type Invite, type Revocation } from "~/lib/services/InviteRepo.server"
 import { LldapClient, LldapError } from "~/lib/services/LldapClient.server"
 import { VaultPki } from "~/lib/services/VaultPki.server"
-import { GitHubClient, GitHubError } from "~/lib/services/GitHubClient.server"
 import { EmailService } from "~/lib/services/EmailService.server"
 
 // --- Mock helpers ---
@@ -230,29 +229,12 @@ const mockVaultPki = (calls: { method: string; args: unknown[] }[] = []) =>
     },
   })
 
-const mockGitHubClient = (calls: { method: string; args: unknown[] }[] = []) =>
-  Layer.succeed(GitHubClient, {
-    createCertPR: () => Effect.succeed({ prUrl: "https://github.com/pr/1", prNumber: 1, certUsername: "alice" }),
-    checkPRMerged: () => Effect.succeed(false),
-    mergePR: () => Effect.void,
-    checkWebhookSecret: () => Effect.succeed(false),
-    closePR: (prNumber) => {
-      calls.push({ method: "closePR", args: [prNumber] })
-      return Effect.void
-    },
-    deleteBranch: (inviteId) => {
-      calls.push({ method: "deleteBranch", args: [inviteId] })
-      return Effect.void
-    },
-    revertCertFile: (username, email) => {
-      calls.push({ method: "revertCertFile", args: [username, email] })
-      return Effect.succeed({ prNumber: 99 })
-    },
-  })
-
 const mockEmailService = (calls: { method: string; args: unknown[] }[] = []) =>
   Layer.succeed(EmailService, {
-    sendInviteEmail: () => Effect.void,
+    sendInviteEmail: (email, token, invitedBy, p12Buffer) => {
+      calls.push({ method: "sendInviteEmail", args: [email, token, invitedBy, p12Buffer] })
+      return Effect.void
+    },
     sendCertRenewalEmail: (email, p12Buffer) => {
       calls.push({ method: "sendCertRenewalEmail", args: [email, p12Buffer] })
       return Effect.void
@@ -262,9 +244,10 @@ const mockEmailService = (calls: { method: string; args: unknown[] }[] = []) =>
 // --- Tests ---
 
 describe("queueInvite", () => {
-  it.effect("creates an invite, issues cert, and creates PR", () => {
+  it.effect("creates an invite, issues cert, and sends email", () => {
     const store = new Map<string, Invite>()
     const vaultCalls: { method: string; args: unknown[] }[] = []
+    const emailCalls: { method: string; args: unknown[] }[] = []
 
     return queueInvite({
       email: "alice@example.com",
@@ -280,27 +263,29 @@ describe("queueInvite", () => {
 
           const invite = [...store.values()][0]
           expect(invite.certIssued).toBe(true)
-          expect(invite.prCreated).toBe(true)
-          expect(invite.prNumber).toBe(1)
+          expect(invite.emailSent).toBe(true)
           expect(invite.certUsername).toBe("alice")
+
+          // Cert issued
+          expect(vaultCalls.find((c) => c.method === "issueCertAndP12")).toBeDefined()
+
+          // Email sent
+          const emailCall = emailCalls.find((c) => c.method === "sendInviteEmail")
+          expect(emailCall).toBeDefined()
+          expect(emailCall!.args[0]).toBe("alice@example.com")
         }),
       ),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), mockGitHubClient())),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), mockEmailService(emailCalls))),
     )
   })
 
-  it.effect("continues even if PR creation fails", () => {
+  it.effect("marks invite as failed when email sending fails", () => {
     const store = new Map<string, Invite>()
     const vaultCalls: { method: string; args: unknown[] }[] = []
 
-    const failingGitHub = Layer.succeed(GitHubClient, {
-      createCertPR: () => Effect.fail(new GitHubError({ message: "GitHub down" })),
-      checkPRMerged: () => Effect.succeed(false),
-      mergePR: () => Effect.void,
-      checkWebhookSecret: () => Effect.succeed(false),
-      closePR: () => Effect.void,
-      deleteBranch: () => Effect.void,
-      revertCertFile: () => Effect.succeed({ prNumber: 0 }),
+    const failingEmail = Layer.succeed(EmailService, {
+      sendInviteEmail: () => Effect.fail({ _tag: "EmailError" as const, message: "SMTP down" }),
+      sendCertRenewalEmail: () => Effect.void,
     })
 
     return queueInvite({
@@ -309,137 +294,17 @@ describe("queueInvite", () => {
       groupNames: ["friends", "family"],
       invitedBy: "admin",
     }).pipe(
-      Effect.tap((result) =>
+      Effect.flip,
+      Effect.tap(() =>
         Effect.sync(() => {
-          expect(result.success).toBe(true)
-
           const invite = [...store.values()][0]
           expect(invite.certIssued).toBe(true)
-          // PR not created due to failure
-          expect(invite.prCreated).toBe(false)
+          expect(invite.emailSent).toBe(false)
+          expect(invite.failedAt).not.toBeNull()
+          expect(invite.lastError).toBe("SMTP down")
         }),
       ),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), failingGitHub)),
-    )
-  })
-})
-
-describe("reconciler logic", () => {
-  it.effect("auto-merges PR and sends email", () => {
-    const sendInviteEmail = vi.fn(() => Effect.void)
-    const mergePR = vi.fn(() => Effect.void)
-    const store = new Map<string, Invite>()
-    store.set("inv-1", makeInvite({ prCreated: true, prNumber: 42, certIssued: true }))
-    const vaultCalls: { method: string; args: unknown[] }[] = []
-
-    const emailLayer = Layer.succeed(EmailService, {
-      sendInviteEmail,
-      sendCertRenewalEmail: () => Effect.void,
-    })
-    const ghLayer = Layer.succeed(GitHubClient, {
-      createCertPR: () => Effect.succeed({ prUrl: "", prNumber: 0, certUsername: "" }),
-      checkPRMerged: () => Effect.succeed(false),
-      mergePR,
-      checkWebhookSecret: () => Effect.succeed(false),
-      closePR: () => Effect.void,
-      deleteBranch: () => Effect.void,
-      revertCertFile: () => Effect.succeed({ prNumber: 0 }),
-    })
-
-    // Inline reconcile logic for testing (one cycle)
-    const reconcileOnce = Effect.gen(function* () {
-      const inviteRepo = yield* InviteRepo
-      const github = yield* GitHubClient
-      const vault = yield* VaultPki
-      const emailSvc = yield* EmailService
-
-      const pending = yield* inviteRepo.findAwaitingMerge()
-
-      for (const invite of pending) {
-        let merged = yield* github.checkPRMerged(invite.prNumber!).pipe(Effect.catchAll(() => Effect.succeed(false)))
-
-        if (!merged) {
-          merged = yield* github.mergePR(invite.prNumber!).pipe(
-            Effect.map(() => true),
-            Effect.catchAll(() => Effect.succeed(false)),
-          )
-        }
-
-        if (!merged) continue
-
-        yield* inviteRepo.markPRMerged(invite.id)
-
-        const { p12Buffer } = yield* vault.issueCertAndP12(invite.email, invite.id)
-        yield* emailSvc.sendInviteEmail(invite.email, invite.token, invite.invitedBy, p12Buffer)
-        yield* inviteRepo.markEmailSent(invite.id)
-      }
-    })
-
-    return reconcileOnce.pipe(
-      Effect.tap(() =>
-        Effect.sync(() => {
-          expect(mergePR).toHaveBeenCalledWith(42)
-          expect(sendInviteEmail).toHaveBeenCalledWith("alice@example.com", "tok-inv-1", "admin", Buffer.from("fake"))
-
-          const invite = store.get("inv-1")!
-          expect(invite.prMerged).toBe(true)
-          expect(invite.emailSent).toBe(true)
-        }),
-      ),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), ghLayer, emailLayer)),
-    )
-  })
-
-  it.effect("skips invite when merge fails", () => {
-    const sendInviteEmail = vi.fn(() => Effect.void)
-    const store = new Map<string, Invite>()
-    store.set("inv-1", makeInvite({ prCreated: true, prNumber: 42 }))
-    const vaultCalls: { method: string; args: unknown[] }[] = []
-
-    const emailLayer = Layer.succeed(EmailService, {
-      sendInviteEmail,
-      sendCertRenewalEmail: () => Effect.void,
-    })
-    const ghLayer = Layer.succeed(GitHubClient, {
-      createCertPR: () => Effect.succeed({ prUrl: "", prNumber: 0, certUsername: "" }),
-      checkPRMerged: () => Effect.succeed(false),
-      mergePR: () => Effect.fail(new GitHubError({ message: "checks pending" })),
-      checkWebhookSecret: () => Effect.succeed(false),
-      closePR: () => Effect.void,
-      deleteBranch: () => Effect.void,
-      revertCertFile: () => Effect.succeed({ prNumber: 0 }),
-    })
-
-    const reconcileOnce = Effect.gen(function* () {
-      const inviteRepo = yield* InviteRepo
-      const github = yield* GitHubClient
-
-      const pending = yield* inviteRepo.findAwaitingMerge()
-
-      for (const invite of pending) {
-        let merged = yield* github.checkPRMerged(invite.prNumber!).pipe(Effect.catchAll(() => Effect.succeed(false)))
-
-        if (!merged) {
-          merged = yield* github.mergePR(invite.prNumber!).pipe(
-            Effect.map(() => true),
-            Effect.catchAll(() => Effect.succeed(false)),
-          )
-        }
-
-        if (!merged) continue
-
-        yield* inviteRepo.markEmailSent(invite.id)
-      }
-    })
-
-    return reconcileOnce.pipe(
-      Effect.tap(() =>
-        Effect.sync(() => {
-          expect(sendInviteEmail).not.toHaveBeenCalled()
-          expect(store.get("inv-1")!.emailSent).toBe(false)
-        }),
-      ),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), ghLayer, emailLayer)),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), failingEmail)),
     )
   })
 })
@@ -525,20 +390,16 @@ describe("acceptInvite", () => {
 })
 
 describe("revokeInvite", () => {
-  it.effect("cleans up Vault, closes PR, and deletes branch for unmerged invite", () => {
+  it.effect("cleans up Vault secrets and revokes invite", () => {
     const store = new Map<string, Invite>()
     store.set(
       "inv-1",
       makeInvite({
         certIssued: true,
         certUsername: "alice",
-        prCreated: true,
-        prNumber: 42,
-        prMerged: false,
       }),
     )
     const vaultCalls: { method: string; args: unknown[] }[] = []
-    const ghCalls: { method: string; args: unknown[] }[] = []
 
     return revokeInvite("inv-1").pipe(
       Effect.tap(() =>
@@ -546,59 +407,39 @@ describe("revokeInvite", () => {
           // Vault cleanup
           expect(vaultCalls.find((c) => c.method === "deleteP12Secret")).toBeDefined()
           expect(vaultCalls.find((c) => c.method === "deleteCertByUsername" && c.args[0] === "alice")).toBeDefined()
-
-          // PR closed and branch deleted
-          expect(ghCalls.find((c) => c.method === "closePR" && c.args[0] === 42)).toBeDefined()
-          expect(ghCalls.find((c) => c.method === "deleteBranch" && c.args[0] === "inv-1")).toBeDefined()
-
-          // No revertCertFile since PR not merged
-          expect(ghCalls.find((c) => c.method === "revertCertFile")).toBeUndefined()
         }),
       ),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), mockGitHubClient(ghCalls))),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls))),
     )
   })
 
-  it.effect("creates revert PR and marks as revoking when PR was already merged", () => {
+  it.effect("derives certUsername from email when not set", () => {
     const store = new Map<string, Invite>()
     store.set(
       "inv-1",
       makeInvite({
         certIssued: true,
-        certUsername: "alice",
-        prCreated: true,
-        prNumber: 42,
-        prMerged: true,
+        certUsername: null,
+        email: "bob.smith@example.com",
       }),
     )
     const vaultCalls: { method: string; args: unknown[] }[] = []
-    const ghCalls: { method: string; args: unknown[] }[] = []
 
     return revokeInvite("inv-1").pipe(
       Effect.tap(() =>
         Effect.sync(() => {
-          // Should NOT close PR (already merged)
-          expect(ghCalls.find((c) => c.method === "closePR")).toBeUndefined()
-
-          // Should revert cert file
-          expect(ghCalls.find((c) => c.method === "revertCertFile" && c.args[0] === "alice")).toBeDefined()
-
-          // Should be in revoking state, not revoked — worker will finalize
-          const invite = store.get("inv-1")!
-          expect(invite.usedBy).toBe("__revoking__")
-          expect(invite.revertPrNumber).toBe(99) // from mock
+          expect(vaultCalls.find((c) => c.method === "deleteCertByUsername" && c.args[0] === "bobsmith")).toBeDefined()
         }),
       ),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), mockGitHubClient(ghCalls))),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls))),
     )
   })
 })
 
 describe("revokeUser", () => {
-  it.effect("deletes LLDAP user, cleans up Vault, reverts cert, and records revocation", () => {
+  it.effect("deletes LLDAP user, cleans up Vault, and records revocation", () => {
     const lldapCalls: { method: string; args: unknown[] }[] = []
     const vaultCalls: { method: string; args: unknown[] }[] = []
-    const ghCalls: { method: string; args: unknown[] }[] = []
     const revocations: Revocation[] = []
 
     return revokeUser("alice", "alice@example.com", "admin", "No longer needed").pipe(
@@ -610,9 +451,6 @@ describe("revokeUser", () => {
           // Vault cert secret cleaned up
           expect(vaultCalls.find((c) => c.method === "deleteCertByUsername" && c.args[0] === "alice")).toBeDefined()
 
-          // Cert file revert PR
-          expect(ghCalls.find((c) => c.method === "revertCertFile" && c.args[0] === "alice")).toBeDefined()
-
           // Revocation recorded
           expect(revocations).toHaveLength(1)
           expect(revocations[0].email).toBe("alice@example.com")
@@ -622,12 +460,7 @@ describe("revokeUser", () => {
         }),
       ),
       Effect.provide(
-        Layer.mergeAll(
-          mockInviteRepo(new Map(), revocations),
-          mockLldapClient(lldapCalls),
-          mockVaultPki(vaultCalls),
-          mockGitHubClient(ghCalls),
-        ),
+        Layer.mergeAll(mockInviteRepo(new Map(), revocations), mockLldapClient(lldapCalls), mockVaultPki(vaultCalls)),
       ),
     )
   })

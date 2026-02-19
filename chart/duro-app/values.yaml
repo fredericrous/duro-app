@@ -27,7 +27,7 @@ securityContext:
   capabilities:
     drop: ["ALL"]
 
-# Shared env vars (applied to both web and worker)
+# Shared env vars
 env:
   NODE_TLS_REJECT_UNAUTHORIZED: "0"
   SMTP_HOST: "stalwart.stalwart.svc.cluster.local."
@@ -36,7 +36,6 @@ env:
   SMTP_FROM: "noreply@daddyshome.fr"
   INVITE_BASE_URL: "https://join.daddyshome.fr"
   NAS_VAULT_ADDR: "https://vault.vault.mesh:15443"
-  GITHUB_REPO: "fredericrous/homelab"
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy.monitoring.svc.cluster.local.:4318"
   DURO_DB_PATH: "/db/duro.sqlite"
 
@@ -62,7 +61,7 @@ web:
 
 # Worker config
 worker:
-  enabled: true
+  enabled: false
   port: 3001
   otelServiceName: "duro-worker"
   env: {}
