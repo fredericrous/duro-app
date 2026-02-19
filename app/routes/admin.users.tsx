@@ -307,9 +307,7 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
           <>
             <div className={`${styles.alert} ${styles.alertSuccess}`}>{actionData.message}</div>
             {"warning" in actionData && actionData.warning && (
-              <div className={`${styles.alert} ${styles.alertWarning}`}>
-                {actionData.warning}. The reconciler will retry automatically.
-              </div>
+              <div className={`${styles.alert} ${styles.alertWarning}`}>{actionData.warning}</div>
             )}
           </>
         )}

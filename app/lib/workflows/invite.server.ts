@@ -44,9 +44,8 @@ export const queueInvite = (input: InviteInput) =>
       ),
       Effect.catchAll((e) =>
         Effect.gen(function* () {
-          const msg = `PR creation failed: ${e.message}`
-          warning = msg
-          yield* inviteRepo.recordReconcileError(invite.id, msg).pipe(Effect.ignore)
+          warning = "PR creation failed — the reconciler will retry automatically"
+          yield* inviteRepo.recordReconcileError(invite.id, e.message).pipe(Effect.ignore)
           yield* Effect.logWarning("PR creation failed", { error: String(e) })
         }),
       ),
