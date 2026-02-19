@@ -116,12 +116,10 @@ const Coerced = {
     decode: (v) => (v instanceof Date ? v.toISOString() : String(v)),
     encode: (v) => v,
   }),
-  NullableDateString: Schema.NullOr(
-    Schema.transform(Schema.Unknown, Schema.String, {
-      decode: (v) => (v instanceof Date ? v.toISOString() : String(v)),
-      encode: (v) => v,
-    }),
-  ),
+  NullableDateString: Schema.transform(Schema.Unknown, Schema.NullOr(Schema.String), {
+    decode: (v) => v == null ? null : (v instanceof Date ? v.toISOString() : String(v)),
+    encode: (v) => v,
+  }),
 }
 
 const InviteRow = Schema.Struct({
