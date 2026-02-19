@@ -72,7 +72,7 @@ export const EmailServiceLive = Layer.scoped(
               ),
             catch: (e) =>
               new EmailError({
-                message: "Failed to render email template",
+                message: `Failed to render email template: ${e instanceof Error ? e.message : String(e)}`,
                 cause: e,
               }),
           })
