@@ -28,6 +28,9 @@ export class VaultPki extends Context.Tag("VaultPki")<
     readonly checkCertProcessed: (
       username: string,
     ) => Effect.Effect<boolean, VaultPkiError>
+    readonly deleteCertByUsername: (
+      username: string,
+    ) => Effect.Effect<void, VaultPkiError>
   }
 >() {}
 
@@ -197,6 +200,13 @@ export const VaultPkiLive = Layer.effect(
           }),
           Effect.tapError((e) => Effect.logDebug("Failed to check cert processed", { username, error: String(e) })),
           Effect.catchAll(() => Effect.succeed(false)),
+        ),
+
+      deleteCertByUsername: (username: string) =>
+        vault.del(`/secret/metadata/pki/clients/${username}`).pipe(
+          Effect.asVoid,
+          Effect.tapError((e) => Effect.logDebug("Failed to delete cert secret by username", { username, error: String(e) })),
+          Effect.catchAll(() => Effect.void),
         ),
     }
   }),

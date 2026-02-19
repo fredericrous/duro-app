@@ -515,4 +515,58 @@ describe("InviteRepo", () => {
       }),
     )
   })
+
+  it.layer(TestLayer)("user revocations", (it) => {
+    it.effect("records and finds revocations", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+
+        yield* repo.recordRevocation("alice@example.com", "alice", "admin", "Left the team")
+
+        const revocations = yield* repo.findRevocations()
+        expect(revocations).toHaveLength(1)
+        expect(revocations[0].email).toBe("alice@example.com")
+        expect(revocations[0].username).toBe("alice")
+        expect(revocations[0].reason).toBe("Left the team")
+        expect(revocations[0].revokedBy).toBe("admin")
+        expect(revocations[0].revokedAt).toBeDefined()
+      }),
+    )
+
+    it.effect("records revocation without reason", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+
+        yield* repo.recordRevocation("bob@example.com", "bob", "admin")
+
+        const revocation = yield* repo.findRevocationByEmail("bob@example.com")
+        expect(revocation).not.toBeNull()
+        expect(revocation!.reason).toBeNull()
+      }),
+    )
+
+    it.effect("findRevocationByEmail returns null for unknown email", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const result = yield* repo.findRevocationByEmail("nobody@example.com")
+        expect(result).toBeNull()
+      }),
+    )
+
+    it.effect("deleteRevocation removes the record", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+
+        yield* repo.recordRevocation("charlie@example.com", "charlie", "admin", "test")
+
+        const revocation = yield* repo.findRevocationByEmail("charlie@example.com")
+        expect(revocation).not.toBeNull()
+
+        yield* repo.deleteRevocation(revocation!.id)
+
+        const after = yield* repo.findRevocationByEmail("charlie@example.com")
+        expect(after).toBeNull()
+      }),
+    )
+  })
 })

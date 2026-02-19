@@ -42,6 +42,15 @@ export interface Invite {
   certVerifiedAt: string | null
 }
 
+export interface Revocation {
+  id: string
+  email: string
+  username: string
+  reason: string | null
+  revokedAt: string
+  revokedBy: string
+}
+
 export class InviteError extends Data.TaggedError("InviteError")<{
   readonly message: string
   readonly cause?: unknown
@@ -102,6 +111,17 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
       Invite[],
       InviteError
     >
+    readonly recordRevocation: (
+      email: string,
+      username: string,
+      revokedBy: string,
+      reason?: string,
+    ) => Effect.Effect<void, InviteError>
+    readonly findRevocations: () => Effect.Effect<Revocation[], InviteError>
+    readonly deleteRevocation: (id: string) => Effect.Effect<void, InviteError>
+    readonly findRevocationByEmail: (
+      email: string,
+    ) => Effect.Effect<Revocation | null, InviteError>
   }
 >() {}
 
@@ -154,6 +174,21 @@ const decodeInviteRow = Schema.decodeUnknownSync(InviteRow)
 
 function rowToInvite(row: unknown): Invite {
   return decodeInviteRow(row) as Invite
+}
+
+const RevocationRow = Schema.Struct({
+  id: Schema.String,
+  email: Schema.String,
+  username: Schema.String,
+  reason: Coerced.NullableString,
+  revokedAt: Coerced.DateString,
+  revokedBy: Schema.String,
+})
+
+const decodeRevocationRow = Schema.decodeUnknownSync(RevocationRow)
+
+function rowToRevocation(row: unknown): Revocation {
+  return decodeRevocationRow(row) as Revocation
 }
 
 const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
@@ -364,6 +399,37 @@ export const InviteRepoLive = Layer.effect(
             Effect.map((rows) => rows.map(rowToInvite)),
           ),
           "Failed to find invites awaiting cert verification",
+        ),
+
+      recordRevocation: (email, username, revokedBy, reason?) =>
+        withErr(
+          sql`INSERT INTO user_revocations (id, email, username, reason, revoked_by)
+              VALUES (${crypto.randomUUID()}, ${email}, ${username}, ${reason ?? null}, ${revokedBy})`.pipe(
+            Effect.asVoid,
+          ),
+          "Failed to record revocation",
+        ),
+
+      findRevocations: () =>
+        withErr(
+          sql`SELECT * FROM user_revocations ORDER BY revoked_at DESC`.pipe(
+            Effect.map((rows) => rows.map(rowToRevocation)),
+          ),
+          "Failed to find revocations",
+        ),
+
+      deleteRevocation: (id) =>
+        withErr(
+          sql`DELETE FROM user_revocations WHERE id = ${id}`.pipe(Effect.asVoid),
+          "Failed to delete revocation",
+        ),
+
+      findRevocationByEmail: (email) =>
+        withErr(
+          sql`SELECT * FROM user_revocations WHERE email = ${email}`.pipe(
+            Effect.map((rows) => (rows.length > 0 ? rowToRevocation(rows[0]) : null)),
+          ),
+          "Failed to find revocation by email",
         ),
     }
   }),

@@ -37,6 +37,12 @@ export const makeJsonApi = <E>(
           ? HttpClientRequest.put(path).pipe(HttpClientRequest.bodyUnsafeJson(body))
           : HttpClientRequest.put(path),
       ),
+    patch: (path: string, body?: unknown) =>
+      exec(
+        body !== undefined
+          ? HttpClientRequest.patch(path).pipe(HttpClientRequest.bodyUnsafeJson(body))
+          : HttpClientRequest.patch(path),
+      ),
     del: (path: string) =>
       exec(HttpClientRequest.del(path)),
   }

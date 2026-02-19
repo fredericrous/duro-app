@@ -4,6 +4,7 @@ import nodemailer from "nodemailer"
 import type SMTPTransport from "nodemailer/lib/smtp-transport"
 import { render } from "@react-email/render"
 import { InviteEmail } from "~/lib/emails/invite-email"
+import { CertRenewalEmail } from "~/lib/emails/cert-renewal-email"
 
 export class EmailError extends Data.TaggedError("EmailError")<{
   readonly message: string
@@ -17,6 +18,10 @@ export class EmailService extends Context.Tag("EmailService")<
       email: string,
       token: string,
       invitedBy: string,
+      p12Buffer: Buffer,
+    ) => Effect.Effect<void, EmailError>
+    readonly sendCertRenewalEmail: (
+      email: string,
       p12Buffer: Buffer,
     ) => Effect.Effect<void, EmailError>
   }
@@ -98,6 +103,40 @@ export const EmailServiceLive = Layer.scoped(
             catch: (e) =>
               new EmailError({
                 message: "Failed to send invite email",
+                cause: e,
+              }),
+          })
+        }),
+
+      sendCertRenewalEmail: (email: string, p12Buffer: Buffer) =>
+        Effect.gen(function* () {
+          const html = yield* Effect.tryPromise({
+            try: () => render(CertRenewalEmail()),
+            catch: (e) =>
+              new EmailError({
+                message: "Failed to render cert renewal email template",
+                cause: e,
+              }),
+          })
+
+          yield* Effect.tryPromise({
+            try: () =>
+              transporter.sendMail({
+                from,
+                to: email,
+                subject: "Your Daddyshome certificate has been renewed",
+                html,
+                attachments: [
+                  {
+                    filename: "certificate.p12",
+                    content: p12Buffer,
+                    contentType: "application/x-pkcs12",
+                  },
+                ],
+              }),
+            catch: (e) =>
+              new EmailError({
+                message: "Failed to send cert renewal email",
                 cause: e,
               }),
           })

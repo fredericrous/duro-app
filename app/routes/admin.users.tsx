@@ -1,15 +1,17 @@
-import { useEffect, useRef } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useFetcher, useRevalidator } from "react-router"
 import type { Route } from "./+types/admin.users"
 import { runEffect } from "~/lib/runtime.server"
 import { LldapClient } from "~/lib/services/LldapClient.server"
-import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
-import { queueInvite } from "~/lib/workflows/invite.server"
+import { InviteRepo, type Invite, type Revocation } from "~/lib/services/InviteRepo.server"
+import { queueInvite, revokeInvite, revokeUser, resendCert } from "~/lib/workflows/invite.server"
 import { Effect } from "effect"
 import styles from "./admin.users.module.css"
 
+const SYSTEM_USERS = ["admin", "gitea-service"]
+
 export async function loader() {
-  const [users, groups, pendingInvites, failedInvites] = await Promise.all([
+  const [users, groups, pendingInvites, failedInvites, revocations] = await Promise.all([
     runEffect(
       Effect.gen(function* () {
         const lldap = yield* LldapClient
@@ -34,9 +36,15 @@ export async function loader() {
         return yield* repo.findFailed()
       }),
     ),
+    runEffect(
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        return yield* repo.findRevocations()
+      }),
+    ),
   ])
 
-  return { users, groups, pendingInvites, failedInvites }
+  return { users, groups, pendingInvites, failedInvites, revocations }
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -53,12 +61,7 @@ export async function action({ request }: Route.ActionArgs) {
     const inviteId = formData.get("inviteId") as string
     if (!inviteId) return { error: "Missing invite ID" }
     try {
-      await runEffect(
-        Effect.gen(function* () {
-          const repo = yield* InviteRepo
-          yield* repo.revoke(inviteId)
-        }),
-      )
+      await runEffect(revokeInvite(inviteId))
       return { success: true, message: "Invite revoked" }
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to revoke invite"
@@ -109,9 +112,62 @@ export async function action({ request }: Route.ActionArgs) {
     }
   }
 
+  if (intent === "revokeUser") {
+    const username = formData.get("username") as string
+    const email = formData.get("email") as string
+    const reason = (formData.get("reason") as string) || undefined
+    if (!username || !email) return { error: "Missing username or email" }
+    try {
+      await runEffect(revokeUser(username, email, "admin", reason))
+      return { success: true, message: `User ${username} revoked` }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to revoke user"
+      return { error: message }
+    }
+  }
+
+  if (intent === "resendCert") {
+    const username = formData.get("username") as string
+    const email = formData.get("email") as string
+    if (!username || !email) return { error: "Missing username or email" }
+    try {
+      const result = await runEffect(resendCert(email, username))
+      return result
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to send certificate"
+      return { error: message }
+    }
+  }
+
+  if (intent === "reinviteRevoked") {
+    const revocationId = formData.get("revocationId") as string
+    if (!revocationId) return { error: "Missing revocation ID" }
+    try {
+      const revocation = await runEffect(
+        Effect.gen(function* () {
+          const repo = yield* InviteRepo
+          const revocations = yield* repo.findRevocations()
+          return revocations.find((r) => r.id === revocationId) ?? null
+        }),
+      )
+      if (!revocation) return { error: "Revocation not found" }
+      await runEffect(
+        Effect.gen(function* () {
+          const repo = yield* InviteRepo
+          yield* repo.deleteRevocation(revocationId)
+        }),
+      )
+      return { success: true, message: `Revocation cleared for ${revocation.email}. You can now re-invite them.`, reinviteEmail: revocation.email }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to clear revocation"
+      return { error: message }
+    }
+  }
+
   // Default: send new invite
   const email = formData.get("email") as string
   const selectedGroups = formData.getAll("groups") as string[]
+  const confirmed = formData.get("confirmed") as string
 
   if (!email || !email.includes("@")) {
     return { error: "Valid email is required" }
@@ -121,6 +177,35 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   try {
+    // Check for previous revocation
+    if (confirmed !== "true") {
+      const revocation = await runEffect(
+        Effect.gen(function* () {
+          const repo = yield* InviteRepo
+          return yield* repo.findRevocationByEmail(email)
+        }),
+      )
+      if (revocation) {
+        return {
+          warning: `This email was previously revoked by ${revocation.revokedBy}${revocation.reason ? ` (reason: ${revocation.reason})` : ""}. Proceed anyway?`,
+          revocationId: revocation.id,
+          email,
+          groups: selectedGroups,
+        }
+      }
+    }
+
+    // Clear revocation if confirmed
+    const revocationId = formData.get("revocationId") as string
+    if (confirmed === "true" && revocationId) {
+      await runEffect(
+        Effect.gen(function* () {
+          const repo = yield* InviteRepo
+          yield* repo.deleteRevocation(revocationId)
+        }),
+      )
+    }
+
     const groupIds = selectedGroups.map((g) => {
       const [id] = g.split("|")
       return parseInt(id, 10)
@@ -161,7 +246,7 @@ function StepBadges({ invite }: { invite: Invite }) {
 }
 
 export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
-  const { users, groups, pendingInvites, failedInvites } = loaderData
+  const { users, groups, pendingInvites, failedInvites, revocations } = loaderData
   const fetcher = useFetcher<typeof action>()
   const formRef = useRef<HTMLFormElement>(null)
   const isSubmitting = fetcher.state !== "idle"
@@ -187,17 +272,36 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
     return () => clearInterval(interval)
   }, [pendingInvites, revalidator])
 
+  const actionData = fetcher.data
+  const hasWarning = actionData && "warning" in actionData
+
   return (
     <>
       {/* Invite Form */}
       <section className={styles.card}>
         <h2 className={styles.cardTitle}>Send Invite</h2>
 
-        {fetcher.data && "error" in fetcher.data && (
-          <div className={`${styles.alert} ${styles.alertError}`}>{fetcher.data.error}</div>
+        {actionData && "error" in actionData && (
+          <div className={`${styles.alert} ${styles.alertError}`}>{actionData.error}</div>
         )}
-        {fetcher.data && "success" in fetcher.data && fetcher.data.success && (
-          <div className={`${styles.alert} ${styles.alertSuccess}`}>{fetcher.data.message}</div>
+        {actionData && "success" in actionData && actionData.success && (
+          <div className={`${styles.alert} ${styles.alertSuccess}`}>{actionData.message}</div>
+        )}
+        {hasWarning && (
+          <div className={`${styles.alert} ${styles.alertWarning}`}>
+            <p>{actionData.warning}</p>
+            <fetcher.Form method="post" style={{ marginTop: "0.5rem" }}>
+              <input type="hidden" name="email" value={actionData.email} />
+              <input type="hidden" name="confirmed" value="true" />
+              <input type="hidden" name="revocationId" value={actionData.revocationId} />
+              {(actionData.groups as string[]).map((g) => (
+                <input key={g} type="hidden" name="groups" value={g} />
+              ))}
+              <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`}>
+                Proceed anyway
+              </button>
+            </fetcher.Form>
+          </div>
         )}
 
         <fetcher.Form method="post" ref={formRef}>
@@ -298,23 +402,43 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
                 <th>Display Name</th>
                 <th>Email</th>
                 <th>Created</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id}>
-                  <td>{u.id}</td>
-                  <td>{u.displayName}</td>
-                  <td>{u.email}</td>
-                  <td>
-                    {new Date(u.creationDate).toLocaleDateString()}
-                  </td>
-                </tr>
+                <UserRow key={u.id} user={u} isSystem={SYSTEM_USERS.includes(u.id)} />
               ))}
             </tbody>
           </table>
         </div>
       </section>
+
+      {/* Revoked Users */}
+      {revocations.length > 0 && (
+        <section className={styles.card}>
+          <h2 className={styles.cardTitle}>Revoked Users ({revocations.length})</h2>
+          <div className={styles.tableContainer}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Username</th>
+                  <th>Reason</th>
+                  <th>Revoked</th>
+                  <th>By</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {revocations.map((r) => (
+                  <RevokedUserRow key={r.id} revocation={r} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </>
   )
 }
@@ -364,7 +488,7 @@ function FailedInviteRow({ invite }: { invite: Invite }) {
     <tr>
       <td>{invite.email}</td>
       <td className={styles.errorText}>{invite.lastError ?? "Unknown error"}</td>
-      <td>{invite.failedAt ? new Date(invite.failedAt + "Z").toLocaleString() : "—"}</td>
+      <td>{invite.failedAt ? new Date(invite.failedAt + "Z").toLocaleString() : "\u2014"}</td>
       <td>
         <div className={styles.actionBtns}>
           <retryFetcher.Form method="post">
@@ -382,6 +506,101 @@ function FailedInviteRow({ invite }: { invite: Invite }) {
             </button>
           </revokeFetcher.Form>
         </div>
+      </td>
+    </tr>
+  )
+}
+
+function UserRow({ user, isSystem }: { user: { id: string; displayName: string; email: string; creationDate: string }; isSystem: boolean }) {
+  const [showRevoke, setShowRevoke] = useState(false)
+  const certFetcher = useFetcher()
+  const revokeFetcher = useFetcher()
+  const isSendingCert = certFetcher.state !== "idle"
+  const isRevoking = revokeFetcher.state !== "idle"
+
+  useEffect(() => {
+    if (revokeFetcher.data && "success" in revokeFetcher.data) {
+      setShowRevoke(false)
+    }
+  }, [revokeFetcher.data])
+
+  return (
+    <>
+      <tr>
+        <td>{user.id}</td>
+        <td>{user.displayName}</td>
+        <td>{user.email}</td>
+        <td>{new Date(user.creationDate).toLocaleDateString()}</td>
+        <td>
+          {!isSystem && (
+            <div className={styles.actionBtns}>
+              <certFetcher.Form method="post">
+                <input type="hidden" name="intent" value="resendCert" />
+                <input type="hidden" name="username" value={user.id} />
+                <input type="hidden" name="email" value={user.email} />
+                <button type="submit" className={styles.btnGhost} disabled={isSendingCert || isRevoking}>
+                  {isSendingCert ? "Sending..." : "Send Cert"}
+                </button>
+              </certFetcher.Form>
+              <button
+                type="button"
+                className={`${styles.btnGhost} ${styles.btnGhostDanger}`}
+                disabled={isRevoking}
+                onClick={() => setShowRevoke(!showRevoke)}
+              >
+                Revoke
+              </button>
+            </div>
+          )}
+        </td>
+      </tr>
+      {showRevoke && (
+        <tr>
+          <td colSpan={5}>
+            <revokeFetcher.Form method="post" className={styles.inlineRevokeForm}>
+              <input type="hidden" name="intent" value="revokeUser" />
+              <input type="hidden" name="username" value={user.id} />
+              <input type="hidden" name="email" value={user.email} />
+              <input
+                name="reason"
+                type="text"
+                placeholder="Reason (optional)"
+                className={styles.input}
+                style={{ flex: 1 }}
+              />
+              <button type="submit" className={`${styles.btn} ${styles.btnDanger}`} disabled={isRevoking}>
+                {isRevoking ? "Revoking..." : "Confirm Revoke"}
+              </button>
+              <button type="button" className={styles.btnGhost} onClick={() => setShowRevoke(false)}>
+                Cancel
+              </button>
+            </revokeFetcher.Form>
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+function RevokedUserRow({ revocation }: { revocation: Revocation }) {
+  const fetcher = useFetcher()
+  const isSubmitting = fetcher.state !== "idle"
+
+  return (
+    <tr>
+      <td>{revocation.email}</td>
+      <td>{revocation.username}</td>
+      <td>{revocation.reason ?? "\u2014"}</td>
+      <td>{new Date(revocation.revokedAt + "Z").toLocaleDateString()}</td>
+      <td>{revocation.revokedBy}</td>
+      <td>
+        <fetcher.Form method="post">
+          <input type="hidden" name="intent" value="reinviteRevoked" />
+          <input type="hidden" name="revocationId" value={revocation.id} />
+          <button type="submit" className={styles.btnGhost} disabled={isSubmitting}>
+            {isSubmitting ? "Processing..." : "Re-invite"}
+          </button>
+        </fetcher.Form>
       </td>
     </tr>
   )

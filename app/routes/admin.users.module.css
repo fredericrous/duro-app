@@ -95,6 +95,12 @@
   color: #86efac;
 }
 
+.alertWarning {
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  color: #fde047;
+}
+
 .tableContainer {
   overflow-x: auto;
 }
@@ -189,4 +195,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.btnDanger {
+  background: rgba(239, 68, 68, 0.8);
+  color: #fff;
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 1);
+}
+
+.inlineRevokeForm {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
 }

@@ -1,11 +1,12 @@
 import { describe, expect, vi } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { queueInvite, acceptInvite } from "./invite.server"
+import { queueInvite, acceptInvite, revokeInvite, revokeUser, resendCert } from "./invite.server"
 import {
   InviteRepo,
   InviteError,
   type Invite,
+  type Revocation,
 } from "~/lib/services/InviteRepo.server"
 import {
   LldapClient,
@@ -50,7 +51,10 @@ function makeInvite(overrides: Partial<Invite> = {}): Invite {
 
 // --- Mock Layers ---
 
-const mockInviteRepo = (store: Map<string, Invite> = new Map()) =>
+const mockInviteRepo = (
+  store: Map<string, Invite> = new Map(),
+  revocations: Revocation[] = [],
+) =>
   Layer.succeed(InviteRepo, {
     create: (input) =>
       Effect.sync(() => {
@@ -147,6 +151,25 @@ const mockInviteRepo = (store: Map<string, Invite> = new Map()) =>
       Effect.sync(() =>
         [...store.values()].filter((i) => i.emailSent && !i.certVerified && i.certUsername != null && !i.usedAt && !i.failedAt),
       ),
+    recordRevocation: (email, username, revokedBy, reason?) =>
+      Effect.sync(() => {
+        revocations.push({
+          id: `rev-${revocations.length + 1}`,
+          email,
+          username,
+          reason: reason ?? null,
+          revokedAt: new Date().toISOString(),
+          revokedBy,
+        })
+      }),
+    findRevocations: () => Effect.sync(() => revocations),
+    deleteRevocation: (id) =>
+      Effect.sync(() => {
+        const idx = revocations.findIndex((r) => r.id === id)
+        if (idx >= 0) revocations.splice(idx, 1)
+      }),
+    findRevocationByEmail: (email) =>
+      Effect.sync(() => revocations.find((r) => r.email === email) ?? null),
   })
 
 const mockLldapClient = (
@@ -173,30 +196,60 @@ const mockLldapClient = (
       }),
   })
 
-const mockVaultPki = Layer.succeed(VaultPki, {
-  issueCertAndP12: () => Effect.succeed({ p12Buffer: Buffer.from("fake"), password: "pass" }),
-  getP12Password: () => Effect.succeed("pass"),
-  consumeP12Password: () => Effect.succeed("pass"),
-  deleteP12Secret: () => Effect.void,
-  checkCertProcessed: () => Effect.succeed(false),
-})
+const mockVaultPki = (calls: { method: string; args: unknown[] }[] = []) =>
+  Layer.succeed(VaultPki, {
+    issueCertAndP12: (_email, _id) => {
+      calls.push({ method: "issueCertAndP12", args: [_email, _id] })
+      return Effect.succeed({ p12Buffer: Buffer.from("fake"), password: "pass" })
+    },
+    getP12Password: () => Effect.succeed("pass"),
+    consumeP12Password: () => Effect.succeed("pass"),
+    deleteP12Secret: (id) => {
+      calls.push({ method: "deleteP12Secret", args: [id] })
+      return Effect.void
+    },
+    checkCertProcessed: () => Effect.succeed(false),
+    deleteCertByUsername: (username) => {
+      calls.push({ method: "deleteCertByUsername", args: [username] })
+      return Effect.void
+    },
+  })
 
-const mockGitHubClient = Layer.succeed(GitHubClient, {
-  createCertPR: () => Effect.succeed({ prUrl: "https://github.com/pr/1", prNumber: 1, certUsername: "alice" }),
-  checkPRMerged: () => Effect.succeed(false),
-  mergePR: () => Effect.void,
-  checkWebhookSecret: () => Effect.succeed(false),
-})
+const mockGitHubClient = (calls: { method: string; args: unknown[] }[] = []) =>
+  Layer.succeed(GitHubClient, {
+    createCertPR: () => Effect.succeed({ prUrl: "https://github.com/pr/1", prNumber: 1, certUsername: "alice" }),
+    checkPRMerged: () => Effect.succeed(false),
+    mergePR: () => Effect.void,
+    checkWebhookSecret: () => Effect.succeed(false),
+    closePR: (prNumber) => {
+      calls.push({ method: "closePR", args: [prNumber] })
+      return Effect.void
+    },
+    deleteBranch: (inviteId) => {
+      calls.push({ method: "deleteBranch", args: [inviteId] })
+      return Effect.void
+    },
+    revertCertFile: (username, email) => {
+      calls.push({ method: "revertCertFile", args: [username, email] })
+      return Effect.succeed({ prNumber: 99 })
+    },
+  })
 
-const mockEmailService = Layer.succeed(EmailService, {
-  sendInviteEmail: () => Effect.void,
-})
+const mockEmailService = (calls: { method: string; args: unknown[] }[] = []) =>
+  Layer.succeed(EmailService, {
+    sendInviteEmail: () => Effect.void,
+    sendCertRenewalEmail: (email, p12Buffer) => {
+      calls.push({ method: "sendCertRenewalEmail", args: [email, p12Buffer] })
+      return Effect.void
+    },
+  })
 
 // --- Tests ---
 
 describe("queueInvite", () => {
   it.effect("creates an invite, issues cert, and creates PR", () => {
     const store = new Map<string, Invite>()
+    const vaultCalls: { method: string; args: unknown[] }[] = []
 
     return queueInvite({
       email: "alice@example.com",
@@ -218,19 +271,23 @@ describe("queueInvite", () => {
         }),
       ),
       Effect.provide(
-        Layer.mergeAll(mockInviteRepo(store), mockVaultPki, mockGitHubClient),
+        Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), mockGitHubClient()),
       ),
     )
   })
 
   it.effect("continues even if PR creation fails", () => {
     const store = new Map<string, Invite>()
+    const vaultCalls: { method: string; args: unknown[] }[] = []
 
     const failingGitHub = Layer.succeed(GitHubClient, {
       createCertPR: () => Effect.fail(new GitHubError({ message: "GitHub down" })),
       checkPRMerged: () => Effect.succeed(false),
       mergePR: () => Effect.void,
       checkWebhookSecret: () => Effect.succeed(false),
+      closePR: () => Effect.void,
+      deleteBranch: () => Effect.void,
+      revertCertFile: () => Effect.succeed({ prNumber: 0 }),
     })
 
     return queueInvite({
@@ -250,7 +307,7 @@ describe("queueInvite", () => {
         }),
       ),
       Effect.provide(
-        Layer.mergeAll(mockInviteRepo(store), mockVaultPki, failingGitHub),
+        Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), failingGitHub),
       ),
     )
   })
@@ -262,13 +319,20 @@ describe("reconciler logic", () => {
     const mergePR = vi.fn(() => Effect.void)
     const store = new Map<string, Invite>()
     store.set("inv-1", makeInvite({ prCreated: true, prNumber: 42, certIssued: true }))
+    const vaultCalls: { method: string; args: unknown[] }[] = []
 
-    const emailLayer = Layer.succeed(EmailService, { sendInviteEmail })
+    const emailLayer = Layer.succeed(EmailService, {
+      sendInviteEmail,
+      sendCertRenewalEmail: () => Effect.void,
+    })
     const ghLayer = Layer.succeed(GitHubClient, {
       createCertPR: () => Effect.succeed({ prUrl: "", prNumber: 0, certUsername: "" }),
       checkPRMerged: () => Effect.succeed(false),
       mergePR,
       checkWebhookSecret: () => Effect.succeed(false),
+      closePR: () => Effect.void,
+      deleteBranch: () => Effect.void,
+      revertCertFile: () => Effect.succeed({ prNumber: 0 }),
     })
 
     // Inline reconcile logic for testing (one cycle)
@@ -319,7 +383,7 @@ describe("reconciler logic", () => {
         }),
       ),
       Effect.provide(
-        Layer.mergeAll(mockInviteRepo(store), mockVaultPki, ghLayer, emailLayer),
+        Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), ghLayer, emailLayer),
       ),
     )
   })
@@ -328,13 +392,20 @@ describe("reconciler logic", () => {
     const sendInviteEmail = vi.fn(() => Effect.void)
     const store = new Map<string, Invite>()
     store.set("inv-1", makeInvite({ prCreated: true, prNumber: 42 }))
+    const vaultCalls: { method: string; args: unknown[] }[] = []
 
-    const emailLayer = Layer.succeed(EmailService, { sendInviteEmail })
+    const emailLayer = Layer.succeed(EmailService, {
+      sendInviteEmail,
+      sendCertRenewalEmail: () => Effect.void,
+    })
     const ghLayer = Layer.succeed(GitHubClient, {
       createCertPR: () => Effect.succeed({ prUrl: "", prNumber: 0, certUsername: "" }),
       checkPRMerged: () => Effect.succeed(false),
       mergePR: () => Effect.fail(new GitHubError({ message: "checks pending" })),
       checkWebhookSecret: () => Effect.succeed(false),
+      closePR: () => Effect.void,
+      deleteBranch: () => Effect.void,
+      revertCertFile: () => Effect.succeed({ prNumber: 0 }),
     })
 
     const reconcileOnce = Effect.gen(function* () {
@@ -369,7 +440,7 @@ describe("reconciler logic", () => {
         }),
       ),
       Effect.provide(
-        Layer.mergeAll(mockInviteRepo(store), mockVaultPki, ghLayer, emailLayer),
+        Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), ghLayer, emailLayer),
       ),
     )
   })
@@ -382,11 +453,12 @@ describe("acceptInvite", () => {
       const store = new Map<string, Invite>()
       store.set("inv-1", makeInvite())
       const lldapCalls: { method: string; args: unknown[] }[] = []
+      const vaultCalls: { method: string; args: unknown[] }[] = []
 
       const layer = Layer.mergeAll(
         mockInviteRepo(store),
         mockLldapClient(lldapCalls),
-        mockVaultPki,
+        mockVaultPki(vaultCalls),
       )
 
       return acceptInvite("tok-inv-1", {
@@ -421,6 +493,7 @@ describe("acceptInvite", () => {
     const store = new Map<string, Invite>()
     store.set("inv-1", makeInvite())
     const lldapCalls: { method: string; args: unknown[] }[] = []
+    const vaultCalls: { method: string; args: unknown[] }[] = []
 
     const layer = Layer.mergeAll(
       mockInviteRepo(store),
@@ -441,7 +514,7 @@ describe("acceptInvite", () => {
             lldapCalls.push({ method: "deleteUser", args: [userId] })
           }),
       }),
-      mockVaultPki,
+      mockVaultPki(vaultCalls),
     )
 
     return acceptInvite("tok-inv-1", {
@@ -459,6 +532,138 @@ describe("acceptInvite", () => {
         }),
       ),
       Effect.provide(layer),
+    )
+  })
+})
+
+describe("revokeInvite", () => {
+  it.effect("cleans up Vault, closes PR, and deletes branch for unmerged invite", () => {
+    const store = new Map<string, Invite>()
+    store.set("inv-1", makeInvite({
+      certIssued: true,
+      certUsername: "alice",
+      prCreated: true,
+      prNumber: 42,
+      prMerged: false,
+    }))
+    const vaultCalls: { method: string; args: unknown[] }[] = []
+    const ghCalls: { method: string; args: unknown[] }[] = []
+
+    return revokeInvite("inv-1").pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          // Vault cleanup
+          expect(vaultCalls.find((c) => c.method === "deleteP12Secret")).toBeDefined()
+          expect(vaultCalls.find((c) => c.method === "deleteCertByUsername" && c.args[0] === "alice")).toBeDefined()
+
+          // PR closed and branch deleted
+          expect(ghCalls.find((c) => c.method === "closePR" && c.args[0] === 42)).toBeDefined()
+          expect(ghCalls.find((c) => c.method === "deleteBranch" && c.args[0] === "inv-1")).toBeDefined()
+
+          // No revertCertFile since PR not merged
+          expect(ghCalls.find((c) => c.method === "revertCertFile")).toBeUndefined()
+        }),
+      ),
+      Effect.provide(
+        Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), mockGitHubClient(ghCalls)),
+      ),
+    )
+  })
+
+  it.effect("reverts cert file when PR was already merged", () => {
+    const store = new Map<string, Invite>()
+    store.set("inv-1", makeInvite({
+      certIssued: true,
+      certUsername: "alice",
+      prCreated: true,
+      prNumber: 42,
+      prMerged: true,
+    }))
+    const vaultCalls: { method: string; args: unknown[] }[] = []
+    const ghCalls: { method: string; args: unknown[] }[] = []
+
+    return revokeInvite("inv-1").pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          // Should NOT close PR (already merged)
+          expect(ghCalls.find((c) => c.method === "closePR")).toBeUndefined()
+
+          // Should revert cert file
+          expect(ghCalls.find((c) => c.method === "revertCertFile" && c.args[0] === "alice")).toBeDefined()
+        }),
+      ),
+      Effect.provide(
+        Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), mockGitHubClient(ghCalls)),
+      ),
+    )
+  })
+})
+
+describe("revokeUser", () => {
+  it.effect("deletes LLDAP user, cleans up Vault, reverts cert, and records revocation", () => {
+    const lldapCalls: { method: string; args: unknown[] }[] = []
+    const vaultCalls: { method: string; args: unknown[] }[] = []
+    const ghCalls: { method: string; args: unknown[] }[] = []
+    const revocations: Revocation[] = []
+
+    return revokeUser("alice", "alice@example.com", "admin", "No longer needed").pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          // LLDAP user deleted
+          expect(lldapCalls.find((c) => c.method === "deleteUser" && c.args[0] === "alice")).toBeDefined()
+
+          // Vault cert secret cleaned up
+          expect(vaultCalls.find((c) => c.method === "deleteCertByUsername" && c.args[0] === "alice")).toBeDefined()
+
+          // Cert file revert PR
+          expect(ghCalls.find((c) => c.method === "revertCertFile" && c.args[0] === "alice")).toBeDefined()
+
+          // Revocation recorded
+          expect(revocations).toHaveLength(1)
+          expect(revocations[0].email).toBe("alice@example.com")
+          expect(revocations[0].username).toBe("alice")
+          expect(revocations[0].reason).toBe("No longer needed")
+          expect(revocations[0].revokedBy).toBe("admin")
+        }),
+      ),
+      Effect.provide(
+        Layer.mergeAll(
+          mockInviteRepo(new Map(), revocations),
+          mockLldapClient(lldapCalls),
+          mockVaultPki(vaultCalls),
+          mockGitHubClient(ghCalls),
+        ),
+      ),
+    )
+  })
+})
+
+describe("resendCert", () => {
+  it.effect("issues a fresh cert and sends renewal email", () => {
+    const vaultCalls: { method: string; args: unknown[] }[] = []
+    const emailCalls: { method: string; args: unknown[] }[] = []
+
+    return resendCert("alice@example.com", "alice").pipe(
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          expect(result.success).toBe(true)
+          expect(result.message).toContain("alice@example.com")
+
+          // Cert issued
+          const issueCall = vaultCalls.find((c) => c.method === "issueCertAndP12")
+          expect(issueCall).toBeDefined()
+          expect(issueCall!.args[0]).toBe("alice@example.com")
+
+          // Renewal email sent
+          expect(emailCalls.find((c) => c.method === "sendCertRenewalEmail" && c.args[0] === "alice@example.com")).toBeDefined()
+
+          // Temp secret cleaned up
+          expect(vaultCalls.find((c) => c.method === "deleteP12Secret")).toBeDefined()
+        }),
+      ),
+      Effect.provide(
+        Layer.mergeAll(mockVaultPki(vaultCalls), mockEmailService(emailCalls)),
+      ),
     )
   })
 })
