@@ -25,6 +25,13 @@ export const queueInvite = (input: InviteInput) =>
     const vault = yield* VaultPki
     const emailSvc = yield* EmailService
 
+    // Revoke any existing failed invite for this email so we can re-create
+    const existingFailed = yield* inviteRepo.findFailed()
+    const stale = existingFailed.find((i) => i.email === input.email)
+    if (stale) {
+      yield* inviteRepo.revoke(stale.id)
+    }
+
     const invite = yield* inviteRepo.create(input)
 
     // Derive certUsername for revocation cleanup
