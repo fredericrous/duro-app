@@ -132,6 +132,23 @@ spec:
             ...(existingSha ? { sha: existingSha } : {}),
           })
 
+          // Add entry to kustomization.yaml if not already present
+          const kustomizationPath = `kubernetes/nas/platform-foundation/vault/client-certs/kustomization.yaml`
+          const kustomFile = yield* gh.get(`/contents/${kustomizationPath}?ref=${branch}`)
+          const kustomSha = (kustomFile as { sha: string }).sha
+          const kustomContent = Buffer.from((kustomFile as { content: string }).content, "base64").toString("utf-8")
+          const certEntry = `  - certificates/${normalizedUsername}.yaml`
+
+          if (!kustomContent.includes(certEntry)) {
+            const updatedContent = kustomContent.trimEnd() + `\n${certEntry}\n`
+            yield* gh.put(`/contents/${kustomizationPath}`, {
+              message: `chore: add ${normalizedUsername} to kustomization`,
+              content: Buffer.from(updatedContent).toString("base64"),
+              branch,
+              sha: kustomSha,
+            })
+          }
+
           // Create PR
           const pr = yield* gh.post(`/pulls`, {
             title: `feat: add client certificate for ${email}`,
@@ -187,17 +204,29 @@ spec:
             sha: mainSha,
           })
 
-          // Create new tree without the file using Git Data API (sha: null = delete)
+          // Remove entry from kustomization.yaml
+          const kustomizationPath = `kubernetes/nas/platform-foundation/vault/client-certs/kustomization.yaml`
+          const kustomFile = yield* gh.get(`/contents/${kustomizationPath}?ref=main`)
+          const kustomContent = Buffer.from((kustomFile as { content: string }).content, "base64").toString("utf-8")
+          const certEntry = `  - certificates/${username}.yaml\n`
+          const updatedKustomContent = kustomContent.replace(certEntry, "")
+
+          // Build tree: delete cert file + update kustomization
+          const treeItems: Array<{ path: string; mode: string; type: string; sha: string | null; content?: string }> = [
+            { path: filePath, mode: "100644", type: "blob", sha: null },
+          ]
+          if (updatedKustomContent !== kustomContent) {
+            treeItems.push({
+              path: kustomizationPath,
+              mode: "100644",
+              type: "blob",
+              content: updatedKustomContent,
+            })
+          }
+
           const newTree = yield* gh.post(`/git/trees`, {
             base_tree: mainSha,
-            tree: [
-              {
-                path: filePath,
-                mode: "100644",
-                type: "blob",
-                sha: null,
-              },
-            ],
+            tree: treeItems,
           })
           const newTreeSha = (newTree as { sha: string }).sha
 
