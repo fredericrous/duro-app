@@ -292,7 +292,7 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
   }, [pendingInvites, revokingInvites, revalidator])
 
   const actionData = fetcher.data
-  const hasWarning = actionData && "warning" in actionData
+  const hasRevocationWarning = actionData && "warning" in actionData && "groups" in actionData
 
   return (
     <>
@@ -313,7 +313,7 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
             )}
           </>
         )}
-        {hasWarning && (
+        {hasRevocationWarning && (
           <div className={`${styles.alert} ${styles.alertWarning}`}>
             <p>{actionData.warning}</p>
             <fetcher.Form method="post" style={{ marginTop: "0.5rem" }}>
