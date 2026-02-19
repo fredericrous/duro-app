@@ -41,9 +41,7 @@ export const queueInvite = (input: InviteInput) =>
           inviteRepo.setCertUsername(invite.id, certUsername),
         ]),
       ),
-      Effect.catchAll((e) =>
-        Effect.logWarning("PR creation failed").pipe(Effect.annotateLogs("error", String(e))),
-      ),
+      Effect.catchAll((e) => Effect.logWarning("PR creation failed").pipe(Effect.annotateLogs("error", String(e)))),
     )
 
     // Email sent by reconciler after PR merge
@@ -83,16 +81,10 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
       }
     }).pipe(
       Effect.tapError(() =>
-        lldap
-          .deleteUser(input.username)
-          .pipe(
-            Effect.tap(() =>
-              Effect.logWarning(
-                `Rolled back user ${input.username} after configuration failure`,
-              ),
-            ),
-            Effect.ignore,
-          ),
+        lldap.deleteUser(input.username).pipe(
+          Effect.tap(() => Effect.logWarning(`Rolled back user ${input.username} after configuration failure`)),
+          Effect.ignore,
+        ),
       ),
     )
 
@@ -116,25 +108,31 @@ export const revokeInvite = (inviteId: string) =>
     if (!invite) return
 
     // Clean up Vault P12 secret
-    yield* vault.deleteP12Secret(inviteId).pipe(
-      Effect.catchAll((e) => Effect.logWarning("revokeInvite: failed to delete P12 secret", { error: String(e) })),
-    )
+    yield* vault
+      .deleteP12Secret(inviteId)
+      .pipe(
+        Effect.catchAll((e) => Effect.logWarning("revokeInvite: failed to delete P12 secret", { error: String(e) })),
+      )
 
     // Clean up p12-generator-controller secret
     if (invite.certUsername) {
-      yield* vault.deleteCertByUsername(invite.certUsername).pipe(
-        Effect.catchAll((e) => Effect.logWarning("revokeInvite: failed to delete cert by username", { error: String(e) })),
-      )
+      yield* vault
+        .deleteCertByUsername(invite.certUsername)
+        .pipe(
+          Effect.catchAll((e) =>
+            Effect.logWarning("revokeInvite: failed to delete cert by username", { error: String(e) }),
+          ),
+        )
     }
 
     // Close PR and delete branch if PR exists and not merged
     if (invite.prNumber && !invite.prMerged) {
-      yield* github.closePR(invite.prNumber).pipe(
-        Effect.catchAll((e) => Effect.logWarning("revokeInvite: failed to close PR", { error: String(e) })),
-      )
-      yield* github.deleteBranch(inviteId).pipe(
-        Effect.catchAll((e) => Effect.logWarning("revokeInvite: failed to delete branch", { error: String(e) })),
-      )
+      yield* github
+        .closePR(invite.prNumber)
+        .pipe(Effect.catchAll((e) => Effect.logWarning("revokeInvite: failed to close PR", { error: String(e) })))
+      yield* github
+        .deleteBranch(inviteId)
+        .pipe(Effect.catchAll((e) => Effect.logWarning("revokeInvite: failed to delete branch", { error: String(e) })))
     }
 
     // If PR was merged, create revert PR and let worker wait for merge
@@ -167,22 +165,25 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
     const inviteRepo = yield* InviteRepo
 
     // Remove from LLDAP
-    yield* lldap.deleteUser(username).pipe(
-      Effect.catchAll((e) => Effect.logWarning("revokeUser: failed to delete LLDAP user", { error: String(e) })),
-    )
+    yield* lldap
+      .deleteUser(username)
+      .pipe(Effect.catchAll((e) => Effect.logWarning("revokeUser: failed to delete LLDAP user", { error: String(e) })))
 
     // Derive cert username from email (matching queueInvite pattern)
-    const certUsername = email.split("@")[0].replace(/[^a-z0-9_-]/gi, "").toLowerCase()
+    const certUsername = email
+      .split("@")[0]
+      .replace(/[^a-z0-9_-]/gi, "")
+      .toLowerCase()
 
     // Clean up Vault secret
-    yield* vault.deleteCertByUsername(certUsername).pipe(
-      Effect.catchAll((e) => Effect.logWarning("revokeUser: failed to delete cert secret", { error: String(e) })),
-    )
+    yield* vault
+      .deleteCertByUsername(certUsername)
+      .pipe(Effect.catchAll((e) => Effect.logWarning("revokeUser: failed to delete cert secret", { error: String(e) })))
 
     // PR to remove cert-manager Certificate
-    yield* github.revertCertFile(certUsername, email).pipe(
-      Effect.catchAll((e) => Effect.logWarning("revokeUser: failed to revert cert file", { error: String(e) })),
-    )
+    yield* github
+      .revertCertFile(certUsername, email)
+      .pipe(Effect.catchAll((e) => Effect.logWarning("revokeUser: failed to revert cert file", { error: String(e) })))
 
     // Record revocation in audit log
     yield* inviteRepo.recordRevocation(email, username, revokedBy, reason)
@@ -204,9 +205,11 @@ export const resendCert = (email: string, username: string) =>
     yield* emailService.sendCertRenewalEmail(email, p12Buffer)
 
     // Clean up temp secret
-    yield* vault.deleteP12Secret(tempId).pipe(
-      Effect.catchAll((e) => Effect.logWarning("resendCert: failed to clean up temp secret", { error: String(e) })),
-    )
+    yield* vault
+      .deleteP12Secret(tempId)
+      .pipe(
+        Effect.catchAll((e) => Effect.logWarning("resendCert: failed to clean up temp secret", { error: String(e) })),
+      )
 
     return { success: true as const, message: `Certificate sent to ${email}` }
   }).pipe(Effect.withSpan("resendCert", { attributes: { email, username } }))

@@ -1,14 +1,4 @@
-import {
-  Body,
-  Container,
-  Head,
-  Heading,
-  Html,
-  Preview,
-  Section,
-  Text,
-  Hr,
-} from "@react-email/components"
+import { Body, Container, Head, Heading, Html, Preview, Section, Text, Hr } from "@react-email/components"
 
 export function CertRenewalEmail() {
   return (
@@ -20,8 +10,7 @@ export function CertRenewalEmail() {
           <Heading style={heading}>Certificate Renewed</Heading>
 
           <Text style={text}>
-            Your security certificate for Daddyshome has been renewed. A new
-            certificate is attached to this email as{" "}
+            Your security certificate for Daddyshome has been renewed. A new certificate is attached to this email as{" "}
             <strong>certificate.p12</strong>.
           </Text>
 
@@ -32,29 +21,25 @@ export function CertRenewalEmail() {
               Install Your New Certificate
             </Heading>
             <Text style={text}>
-              Please install this certificate to continue accessing Daddyshome
-              services. You may need to remove the old certificate first.
+              Please install this certificate to continue accessing Daddyshome services. You may need to remove the old
+              certificate first.
             </Text>
 
             <Text style={textSmall}>
-              <strong>macOS:</strong> Double-click the .p12 file to open
-              Keychain Access, enter the password when prompted, then trust the
-              certificate. You can remove the old certificate from Keychain
-              Access.
+              <strong>macOS:</strong> Double-click the .p12 file to open Keychain Access, enter the password when
+              prompted, then trust the certificate. You can remove the old certificate from Keychain Access.
             </Text>
             <Text style={textSmall}>
-              <strong>Windows:</strong> Double-click the .p12 file, follow the
-              Certificate Import Wizard, and enter the password when prompted.
-              You can remove the old certificate from the Certificate Manager.
+              <strong>Windows:</strong> Double-click the .p12 file, follow the Certificate Import Wizard, and enter the
+              password when prompted. You can remove the old certificate from the Certificate Manager.
             </Text>
           </Section>
 
           <Hr style={hr} />
 
           <Text style={footer}>
-            This is an automated renewal. Your account and access remain
-            unchanged — only the certificate has been updated. If you didn't
-            expect this, please contact your administrator.
+            This is an automated renewal. Your account and access remain unchanged — only the certificate has been
+            updated. If you didn't expect this, please contact your administrator.
           </Text>
         </Container>
       </Body>
@@ -64,8 +49,7 @@ export function CertRenewalEmail() {
 
 const main = {
   backgroundColor: "#0f0f0f",
-  fontFamily:
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   padding: "40px 0",
 }
 

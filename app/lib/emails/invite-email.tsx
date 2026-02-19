@@ -1,16 +1,4 @@
-import {
-  Body,
-  Container,
-  Head,
-  Heading,
-  Html,
-  Link,
-  Preview,
-  Section,
-  Text,
-  Button,
-  Hr,
-} from "@react-email/components"
+import { Body, Container, Head, Heading, Html, Link, Preview, Section, Text, Button, Hr } from "@react-email/components"
 
 interface InviteEmailProps {
   inviteUrl: string
@@ -28,8 +16,7 @@ export function InviteEmail({ inviteUrl, reinviteUrl, invitedBy }: InviteEmailPr
           <Heading style={heading}>Welcome to Daddyshome</Heading>
 
           <Text style={text}>
-            {invitedBy} has invited you to join Daddyshome, a private platform
-            for media, productivity, and more.
+            {invitedBy} has invited you to join Daddyshome, a private platform for media, productivity, and more.
           </Text>
 
           <Hr style={hr} />
@@ -39,19 +26,17 @@ export function InviteEmail({ inviteUrl, reinviteUrl, invitedBy }: InviteEmailPr
               Step 1: Install Your Certificate
             </Heading>
             <Text style={text}>
-              Your security certificate is attached to this email as{" "}
-              <strong>certificate.p12</strong>. You'll see the password to
-              install it when you click the link below.
+              Your security certificate is attached to this email as <strong>certificate.p12</strong>. You'll see the
+              password to install it when you click the link below.
             </Text>
 
             <Text style={textSmall}>
-              <strong>macOS:</strong> Double-click the .p12 file to open
-              Keychain Access, enter the password when prompted, then trust the
-              certificate.
+              <strong>macOS:</strong> Double-click the .p12 file to open Keychain Access, enter the password when
+              prompted, then trust the certificate.
             </Text>
             <Text style={textSmall}>
-              <strong>Windows:</strong> Double-click the .p12 file, follow the
-              Certificate Import Wizard, and enter the password when prompted.
+              <strong>Windows:</strong> Double-click the .p12 file, follow the Certificate Import Wizard, and enter the
+              password when prompted.
             </Text>
           </Section>
 
@@ -59,10 +44,7 @@ export function InviteEmail({ inviteUrl, reinviteUrl, invitedBy }: InviteEmailPr
             <Heading as="h2" style={subheading}>
               Step 2: Create Your Account
             </Heading>
-            <Text style={text}>
-              After installing your certificate, click the button below to
-              create your account.
-            </Text>
+            <Text style={text}>After installing your certificate, click the button below to create your account.</Text>
           </Section>
 
           <Section style={buttonContainer}>
@@ -78,8 +60,7 @@ export function InviteEmail({ inviteUrl, reinviteUrl, invitedBy }: InviteEmailPr
             <Link href={reinviteUrl} style={footerLink}>
               Request one here
             </Link>
-            . If you didn't expect this invitation, you can safely ignore this
-            email.
+            . If you didn't expect this invitation, you can safely ignore this email.
           </Text>
         </Container>
       </Body>
@@ -89,8 +70,7 @@ export function InviteEmail({ inviteUrl, reinviteUrl, invitedBy }: InviteEmailPr
 
 const main = {
   backgroundColor: "#0f0f0f",
-  fontFamily:
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   padding: "40px 0",
 }
 

@@ -7,12 +7,7 @@ type ButtonLinkProps = ComponentProps<typeof Link> & {
   size?: "default" | "small"
 }
 
-export function ButtonLink({
-  variant = "primary",
-  size = "default",
-  className,
-  ...props
-}: ButtonLinkProps) {
+export function ButtonLink({ variant = "primary", size = "default", className, ...props }: ButtonLinkProps) {
   const cls = [
     styles.btn,
     variant === "primary" ? styles.primary : styles.ghost,

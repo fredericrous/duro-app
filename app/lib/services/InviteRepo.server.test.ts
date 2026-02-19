@@ -5,9 +5,7 @@ import { InviteRepo, InviteRepoLive, InviteError } from "./InviteRepo.server"
 import { makeTestDbLayer } from "~/lib/db/client.server"
 import { hashToken } from "~/lib/crypto.server"
 
-const TestLayer = InviteRepoLive.pipe(
-  Layer.provide(makeTestDbLayer(":memory:")),
-)
+const TestLayer = InviteRepoLive.pipe(Layer.provide(makeTestDbLayer(":memory:")))
 
 describe("InviteRepo", () => {
   it.layer(TestLayer)("create + findById", (it) => {

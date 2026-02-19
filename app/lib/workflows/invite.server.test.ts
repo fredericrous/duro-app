@@ -2,16 +2,8 @@ import { describe, expect, vi } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { queueInvite, acceptInvite, revokeInvite, revokeUser, resendCert } from "./invite.server"
-import {
-  InviteRepo,
-  InviteError,
-  type Invite,
-  type Revocation,
-} from "~/lib/services/InviteRepo.server"
-import {
-  LldapClient,
-  LldapError,
-} from "~/lib/services/LldapClient.server"
+import { InviteRepo, InviteError, type Invite, type Revocation } from "~/lib/services/InviteRepo.server"
+import { LldapClient, LldapError } from "~/lib/services/LldapClient.server"
 import { VaultPki } from "~/lib/services/VaultPki.server"
 import { GitHubClient, GitHubError } from "~/lib/services/GitHubClient.server"
 import { EmailService } from "~/lib/services/EmailService.server"
@@ -53,10 +45,7 @@ function makeInvite(overrides: Partial<Invite> = {}): Invite {
 
 // --- Mock Layers ---
 
-const mockInviteRepo = (
-  store: Map<string, Invite> = new Map(),
-  revocations: Revocation[] = [],
-) =>
+const mockInviteRepo = (store: Map<string, Invite> = new Map(), revocations: Revocation[] = []) =>
   Layer.succeed(InviteRepo, {
     create: (input) =>
       Effect.sync(() => {
@@ -113,7 +102,9 @@ const mockInviteRepo = (
       }),
     findAwaitingMerge: () =>
       Effect.sync(() =>
-        [...store.values()].filter((i) => i.prCreated && !i.emailSent && i.prNumber != null && !i.usedAt && !i.failedAt),
+        [...store.values()].filter(
+          (i) => i.prCreated && !i.emailSent && i.prNumber != null && !i.usedAt && !i.failedAt,
+        ),
       ),
     revoke: () => Effect.void,
     deleteById: (id) =>
@@ -123,7 +114,13 @@ const mockInviteRepo = (
     recordReconcileError: (id, error) =>
       Effect.sync(() => {
         const invite = store.get(id)
-        if (invite) store.set(id, { ...invite, reconcileAttempts: invite.reconcileAttempts + 1, lastReconcileAt: new Date().toISOString(), lastError: error })
+        if (invite)
+          store.set(id, {
+            ...invite,
+            reconcileAttempts: invite.reconcileAttempts + 1,
+            lastReconcileAt: new Date().toISOString(),
+            lastError: error,
+          })
       }),
     markFailed: (id, error) =>
       Effect.sync(() => {
@@ -133,12 +130,10 @@ const mockInviteRepo = (
     clearReconcileError: (id) =>
       Effect.sync(() => {
         const invite = store.get(id)
-        if (invite) store.set(id, { ...invite, reconcileAttempts: 0, lastReconcileAt: null, lastError: null, failedAt: null })
+        if (invite)
+          store.set(id, { ...invite, reconcileAttempts: 0, lastReconcileAt: null, lastError: null, failedAt: null })
       }),
-    findFailed: () =>
-      Effect.sync(() =>
-        [...store.values()].filter((i) => i.failedAt != null && !i.usedAt),
-      ),
+    findFailed: () => Effect.sync(() => [...store.values()].filter((i) => i.failedAt != null && !i.usedAt)),
     setCertUsername: (id, username) =>
       Effect.sync(() => {
         const invite = store.get(id)
@@ -151,7 +146,9 @@ const mockInviteRepo = (
       }),
     findAwaitingCertVerification: () =>
       Effect.sync(() =>
-        [...store.values()].filter((i) => i.emailSent && !i.certVerified && i.certUsername != null && !i.usedAt && !i.failedAt),
+        [...store.values()].filter(
+          (i) => i.emailSent && !i.certVerified && i.certUsername != null && !i.usedAt && !i.failedAt,
+        ),
       ),
     recordRevocation: (email, username, revokedBy, reason?) =>
       Effect.sync(() => {
@@ -170,8 +167,7 @@ const mockInviteRepo = (
         const idx = revocations.findIndex((r) => r.id === id)
         if (idx >= 0) revocations.splice(idx, 1)
       }),
-    findRevocationByEmail: (email) =>
-      Effect.sync(() => revocations.find((r) => r.email === email) ?? null),
+    findRevocationByEmail: (email) => Effect.sync(() => revocations.find((r) => r.email === email) ?? null),
     markRevoking: (id) =>
       Effect.sync(() => {
         const invite = store.get(id)
@@ -193,9 +189,7 @@ const mockInviteRepo = (
       ),
   })
 
-const mockLldapClient = (
-  calls: { method: string; args: unknown[] }[] = [],
-) =>
+const mockLldapClient = (calls: { method: string; args: unknown[] }[] = []) =>
   Layer.succeed(LldapClient, {
     getUsers: Effect.succeed([]),
     getGroups: Effect.succeed([]),
@@ -291,9 +285,7 @@ describe("queueInvite", () => {
           expect(invite.certUsername).toBe("alice")
         }),
       ),
-      Effect.provide(
-        Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), mockGitHubClient()),
-      ),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), mockGitHubClient())),
     )
   })
 
@@ -327,9 +319,7 @@ describe("queueInvite", () => {
           expect(invite.prCreated).toBe(false)
         }),
       ),
-      Effect.provide(
-        Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), failingGitHub),
-      ),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), failingGitHub)),
     )
   })
 })
@@ -366,9 +356,7 @@ describe("reconciler logic", () => {
       const pending = yield* inviteRepo.findAwaitingMerge()
 
       for (const invite of pending) {
-        let merged = yield* github.checkPRMerged(invite.prNumber!).pipe(
-          Effect.catchAll(() => Effect.succeed(false)),
-        )
+        let merged = yield* github.checkPRMerged(invite.prNumber!).pipe(Effect.catchAll(() => Effect.succeed(false)))
 
         if (!merged) {
           merged = yield* github.mergePR(invite.prNumber!).pipe(
@@ -391,21 +379,14 @@ describe("reconciler logic", () => {
       Effect.tap(() =>
         Effect.sync(() => {
           expect(mergePR).toHaveBeenCalledWith(42)
-          expect(sendInviteEmail).toHaveBeenCalledWith(
-            "alice@example.com",
-            "tok-inv-1",
-            "admin",
-            Buffer.from("fake"),
-          )
+          expect(sendInviteEmail).toHaveBeenCalledWith("alice@example.com", "tok-inv-1", "admin", Buffer.from("fake"))
 
           const invite = store.get("inv-1")!
           expect(invite.prMerged).toBe(true)
           expect(invite.emailSent).toBe(true)
         }),
       ),
-      Effect.provide(
-        Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), ghLayer, emailLayer),
-      ),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), ghLayer, emailLayer)),
     )
   })
 
@@ -436,9 +417,7 @@ describe("reconciler logic", () => {
       const pending = yield* inviteRepo.findAwaitingMerge()
 
       for (const invite of pending) {
-        let merged = yield* github.checkPRMerged(invite.prNumber!).pipe(
-          Effect.catchAll(() => Effect.succeed(false)),
-        )
+        let merged = yield* github.checkPRMerged(invite.prNumber!).pipe(Effect.catchAll(() => Effect.succeed(false)))
 
         if (!merged) {
           merged = yield* github.mergePR(invite.prNumber!).pipe(
@@ -460,55 +439,46 @@ describe("reconciler logic", () => {
           expect(store.get("inv-1")!.emailSent).toBe(false)
         }),
       ),
-      Effect.provide(
-        Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), ghLayer, emailLayer),
-      ),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), ghLayer, emailLayer)),
     )
   })
 })
 
 describe("acceptInvite", () => {
-  it.effect(
-    "consumes the invite, creates LLDAP user, sets password, and adds to groups",
-    () => {
-      const store = new Map<string, Invite>()
-      store.set("inv-1", makeInvite())
-      const lldapCalls: { method: string; args: unknown[] }[] = []
-      const vaultCalls: { method: string; args: unknown[] }[] = []
+  it.effect("consumes the invite, creates LLDAP user, sets password, and adds to groups", () => {
+    const store = new Map<string, Invite>()
+    store.set("inv-1", makeInvite())
+    const lldapCalls: { method: string; args: unknown[] }[] = []
+    const vaultCalls: { method: string; args: unknown[] }[] = []
 
-      const layer = Layer.mergeAll(
-        mockInviteRepo(store),
-        mockLldapClient(lldapCalls),
-        mockVaultPki(vaultCalls),
-      )
+    const layer = Layer.mergeAll(mockInviteRepo(store), mockLldapClient(lldapCalls), mockVaultPki(vaultCalls))
 
-      return acceptInvite("tok-inv-1", {
-        username: "alice",
-        password: "s3cret",
-      }).pipe(
-        Effect.tap((result) =>
-          Effect.sync(() => {
-            expect(result.success).toBe(true)
+    return acceptInvite("tok-inv-1", {
+      username: "alice",
+      password: "s3cret",
+    }).pipe(
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          expect(result.success).toBe(true)
 
-            // Invite consumed
-            expect(store.get("inv-1")!.usedAt).not.toBeNull()
-            expect(store.get("inv-1")!.usedBy).toBe("alice")
+          // Invite consumed
+          expect(store.get("inv-1")!.usedAt).not.toBeNull()
+          expect(store.get("inv-1")!.usedBy).toBe("alice")
 
-            // LLDAP calls in order: createUser, setUserPassword, addUserToGroup x2
-            expect(lldapCalls).toHaveLength(4)
-            expect(lldapCalls[0].method).toBe("createUser")
-            expect(lldapCalls[1].method).toBe("setUserPassword")
-            expect(lldapCalls[1].args).toEqual(["alice", "s3cret"])
-            expect(lldapCalls[2].method).toBe("addUserToGroup")
-            expect(lldapCalls[2].args).toEqual(["alice", 1])
-            expect(lldapCalls[3].method).toBe("addUserToGroup")
-            expect(lldapCalls[3].args).toEqual(["alice", 2])
-          }),
-        ),
-        Effect.provide(layer),
-      )
-    },
-  )
+          // LLDAP calls in order: createUser, setUserPassword, addUserToGroup x2
+          expect(lldapCalls).toHaveLength(4)
+          expect(lldapCalls[0].method).toBe("createUser")
+          expect(lldapCalls[1].method).toBe("setUserPassword")
+          expect(lldapCalls[1].args).toEqual(["alice", "s3cret"])
+          expect(lldapCalls[2].method).toBe("addUserToGroup")
+          expect(lldapCalls[2].args).toEqual(["alice", 1])
+          expect(lldapCalls[3].method).toBe("addUserToGroup")
+          expect(lldapCalls[3].args).toEqual(["alice", 2])
+        }),
+      ),
+      Effect.provide(layer),
+    )
+  })
 
   it.effect("rolls back LLDAP user when setUserPassword fails", () => {
     const store = new Map<string, Invite>()
@@ -525,10 +495,7 @@ describe("acceptInvite", () => {
           Effect.sync(() => {
             lldapCalls.push({ method: "createUser", args: [input] })
           }),
-        setUserPassword: () =>
-          Effect.fail(
-            new LldapError({ message: "password policy violation" }),
-          ),
+        setUserPassword: () => Effect.fail(new LldapError({ message: "password policy violation" })),
         addUserToGroup: () => Effect.void,
         deleteUser: (userId) =>
           Effect.sync(() => {
@@ -560,13 +527,16 @@ describe("acceptInvite", () => {
 describe("revokeInvite", () => {
   it.effect("cleans up Vault, closes PR, and deletes branch for unmerged invite", () => {
     const store = new Map<string, Invite>()
-    store.set("inv-1", makeInvite({
-      certIssued: true,
-      certUsername: "alice",
-      prCreated: true,
-      prNumber: 42,
-      prMerged: false,
-    }))
+    store.set(
+      "inv-1",
+      makeInvite({
+        certIssued: true,
+        certUsername: "alice",
+        prCreated: true,
+        prNumber: 42,
+        prMerged: false,
+      }),
+    )
     const vaultCalls: { method: string; args: unknown[] }[] = []
     const ghCalls: { method: string; args: unknown[] }[] = []
 
@@ -585,21 +555,22 @@ describe("revokeInvite", () => {
           expect(ghCalls.find((c) => c.method === "revertCertFile")).toBeUndefined()
         }),
       ),
-      Effect.provide(
-        Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), mockGitHubClient(ghCalls)),
-      ),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), mockGitHubClient(ghCalls))),
     )
   })
 
   it.effect("creates revert PR and marks as revoking when PR was already merged", () => {
     const store = new Map<string, Invite>()
-    store.set("inv-1", makeInvite({
-      certIssued: true,
-      certUsername: "alice",
-      prCreated: true,
-      prNumber: 42,
-      prMerged: true,
-    }))
+    store.set(
+      "inv-1",
+      makeInvite({
+        certIssued: true,
+        certUsername: "alice",
+        prCreated: true,
+        prNumber: 42,
+        prMerged: true,
+      }),
+    )
     const vaultCalls: { method: string; args: unknown[] }[] = []
     const ghCalls: { method: string; args: unknown[] }[] = []
 
@@ -618,9 +589,7 @@ describe("revokeInvite", () => {
           expect(invite.revertPrNumber).toBe(99) // from mock
         }),
       ),
-      Effect.provide(
-        Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), mockGitHubClient(ghCalls)),
-      ),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockVaultPki(vaultCalls), mockGitHubClient(ghCalls))),
     )
   })
 })
@@ -681,15 +650,15 @@ describe("resendCert", () => {
           expect(issueCall!.args[0]).toBe("alice@example.com")
 
           // Renewal email sent
-          expect(emailCalls.find((c) => c.method === "sendCertRenewalEmail" && c.args[0] === "alice@example.com")).toBeDefined()
+          expect(
+            emailCalls.find((c) => c.method === "sendCertRenewalEmail" && c.args[0] === "alice@example.com"),
+          ).toBeDefined()
 
           // Temp secret cleaned up
           expect(vaultCalls.find((c) => c.method === "deleteP12Secret")).toBeDefined()
         }),
       ),
-      Effect.provide(
-        Layer.mergeAll(mockVaultPki(vaultCalls), mockEmailService(emailCalls)),
-      ),
+      Effect.provide(Layer.mergeAll(mockVaultPki(vaultCalls), mockEmailService(emailCalls))),
     )
   })
 })

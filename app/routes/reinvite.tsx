@@ -1,4 +1,3 @@
-import { useState } from "react"
 import { useNavigation } from "react-router"
 import type { Route } from "./+types/reinvite"
 import { runEffect } from "~/lib/runtime.server"
@@ -38,12 +37,13 @@ export async function loader({ params }: Route.LoaderArgs) {
         if (invite.usedBy && invite.usedBy !== "__revoked__") {
           return {
             canReinvite: false as const,
-            error: "This invite has already been used to create an account. If you need help, contact the person who invited you.",
+            error:
+              "This invite has already been used to create an account. If you need help, contact the person who invited you.",
           }
         }
 
         // Only allow re-invite if expired or password already consumed
-        const isExpired = new Date(invite.expiresAt + "Z") < new Date()
+        const isExpired = new Date(invite.expiresAt) < new Date()
         const pw = yield* vault.getP12Password(invite.id)
         const passwordConsumed = pw === null
 
@@ -116,10 +116,7 @@ export async function action({ params }: Route.ActionArgs) {
   }
 }
 
-export default function ReinvitePage({
-  loaderData,
-  actionData,
-}: Route.ComponentProps) {
+export default function ReinvitePage({ loaderData, actionData }: Route.ComponentProps) {
   const navigation = useNavigation()
   const isSubmitting = navigation.state === "submitting"
 
@@ -135,8 +132,7 @@ export default function ReinvitePage({
           </div>
           <h1>New Invite Sent</h1>
           <p className={local.infoText}>
-            A new invitation email has been sent to{" "}
-            <strong>{actionData.email}</strong>. Check your inbox for the new
+            A new invitation email has been sent to <strong>{actionData.email}</strong>. Check your inbox for the new
             link and certificate.
           </p>
         </div>
@@ -156,9 +152,7 @@ export default function ReinvitePage({
             </svg>
           </div>
           <h1>Cannot Re-invite</h1>
-          <p className={local.infoText}>
-            {loaderData.error}
-          </p>
+          <p className={local.infoText}>{loaderData.error}</p>
         </div>
       </main>
     )
@@ -169,14 +163,11 @@ export default function ReinvitePage({
       <div className={shared.card}>
         <h1>Request New Invite</h1>
         <p className={local.infoText}>
-          Your previous invite for <strong>{loaderData.email}</strong> has
-          expired or the certificate password was already revealed. You can
-          request a fresh invite below.
+          Your previous invite for <strong>{loaderData.email}</strong> has expired or the certificate password was
+          already revealed. You can request a fresh invite below.
         </p>
 
-        {actionData && "error" in actionData && (
-          <div className={shared.alertError}>{actionData.error}</div>
-        )}
+        {actionData && "error" in actionData && <div className={shared.alertError}>{actionData.error}</div>}
 
         <form method="post">
           <Button

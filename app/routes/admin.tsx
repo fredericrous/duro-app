@@ -31,21 +31,10 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
       </header>
 
       <nav className={styles.tabs}>
-        <NavLink
-          to="/admin"
-          end
-          className={({ isActive }) =>
-            `${styles.tab} ${isActive ? styles.tabActive : ""}`
-          }
-        >
+        <NavLink to="/admin" end className={({ isActive }) => `${styles.tab} ${isActive ? styles.tabActive : ""}`}>
           Users
         </NavLink>
-        <NavLink
-          to="/admin/settings"
-          className={({ isActive }) =>
-            `${styles.tab} ${isActive ? styles.tabActive : ""}`
-          }
-        >
+        <NavLink to="/admin/settings" className={({ isActive }) => `${styles.tab} ${isActive ? styles.tabActive : ""}`}>
           Settings
         </NavLink>
       </nav>

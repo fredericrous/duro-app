@@ -163,7 +163,11 @@ export async function action({ request }: Route.ActionArgs) {
           yield* repo.deleteRevocation(revocationId)
         }),
       )
-      return { success: true, message: `Revocation cleared for ${revocation.email}. You can now re-invite them.`, reinviteEmail: revocation.email }
+      return {
+        success: true,
+        message: `Revocation cleared for ${revocation.email}. You can now re-invite them.`,
+        reinviteEmail: revocation.email,
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to clear revocation"
       return { error: message }
@@ -231,21 +235,23 @@ export async function action({ request }: Route.ActionArgs) {
     )
     return result
   } catch (e) {
-    const message =
-      e instanceof Error ? e.message : "Failed to send invite"
+    const message = e instanceof Error ? e.message : "Failed to send invite"
     return { error: message }
   }
 }
 
 function StepBadges({ invite }: { invite: Invite }) {
-  if (invite.usedBy === "__revoking__") return <span className={`${styles.badge} ${styles.badgeProgress}`}>Revoking (PR #{invite.revertPrNumber})...</span>
+  if (invite.usedBy === "__revoking__")
+    return <span className={`${styles.badge} ${styles.badgeProgress}`}>Revoking (PR #{invite.revertPrNumber})...</span>
   if (invite.failedAt) return <span className={`${styles.badge} ${styles.badgeError}`}>Failed</span>
-  if (invite.emailSent && invite.certVerified) return <span className={`${styles.badge} ${styles.badgeSuccess}`}>Sent</span>
-  if (invite.emailSent && !invite.certVerified) return (
-    <span className={`${styles.badge} ${styles.badgePending}`} title="Email sent, cert-manager pending">
-      Sent (cert pending)
-    </span>
-  )
+  if (invite.emailSent && invite.certVerified)
+    return <span className={`${styles.badge} ${styles.badgeSuccess}`}>Sent</span>
+  if (invite.emailSent && !invite.certVerified)
+    return (
+      <span className={`${styles.badge} ${styles.badgePending}`} title="Email sent, cert-manager pending">
+        Sent (cert pending)
+      </span>
+    )
   if (invite.prMerged) return <span className={`${styles.badge} ${styles.badgeProgress}`}>Sending email...</span>
   if (invite.prCreated) return <span className={`${styles.badge} ${styles.badgePending}`}>Awaiting PR merge</span>
   if (invite.certIssued) return <span className={`${styles.badge} ${styles.badgeDone}`}>Cert issued</span>
@@ -329,11 +335,7 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
             <div className={styles.checkboxGrid}>
               {groups.map((g) => (
                 <label key={g.id} className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    name="groups"
-                    value={`${g.id}|${g.displayName}`}
-                  />
+                  <input type="checkbox" name="groups" value={`${g.id}|${g.displayName}`} />
                   <span>{g.displayName}</span>
                 </label>
               ))}
@@ -393,9 +395,11 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
                   <tr key={inv.id}>
                     <td>{inv.email}</td>
                     <td>{JSON.parse(inv.groupNames).join(", ")}</td>
-                    <td><StepBadges invite={inv} /></td>
+                    <td>
+                      <StepBadges invite={inv} />
+                    </td>
                     <td>{inv.invitedBy}</td>
-                    <td>{new Date(inv.expiresAt + "Z").toLocaleDateString()}</td>
+                    <td>{new Date(inv.expiresAt).toLocaleDateString()}</td>
                     <td />
                   </tr>
                 ))}
@@ -470,9 +474,11 @@ function PendingInviteRow({ invite }: { invite: Invite }) {
     <tr>
       <td>{invite.email}</td>
       <td>{JSON.parse(invite.groupNames).join(", ")}</td>
-      <td><StepBadges invite={invite} /></td>
+      <td>
+        <StepBadges invite={invite} />
+      </td>
       <td>{invite.invitedBy}</td>
-      <td>{new Date(invite.expiresAt + "Z").toLocaleDateString()}</td>
+      <td>{new Date(invite.expiresAt).toLocaleDateString()}</td>
       <td>
         <div className={styles.actionBtns}>
           <resendFetcher.Form method="post">
@@ -485,7 +491,11 @@ function PendingInviteRow({ invite }: { invite: Invite }) {
           <revokeFetcher.Form method="post">
             <input type="hidden" name="intent" value="revoke" />
             <input type="hidden" name="inviteId" value={invite.id} />
-            <button type="submit" className={`${styles.btnGhost} ${styles.btnGhostDanger}`} disabled={isRevoking || isResending}>
+            <button
+              type="submit"
+              className={`${styles.btnGhost} ${styles.btnGhostDanger}`}
+              disabled={isRevoking || isResending}
+            >
               {isRevoking ? "Revoking..." : "Revoke"}
             </button>
           </revokeFetcher.Form>
@@ -505,7 +515,7 @@ function FailedInviteRow({ invite }: { invite: Invite }) {
     <tr>
       <td>{invite.email}</td>
       <td className={styles.errorText}>{invite.lastError ?? "Unknown error"}</td>
-      <td>{invite.failedAt ? new Date(invite.failedAt + "Z").toLocaleString() : "\u2014"}</td>
+      <td>{invite.failedAt ? new Date(invite.failedAt).toLocaleString() : "\u2014"}</td>
       <td>
         <div className={styles.actionBtns}>
           <retryFetcher.Form method="post">
@@ -518,7 +528,11 @@ function FailedInviteRow({ invite }: { invite: Invite }) {
           <revokeFetcher.Form method="post">
             <input type="hidden" name="intent" value="revoke" />
             <input type="hidden" name="inviteId" value={invite.id} />
-            <button type="submit" className={`${styles.btnGhost} ${styles.btnGhostDanger}`} disabled={isRevoking || isRetrying}>
+            <button
+              type="submit"
+              className={`${styles.btnGhost} ${styles.btnGhostDanger}`}
+              disabled={isRevoking || isRetrying}
+            >
               {isRevoking ? "Revoking..." : "Revoke"}
             </button>
           </revokeFetcher.Form>
@@ -528,18 +542,23 @@ function FailedInviteRow({ invite }: { invite: Invite }) {
   )
 }
 
-function UserRow({ user, isSystem }: { user: { id: string; displayName: string; email: string; creationDate: string }; isSystem: boolean }) {
+function UserRow({
+  user,
+  isSystem,
+}: {
+  user: { id: string; displayName: string; email: string; creationDate: string }
+  isSystem: boolean
+}) {
   const [showRevoke, setShowRevoke] = useState(false)
   const certFetcher = useFetcher()
   const revokeFetcher = useFetcher()
   const isSendingCert = certFetcher.state !== "idle"
   const isRevoking = revokeFetcher.state !== "idle"
 
-  useEffect(() => {
-    if (revokeFetcher.data && "success" in revokeFetcher.data) {
-      setShowRevoke(false)
-    }
-  }, [revokeFetcher.data])
+  const revokeSucceeded = revokeFetcher.data && "success" in revokeFetcher.data
+  if (revokeSucceeded && showRevoke) {
+    setShowRevoke(false)
+  }
 
   return (
     <>
@@ -608,7 +627,7 @@ function RevokedUserRow({ revocation }: { revocation: Revocation }) {
       <td>{revocation.email}</td>
       <td>{revocation.username}</td>
       <td>{revocation.reason ?? "\u2014"}</td>
-      <td>{new Date(revocation.revokedAt + "Z").toLocaleDateString()}</td>
+      <td>{new Date(revocation.revokedAt).toLocaleDateString()}</td>
       <td>{revocation.revokedBy}</td>
       <td>
         <fetcher.Form method="post">

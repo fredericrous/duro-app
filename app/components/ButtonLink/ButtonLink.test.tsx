@@ -18,7 +18,9 @@ describe("ButtonLink", () => {
   it("renders ghost variant when specified", () => {
     render(
       <MemoryRouter>
-        <ButtonLink to="/back" variant="ghost">Back</ButtonLink>
+        <ButtonLink to="/back" variant="ghost">
+          Back
+        </ButtonLink>
       </MemoryRouter>,
     )
     const link = screen.getByRole("link", { name: "Back" })
@@ -28,7 +30,9 @@ describe("ButtonLink", () => {
   it("applies small size class", () => {
     render(
       <MemoryRouter>
-        <ButtonLink to="/small" size="small">Small Link</ButtonLink>
+        <ButtonLink to="/small" size="small">
+          Small Link
+        </ButtonLink>
       </MemoryRouter>,
     )
     const link = screen.getByRole("link", { name: "Small Link" })
@@ -38,7 +42,9 @@ describe("ButtonLink", () => {
   it("merges custom className", () => {
     render(
       <MemoryRouter>
-        <ButtonLink to="/custom" className="extra-class">Custom</ButtonLink>
+        <ButtonLink to="/custom" className="extra-class">
+          Custom
+        </ButtonLink>
       </MemoryRouter>,
     )
     const link = screen.getByRole("link", { name: "Custom" })

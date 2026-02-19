@@ -55,18 +55,15 @@ export function ScratchCard({
     [width, height],
   )
 
-  const scratch = useCallback(
-    (x: number, y: number) => {
-      const ctx = canvasRef.current?.getContext("2d")
-      if (!ctx) return
+  const scratch = useCallback((x: number, y: number) => {
+    const ctx = canvasRef.current?.getContext("2d")
+    if (!ctx) return
 
-      ctx.globalCompositeOperation = "destination-out"
-      ctx.beginPath()
-      ctx.arc(x, y, 20, 0, Math.PI * 2)
-      ctx.fill()
-    },
-    [],
-  )
+    ctx.globalCompositeOperation = "destination-out"
+    ctx.beginPath()
+    ctx.arc(x, y, 20, 0, Math.PI * 2)
+    ctx.fill()
+  }, [])
 
   const checkReveal = useCallback(() => {
     if (revealed.current) return

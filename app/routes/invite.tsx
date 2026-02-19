@@ -41,7 +41,7 @@ export async function loader({ params }: Route.LoaderArgs) {
           return { valid: false as const, error: "already_used" }
         }
 
-        if (new Date(invite.expiresAt + "Z") < new Date()) {
+        if (new Date(invite.expiresAt) < new Date()) {
           return { valid: false as const, error: "expired" }
         }
 
@@ -132,8 +132,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     )
     return redirect("https://home.daddyshome.fr/welcome")
   } catch (e) {
-    const message =
-      e instanceof Error ? e.message : "Failed to create account"
+    const message = e instanceof Error ? e.message : "Failed to create account"
     return { error: message }
   }
 }
@@ -144,10 +143,7 @@ function checkCert(): Promise<boolean> {
     .catch(() => false)
 }
 
-export default function InvitePage({
-  loaderData,
-  actionData,
-}: Route.ComponentProps) {
+export default function InvitePage({ loaderData, actionData }: Route.ComponentProps) {
   const [certPromise] = useState(() => checkCert())
 
   if (!loaderData.valid) {
@@ -165,8 +161,7 @@ export default function InvitePage({
             </div>
             <h1>Invite Expired</h1>
             <p className={styles.errorMessage}>
-              This invite has expired. Use the link in your invitation email to
-              request a new one.
+              This invite has expired. Use the link in your invitation email to request a new one.
             </p>
           </div>
         </main>
@@ -185,8 +180,7 @@ export default function InvitePage({
             </div>
             <h1>Already Joined</h1>
             <p className={styles.errorMessage}>
-              This invite has already been used. If you need help, contact the
-              person who invited you.
+              This invite has already been used. If you need help, contact the person who invited you.
             </p>
           </div>
         </main>
@@ -219,9 +213,7 @@ export default function InvitePage({
         </p>
 
         {loaderData.groupNames && loaderData.groupNames.length > 0 && (
-          <p className={styles.groupsInfo}>
-            Groups: {loaderData.groupNames.join(", ")}
-          </p>
+          <p className={styles.groupsInfo}>Groups: {loaderData.groupNames.join(", ")}</p>
         )}
 
         {/* P12 Password Section */}
@@ -233,9 +225,7 @@ export default function InvitePage({
         </Suspense>
 
         {/* Error */}
-        {actionData && "error" in actionData && (
-          <div className={shared.alertError}>{actionData.error}</div>
-        )}
+        {actionData && "error" in actionData && <div className={shared.alertError}>{actionData.error}</div>}
 
         {/* Account Creation Form */}
         <AccountForm />
@@ -273,8 +263,8 @@ function PasswordReveal({ passwordAvailable }: { passwordAvailable: boolean }) {
       <div className={styles.passwordSection}>
         <h2>Certificate Password</h2>
         <p className={styles.infoText}>
-          The certificate password has already been revealed. If you need a new
-          invite, use the link in your original invitation email.
+          The certificate password has already been revealed. If you need a new invite, use the link in your original
+          invitation email.
         </p>
       </div>
     )
@@ -284,8 +274,8 @@ function PasswordReveal({ passwordAvailable }: { passwordAvailable: boolean }) {
     <div className={styles.passwordSection}>
       <h2>Certificate Password</h2>
       <p className={styles.warningText}>
-        Scratch to reveal your certificate password. Save it — you'll need it
-        to install the certificate from your email.
+        Scratch to reveal your certificate password. Save it — you'll need it to install the certificate from your
+        email.
       </p>
       {revealed && password ? (
         <div className={styles.passwordDisplay}>
@@ -331,8 +321,8 @@ function CertCheckResult({ certPromise }: { certPromise: Promise<boolean> }) {
       ) : (
         <div className={styles.certWarning}>
           <p>
-            It looks like your certificate isn't installed yet. Install the .p12
-            file from your email, then refresh this page.
+            It looks like your certificate isn't installed yet. Install the .p12 file from your email, then refresh this
+            page.
           </p>
         </div>
       )}
@@ -358,7 +348,9 @@ function AccountForm() {
           className={styles.input}
           autoComplete="username"
         />
-        <Field.Description className={styles.hint}>3-32 characters: letters, numbers, hyphens, underscores</Field.Description>
+        <Field.Description className={styles.hint}>
+          3-32 characters: letters, numbers, hyphens, underscores
+        </Field.Description>
         <Field.Error className={styles.fieldError} />
       </Field.Root>
 

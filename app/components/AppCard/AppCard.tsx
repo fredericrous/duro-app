@@ -1,9 +1,9 @@
-import type { AppDefinition } from "~/lib/apps";
-import { Icon } from "../Icon";
-import styles from "./AppCard.module.css";
+import type { AppDefinition } from "~/lib/apps"
+import { Icon } from "../Icon"
+import styles from "./AppCard.module.css"
 
 interface AppCardProps {
-  app: AppDefinition;
+  app: AppDefinition
 }
 
 export function AppCard({ app }: AppCardProps) {
@@ -14,5 +14,5 @@ export function AppCard({ app }: AppCardProps) {
       </div>
       <span className={styles.name}>{app.name}</span>
     </a>
-  );
+  )
 }

@@ -6,5 +6,5 @@ export function loader() {
         "Access-Control-Allow-Origin": "https://join.daddyshome.fr",
       },
     },
-  );
+  )
 }

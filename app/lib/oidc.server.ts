@@ -17,8 +17,7 @@ async function getConfig(): Promise<client.Configuration> {
 export async function buildAuthRequest() {
   const config = await getConfig()
   const codeVerifier = client.randomPKCECodeVerifier()
-  const codeChallenge =
-    await client.calculatePKCECodeChallenge(codeVerifier)
+  const codeChallenge = await client.calculatePKCECodeChallenge(codeVerifier)
   const state = client.randomState()
 
   const authorizationUrl = client.buildAuthorizationUrl(config, {
@@ -39,11 +38,7 @@ export interface OidcUser {
   groups: string[]
 }
 
-export async function exchangeCode(
-  callbackUrl: URL,
-  codeVerifier: string,
-  expectedState: string,
-): Promise<OidcUser> {
+export async function exchangeCode(callbackUrl: URL, codeVerifier: string, expectedState: string): Promise<OidcUser> {
   const config = await getConfig()
 
   const tokens = await client.authorizationCodeGrant(config, callbackUrl, {

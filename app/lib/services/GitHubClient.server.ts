@@ -15,23 +15,12 @@ export class GitHubClient extends Context.Tag("GitHubClient")<
       email: string,
       username: string,
     ) => Effect.Effect<{ prUrl: string; prNumber: number; certUsername: string }, GitHubError>
-    readonly checkPRMerged: (
-      prNumber: number,
-    ) => Effect.Effect<boolean, GitHubError>
-    readonly mergePR: (
-      prNumber: number,
-    ) => Effect.Effect<void, GitHubError>
+    readonly checkPRMerged: (prNumber: number) => Effect.Effect<boolean, GitHubError>
+    readonly mergePR: (prNumber: number) => Effect.Effect<void, GitHubError>
     readonly checkWebhookSecret: () => Effect.Effect<boolean, GitHubError>
-    readonly closePR: (
-      prNumber: number,
-    ) => Effect.Effect<void, GitHubError>
-    readonly deleteBranch: (
-      inviteId: string,
-    ) => Effect.Effect<void, GitHubError>
-    readonly revertCertFile: (
-      username: string,
-      email: string,
-    ) => Effect.Effect<{ prNumber: number }, GitHubError>
+    readonly closePR: (prNumber: number) => Effect.Effect<void, GitHubError>
+    readonly deleteBranch: (inviteId: string) => Effect.Effect<void, GitHubError>
+    readonly revertCertFile: (username: string, email: string) => Effect.Effect<{ prNumber: number }, GitHubError>
   }
 >() {}
 
@@ -96,36 +85,28 @@ spec:
           const filePath = `kubernetes/nas/platform-foundation/vault/client-certs/certificates/${username}.yaml`
 
           // Check if branch already exists (idempotency)
-          const branchExists = yield* gh.get(
-            `/git/refs/heads/${branch}`,
-          ).pipe(
+          const branchExists = yield* gh.get(`/git/refs/heads/${branch}`).pipe(
             Effect.map(() => true),
             Effect.catchAll(() => Effect.succeed(false)),
           ) // 404 = branch doesn't exist, expected
 
           if (branchExists) {
             // Branch exists, check for existing PR
-            const prs = yield* gh.get(
-              `/pulls?head=fredericrous:${branch}&state=open`,
-            ).pipe(
+            const prs = yield* gh.get(`/pulls?head=fredericrous:${branch}&state=open`).pipe(
               Effect.map((r) => r as unknown as Array<{ html_url: string; number: number }>),
               Effect.tapError((e) => Effect.logDebug("Failed to list PRs for branch", { error: String(e), branch })),
               Effect.catchAll(() => Effect.succeed([] as Array<{ html_url: string; number: number }>)),
             )
 
             if (prs.length > 0) {
-              const certUsername = username
-                .toLowerCase()
-                .replace(/[^a-z0-9_-]/g, "")
+              const certUsername = username.toLowerCase().replace(/[^a-z0-9_-]/g, "")
               return { prUrl: prs[0].html_url, prNumber: prs[0].number, certUsername }
             }
           }
 
           // Get main branch SHA
           const mainRef = yield* gh.get(`/git/refs/heads/main`)
-          const mainSha = (
-            mainRef as { object: { sha: string } }
-          ).object.sha
+          const mainSha = (mainRef as { object: { sha: string } }).object.sha
 
           // Create branch
           if (!branchExists) {
@@ -136,9 +117,7 @@ spec:
           }
 
           // Create file
-          const normalizedUsername = username
-            .toLowerCase()
-            .replace(/[^a-z0-9_-]/g, "")
+          const normalizedUsername = username.toLowerCase().replace(/[^a-z0-9_-]/g, "")
           const content = certYaml(normalizedUsername, email)
 
           yield* gh.put(`/contents/${filePath}`, {
@@ -163,14 +142,9 @@ spec:
         }),
 
       checkPRMerged: (prNumber: number) =>
-        gh.get(`/pulls/${prNumber}`).pipe(
-          Effect.map((pr) => !!(pr as { merged: boolean }).merged),
-        ),
+        gh.get(`/pulls/${prNumber}`).pipe(Effect.map((pr) => !!(pr as { merged: boolean }).merged)),
 
-      mergePR: (prNumber: number) =>
-        gh.put(`/pulls/${prNumber}/merge`, { merge_method: "squash" }).pipe(
-          Effect.asVoid,
-        ),
+      mergePR: (prNumber: number) => gh.put(`/pulls/${prNumber}/merge`, { merge_method: "squash" }).pipe(Effect.asVoid),
 
       checkWebhookSecret: () =>
         gh.get(`/actions/secrets/DURO_WEBHOOK_SECRET`).pipe(
@@ -210,12 +184,14 @@ spec:
           // Create new tree without the file using Git Data API (sha: null = delete)
           const newTree = yield* gh.post(`/git/trees`, {
             base_tree: mainSha,
-            tree: [{
-              path: filePath,
-              mode: "100644",
-              type: "blob",
-              sha: null,
-            }],
+            tree: [
+              {
+                path: filePath,
+                mode: "100644",
+                type: "blob",
+                sha: null,
+              },
+            ],
           })
           const newTreeSha = (newTree as { sha: string }).sha
 

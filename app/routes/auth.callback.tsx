@@ -1,11 +1,7 @@
 import { redirect } from "react-router"
 import type { Route } from "./+types/auth.callback"
 import { exchangeCode } from "~/lib/oidc.server"
-import {
-  getPkceData,
-  createSessionCookie,
-  clearPkceCookie,
-} from "~/lib/session.server"
+import { getPkceData, createSessionCookie, clearPkceCookie } from "~/lib/session.server"
 
 export async function loader({ request }: Route.LoaderArgs) {
   const pkce = await getPkceData(request)

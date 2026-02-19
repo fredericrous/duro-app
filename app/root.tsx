@@ -1,14 +1,7 @@
-import type { ReactNode } from "react";
-import {
-  Links,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-  isRouteErrorResponse,
-} from "react-router";
-import type { Route } from "./+types/root";
-import "./styles/global.css";
+import type { ReactNode } from "react"
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse } from "react-router"
+import type { Route } from "./+types/root"
+import "./styles/global.css"
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
@@ -25,25 +18,22 @@ export function Layout({ children }: { children: ReactNode }) {
         <Scripts />
       </body>
     </html>
-  );
+  )
 }
 
 export default function App() {
-  return <Outlet />;
+  return <Outlet />
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Oops!";
-  let details = "An unexpected error occurred.";
+  let message = "Oops!"
+  let details = "An unexpected error occurred."
 
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? "404" : "Error";
-    details =
-      error.status === 404
-        ? "The requested page could not be found."
-        : error.statusText || details;
+    message = error.status === 404 ? "404" : "Error"
+    details = error.status === 404 ? "The requested page could not be found." : error.statusText || details
   } else if (error instanceof Error) {
-    details = error.message;
+    details = error.message
   }
 
   return (
@@ -51,5 +41,5 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       <h1>{message}</h1>
       <p>{details}</p>
     </main>
-  );
+  )
 }

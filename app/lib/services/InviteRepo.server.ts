@@ -67,60 +67,29 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
       groupNames: string[]
       invitedBy: string
     }) => Effect.Effect<{ id: string; token: string }, InviteError>
-    readonly findByTokenHash: (
-      tokenHash: string,
-    ) => Effect.Effect<Invite | null, InviteError>
-    readonly consumeByToken: (
-      rawToken: string,
-    ) => Effect.Effect<Invite, InviteError>
-    readonly markUsedBy: (
-      id: string,
-      username: string,
-    ) => Effect.Effect<void, InviteError>
+    readonly findByTokenHash: (tokenHash: string) => Effect.Effect<Invite | null, InviteError>
+    readonly consumeByToken: (rawToken: string) => Effect.Effect<Invite, InviteError>
+    readonly markUsedBy: (id: string, username: string) => Effect.Effect<void, InviteError>
     readonly findPending: () => Effect.Effect<Invite[], InviteError>
-    readonly incrementAttempt: (
-      tokenHash: string,
-    ) => Effect.Effect<void, InviteError>
+    readonly incrementAttempt: (tokenHash: string) => Effect.Effect<void, InviteError>
     readonly markCertIssued: (id: string) => Effect.Effect<void, InviteError>
-    readonly markPRCreated: (
-      id: string,
-      prNumber: number,
-    ) => Effect.Effect<void, InviteError>
+    readonly markPRCreated: (id: string, prNumber: number) => Effect.Effect<void, InviteError>
     readonly markPRMerged: (id: string) => Effect.Effect<void, InviteError>
     readonly markEmailSent: (id: string) => Effect.Effect<void, InviteError>
     readonly findAwaitingMerge: () => Effect.Effect<Invite[], InviteError>
     readonly revoke: (id: string) => Effect.Effect<void, InviteError>
     readonly deleteById: (id: string) => Effect.Effect<void, InviteError>
     readonly findById: (id: string) => Effect.Effect<Invite | null, InviteError>
-    readonly recordReconcileError: (
-      id: string,
-      error: string,
-    ) => Effect.Effect<void, InviteError>
-    readonly markFailed: (
-      id: string,
-      error: string,
-    ) => Effect.Effect<void, InviteError>
-    readonly clearReconcileError: (
-      id: string,
-    ) => Effect.Effect<void, InviteError>
+    readonly recordReconcileError: (id: string, error: string) => Effect.Effect<void, InviteError>
+    readonly markFailed: (id: string, error: string) => Effect.Effect<void, InviteError>
+    readonly clearReconcileError: (id: string) => Effect.Effect<void, InviteError>
     readonly findFailed: () => Effect.Effect<Invite[], InviteError>
-    readonly setCertUsername: (
-      id: string,
-      username: string,
-    ) => Effect.Effect<void, InviteError>
+    readonly setCertUsername: (id: string, username: string) => Effect.Effect<void, InviteError>
     readonly markCertVerified: (id: string) => Effect.Effect<void, InviteError>
-    readonly findAwaitingCertVerification: () => Effect.Effect<
-      Invite[],
-      InviteError
-    >
+    readonly findAwaitingCertVerification: () => Effect.Effect<Invite[], InviteError>
     readonly markRevoking: (id: string) => Effect.Effect<void, InviteError>
-    readonly markRevertPRCreated: (
-      id: string,
-      prNumber: number,
-    ) => Effect.Effect<void, InviteError>
-    readonly markRevertPRMerged: (
-      id: string,
-    ) => Effect.Effect<void, InviteError>
+    readonly markRevertPRCreated: (id: string, prNumber: number) => Effect.Effect<void, InviteError>
+    readonly markRevertPRMerged: (id: string) => Effect.Effect<void, InviteError>
     readonly findAwaitingRevertMerge: () => Effect.Effect<Invite[], InviteError>
     readonly recordRevocation: (
       email: string,
@@ -130,9 +99,7 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
     ) => Effect.Effect<void, InviteError>
     readonly findRevocations: () => Effect.Effect<Revocation[], InviteError>
     readonly deleteRevocation: (id: string) => Effect.Effect<void, InviteError>
-    readonly findRevocationByEmail: (
-      email: string,
-    ) => Effect.Effect<Revocation | null, InviteError>
+    readonly findRevocationByEmail: (email: string) => Effect.Effect<Revocation | null, InviteError>
   }
 >() {}
 
@@ -148,7 +115,7 @@ const Coerced = {
     encode: (v) => v,
   }),
   NullableDateString: Schema.transform(Schema.Unknown, Schema.NullOr(Schema.String), {
-    decode: (v) => v == null ? null : (v instanceof Date ? v.toISOString() : String(v)),
+    decode: (v) => (v == null ? null : v instanceof Date ? v.toISOString() : String(v)),
     encode: (v) => v,
   }),
 }
@@ -272,9 +239,7 @@ export const InviteRepoLive = Layer.effect(
 
       markUsedBy: (id, username) =>
         withErr(
-          sql`UPDATE invites SET used_by = ${username} WHERE id = ${id}`.pipe(
-            Effect.asVoid,
-          ),
+          sql`UPDATE invites SET used_by = ${username} WHERE id = ${id}`.pipe(Effect.asVoid),
           "Failed to mark invite as used",
         ),
 
@@ -302,9 +267,7 @@ export const InviteRepoLive = Layer.effect(
 
       markPRCreated: (id, prNumber) =>
         withErr(
-          sql`UPDATE invites SET pr_created = ${TRUE}, pr_number = ${prNumber} WHERE id = ${id}`.pipe(
-            Effect.asVoid,
-          ),
+          sql`UPDATE invites SET pr_created = ${TRUE}, pr_number = ${prNumber} WHERE id = ${id}`.pipe(Effect.asVoid),
           "Failed to mark PR created",
         ),
 
@@ -345,10 +308,7 @@ export const InviteRepoLive = Layer.effect(
         }),
 
       deleteById: (id) =>
-        withErr(
-          sql`DELETE FROM invites WHERE id = ${id}`.pipe(Effect.asVoid),
-          "Failed to delete invite",
-        ),
+        withErr(sql`DELETE FROM invites WHERE id = ${id}`.pipe(Effect.asVoid), "Failed to delete invite"),
 
       findById: (id) =>
         withErr(
@@ -368,9 +328,7 @@ export const InviteRepoLive = Layer.effect(
 
       markFailed: (id, error) =>
         withErr(
-          sql`UPDATE invites SET failed_at = ${now()}, last_error = ${error} WHERE id = ${id}`.pipe(
-            Effect.asVoid,
-          ),
+          sql`UPDATE invites SET failed_at = ${now()}, last_error = ${error} WHERE id = ${id}`.pipe(Effect.asVoid),
           "Failed to mark invite as failed",
         ),
 
@@ -392,9 +350,7 @@ export const InviteRepoLive = Layer.effect(
 
       setCertUsername: (id, username) =>
         withErr(
-          sql`UPDATE invites SET cert_username = ${username} WHERE id = ${id}`.pipe(
-            Effect.asVoid,
-          ),
+          sql`UPDATE invites SET cert_username = ${username} WHERE id = ${id}`.pipe(Effect.asVoid),
           "Failed to set cert username",
         ),
 
@@ -428,7 +384,9 @@ export const InviteRepoLive = Layer.effect(
 
       markRevertPRMerged: (id) =>
         withErr(
-          sql`UPDATE invites SET revert_pr_merged = ${TRUE}, used_by = '__revoked__' WHERE id = ${id}`.pipe(Effect.asVoid),
+          sql`UPDATE invites SET revert_pr_merged = ${TRUE}, used_by = '__revoked__' WHERE id = ${id}`.pipe(
+            Effect.asVoid,
+          ),
           "Failed to mark revert PR merged",
         ),
 
@@ -458,10 +416,7 @@ export const InviteRepoLive = Layer.effect(
         ),
 
       deleteRevocation: (id) =>
-        withErr(
-          sql`DELETE FROM user_revocations WHERE id = ${id}`.pipe(Effect.asVoid),
-          "Failed to delete revocation",
-        ),
+        withErr(sql`DELETE FROM user_revocations WHERE id = ${id}`.pipe(Effect.asVoid), "Failed to delete revocation"),
 
       findRevocationByEmail: (email) =>
         withErr(

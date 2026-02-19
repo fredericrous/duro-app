@@ -18,7 +18,9 @@ export async function loader() {
           return yield* github.checkWebhookSecret()
         }),
       )
-    } catch {}
+    } catch {
+      /* best-effort */
+    }
   }
 
   return { webhookSecret: hasWebhookSecret ? webhookSecret : null, githubSecretConfigured }
@@ -72,8 +74,8 @@ export default function AdminSettingsPage({ loaderData }: Route.ComponentProps) 
     <section className={styles.card}>
       <h2 className={styles.cardTitle}>Webhook Configuration</h2>
       <p className={styles.description}>
-        When a cert PR merges, a GitHub Action can POST to Duro for instant email delivery
-        instead of waiting for the 2-minute reconciler poll.
+        When a cert PR merges, a GitHub Action can POST to Duro for instant email delivery instead of waiting for the
+        2-minute reconciler poll.
       </p>
 
       {!webhookSecret && (
@@ -82,8 +84,8 @@ export default function AdminSettingsPage({ loaderData }: Route.ComponentProps) 
           <div>
             <p className={styles.statusText}>Webhook secret not configured</p>
             <p className={styles.statusHint}>
-              Waiting for ExternalSecret to generate and sync the <code>WEBHOOK_SECRET</code> env var.
-              Check that the <code>webhook-secret-generator.yaml</code> resources are deployed.
+              Waiting for ExternalSecret to generate and sync the <code>WEBHOOK_SECRET</code> env var. Check that the{" "}
+              <code>webhook-secret-generator.yaml</code> resources are deployed.
             </p>
           </div>
         </div>
@@ -96,8 +98,8 @@ export default function AdminSettingsPage({ loaderData }: Route.ComponentProps) 
             <div>
               <p className={styles.statusText}>GitHub secret not configured yet</p>
               <p className={styles.statusHint}>
-                Copy the webhook secret below and add it as <code>DURO_WEBHOOK_SECRET</code> in
-                GitHub repo Settings &rarr; Secrets and variables &rarr; Actions.
+                Copy the webhook secret below and add it as <code>DURO_WEBHOOK_SECRET</code> in GitHub repo Settings
+                &rarr; Secrets and variables &rarr; Actions.
               </p>
             </div>
           </div>
@@ -105,9 +107,7 @@ export default function AdminSettingsPage({ loaderData }: Route.ComponentProps) 
           <CopySecret secret={webhookSecret} />
 
           <details className={styles.accordion}>
-            <summary className={styles.accordionSummary}>
-              GitHub Actions workflow snippet
-            </summary>
+            <summary className={styles.accordionSummary}>GitHub Actions workflow snippet</summary>
             <pre className={styles.codeBlock}>{WORKFLOW_SNIPPET}</pre>
           </details>
         </div>
@@ -118,9 +118,7 @@ export default function AdminSettingsPage({ loaderData }: Route.ComponentProps) 
           <div className={`${styles.statusIcon} ${styles.statusOk}`}>&#10003;</div>
           <div>
             <p className={styles.statusText}>Webhook configured</p>
-            <p className={styles.statusHint}>
-              Cert PR merges trigger instant email delivery via the GitHub Action.
-            </p>
+            <p className={styles.statusHint}>Cert PR merges trigger instant email delivery via the GitHub Action.</p>
           </div>
         </div>
       )}

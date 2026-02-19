@@ -19,13 +19,9 @@ export interface SessionData {
   groups: string[]
 }
 
-export async function createSessionCookie(
-  data: SessionData,
-): Promise<string> {
+export async function createSessionCookie(data: SessionData): Promise<string> {
   const key = getKey()
-  const token = await new jose.EncryptJWT(
-    data as unknown as jose.JWTPayload,
-  )
+  const token = await new jose.EncryptJWT(data as unknown as jose.JWTPayload)
     .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_TTL}s`)
@@ -34,9 +30,7 @@ export async function createSessionCookie(
   return `${SESSION_COOKIE}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL}`
 }
 
-export async function getSession(
-  request: Request,
-): Promise<SessionData | null> {
+export async function getSession(request: Request): Promise<SessionData | null> {
   const value = parseCookie(request.headers.get("cookie"), SESSION_COOKIE)
   if (!value) return null
 
@@ -61,13 +55,9 @@ export interface PkceData {
   returnUrl: string
 }
 
-export async function createPkceCookie(
-  data: PkceData,
-): Promise<string> {
+export async function createPkceCookie(data: PkceData): Promise<string> {
   const key = getKey()
-  const token = await new jose.EncryptJWT(
-    data as unknown as jose.JWTPayload,
-  )
+  const token = await new jose.EncryptJWT(data as unknown as jose.JWTPayload)
     .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
     .setIssuedAt()
     .setExpirationTime("10m")
@@ -76,9 +66,7 @@ export async function createPkceCookie(
   return `${PKCE_COOKIE}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-Age=600`
 }
 
-export async function getPkceData(
-  request: Request,
-): Promise<PkceData | null> {
+export async function getPkceData(request: Request): Promise<PkceData | null> {
   const value = parseCookie(request.headers.get("cookie"), PKCE_COOKIE)
   if (!value) return null
 

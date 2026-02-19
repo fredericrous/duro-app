@@ -19,14 +19,7 @@ export default function WelcomePage({ loaderData }: Route.ComponentProps) {
     <main className={styles.page}>
       <div className={styles.card}>
         <div className={styles.successIcon}>
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            width="64"
-            height="64"
-          >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="64" height="64">
             <circle cx="12" cy="12" r="10" />
             <polyline points="16 10 11 15 8 12" />
           </svg>
@@ -34,8 +27,7 @@ export default function WelcomePage({ loaderData }: Route.ComponentProps) {
 
         <h1>Welcome, {user}!</h1>
         <p className={styles.message}>
-          Your account has been created and you're all set. You now have access
-          to your personal dashboard.
+          Your account has been created and you're all set. You now have access to your personal dashboard.
         </p>
 
         <ButtonLink to="/">Go to Dashboard</ButtonLink>

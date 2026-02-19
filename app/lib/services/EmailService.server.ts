@@ -20,10 +20,7 @@ export class EmailService extends Context.Tag("EmailService")<
       invitedBy: string,
       p12Buffer: Buffer,
     ) => Effect.Effect<void, EmailError>
-    readonly sendCertRenewalEmail: (
-      email: string,
-      p12Buffer: Buffer,
-    ) => Effect.Effect<void, EmailError>
+    readonly sendCertRenewalEmail: (email: string, p12Buffer: Buffer) => Effect.Effect<void, EmailError>
   }
 >() {}
 
@@ -59,12 +56,7 @@ export const EmailServiceLive = Layer.scoped(
     )
 
     return {
-      sendInviteEmail: (
-        email: string,
-        token: string,
-        invitedBy: string,
-        p12Buffer: Buffer,
-      ) =>
+      sendInviteEmail: (email: string, token: string, invitedBy: string, p12Buffer: Buffer) =>
         Effect.gen(function* () {
           const inviteUrl = `${inviteBaseUrl}/invite/${token}`
           const reinviteUrl = `${inviteBaseUrl}/reinvite/${token}`

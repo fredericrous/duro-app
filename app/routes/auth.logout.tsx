@@ -3,7 +3,7 @@ import type { Route } from "./+types/auth.logout"
 import { clearSessionCookie } from "~/lib/session.server"
 import { getEndSessionUrl } from "~/lib/oidc.server"
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader(_args: Route.LoaderArgs) {
   const endSessionUrl = await getEndSessionUrl()
   const postLogoutUri = new URL(process.env.OIDC_REDIRECT_URI!).origin
 

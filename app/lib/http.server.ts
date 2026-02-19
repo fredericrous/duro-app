@@ -10,12 +10,7 @@ export const makeJsonApi = <E>(
   mapError: (cause: unknown) => E,
 ) => {
   const exec = (req: HttpClientRequest.HttpClientRequest) =>
-    client.execute(
-      req.pipe(
-        HttpClientRequest.prependUrl(baseUrl),
-        HttpClientRequest.setHeaders(defaultHeaders),
-      ),
-    ).pipe(
+    client.execute(req.pipe(HttpClientRequest.prependUrl(baseUrl), HttpClientRequest.setHeaders(defaultHeaders))).pipe(
       Effect.flatMap(HttpClientResponse.filterStatusOk),
       Effect.flatMap((r) => r.json),
       Effect.mapError(mapError),
@@ -23,8 +18,7 @@ export const makeJsonApi = <E>(
     )
 
   return {
-    get: (path: string) =>
-      exec(HttpClientRequest.get(path)),
+    get: (path: string) => exec(HttpClientRequest.get(path)),
     post: (path: string, body?: unknown) =>
       exec(
         body !== undefined
@@ -43,7 +37,6 @@ export const makeJsonApi = <E>(
           ? HttpClientRequest.patch(path).pipe(HttpClientRequest.bodyUnsafeJson(body))
           : HttpClientRequest.patch(path),
       ),
-    del: (path: string) =>
-      exec(HttpClientRequest.del(path)),
+    del: (path: string) => exec(HttpClientRequest.del(path)),
   }
 }

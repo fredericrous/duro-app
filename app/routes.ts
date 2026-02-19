@@ -1,4 +1,4 @@
-import { type RouteConfig, index, layout, route } from "@react-router/dev/routes";
+import { type RouteConfig, index, layout, route } from "@react-router/dev/routes"
 
 export default [
   layout("routes/dashboard.tsx", [
@@ -15,4 +15,4 @@ export default [
   route("reinvite/:token", "routes/reinvite.tsx"),
   route("welcome", "routes/welcome.tsx"),
   route("api/invite-merged", "routes/api.invite-merged.ts"),
-] satisfies RouteConfig;
+] satisfies RouteConfig

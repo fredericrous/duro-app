@@ -7,10 +7,12 @@ process.env.OTEL_SERVICE_NAME ??= "duro-worker"
 
 const runtime = ManagedRuntime.make(WorkerLayer)
 
-http.createServer((_, res) => {
-  res.writeHead(200)
-  res.end("ok")
-}).listen(3001, () => console.log("[worker] health on :3001"))
+http
+  .createServer((_, res) => {
+    res.writeHead(200)
+    res.end("ok")
+  })
+  .listen(3001, () => console.log("[worker] health on :3001"))
 
 console.log("[worker] starting reconcile loop")
 runtime.runPromise(reconcileLoop).catch((e) => {

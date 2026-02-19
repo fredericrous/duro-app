@@ -4,8 +4,7 @@ import * as SqlClient from "@effect/sql/SqlClient"
 import * as Migrator from "@effect/sql/Migrator"
 import { Context, Config, Effect, Layer } from "effect"
 
-const snakeToCamel = (s: string) =>
-  s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
+const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
 // ---------------------------------------------------------------------------
 // Dialect detection
@@ -55,10 +54,7 @@ const PgClientLive = Layer.unwrapEffect(
 // Migration marker — InviteRepo depends on this to guarantee ordering
 // ---------------------------------------------------------------------------
 
-export class MigrationsRan extends Context.Tag("MigrationsRan")<
-  MigrationsRan,
-  true
->() {}
+export class MigrationsRan extends Context.Tag("MigrationsRan")<MigrationsRan, true>() {}
 
 // ---------------------------------------------------------------------------
 // Lightweight migration runner (no @effect/platform-node required)
@@ -100,9 +96,7 @@ const runMigrations = <R>(loader: Migrator.Loader<R>, dialect: Dialect) =>
       if (appliedIds.has(id)) continue
       // load is Effect.promise(() => module); resolve and extract default export
       const mod = yield* load
-      const migration = Effect.isEffect(mod)
-        ? mod
-        : (mod as any).default?.default ?? (mod as any).default
+      const migration = Effect.isEffect(mod) ? mod : ((mod as any).default?.default ?? (mod as any).default)
       yield* migration
       yield* sql`INSERT INTO _migrations (id, name) VALUES (${id}, ${name})`
       yield* Effect.log(`migration ${id}_${name} applied`)
@@ -120,10 +114,9 @@ const ClientLive = currentDialect === "pg" ? PgClientLive : SqliteClientLive
 
 export const MigratorLive = Layer.effect(
   MigrationsRan,
-  runMigrations(
-    Migrator.fromGlob(currentDialect === "pg" ? pgMigrations : sqliteMigrations),
-    currentDialect,
-  ).pipe(Effect.as(true as const)),
+  runMigrations(Migrator.fromGlob(currentDialect === "pg" ? pgMigrations : sqliteMigrations), currentDialect).pipe(
+    Effect.as(true as const),
+  ),
 )
 
 /**
@@ -131,17 +124,13 @@ export const MigratorLive = Layer.effect(
  * Provides SqlClient.SqlClient and MigrationsRan.
  * Migrations run before any downstream layer is built.
  */
-export const DbLive = MigratorLive.pipe(
-  Layer.provideMerge(ClientLive),
-)
+export const DbLive = MigratorLive.pipe(Layer.provideMerge(ClientLive))
 
 // Tests always use SQLite
 export const makeTestDbLayer = (filename: string) => {
   const testMigrations = import.meta.glob("./migrations/sqlite/*.ts")
   return Layer.effect(
     MigrationsRan,
-    runMigrations(Migrator.fromGlob(testMigrations), "sqlite").pipe(
-      Effect.as(true as const),
-    ),
+    runMigrations(Migrator.fromGlob(testMigrations), "sqlite").pipe(Effect.as(true as const)),
   ).pipe(Layer.provideMerge(makeTestClientLayer(filename)))
 }

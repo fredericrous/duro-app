@@ -14,8 +14,4 @@ export const AppLayer = Layer.mergeAll(
   GitHubClientLive,
   EmailServiceLive,
   InviteRepoLive,
-).pipe(
-  Layer.provide(DbLive),
-  Layer.provide(OtelLayer),
-  Layer.provide(FetchHttpClient.layer),
-)
+).pipe(Layer.provide(DbLive), Layer.provide(OtelLayer), Layer.provide(FetchHttpClient.layer))

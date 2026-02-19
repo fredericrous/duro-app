@@ -7,12 +7,7 @@ import { InviteRepoLive } from "./InviteRepo.server"
 import { DbLive } from "~/lib/db/client.server"
 import { OtelLayer } from "~/lib/telemetry.server"
 
-export const WorkerLayer = Layer.mergeAll(
-  VaultPkiLive,
-  GitHubClientLive,
-  EmailServiceLive,
-  InviteRepoLive,
-).pipe(
+export const WorkerLayer = Layer.mergeAll(VaultPkiLive, GitHubClientLive, EmailServiceLive, InviteRepoLive).pipe(
   Layer.provide(DbLive),
   Layer.provide(OtelLayer),
   Layer.provide(FetchHttpClient.layer),

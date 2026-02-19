@@ -6,12 +6,7 @@ import type { GitHubClient } from "./services/GitHubClient.server"
 import type { EmailService } from "./services/EmailService.server"
 import type { InviteRepo } from "./services/InviteRepo.server"
 
-type AppServices =
-  | LldapClient
-  | VaultPki
-  | GitHubClient
-  | EmailService
-  | InviteRepo
+type AppServices = LldapClient | VaultPki | GitHubClient | EmailService | InviteRepo
 
 const appRuntime = ManagedRuntime.make(AppLayer)
 
@@ -21,8 +16,6 @@ const appRuntime = ManagedRuntime.make(AppLayer)
  * `yield*` to compose effects instead. Nesting runEffect creates a second
  * runtime context which can double-initialize services.
  */
-export function runEffect<A, E>(
-  effect: Effect.Effect<A, E, AppServices>,
-): Promise<A> {
+export function runEffect<A, E>(effect: Effect.Effect<A, E, AppServices>): Promise<A> {
   return appRuntime.runPromise(effect) as Promise<A>
 }

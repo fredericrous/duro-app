@@ -46,12 +46,7 @@ export async function action({ request }: Route.ActionArgs) {
         yield* inviteRepo.markPRMerged(invite.id)
 
         const { p12Buffer } = yield* vault.issueCertAndP12(invite.email, invite.id)
-        yield* emailSvc.sendInviteEmail(
-          invite.email,
-          invite.token,
-          invite.invitedBy,
-          p12Buffer,
-        )
+        yield* emailSvc.sendInviteEmail(invite.email, invite.token, invite.invitedBy, p12Buffer)
         yield* inviteRepo.markEmailSent(invite.id)
         yield* inviteRepo.clearReconcileError(invite.id)
 
@@ -72,7 +67,9 @@ export async function action({ request }: Route.ActionArgs) {
           yield* inviteRepo.recordReconcileError(inviteId, `webhook: ${msg}`)
         }),
       )
-    } catch {}
+    } catch {
+      /* best-effort */
+    }
 
     return Response.json({ error: msg }, { status: 500 })
   }
