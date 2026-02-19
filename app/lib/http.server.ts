@@ -1,6 +1,5 @@
 import * as HttpClient from "@effect/platform/HttpClient"
 import * as HttpClientRequest from "@effect/platform/HttpClientRequest"
-import * as HttpClientResponse from "@effect/platform/HttpClientResponse"
 import { Effect } from "effect"
 
 export const makeJsonApi = <E>(
@@ -11,8 +10,15 @@ export const makeJsonApi = <E>(
 ) => {
   const exec = (req: HttpClientRequest.HttpClientRequest) =>
     client.execute(req.pipe(HttpClientRequest.prependUrl(baseUrl), HttpClientRequest.setHeaders(defaultHeaders))).pipe(
-      Effect.flatMap(HttpClientResponse.filterStatusOk),
-      Effect.flatMap((r) => r.json),
+      Effect.flatMap((response) => {
+        if (response.status >= 200 && response.status < 300) {
+          return response.json
+        }
+        return response.text.pipe(
+          Effect.catchAll(() => Effect.succeed("")),
+          Effect.flatMap((body) => Effect.fail(`${response.status} - ${body.slice(0, 500)}`)),
+        )
+      }),
       Effect.mapError(mapError),
       Effect.scoped,
     )

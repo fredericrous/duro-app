@@ -254,6 +254,12 @@ function StepBadges({ invite }: { invite: Invite }) {
     )
   if (invite.prMerged) return <span className={`${styles.badge} ${styles.badgeProgress}`}>Sending email...</span>
   if (invite.prCreated) return <span className={`${styles.badge} ${styles.badgePending}`}>Awaiting PR merge</span>
+  if (invite.certIssued && !invite.prCreated && invite.lastError)
+    return (
+      <span className={`${styles.badge} ${styles.badgeError}`} title={invite.lastError}>
+        PR failed
+      </span>
+    )
   if (invite.certIssued) return <span className={`${styles.badge} ${styles.badgeDone}`}>Cert issued</span>
   return <span className={`${styles.badge} ${styles.badgePending}`}>Processing...</span>
 }
@@ -298,7 +304,14 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
           <div className={`${styles.alert} ${styles.alertError}`}>{actionData.error}</div>
         )}
         {actionData && "success" in actionData && actionData.success && (
-          <div className={`${styles.alert} ${styles.alertSuccess}`}>{actionData.message}</div>
+          <>
+            <div className={`${styles.alert} ${styles.alertSuccess}`}>{actionData.message}</div>
+            {"warning" in actionData && actionData.warning && (
+              <div className={`${styles.alert} ${styles.alertWarning}`}>
+                {actionData.warning}. The reconciler will retry automatically.
+              </div>
+            )}
+          </>
         )}
         {hasWarning && (
           <div className={`${styles.alert} ${styles.alertWarning}`}>

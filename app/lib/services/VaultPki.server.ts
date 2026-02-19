@@ -38,7 +38,7 @@ export const VaultPkiLive = Layer.effect(
         "X-Vault-Token": vaultToken,
         "Content-Type": "application/json",
       },
-      (e) => new VaultPkiError({ message: "Vault request failed", cause: e }),
+      (e) => new VaultPkiError({ message: `Vault request failed: ${e}` }),
     )
 
     const createP12 = (cert: string, privateKey: string, caChain: string[], password: string): Buffer => {

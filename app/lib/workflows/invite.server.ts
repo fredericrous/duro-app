@@ -34,6 +34,7 @@ export const queueInvite = (input: InviteInput) =>
 
     // Step 2: Create PR (seconds, non-critical)
     const username = input.email.split("@")[0].replace(/[^a-z0-9_-]/gi, "")
+    let warning: string | undefined
     yield* github.createCertPR(invite.id, input.email, username).pipe(
       Effect.tap(({ prNumber, certUsername }) =>
         Effect.all([
@@ -41,11 +42,18 @@ export const queueInvite = (input: InviteInput) =>
           inviteRepo.setCertUsername(invite.id, certUsername),
         ]),
       ),
-      Effect.catchAll((e) => Effect.logWarning("PR creation failed").pipe(Effect.annotateLogs("error", String(e)))),
+      Effect.catchAll((e) =>
+        Effect.gen(function* () {
+          const msg = `PR creation failed: ${e.message}`
+          warning = msg
+          yield* inviteRepo.recordReconcileError(invite.id, msg).pipe(Effect.ignore)
+          yield* Effect.logWarning("PR creation failed", { error: String(e) })
+        }),
+      ),
     )
 
     // Email sent by reconciler after PR merge
-    return { success: true as const, message: `Invite queued for ${input.email}` }
+    return { success: true as const, message: `Invite queued for ${input.email}`, warning }
   }).pipe(Effect.withSpan("queueInvite", { attributes: { email: input.email } }))
 
 // --- Accept Invite (unchanged) ---

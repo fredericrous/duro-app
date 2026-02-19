@@ -40,7 +40,7 @@ export const GitHubClientLive = Layer.effect(
         "X-GitHub-Api-Version": "2022-11-28",
         "Content-Type": "application/json",
       },
-      (e) => new GitHubError({ message: "GitHub API request failed", cause: e }),
+      (e) => new GitHubError({ message: `GitHub API request failed: ${e}` }),
     )
 
     const certYaml = (username: string, email: string) =>
