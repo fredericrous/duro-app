@@ -112,6 +112,16 @@ const Coerced = {
   }),
   NullableString: Schema.NullOr(Schema.String),
   NullableNumber: Schema.NullOr(Schema.Number),
+  DateString: Schema.transform(Schema.Unknown, Schema.String, {
+    decode: (v) => (v instanceof Date ? v.toISOString() : String(v)),
+    encode: (v) => v,
+  }),
+  NullableDateString: Schema.NullOr(
+    Schema.transform(Schema.Unknown, Schema.String, {
+      decode: (v) => (v instanceof Date ? v.toISOString() : String(v)),
+      encode: (v) => v,
+    }),
+  ),
 }
 
 const InviteRow = Schema.Struct({
@@ -122,9 +132,9 @@ const InviteRow = Schema.Struct({
   groups: Schema.String,
   groupNames: Schema.String,
   invitedBy: Schema.String,
-  createdAt: Schema.String,
-  expiresAt: Schema.String,
-  usedAt: Coerced.NullableString,
+  createdAt: Coerced.DateString,
+  expiresAt: Coerced.DateString,
+  usedAt: Coerced.NullableDateString,
   usedBy: Coerced.NullableString,
   certIssued: Coerced.Boolean,
   prCreated: Coerced.Boolean,
@@ -132,14 +142,14 @@ const InviteRow = Schema.Struct({
   prMerged: Coerced.Boolean,
   emailSent: Coerced.Boolean,
   attempts: Schema.optionalWith(Schema.Number, { default: () => 0 }),
-  lastAttemptAt: Coerced.NullableString,
+  lastAttemptAt: Coerced.NullableDateString,
   reconcileAttempts: Schema.optionalWith(Schema.Number, { default: () => 0 }),
-  lastReconcileAt: Coerced.NullableString,
+  lastReconcileAt: Coerced.NullableDateString,
   lastError: Coerced.NullableString,
-  failedAt: Coerced.NullableString,
+  failedAt: Coerced.NullableDateString,
   certUsername: Coerced.NullableString,
   certVerified: Coerced.Boolean,
-  certVerifiedAt: Coerced.NullableString,
+  certVerifiedAt: Coerced.NullableDateString,
 })
 
 const decodeInviteRow = Schema.decodeUnknownSync(InviteRow)
