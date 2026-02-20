@@ -8,13 +8,9 @@ import { Effect } from "effect"
 import { supportedLngs } from "~/lib/i18n"
 import { localeCookieHeader, resolveLocale } from "~/lib/i18n.server"
 import { Alert } from "~/components/Alert/Alert"
+import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 import styles from "./settings.module.css"
 import shared from "./admin.shared.module.css"
-
-const languageNames: Record<string, string> = {
-  en: "English",
-  fr: "Francais",
-}
 
 export function meta() {
   return [{ title: "Settings - Duro" }]
@@ -68,13 +64,7 @@ export default function SettingsPage({ loaderData }: Route.ComponentProps) {
           <label htmlFor="locale" className={styles.label}>
             {t("settings.languageLabel")}
           </label>
-          <select id="locale" name="locale" defaultValue={loaderData.locale} className={shared.input}>
-            {supportedLngs.map((lng) => (
-              <option key={lng} value={lng}>
-                {languageNames[lng] ?? lng}
-              </option>
-            ))}
-          </select>
+          <LanguageSelect defaultValue={loaderData.locale} />
           <p className={styles.hint}>{t("settings.languageHint")}</p>
         </div>
 

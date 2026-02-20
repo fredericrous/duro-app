@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react"
 import { Link } from "react-router"
 import { useTranslation } from "react-i18next"
+import { Menu } from "@base-ui/react/menu"
 import styles from "./Header.module.css"
 
 interface HeaderProps {
@@ -10,45 +10,34 @@ interface HeaderProps {
 
 export function Header({ user, isAdmin }: HeaderProps) {
   const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClick)
-    return () => document.removeEventListener("mousedown", handleClick)
-  }, [open])
 
   return (
     <header className={styles.header}>
       <Link to="/" className={styles.title}>
         {t("common.appTitle")}
       </Link>
-      <div className={styles.menu} ref={ref}>
-        <button className={styles.trigger} onClick={() => setOpen((v) => !v)}>
+      <Menu.Root modal={false}>
+        <Menu.Trigger className={styles.trigger}>
           {t("header.welcome", { user })} <span className={styles.caret}>&#9662;</span>
-        </button>
-        {open && (
-          <div className={styles.dropdown}>
-            {isAdmin && (
-              <Link to="/admin" className={styles.dropdownItem} onClick={() => setOpen(false)}>
-                {t("common.admin")}
-              </Link>
-            )}
-            <Link to="/settings" className={styles.dropdownItem} onClick={() => setOpen(false)}>
-              {t("common.settings")}
-            </Link>
-            <Link to="/auth/logout" className={styles.dropdownItem} onClick={() => setOpen(false)}>
-              {t("common.logout")}
-            </Link>
-          </div>
-        )}
-      </div>
+        </Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Positioner side="bottom" alignment="end" sideOffset={6}>
+            <Menu.Popup className={styles.dropdown}>
+              {isAdmin && (
+                <Menu.LinkItem href="/admin" className={styles.dropdownItem}>
+                  {t("common.admin")}
+                </Menu.LinkItem>
+              )}
+              <Menu.LinkItem href="/settings" className={styles.dropdownItem}>
+                {t("common.settings")}
+              </Menu.LinkItem>
+              <Menu.LinkItem href="/auth/logout" className={styles.dropdownItem}>
+                {t("common.logout")}
+              </Menu.LinkItem>
+            </Menu.Popup>
+          </Menu.Positioner>
+        </Menu.Portal>
+      </Menu.Root>
     </header>
   )
 }

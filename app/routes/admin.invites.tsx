@@ -8,16 +8,11 @@ import { config } from "~/lib/config.server"
 import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
 import { queueInvite, revokeInvite } from "~/lib/workflows/invite.server"
 import { Effect } from "effect"
-import { supportedLngs } from "~/lib/i18n"
 import { Alert } from "~/components/Alert/Alert"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 import s from "./admin.shared.module.css"
 import inv from "./admin.invites.module.css"
-
-const languageNames: Record<string, string> = {
-  en: "English",
-  fr: "Francais",
-}
 
 export async function loader() {
   const [groups, pendingInvites, failedInvites] = await Promise.all([
@@ -278,14 +273,8 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
           </div>
 
           <div className={inv.formGroup}>
-            <label htmlFor="locale">{t("admin.invites.languageLabel")}</label>
-            <select id="locale" name="locale" defaultValue="en" className={s.input} style={{ width: "auto" }}>
-              {supportedLngs.map((lng) => (
-                <option key={lng} value={lng}>
-                  {languageNames[lng] ?? lng}
-                </option>
-              ))}
-            </select>
+            <label>{t("admin.invites.languageLabel")}</label>
+            <LanguageSelect />
           </div>
 
           <button type="submit" className={`${s.btn} ${s.btnPrimary}`} disabled={isSubmitting}>
