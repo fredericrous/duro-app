@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next"
-import type { AppDefinition, Category } from "~/lib/apps"
-import { categoryOrder, groupAppsByCategory } from "~/lib/apps"
+import type { AppDefinition } from "~/lib/apps"
+import { getCategoryOrder, formatCategory, groupAppsByCategory } from "~/lib/apps"
 import { AppCard } from "../AppCard/AppCard"
 import styles from "./AppGrid.module.css"
 
@@ -11,12 +11,17 @@ interface AppGridProps {
 export function AppGrid({ apps }: AppGridProps) {
   const { t } = useTranslation()
   const grouped = groupAppsByCategory(apps)
+  const order = getCategoryOrder(apps)
 
-  const categoryLabel = (cat: Category) => t(`categories.${cat}`)
+  const categoryLabel = (cat: string) => {
+    const key = `categories.${cat}`
+    const translated = t(key)
+    return translated === key ? formatCategory(cat) : translated
+  }
 
   return (
     <div className={styles.container}>
-      {categoryOrder.map((category) => {
+      {order.map((category) => {
         const categoryApps = grouped.get(category)
         if (!categoryApps || categoryApps.length === 0) return null
 

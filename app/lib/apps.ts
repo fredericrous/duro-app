@@ -1,19 +1,17 @@
-export type Category = "media" | "ai" | "productivity" | "development" | "admin"
-
 export interface AppDefinition {
   id: string
   name: string
   url: string
-  category: Category
+  category: string
   icon: string
   groups: string[]
   priority: number
 }
 
-export function groupAppsByCategory(visibleApps: AppDefinition[]): Map<Category, AppDefinition[]> {
-  const grouped = new Map<Category, AppDefinition[]>()
+export function groupAppsByCategory(apps: AppDefinition[]): Map<string, AppDefinition[]> {
+  const grouped = new Map<string, AppDefinition[]>()
 
-  for (const app of visibleApps) {
+  for (const app of apps) {
     const existing = grouped.get(app.category) || []
     existing.push(app)
     grouped.set(app.category, existing)
@@ -22,12 +20,21 @@ export function groupAppsByCategory(visibleApps: AppDefinition[]): Map<Category,
   return grouped
 }
 
-export const categoryLabels: Record<Category, string> = {
-  media: "Media",
-  ai: "AI",
-  productivity: "Productivity",
-  development: "Development",
-  admin: "Admin",
+/** Derive ordered category list from apps, sorted by the lowest priority value in each category. */
+export function getCategoryOrder(apps: AppDefinition[]): string[] {
+  const minPriority = new Map<string, number>()
+
+  for (const app of apps) {
+    const current = minPriority.get(app.category)
+    if (current === undefined || app.priority < current) {
+      minPriority.set(app.category, app.priority)
+    }
+  }
+
+  return [...minPriority.entries()].sort(([, a], [, b]) => a - b).map(([cat]) => cat)
 }
 
-export const categoryOrder: Category[] = ["media", "ai", "productivity", "development", "admin"]
+/** Capitalize a category slug for display (fallback when no i18n key exists). */
+export function formatCategory(category: string): string {
+  return category.charAt(0).toUpperCase() + category.slice(1)
+}

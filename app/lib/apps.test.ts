@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { groupAppsByCategory, categoryOrder, categoryLabels } from "./apps"
+import { groupAppsByCategory, getCategoryOrder, formatCategory } from "./apps"
 import type { AppDefinition } from "./apps"
 
 function makeApp(overrides: Partial<AppDefinition> & Pick<AppDefinition, "id" | "category">): AppDefinition {
@@ -42,15 +42,31 @@ describe("groupAppsByCategory", () => {
   })
 })
 
-describe("categoryOrder and categoryLabels", () => {
-  it("has labels for all ordered categories", () => {
-    for (const cat of categoryOrder) {
-      expect(categoryLabels[cat]).toBeDefined()
-      expect(typeof categoryLabels[cat]).toBe("string")
-    }
+describe("getCategoryOrder", () => {
+  it("sorts categories by lowest priority in each", () => {
+    const apps = [
+      makeApp({ id: "a", category: "admin", priority: 50 }),
+      makeApp({ id: "b", category: "media", priority: 1 }),
+      makeApp({ id: "c", category: "media", priority: 10 }),
+      makeApp({ id: "d", category: "ai", priority: 5 }),
+    ]
+    expect(getCategoryOrder(apps)).toEqual(["media", "ai", "admin"])
   })
 
-  it("has all five categories", () => {
-    expect(categoryOrder).toHaveLength(5)
+  it("returns empty array for no apps", () => {
+    expect(getCategoryOrder([])).toEqual([])
+  })
+
+  it("handles single category", () => {
+    const apps = [makeApp({ id: "a", category: "storage", priority: 1 })]
+    expect(getCategoryOrder(apps)).toEqual(["storage"])
+  })
+})
+
+describe("formatCategory", () => {
+  it("capitalizes the first letter", () => {
+    expect(formatCategory("media")).toBe("Media")
+    expect(formatCategory("ai")).toBe("Ai")
+    expect(formatCategory("automation")).toBe("Automation")
   })
 })
