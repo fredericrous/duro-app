@@ -98,13 +98,17 @@ export const VaultPkiLive = Layer.effect(
           }
 
           // Issue cert from NAS Vault PKI
-          const certResponse = yield* vault.post(`/pki-client/issue/client-cert`, {
-            common_name: email,
-            ttl: "2160h",
-          }).pipe(
-            Effect.flatMap(decodeCertIssue),
-            Effect.mapError((e) => new VaultPkiError({ message: "Invalid certificate response from Vault PKI", cause: e })),
-          )
+          const certResponse = yield* vault
+            .post(`/pki-client/issue/client-cert`, {
+              common_name: email,
+              ttl: "2160h",
+            })
+            .pipe(
+              Effect.flatMap(decodeCertIssue),
+              Effect.mapError(
+                (e) => new VaultPkiError({ message: "Invalid certificate response from Vault PKI", cause: e }),
+              ),
+            )
 
           const certData = certResponse.data
 
@@ -203,7 +207,8 @@ export const VaultCertManagerLive = Layer.effect(
   Effect.gen(function* () {
     const vault = yield* VaultPki
     return {
-      issueCertAndP12: (email, inviteId) => pipe(vault.issueCertAndP12(email, inviteId), Effect.mapError(mapVaultError)),
+      issueCertAndP12: (email, inviteId) =>
+        pipe(vault.issueCertAndP12(email, inviteId), Effect.mapError(mapVaultError)),
       getP12Password: (inviteId) => pipe(vault.getP12Password(inviteId), Effect.mapError(mapVaultError)),
       consumeP12Password: (inviteId) => pipe(vault.consumeP12Password(inviteId), Effect.mapError(mapVaultError)),
       deleteP12Secret: (inviteId) => pipe(vault.deleteP12Secret(inviteId), Effect.mapError(mapVaultError)),

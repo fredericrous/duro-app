@@ -23,7 +23,11 @@ export class EmailService extends Context.Tag("EmailService")<
       p12Buffer: Buffer,
       locale?: string,
     ) => Effect.Effect<void, EmailError>
-    readonly sendCertRenewalEmail: (email: string, p12Buffer: Buffer, locale?: string) => Effect.Effect<void, EmailError>
+    readonly sendCertRenewalEmail: (
+      email: string,
+      p12Buffer: Buffer,
+      locale?: string,
+    ) => Effect.Effect<void, EmailError>
   }
 >() {}
 

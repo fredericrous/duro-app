@@ -4,10 +4,7 @@ export default [
   layout("routes/dashboard.tsx", [
     index("routes/home.tsx"),
     route("settings", "routes/settings.tsx"),
-    route("admin", "routes/admin.tsx", [
-      index("routes/admin.invites.tsx"),
-      route("users", "routes/admin.users.tsx"),
-    ]),
+    route("admin", "routes/admin.tsx", [index("routes/admin.invites.tsx"), route("users", "routes/admin.users.tsx")]),
   ]),
   route("auth/callback", "routes/auth.callback.tsx"),
   route("auth/logout", "routes/auth.logout.tsx"),

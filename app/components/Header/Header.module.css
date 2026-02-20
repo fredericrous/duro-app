@@ -61,7 +61,9 @@
   font-size: 0.85rem;
   color: var(--color-text-muted);
   text-decoration: none;
-  transition: background 150ms, color 150ms;
+  transition:
+    background 150ms,
+    color 150ms;
 }
 
 .dropdownItem:first-child {

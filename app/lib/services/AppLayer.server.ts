@@ -8,8 +8,10 @@ import { PreferencesRepoLive } from "./PreferencesRepo.server"
 import { DbLive } from "~/lib/db/client.server"
 import { OtelLayer } from "~/lib/telemetry.server"
 
-export const AppLayer = Layer.mergeAll(LldapUserManagerLive, VaultCertManagerLive, EmailServiceLive, InviteRepoLive, PreferencesRepoLive).pipe(
-  Layer.provide(DbLive),
-  Layer.provide(OtelLayer),
-  Layer.provide(FetchHttpClient.layer),
-)
+export const AppLayer = Layer.mergeAll(
+  LldapUserManagerLive,
+  VaultCertManagerLive,
+  EmailServiceLive,
+  InviteRepoLive,
+  PreferencesRepoLive,
+).pipe(Layer.provide(DbLive), Layer.provide(OtelLayer), Layer.provide(FetchHttpClient.layer))

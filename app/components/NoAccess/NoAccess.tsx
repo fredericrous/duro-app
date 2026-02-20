@@ -13,9 +13,7 @@ export function NoAccess({ user }: NoAccessProps) {
     <div className={styles.container}>
       <StatusIcon name="forbidden" size={64} className={styles.icon} />
       <h1 className={styles.title}>{t("noAccess.title")}</h1>
-      <p className={styles.message}>
-        {user ? t("noAccess.messageUser", { user }) : t("noAccess.messageAnon")}
-      </p>
+      <p className={styles.message}>{user ? t("noAccess.messageUser", { user }) : t("noAccess.messageAnon")}</p>
       <p className={styles.hint}>{t("noAccess.hint")}</p>
     </div>
   )

@@ -25,9 +25,7 @@ export function CertRenewalEmail({ appName, t }: CertRenewalEmailProps) {
             <Heading as="h2" style={subheading}>
               {t("email.renewal.install.title")}
             </Heading>
-            <Text style={text}>
-              {t("email.renewal.install.body", { appName })}
-            </Text>
+            <Text style={text}>{t("email.renewal.install.body", { appName })}</Text>
 
             <Text style={textSmall} dangerouslySetInnerHTML={{ __html: t("email.renewal.install.macos") }} />
             <Text style={textSmall} dangerouslySetInnerHTML={{ __html: t("email.renewal.install.windows") }} />

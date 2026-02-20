@@ -24,7 +24,12 @@ export function meta({ data }: Route.MetaArgs) {
 export async function loader({ request, params }: Route.LoaderArgs) {
   const token = params.token
   if (!token) {
-    return { valid: false as const, error: "Missing invite token", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+    return {
+      valid: false as const,
+      error: "Missing invite token",
+      appName: config.appName,
+      healthUrl: `${config.homeUrl}/health`,
+    }
   }
 
   try {
@@ -37,7 +42,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
         const invite = yield* repo.findByTokenHash(tokenHash)
         if (!invite) {
-          return { valid: false as const, error: "Invalid invite link", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+          return {
+            valid: false as const,
+            error: "Invalid invite link",
+            appName: config.appName,
+            healthUrl: `${config.homeUrl}/health`,
+          }
         }
 
         // Set locale cookie from invite if different from current
@@ -49,15 +59,30 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         }
 
         if (invite.usedAt) {
-          return { valid: false as const, error: "already_used", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+          return {
+            valid: false as const,
+            error: "already_used",
+            appName: config.appName,
+            healthUrl: `${config.homeUrl}/health`,
+          }
         }
 
         if (new Date(invite.expiresAt) < new Date()) {
-          return { valid: false as const, error: "expired", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+          return {
+            valid: false as const,
+            error: "expired",
+            appName: config.appName,
+            healthUrl: `${config.homeUrl}/health`,
+          }
         }
 
         if (invite.attempts >= 5) {
-          return { valid: false as const, error: "Too many attempts. Please contact an administrator.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+          return {
+            valid: false as const,
+            error: "Too many attempts. Please contact an administrator.",
+            appName: config.appName,
+            healthUrl: `${config.homeUrl}/health`,
+          }
         }
 
         // Read P12 password (non-destructive). Consumed via "reveal" action on scratch.
@@ -76,7 +101,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   } catch (e) {
     // Re-throw redirects
     if (e instanceof Response) throw e
-    return { valid: false as const, error: "Something went wrong", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+    return {
+      valid: false as const,
+      error: "Something went wrong",
+      appName: config.appName,
+      healthUrl: `${config.homeUrl}/health`,
+    }
   }
 }
 
@@ -133,23 +163,11 @@ export default function InvitePage({ loaderData, actionData }: Route.ComponentPr
     const { error } = loaderData
 
     if (error === "expired") {
-      return (
-        <ErrorCard
-          icon="clock"
-          title={t("invite.expired.title")}
-          message={t("invite.expired.message")}
-        />
-      )
+      return <ErrorCard icon="clock" title={t("invite.expired.title")} message={t("invite.expired.message")} />
     }
 
     if (error === "already_used") {
-      return (
-        <ErrorCard
-          icon="check-done"
-          title={t("invite.used.title")}
-          message={t("invite.used.message")}
-        />
-      )
+      return <ErrorCard icon="check-done" title={t("invite.used.title")} message={t("invite.used.message")} />
     }
 
     return <ErrorCard title={t("invite.error.title")} message={error} />
@@ -158,7 +176,10 @@ export default function InvitePage({ loaderData, actionData }: Route.ComponentPr
   return (
     <CenteredCardPage>
       <h1>{t("invite.title", { appName: loaderData.appName })}</h1>
-      <p className={styles.subtitle} dangerouslySetInnerHTML={{ __html: t("invite.subtitle", { email: loaderData.email }) }} />
+      <p
+        className={styles.subtitle}
+        dangerouslySetInnerHTML={{ __html: t("invite.subtitle", { email: loaderData.email }) }}
+      />
 
       {loaderData.groupNames && loaderData.groupNames.length > 0 && (
         <p className={styles.groupsInfo}>{t("invite.groupsLabel", { groups: loaderData.groupNames.join(", ") })}</p>

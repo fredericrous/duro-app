@@ -191,7 +191,8 @@ function StepBadges({ invite }: { invite: Invite }) {
   const { t } = useTranslation()
   if (invite.failedAt) return <span className={`${s.badge} ${s.badgeError}`}>{t("admin.invites.badge.failed")}</span>
   if (invite.emailSent) return <span className={`${s.badge} ${s.badgeSuccess}`}>{t("admin.invites.badge.sent")}</span>
-  if (invite.certIssued) return <span className={`${s.badge} ${s.badgeDone}`}>{t("admin.invites.badge.certIssued")}</span>
+  if (invite.certIssued)
+    return <span className={`${s.badge} ${s.badgeDone}`}>{t("admin.invites.badge.certIssued")}</span>
   return <span className={`${s.badge} ${s.badgePending}`}>{t("admin.invites.badge.processing")}</span>
 }
 
@@ -230,9 +231,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
     <>
       {/* Invite Form */}
       <CardSection title={t("admin.invites.sendTitle")}>
-        {actionData && "error" in actionData && (
-          <Alert variant="error">{actionData.error}</Alert>
-        )}
+        {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
         {actionData && "success" in actionData && actionData.success && (
           <Alert variant="success">{actionData.message}</Alert>
         )}
@@ -376,11 +375,7 @@ function PendingInviteRow({ invite }: { invite: Invite }) {
           <revokeFetcher.Form method="post">
             <input type="hidden" name="intent" value="revoke" />
             <input type="hidden" name="inviteId" value={invite.id} />
-            <button
-              type="submit"
-              className={`${s.btnGhost} ${s.btnGhostDanger}`}
-              disabled={isRevoking || isResending}
-            >
+            <button type="submit" className={`${s.btnGhost} ${s.btnGhostDanger}`} disabled={isRevoking || isResending}>
               {isRevoking ? t("admin.invites.action.revoking") : t("admin.invites.action.revoke")}
             </button>
           </revokeFetcher.Form>
@@ -414,11 +409,7 @@ function FailedInviteRow({ invite }: { invite: Invite }) {
           <revokeFetcher.Form method="post">
             <input type="hidden" name="intent" value="revoke" />
             <input type="hidden" name="inviteId" value={invite.id} />
-            <button
-              type="submit"
-              className={`${s.btnGhost} ${s.btnGhostDanger}`}
-              disabled={isRevoking || isRetrying}
-            >
+            <button type="submit" className={`${s.btnGhost} ${s.btnGhostDanger}`} disabled={isRevoking || isRetrying}>
               {isRevoking ? t("admin.invites.action.revoking") : t("admin.invites.action.revoke")}
             </button>
           </revokeFetcher.Form>

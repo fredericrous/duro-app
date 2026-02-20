@@ -146,7 +146,10 @@ export default function ReinvitePage({ loaderData, actionData }: Route.Component
       <CenteredCardPage>
         <StatusIcon name="check-done" variant="success" />
         <h1>{t("reinvite.success.title")}</h1>
-        <p className={local.infoText} dangerouslySetInnerHTML={{ __html: t("reinvite.success.message", { email: actionData.email }) }} />
+        <p
+          className={local.infoText}
+          dangerouslySetInnerHTML={{ __html: t("reinvite.success.message", { email: actionData.email }) }}
+        />
       </CenteredCardPage>
     )
   }
@@ -158,7 +161,10 @@ export default function ReinvitePage({ loaderData, actionData }: Route.Component
   return (
     <CenteredCardPage>
       <h1>{t("reinvite.heading")}</h1>
-      <p className={local.infoText} dangerouslySetInnerHTML={{ __html: t("reinvite.message", { email: loaderData.email }) }} />
+      <p
+        className={local.infoText}
+        dangerouslySetInnerHTML={{ __html: t("reinvite.message", { email: loaderData.email }) }}
+      />
 
       {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
 

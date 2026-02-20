@@ -25,7 +25,12 @@ export function meta({ data }: Route.MetaArgs) {
 export async function loader({ request, params }: Route.LoaderArgs) {
   const token = params.token
   if (!token) {
-    return { valid: false as const, error: "Missing invite token", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+    return {
+      valid: false as const,
+      error: "Missing invite token",
+      appName: config.appName,
+      healthUrl: `${config.homeUrl}/health`,
+    }
   }
 
   try {
@@ -37,7 +42,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
         const invite = yield* repo.findByTokenHash(tokenHash)
         if (!invite) {
-          return { valid: false as const, error: "Invalid invite link", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+          return {
+            valid: false as const,
+            error: "Invalid invite link",
+            appName: config.appName,
+            healthUrl: `${config.homeUrl}/health`,
+          }
         }
 
         // Set locale cookie from invite if different from current
@@ -49,15 +59,30 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         }
 
         if (invite.usedAt) {
-          return { valid: false as const, error: "This invite has already been used.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+          return {
+            valid: false as const,
+            error: "This invite has already been used.",
+            appName: config.appName,
+            healthUrl: `${config.homeUrl}/health`,
+          }
         }
 
         if (new Date(invite.expiresAt) < new Date()) {
-          return { valid: false as const, error: "This invite has expired.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+          return {
+            valid: false as const,
+            error: "This invite has expired.",
+            appName: config.appName,
+            healthUrl: `${config.homeUrl}/health`,
+          }
         }
 
         if (invite.attempts >= 5) {
-          return { valid: false as const, error: "Too many attempts. Please contact an administrator.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+          return {
+            valid: false as const,
+            error: "Too many attempts. Please contact an administrator.",
+            appName: config.appName,
+            healthUrl: `${config.homeUrl}/health`,
+          }
         }
 
         return {
@@ -70,7 +95,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     )
   } catch (e) {
     if (e instanceof Response) throw e
-    return { valid: false as const, error: "Something went wrong", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+    return {
+      valid: false as const,
+      error: "Something went wrong",
+      appName: config.appName,
+      healthUrl: `${config.homeUrl}/health`,
+    }
   }
 }
 
@@ -145,7 +175,10 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
     return (
       <CenteredCardPage>
         <h1>{t("createAccount.heading")}</h1>
-        <p className={styles.subtitle} dangerouslySetInnerHTML={{ __html: t("createAccount.subtitle", { email: loaderData.email }) }} />
+        <p
+          className={styles.subtitle}
+          dangerouslySetInnerHTML={{ __html: t("createAccount.subtitle", { email: loaderData.email }) }}
+        />
         <p className={styles.checkingCert}>{t("createAccount.certCheck")}</p>
       </CenteredCardPage>
     )
@@ -169,7 +202,10 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
   return (
     <CenteredCardPage>
       <h1>{t("createAccount.heading")}</h1>
-      <p className={styles.subtitle} dangerouslySetInnerHTML={{ __html: t("createAccount.subtitle", { email: loaderData.email }) }} />
+      <p
+        className={styles.subtitle}
+        dangerouslySetInnerHTML={{ __html: t("createAccount.subtitle", { email: loaderData.email }) }}
+      />
 
       {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
 
@@ -185,9 +221,7 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
               className={styles.input}
               autoComplete="username"
             />
-            <Field.Description className={styles.hint}>
-              {t("createAccount.username.hint")}
-            </Field.Description>
+            <Field.Description className={styles.hint}>{t("createAccount.username.hint")}</Field.Description>
             <Field.Error className={styles.fieldError} />
           </Field.Root>
 

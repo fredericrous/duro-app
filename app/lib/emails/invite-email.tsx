@@ -21,9 +21,7 @@ export function InviteEmail({ inviteUrl, reinviteUrl, invitedBy, appName, appDes
         <Container style={container}>
           <Heading style={heading}>{t("email.invite.heading", { appName })}</Heading>
 
-          <Text style={text}>
-            {t("email.invite.body", { invitedBy, appName, appDescription })}
-          </Text>
+          <Text style={text}>{t("email.invite.body", { invitedBy, appName, appDescription })}</Text>
 
           <Hr style={hr} />
 

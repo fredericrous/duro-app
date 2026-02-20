@@ -41,20 +41,28 @@ const GraphQLResponse = Schema.Struct({
 const decodeGraphQLResponse = Schema.decodeUnknown(GraphQLResponse)
 
 const UsersData = Schema.Struct({
-  users: Schema.mutable(Schema.Array(Schema.Struct({
-    id: Schema.String,
-    email: Schema.String,
-    displayName: Schema.String,
-    creationDate: Schema.String,
-  }))),
+  users: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        id: Schema.String,
+        email: Schema.String,
+        displayName: Schema.String,
+        creationDate: Schema.String,
+      }),
+    ),
+  ),
 })
 const decodeUsersData = Schema.decodeUnknown(UsersData)
 
 const GroupsData = Schema.Struct({
-  groups: Schema.mutable(Schema.Array(Schema.Struct({
-    id: Schema.Number,
-    displayName: Schema.String,
-  }))),
+  groups: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        id: Schema.Number,
+        displayName: Schema.String,
+      }),
+    ),
+  ),
 })
 const decodeGroupsData = Schema.decodeUnknown(GroupsData)
 
@@ -253,7 +261,8 @@ export const LldapUserManagerLive = Layer.effect(
       getUsers: pipe(lldap.getUsers, Effect.mapError(mapLldapError)),
       getGroups: pipe(lldap.getGroups, Effect.mapError(mapLldapError)),
       createUser: (input) => pipe(lldap.createUser(input), Effect.mapError(mapLldapError)),
-      setUserPassword: (userId, password) => pipe(lldap.setUserPassword(userId, password), Effect.mapError(mapLldapError)),
+      setUserPassword: (userId, password) =>
+        pipe(lldap.setUserPassword(userId, password), Effect.mapError(mapLldapError)),
       addUserToGroup: (userId, groupId) => pipe(lldap.addUserToGroup(userId, groupId), Effect.mapError(mapLldapError)),
       deleteUser: (userId) => pipe(lldap.deleteUser(userId), Effect.mapError(mapLldapError)),
     }
