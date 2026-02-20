@@ -1,15 +1,11 @@
 import { Suspense, use, useState, useEffect, useRef } from "react"
-import { redirect, useNavigation } from "react-router"
 import type { Route } from "./+types/invite"
 import { runEffect } from "~/lib/runtime.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { VaultPki } from "~/lib/services/VaultPki.server"
-import { acceptInvite } from "~/lib/workflows/invite.server"
 import { hashToken } from "~/lib/crypto.server"
 import { Effect } from "effect"
 import { Button } from "@base-ui/react/button"
-import { Field } from "@base-ui/react/field"
-import { Input } from "@base-ui/react/input"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
 import shared from "./shared.module.css"
 import styles from "./invite.module.css"
@@ -101,39 +97,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
   }
 
-  // Handle account creation
-  const username = (formData.get("username") as string)?.trim()
-  const password = formData.get("password") as string
-  const confirmPassword = formData.get("confirmPassword") as string
-
-  // Validate
-  if (!username || !/^[a-zA-Z0-9_-]{3,32}$/.test(username)) {
-    return {
-      error: "Username must be 3-32 characters (letters, numbers, hyphens, underscores)",
-    }
-  }
-  if (!password || password.length < 12) {
-    return { error: "Password must be at least 12 characters" }
-  }
-  if (password !== confirmPassword) {
-    return { error: "Passwords do not match" }
-  }
-
-  try {
-    const tokenHash = hashToken(token)
-    await runEffect(
-      Effect.gen(function* () {
-        const repo = yield* InviteRepo
-        // Rate limit: increment attempt counter (best-effort)
-        yield* repo.incrementAttempt(tokenHash).pipe(Effect.ignore)
-        yield* acceptInvite(token, { username, password })
-      }),
-    )
-    return redirect("https://home.daddyshome.fr/welcome")
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to create account"
-    return { error: message }
-  }
+  return { error: "Unknown action" }
 }
 
 function checkCert(): Promise<boolean> {
@@ -144,7 +108,6 @@ function checkCert(): Promise<boolean> {
 
 export default function InvitePage({ loaderData, actionData }: Route.ComponentProps) {
   const [certPromise] = useState(() => checkCert())
-  const [certInstalled, setCertInstalled] = useState(false)
 
   if (!loaderData.valid) {
     const { error } = loaderData
@@ -221,14 +184,11 @@ export default function InvitePage({ loaderData, actionData }: Route.ComponentPr
 
         {/* Cert Check */}
         <Suspense fallback={<CertCheckLoading />}>
-          <CertCheckResult certPromise={certPromise} onResult={setCertInstalled} />
+          <CertCheckResult certPromise={certPromise} />
         </Suspense>
 
         {/* Error */}
         {actionData && "error" in actionData && <div className={shared.alertError}>{actionData.error}</div>}
-
-        {/* Account Creation Form */}
-        <AccountForm disabled={!certInstalled} />
       </div>
     </main>
   )
@@ -305,23 +265,18 @@ function CertCheckLoading() {
   )
 }
 
-function CertCheckResult({
-  certPromise,
-  onResult,
-}: {
-  certPromise: Promise<boolean>
-  onResult: (installed: boolean) => void
-}) {
+function CertCheckResult({ certPromise }: { certPromise: Promise<boolean> }) {
   const installed = use(certPromise)
-
-  useEffect(() => {
-    onResult(installed)
-  }, [installed, onResult])
 
   return (
     <div className={styles.certCheck}>
       {installed ? (
-        <p className={`${styles.certStatus} ${styles.certStatusSuccess}`}>Certificate detected</p>
+        <>
+          <p className={`${styles.certStatus} ${styles.certStatusSuccess}`}>Certificate detected</p>
+          <a href="create-account" className={`${shared.btn} ${shared.btnPrimary} ${shared.btnFull}`}>
+            Continue to Create Account
+          </a>
+        </>
       ) : (
         <div className={styles.certWarning}>
           <p>
@@ -331,74 +286,5 @@ function CertCheckResult({
         </div>
       )}
     </div>
-  )
-}
-
-function AccountForm({ disabled }: { disabled: boolean }) {
-  const navigation = useNavigation()
-  const isSubmitting = navigation.state === "submitting"
-
-  return (
-    <form method="post" className={`${styles.accountForm} ${disabled ? styles.formDisabled : ""}`}>
-      <h2>Create Your Account</h2>
-      {disabled && (
-        <p className={styles.formDisabledHint}>Install your certificate first, then refresh this page.</p>
-      )}
-
-      <fieldset disabled={disabled || isSubmitting}>
-        <Field.Root className={styles.formGroup}>
-          <Field.Label className={styles.label}>Username</Field.Label>
-          <Input
-            name="username"
-            required
-            pattern="^[a-zA-Z0-9_-]{3,32}$"
-            placeholder="Choose a username"
-            className={styles.input}
-            autoComplete="username"
-          />
-          <Field.Description className={styles.hint}>
-            3-32 characters: letters, numbers, hyphens, underscores
-          </Field.Description>
-          <Field.Error className={styles.fieldError} />
-        </Field.Root>
-
-        <Field.Root className={styles.formGroup}>
-          <Field.Label className={styles.label}>Password</Field.Label>
-          <Input
-            name="password"
-            type="password"
-            required
-            minLength={12}
-            placeholder="Choose a strong password"
-            className={styles.input}
-            autoComplete="new-password"
-          />
-          <Field.Description className={styles.hint}>At least 12 characters</Field.Description>
-          <Field.Error className={styles.fieldError} />
-        </Field.Root>
-
-        <Field.Root className={styles.formGroup}>
-          <Field.Label className={styles.label}>Confirm Password</Field.Label>
-          <Input
-            name="confirmPassword"
-            type="password"
-            required
-            minLength={12}
-            placeholder="Confirm your password"
-            className={styles.input}
-            autoComplete="new-password"
-          />
-          <Field.Error className={styles.fieldError} />
-        </Field.Root>
-
-        <Button
-          type="submit"
-          disabled={disabled || isSubmitting}
-          className={`${shared.btn} ${shared.btnPrimary} ${shared.btnFull}`}
-        >
-          {isSubmitting ? "Creating Account..." : "Create Account"}
-        </Button>
-      </fieldset>
-    </form>
   )
 }

@@ -9,6 +9,7 @@ export default [
   route("auth/logout", "routes/auth.logout.tsx"),
   route("health", "routes/health.ts"),
   route("invite/:token", "routes/invite.tsx"),
+  route("invite/:token/create-account", "routes/invite-create-account.tsx"),
   route("reinvite/:token", "routes/reinvite.tsx"),
   route("welcome", "routes/welcome.tsx"),
 ] satisfies RouteConfig
