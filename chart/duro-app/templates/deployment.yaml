@@ -104,7 +104,7 @@ spec:
             - name: db
               mountPath: /db
             {{- end }}
-            {{- if .Values.web.appsConfig.enabled }}
+            {{- if .Values.web.appsConfig.configMapName }}
             - name: apps-config
               mountPath: /data
               readOnly: true
@@ -129,7 +129,7 @@ spec:
           emptyDir: {}
         {{- end }}
         {{- end }}
-        {{- if .Values.web.appsConfig.enabled }}
+        {{- if .Values.web.appsConfig.configMapName }}
         - name: apps-config
           configMap:
             name: {{ .Values.web.appsConfig.configMapName }}
