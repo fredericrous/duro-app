@@ -35,72 +35,71 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   try {
     const tokenHash = hashToken(token)
 
-    return await runEffect(
+    const { invite, p12Password } = await runEffect(
       Effect.gen(function* () {
         const repo = yield* InviteRepo
         const cert = yield* CertManager
-
         const invite = yield* repo.findByTokenHash(tokenHash)
-        if (!invite) {
-          return {
-            valid: false as const,
-            error: "Invalid invite link",
-            appName: config.appName,
-            healthUrl: `${config.homeUrl}/health`,
-          }
-        }
-
-        // Set locale cookie from invite if different from current
-        const currentLocale = resolveLocale(request)
-        if (invite.locale && invite.locale !== currentLocale) {
-          throw redirect(request.url, {
-            headers: { "Set-Cookie": localeCookieHeader(invite.locale) },
-          })
-        }
-
-        if (invite.usedAt) {
-          return {
-            valid: false as const,
-            error: "already_used",
-            appName: config.appName,
-            healthUrl: `${config.homeUrl}/health`,
-          }
-        }
-
-        if (new Date(invite.expiresAt) < new Date()) {
-          return {
-            valid: false as const,
-            error: "expired",
-            appName: config.appName,
-            healthUrl: `${config.homeUrl}/health`,
-          }
-        }
-
-        if (invite.attempts >= 5) {
-          return {
-            valid: false as const,
-            error: "Too many attempts. Please contact an administrator.",
-            appName: config.appName,
-            healthUrl: `${config.homeUrl}/health`,
-          }
-        }
-
-        // Read P12 password (non-destructive). Consumed via "reveal" action on scratch.
-        const p12Password = yield* cert.getP12Password(invite.id)
-
-        return {
-          valid: true as const,
-          email: invite.email,
-          groupNames: JSON.parse(invite.groupNames) as string[],
-          p12Password,
-          appName: config.appName,
-          healthUrl: `${config.homeUrl}/health`,
-        }
+        const p12Password = invite ? yield* cert.getP12Password(invite.id) : null
+        return { invite, p12Password }
       }),
     )
+
+    if (!invite) {
+      return {
+        valid: false as const,
+        error: "Invalid invite link",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
+    }
+
+    // Set locale cookie from invite if different from current
+    const currentLocale = resolveLocale(request)
+    if (invite.locale && invite.locale !== currentLocale) {
+      throw redirect(request.url, {
+        headers: { "Set-Cookie": localeCookieHeader(invite.locale) },
+      })
+    }
+
+    if (invite.usedAt) {
+      return {
+        valid: false as const,
+        error: "already_used",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
+    }
+
+    if (new Date(invite.expiresAt) < new Date()) {
+      return {
+        valid: false as const,
+        error: "expired",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
+    }
+
+    if (invite.attempts >= 5) {
+      return {
+        valid: false as const,
+        error: "Too many attempts. Please contact an administrator.",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
+    }
+
+    return {
+      valid: true as const,
+      email: invite.email,
+      groupNames: JSON.parse(invite.groupNames) as string[],
+      p12Password,
+      appName: config.appName,
+      healthUrl: `${config.homeUrl}/health`,
+    }
   } catch (e) {
-    // Re-throw redirects
     if (e instanceof Response) throw e
+    console.error("[invite] loader error:", e)
     return {
       valid: false as const,
       error: "Something went wrong",
@@ -141,7 +140,8 @@ export async function action({ request, params }: Route.ActionArgs) {
         }),
       )
       return result
-    } catch {
+    } catch (e) {
+      console.error("[invite] reveal action error:", e)
       return { password: null }
     }
   }

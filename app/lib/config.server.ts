@@ -6,5 +6,8 @@ export const config = {
   adminGroupName: process.env.ADMIN_GROUP_NAME ?? "lldap_admin",
   isSystemUser: (username: string) => username === "admin" || username.endsWith("-service"),
   appDescription: process.env.APP_DESCRIPTION ?? "a private platform for media, productivity, and more",
-  categoryOrder: (process.env.CATEGORY_ORDER ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+  categoryOrder: (process.env.CATEGORY_ORDER ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
 } as const

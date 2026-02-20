@@ -30,56 +30,58 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   try {
     const tokenHash = hashToken(token)
 
-    return await runEffect(
+    const { invite, p12Password } = await runEffect(
       Effect.gen(function* () {
         const repo = yield* InviteRepo
         const cert = yield* CertManager
-
         const invite = yield* repo.findByTokenHash(tokenHash)
-        if (!invite) {
-          return { canReinvite: false as const, error: "Invalid link", appName: config.appName }
-        }
-
-        // Set locale cookie from invite if different from current
-        const currentLocale = resolveLocale(request)
-        if (invite.locale && invite.locale !== currentLocale) {
-          throw redirect(request.url, {
-            headers: { "Set-Cookie": localeCookieHeader(invite.locale) },
-          })
-        }
-
-        // If account was already created, no re-invite
-        if (invite.usedBy && invite.usedBy !== "__revoked__") {
-          return {
-            canReinvite: false as const,
-            error:
-              "This invite has already been used to create an account. If you need help, contact the person who invited you.",
-            appName: config.appName,
-          }
-        }
-
-        // Only allow re-invite if expired or password already consumed
-        const isExpired = new Date(invite.expiresAt) < new Date()
-        const pw = yield* cert.getP12Password(invite.id)
-        const passwordConsumed = pw === null
-
-        if (!isExpired && !passwordConsumed) {
-          return {
-            canReinvite: false as const,
-            error: "Your invite is still valid. Check your email for the original invitation link.",
-            appName: config.appName,
-          }
-        }
-
-        return {
-          canReinvite: true as const,
-          email: invite.email,
-          appName: config.appName,
-        }
+        const p12Password = invite ? yield* cert.getP12Password(invite.id) : null
+        return { invite, p12Password }
       }),
     )
+
+    if (!invite) {
+      return { canReinvite: false as const, error: "Invalid link", appName: config.appName }
+    }
+
+    // Set locale cookie from invite if different from current
+    const currentLocale = resolveLocale(request)
+    if (invite.locale && invite.locale !== currentLocale) {
+      throw redirect(request.url, {
+        headers: { "Set-Cookie": localeCookieHeader(invite.locale) },
+      })
+    }
+
+    // If account was already created, no re-invite
+    if (invite.usedBy && invite.usedBy !== "__revoked__") {
+      return {
+        canReinvite: false as const,
+        error:
+          "This invite has already been used to create an account. If you need help, contact the person who invited you.",
+        appName: config.appName,
+      }
+    }
+
+    // Only allow re-invite if expired or password already consumed
+    const isExpired = new Date(invite.expiresAt) < new Date()
+    const passwordConsumed = p12Password === null
+
+    if (!isExpired && !passwordConsumed) {
+      return {
+        canReinvite: false as const,
+        error: "Your invite is still valid. Check your email for the original invitation link.",
+        appName: config.appName,
+      }
+    }
+
+    return {
+      canReinvite: true as const,
+      email: invite.email,
+      appName: config.appName,
+    }
   } catch (e) {
     if (e instanceof Response) throw e
+    console.error("[reinvite] loader error:", e)
     return { canReinvite: false as const, error: "Something went wrong", appName: config.appName }
   }
 }

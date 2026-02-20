@@ -36,65 +36,66 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   try {
     const tokenHash = hashToken(token)
 
-    return await runEffect(
+    const invite = await runEffect(
       Effect.gen(function* () {
         const repo = yield* InviteRepo
-
-        const invite = yield* repo.findByTokenHash(tokenHash)
-        if (!invite) {
-          return {
-            valid: false as const,
-            error: "Invalid invite link",
-            appName: config.appName,
-            healthUrl: `${config.homeUrl}/health`,
-          }
-        }
-
-        // Set locale cookie from invite if different from current
-        const currentLocale = resolveLocale(request)
-        if (invite.locale && invite.locale !== currentLocale) {
-          throw redirect(request.url, {
-            headers: { "Set-Cookie": localeCookieHeader(invite.locale) },
-          })
-        }
-
-        if (invite.usedAt) {
-          return {
-            valid: false as const,
-            error: "This invite has already been used.",
-            appName: config.appName,
-            healthUrl: `${config.homeUrl}/health`,
-          }
-        }
-
-        if (new Date(invite.expiresAt) < new Date()) {
-          return {
-            valid: false as const,
-            error: "This invite has expired.",
-            appName: config.appName,
-            healthUrl: `${config.homeUrl}/health`,
-          }
-        }
-
-        if (invite.attempts >= 5) {
-          return {
-            valid: false as const,
-            error: "Too many attempts. Please contact an administrator.",
-            appName: config.appName,
-            healthUrl: `${config.homeUrl}/health`,
-          }
-        }
-
-        return {
-          valid: true as const,
-          email: invite.email,
-          appName: config.appName,
-          healthUrl: `${config.homeUrl}/health`,
-        }
+        return yield* repo.findByTokenHash(tokenHash)
       }),
     )
+
+    if (!invite) {
+      return {
+        valid: false as const,
+        error: "Invalid invite link",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
+    }
+
+    // Set locale cookie from invite if different from current
+    const currentLocale = resolveLocale(request)
+    if (invite.locale && invite.locale !== currentLocale) {
+      throw redirect(request.url, {
+        headers: { "Set-Cookie": localeCookieHeader(invite.locale) },
+      })
+    }
+
+    if (invite.usedAt) {
+      return {
+        valid: false as const,
+        error: "This invite has already been used.",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
+    }
+
+    if (new Date(invite.expiresAt) < new Date()) {
+      return {
+        valid: false as const,
+        error: "This invite has expired.",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
+    }
+
+    if (invite.attempts >= 5) {
+      return {
+        valid: false as const,
+        error: "Too many attempts. Please contact an administrator.",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
+    }
+
+    return {
+      valid: true as const,
+      email: invite.email,
+      appName: config.appName,
+      healthUrl: `${config.homeUrl}/health`,
+    }
   } catch (e) {
     if (e instanceof Response) throw e
+    console.error("[create-account] loader error:", e)
     return {
       valid: false as const,
       error: "Something went wrong",

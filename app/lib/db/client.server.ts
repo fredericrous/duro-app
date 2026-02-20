@@ -92,14 +92,32 @@ const runMigrations = <R>(loader: Migrator.Loader<R>, dialect: Dialect) =>
     const migrations = yield* loader
     const sorted = [...migrations].sort(([a], [b]) => a - b)
 
+    if (sorted.length === 0) {
+      yield* Effect.die(new Error(`No migrations discovered for dialect "${dialect}". Check import.meta.glob paths.`))
+    }
+
+    yield* Effect.log(`migrations: discovered ${sorted.length}, already applied ${appliedIds.size} [${dialect}]`)
+
+    let newCount = 0
     for (const [id, name, load] of sorted) {
       if (appliedIds.has(id)) continue
-      // load is Effect.promise(() => module); resolve and extract default export
       const mod = yield* load
       const migration = Effect.isEffect(mod) ? mod : ((mod as any).default?.default ?? (mod as any).default)
-      yield* migration as Effect.Effect<void>
+      if (!Effect.isEffect(migration)) {
+        yield* Effect.die(new Error(`Migration ${id}_${name}: default export is not an Effect`))
+      }
+      yield* (migration as Effect.Effect<void>).pipe(
+        Effect.tapError((e) => Effect.logError(`migration ${id}_${name} failed`, e)),
+      )
       yield* sql`INSERT INTO _migrations (id, name) VALUES (${id}, ${name})`
       yield* Effect.log(`migration ${id}_${name} applied`)
+      newCount++
+    }
+
+    if (newCount > 0) {
+      yield* Effect.log(`migrations: ${newCount} new migration(s) applied`)
+    } else {
+      yield* Effect.log(`migrations: all ${sorted.length} already applied, nothing to do`)
     }
   })
 
