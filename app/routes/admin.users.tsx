@@ -28,7 +28,8 @@ export async function loader() {
     ),
   ])
 
-  return { users, revocations, systemUsers: config.systemUsers }
+  const systemUserIds = new Set(users.filter((u) => config.isSystemUser(u.id)).map((u) => u.id))
+  return { users, revocations, systemUserIds: [...systemUserIds] }
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -101,7 +102,7 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
-  const { users, revocations, systemUsers } = loaderData
+  const { users, revocations, systemUserIds } = loaderData
 
   return (
     <>
@@ -120,7 +121,7 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
             </thead>
             <tbody>
               {users.map((user) => (
-                <UserRow key={user.id} user={user} isSystem={systemUsers.includes(user.id)} />
+                <UserRow key={user.id} user={user} isSystem={systemUserIds.includes(user.id)} />
               ))}
             </tbody>
           </table>

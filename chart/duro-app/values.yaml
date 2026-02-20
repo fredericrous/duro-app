@@ -43,7 +43,7 @@ env:
   ALLOWED_ORIGIN_SUFFIX: "daddyshome.fr"
   HOME_URL: "https://home.daddyshome.fr"
   ADMIN_GROUP_NAME: "lldap_admin"
-  SYSTEM_USERS: "admin,gitea-service"
+  CATEGORY_ORDER: "media,ai,storage,automation,development,admin"
 
 envFrom: []
 

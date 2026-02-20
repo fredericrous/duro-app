@@ -20,18 +20,22 @@ export function groupAppsByCategory(apps: AppDefinition[]): Map<string, AppDefin
   return grouped
 }
 
-/** Derive ordered category list from apps, sorted by the lowest priority value in each category. */
-export function getCategoryOrder(apps: AppDefinition[]): string[] {
-  const minPriority = new Map<string, number>()
+/**
+ * Return ordered category list. Uses `configuredOrder` when provided —
+ * only categories that actually have apps are kept, and any categories
+ * present in apps but missing from the list are appended alphabetically.
+ * When no configured order is given, falls back to alphabetical.
+ */
+export function getCategoryOrder(apps: AppDefinition[], configuredOrder: string[] = []): string[] {
+  const present = new Set(apps.map((a) => a.category))
 
-  for (const app of apps) {
-    const current = minPriority.get(app.category)
-    if (current === undefined || app.priority < current) {
-      minPriority.set(app.category, app.priority)
-    }
+  if (configuredOrder.length === 0) {
+    return [...present].sort()
   }
 
-  return [...minPriority.entries()].sort(([, a], [, b]) => a - b).map(([cat]) => cat)
+  const ordered = configuredOrder.filter((c) => present.has(c))
+  const remaining = [...present].filter((c) => !configuredOrder.includes(c)).sort()
+  return [...ordered, ...remaining]
 }
 
 /** Capitalize a category slug for display (fallback when no i18n key exists). */

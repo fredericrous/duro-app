@@ -1,7 +1,7 @@
-import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/home"
 import { getAuth } from "~/lib/auth.server"
 import { getVisibleApps } from "~/lib/apps.server"
+import { config } from "~/lib/config.server"
 import { AppGrid } from "~/components/AppGrid/AppGrid"
 import { NoAccess } from "~/components/NoAccess/NoAccess"
 import styles from "./home.module.css"
@@ -17,15 +17,16 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     user: auth.user,
     visibleApps,
+    categoryOrder: config.categoryOrder,
   }
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { user, visibleApps } = loaderData
+  const { user, visibleApps, categoryOrder } = loaderData
 
   return (
     <main className={styles.page}>
-      {visibleApps.length > 0 ? <AppGrid apps={visibleApps} /> : <NoAccess user={user} />}
+      {visibleApps.length > 0 ? <AppGrid apps={visibleApps} categoryOrder={categoryOrder} /> : <NoAccess user={user} />}
     </main>
   )
 }

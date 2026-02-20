@@ -4,6 +4,7 @@ export const config = {
   homeUrl: process.env.HOME_URL ?? "https://home.daddyshome.fr",
   inviteBaseUrl: process.env.INVITE_BASE_URL ?? "https://join.daddyshome.fr",
   adminGroupName: process.env.ADMIN_GROUP_NAME ?? "lldap_admin",
-  systemUsers: (process.env.SYSTEM_USERS ?? "admin,gitea-service").split(",").map((s) => s.trim()),
+  isSystemUser: (username: string) => username === "admin" || username.endsWith("-service"),
   appDescription: process.env.APP_DESCRIPTION ?? "a private platform for media, productivity, and more",
+  categoryOrder: (process.env.CATEGORY_ORDER ?? "").split(",").map((s) => s.trim()).filter(Boolean),
 } as const

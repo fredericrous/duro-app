@@ -6,12 +6,13 @@ import styles from "./AppGrid.module.css"
 
 interface AppGridProps {
   apps: AppDefinition[]
+  categoryOrder?: string[]
 }
 
-export function AppGrid({ apps }: AppGridProps) {
+export function AppGrid({ apps, categoryOrder }: AppGridProps) {
   const { t } = useTranslation()
   const grouped = groupAppsByCategory(apps)
-  const order = getCategoryOrder(apps)
+  const order = getCategoryOrder(apps, categoryOrder)
 
   const categoryLabel = (cat: string) => {
     const key = `categories.${cat}`

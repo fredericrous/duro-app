@@ -43,14 +43,31 @@ describe("groupAppsByCategory", () => {
 })
 
 describe("getCategoryOrder", () => {
-  it("sorts categories by lowest priority in each", () => {
-    const apps = [
-      makeApp({ id: "a", category: "admin", priority: 50 }),
-      makeApp({ id: "b", category: "media", priority: 1 }),
-      makeApp({ id: "c", category: "media", priority: 10 }),
-      makeApp({ id: "d", category: "ai", priority: 5 }),
-    ]
-    expect(getCategoryOrder(apps)).toEqual(["media", "ai", "admin"])
+  const apps = [
+    makeApp({ id: "a", category: "admin", priority: 50 }),
+    makeApp({ id: "b", category: "media", priority: 1 }),
+    makeApp({ id: "c", category: "media", priority: 10 }),
+    makeApp({ id: "d", category: "ai", priority: 5 }),
+  ]
+
+  it("uses configured order, filtering to present categories", () => {
+    expect(getCategoryOrder(apps, ["ai", "media", "admin"])).toEqual(["ai", "media", "admin"])
+  })
+
+  it("appends unconfigured categories alphabetically", () => {
+    expect(getCategoryOrder(apps, ["media"])).toEqual(["media", "admin", "ai"])
+  })
+
+  it("skips configured categories not present in apps", () => {
+    expect(getCategoryOrder(apps, ["storage", "media", "ai", "admin"])).toEqual(["media", "ai", "admin"])
+  })
+
+  it("falls back to alphabetical when no configured order", () => {
+    expect(getCategoryOrder(apps)).toEqual(["admin", "ai", "media"])
+  })
+
+  it("falls back to alphabetical with empty configured order", () => {
+    expect(getCategoryOrder(apps, [])).toEqual(["admin", "ai", "media"])
   })
 
   it("returns empty array for no apps", () => {
@@ -58,8 +75,8 @@ describe("getCategoryOrder", () => {
   })
 
   it("handles single category", () => {
-    const apps = [makeApp({ id: "a", category: "storage", priority: 1 })]
-    expect(getCategoryOrder(apps)).toEqual(["storage"])
+    const single = [makeApp({ id: "a", category: "storage", priority: 1 })]
+    expect(getCategoryOrder(single, ["storage"])).toEqual(["storage"])
   })
 })
 
