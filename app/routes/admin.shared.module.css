@@ -1,0 +1,134 @@
+.input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.btn {
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: background-color var(--transition);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btnPrimary {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.tableContainer {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(51, 51, 51, 0.5);
+}
+
+.emptyState {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.actionBtns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btnGhost {
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.btnGhost:hover:not(:disabled) {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.btnGhostDanger:hover:not(:disabled) {
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.badgeSuccess {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+}
+
+.badgePending {
+  background: rgba(234, 179, 8, 0.15);
+  color: #fde047;
+}
+
+.badgeDone {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+}
+
+.badgeProgress {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+}
+
+.badgeError {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+
+.btnDanger {
+  background: rgba(239, 68, 68, 0.8);
+  color: #fff;
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 1);
+}

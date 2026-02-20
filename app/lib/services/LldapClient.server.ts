@@ -1,4 +1,5 @@
-import { Context, Effect, Data, Layer, Ref, Config, Redacted } from "effect"
+import { Context, Effect, Data, Layer, Ref, Config, Redacted, Schema, pipe } from "effect"
+import { UserManager, UserManagerError } from "./UserManager.server"
 import * as HttpClient from "@effect/platform/HttpClient"
 import * as HttpClientRequest from "@effect/platform/HttpClientRequest"
 import * as HttpClientResponse from "@effect/platform/HttpClientResponse"
@@ -27,6 +28,35 @@ export class LldapError extends Data.TaggedError("LldapError")<{
   readonly message: string
   readonly cause?: unknown
 }> {}
+
+// --- Response schemas ---
+
+const LoginResponse = Schema.Struct({ token: Schema.String })
+const decodeLoginResponse = Schema.decodeUnknown(LoginResponse)
+
+const GraphQLResponse = Schema.Struct({
+  data: Schema.optional(Schema.Unknown),
+  errors: Schema.optional(Schema.Array(Schema.Struct({ message: Schema.String }))),
+})
+const decodeGraphQLResponse = Schema.decodeUnknown(GraphQLResponse)
+
+const UsersData = Schema.Struct({
+  users: Schema.mutable(Schema.Array(Schema.Struct({
+    id: Schema.String,
+    email: Schema.String,
+    displayName: Schema.String,
+    creationDate: Schema.String,
+  }))),
+})
+const decodeUsersData = Schema.decodeUnknown(UsersData)
+
+const GroupsData = Schema.Struct({
+  groups: Schema.mutable(Schema.Array(Schema.Struct({
+    id: Schema.Number,
+    displayName: Schema.String,
+  }))),
+})
+const decodeGroupsData = Schema.decodeUnknown(GroupsData)
 
 export class LldapClient extends Context.Tag("LldapClient")<
   LldapClient,
@@ -81,13 +111,9 @@ export const LldapClientLive = Layer.effect(
           Effect.scoped,
         )
 
-      const { token } = res as { token: string }
-
-      if (!token) {
-        return yield* new LldapError({
-          message: "No token in LLDAP login response",
-        })
-      }
+      const { token } = yield* decodeLoginResponse(res).pipe(
+        Effect.mapError((e) => new LldapError({ message: "No token in LLDAP login response", cause: e })),
+      )
 
       yield* Ref.set(tokenRef, {
         token,
@@ -96,7 +122,7 @@ export const LldapClientLive = Layer.effect(
       return token
     })
 
-    const graphql = <T = Record<string, unknown>>(query: string, variables?: Record<string, unknown>) =>
+    const graphql = (query: string, variables?: Record<string, unknown>) =>
       Effect.gen(function* () {
         const token = yield* getToken
         const res = yield* http
@@ -114,10 +140,9 @@ export const LldapClientLive = Layer.effect(
             Effect.scoped,
           )
 
-        const body = res as {
-          data?: T
-          errors?: Array<{ message: string }>
-        }
+        const body = yield* decodeGraphQLResponse(res).pipe(
+          Effect.mapError((e) => new LldapError({ message: "Invalid GraphQL response", cause: e })),
+        )
 
         if (body.errors?.length) {
           return yield* new LldapError({
@@ -125,12 +150,12 @@ export const LldapClientLive = Layer.effect(
           })
         }
 
-        return body.data as T
+        return body.data
       })
 
     return {
       getUsers: Effect.gen(function* () {
-        const data = yield* graphql<{ users: LldapUser[] }>(`
+        const raw = yield* graphql(`
           {
             users {
               id
@@ -140,11 +165,14 @@ export const LldapClientLive = Layer.effect(
             }
           }
         `)
-        return data.users ?? []
+        const data = yield* decodeUsersData(raw).pipe(
+          Effect.mapError((e) => new LldapError({ message: "Invalid users response", cause: e })),
+        )
+        return data.users
       }),
 
       getGroups: Effect.gen(function* () {
-        const data = yield* graphql<{ groups: LldapGroup[] }>(`
+        const raw = yield* graphql(`
           {
             groups {
               id
@@ -152,7 +180,10 @@ export const LldapClientLive = Layer.effect(
             }
           }
         `)
-        return data.groups ?? []
+        const data = yield* decodeGroupsData(raw).pipe(
+          Effect.mapError((e) => new LldapError({ message: "Invalid groups response", cause: e })),
+        )
+        return data.groups
       }),
 
       createUser: (input: CreateUserInput) =>
@@ -211,3 +242,20 @@ export const LldapClientLive = Layer.effect(
     }
   }),
 )
+
+const mapLldapError = (e: LldapError) => new UserManagerError({ message: e.message, cause: e.cause })
+
+export const LldapUserManagerLive = Layer.effect(
+  UserManager,
+  Effect.gen(function* () {
+    const lldap = yield* LldapClient
+    return {
+      getUsers: pipe(lldap.getUsers, Effect.mapError(mapLldapError)),
+      getGroups: pipe(lldap.getGroups, Effect.mapError(mapLldapError)),
+      createUser: (input) => pipe(lldap.createUser(input), Effect.mapError(mapLldapError)),
+      setUserPassword: (userId, password) => pipe(lldap.setUserPassword(userId, password), Effect.mapError(mapLldapError)),
+      addUserToGroup: (userId, groupId) => pipe(lldap.addUserToGroup(userId, groupId), Effect.mapError(mapLldapError)),
+      deleteUser: (userId) => pipe(lldap.deleteUser(userId), Effect.mapError(mapLldapError)),
+    }
+  }),
+).pipe(Layer.provide(LldapClientLive))

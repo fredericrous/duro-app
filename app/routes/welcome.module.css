@@ -1,30 +1,10 @@
-.page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-}
-
-.card {
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 3rem;
-  max-width: 480px;
-  width: 100%;
+.centered {
   text-align: center;
+  padding: 3rem;
 }
 
-.successIcon {
-  color: #22c55e;
+.bigIcon {
   margin-bottom: 1.5rem;
-}
-
-.card h1 {
-  font-size: 1.75rem;
-  font-weight: 700;
-  margin-bottom: 0.75rem;
 }
 
 .message {

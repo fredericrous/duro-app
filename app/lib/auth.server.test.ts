@@ -1,7 +1,14 @@
 // @vitest-environment node
-import { describe, it, expect, beforeAll } from "vitest"
-import { getAuth } from "./auth.server"
+import { describe, it, expect, beforeAll, vi } from "vitest"
 import { createSessionCookie } from "./session.server"
+
+// Mock oidc.server to prevent loading openid-client (heavy, can hang under load)
+vi.mock("./oidc.server", () => ({
+  buildAuthRequest: vi.fn(),
+}))
+
+// Import after mock registration
+const { getAuth } = await import("./auth.server")
 
 beforeAll(() => {
   process.env.SESSION_SECRET = "test-session-secret-must-be-32ch"

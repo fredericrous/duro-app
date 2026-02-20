@@ -1,15 +1,17 @@
 import { Effect } from "effect"
 import * as crypto from "node:crypto"
-import { LldapClient } from "~/lib/services/LldapClient.server"
-import { VaultPki } from "~/lib/services/VaultPki.server"
+import { UserManager } from "~/lib/services/UserManager.server"
+import { CertManager } from "~/lib/services/CertManager.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { EmailService } from "~/lib/services/EmailService.server"
+import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 
 export interface InviteInput {
   email: string
   groups: number[]
   groupNames: string[]
   invitedBy: string
+  locale?: string
 }
 
 export interface AcceptInput {
@@ -22,7 +24,7 @@ export interface AcceptInput {
 export const queueInvite = (input: InviteInput) =>
   Effect.gen(function* () {
     const inviteRepo = yield* InviteRepo
-    const vault = yield* VaultPki
+    const cert = yield* CertManager
     const emailSvc = yield* EmailService
 
     // Revoke any existing failed invite for this email so we can re-create
@@ -42,11 +44,12 @@ export const queueInvite = (input: InviteInput) =>
     yield* inviteRepo.setCertUsername(invite.id, certUsername)
 
     // Issue cert directly from Vault PKI
-    const { p12Buffer } = yield* vault.issueCertAndP12(input.email, invite.id)
+    const { p12Buffer } = yield* cert.issueCertAndP12(input.email, invite.id)
     yield* inviteRepo.markCertIssued(invite.id)
 
     // Send email inline
-    yield* emailSvc.sendInviteEmail(input.email, invite.token, input.invitedBy, p12Buffer).pipe(
+    const locale = input.locale ?? "en"
+    yield* emailSvc.sendInviteEmail(input.email, invite.token, input.invitedBy, p12Buffer, locale).pipe(
       Effect.tap(() => inviteRepo.markEmailSent(invite.id)),
       Effect.catchAll((e) =>
         Effect.gen(function* () {
@@ -64,8 +67,8 @@ export const queueInvite = (input: InviteInput) =>
 export const acceptInvite = (token: string, input: AcceptInput) =>
   Effect.gen(function* () {
     const inviteRepo = yield* InviteRepo
-    const lldap = yield* LldapClient
-    const vault = yield* VaultPki
+    const users = yield* UserManager
+    const cert = yield* CertManager
 
     // Atomic consume — marks invite as used
     const invite = yield* inviteRepo.consumeByToken(token)
@@ -76,7 +79,7 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
     })
 
     // Create user with compensating rollback on failure
-    yield* lldap.createUser({
+    yield* users.createUser({
       id: input.username,
       email: invite.email,
       displayName: input.username,
@@ -86,13 +89,13 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
 
     // Set password + add to groups, rollback user on failure
     yield* Effect.gen(function* () {
-      yield* lldap.setUserPassword(input.username, input.password)
+      yield* users.setUserPassword(input.username, input.password)
       for (const gid of groups) {
-        yield* lldap.addUserToGroup(input.username, gid)
+        yield* users.addUserToGroup(input.username, gid)
       }
     }).pipe(
       Effect.tapError(() =>
-        lldap.deleteUser(input.username).pipe(
+        users.deleteUser(input.username).pipe(
           Effect.tap(() => Effect.logWarning(`Rolled back user ${input.username} after configuration failure`)),
           Effect.ignore,
         ),
@@ -101,8 +104,8 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
 
     yield* inviteRepo.markUsedBy(invite.id, input.username)
 
-    // Clean up P12 secret from Vault
-    yield* vault.deleteP12Secret(invite.id)
+    // Clean up P12 secret
+    yield* cert.deleteP12Secret(invite.id)
 
     return { success: true as const }
   }).pipe(Effect.withSpan("acceptInvite", { attributes: { username: input.username } }))
@@ -112,13 +115,13 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
 export const revokeInvite = (inviteId: string) =>
   Effect.gen(function* () {
     const inviteRepo = yield* InviteRepo
-    const vault = yield* VaultPki
+    const cert = yield* CertManager
 
     const invite = yield* inviteRepo.findById(inviteId)
     if (!invite) return
 
-    // Clean up Vault P12 secret
-    yield* vault
+    // Clean up P12 secret
+    yield* cert
       .deleteP12Secret(inviteId)
       .pipe(
         Effect.catchAll((e) => Effect.logWarning("revokeInvite: failed to delete P12 secret", { error: String(e) })),
@@ -131,7 +134,7 @@ export const revokeInvite = (inviteId: string) =>
         .split("@")[0]
         .replace(/[^a-z0-9_-]/gi, "")
         .toLowerCase()
-    yield* vault
+    yield* cert
       .deleteCertByUsername(certUsername)
       .pipe(
         Effect.catchAll((e) =>
@@ -146,14 +149,14 @@ export const revokeInvite = (inviteId: string) =>
 
 export const revokeUser = (username: string, email: string, revokedBy: string, reason?: string) =>
   Effect.gen(function* () {
-    const lldap = yield* LldapClient
-    const vault = yield* VaultPki
+    const users = yield* UserManager
+    const cert = yield* CertManager
     const inviteRepo = yield* InviteRepo
 
-    // Remove from LLDAP
-    yield* lldap
+    // Remove from user directory
+    yield* users
       .deleteUser(username)
-      .pipe(Effect.catchAll((e) => Effect.logWarning("revokeUser: failed to delete LLDAP user", { error: String(e) })))
+      .pipe(Effect.catchAll((e) => Effect.logWarning("revokeUser: failed to delete user", { error: String(e) })))
 
     // Derive cert username from email (matching queueInvite pattern)
     const certUsername = email
@@ -161,8 +164,8 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
       .replace(/[^a-z0-9_-]/gi, "")
       .toLowerCase()
 
-    // Clean up Vault secret
-    yield* vault
+    // Clean up cert secret
+    yield* cert
       .deleteCertByUsername(certUsername)
       .pipe(Effect.catchAll((e) => Effect.logWarning("revokeUser: failed to delete cert secret", { error: String(e) })))
 
@@ -174,19 +177,21 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
 
 export const resendCert = (email: string, username: string) =>
   Effect.gen(function* () {
-    const vault = yield* VaultPki
+    const cert = yield* CertManager
     const emailService = yield* EmailService
+    const prefs = yield* PreferencesRepo
 
     const tempId = crypto.randomUUID()
+    const locale = yield* prefs.getLocale(username)
 
     // Issue fresh cert
-    const { p12Buffer } = yield* vault.issueCertAndP12(email, tempId)
+    const { p12Buffer } = yield* cert.issueCertAndP12(email, tempId)
 
     // Send renewal email
-    yield* emailService.sendCertRenewalEmail(email, p12Buffer)
+    yield* emailService.sendCertRenewalEmail(email, p12Buffer, locale)
 
     // Clean up temp secret
-    yield* vault
+    yield* cert
       .deleteP12Secret(tempId)
       .pipe(
         Effect.catchAll((e) => Effect.logWarning("resendCert: failed to clean up temp secret", { error: String(e) })),

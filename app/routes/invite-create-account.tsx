@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { redirect, useNavigation } from "react-router"
+import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/invite-create-account"
 import { runEffect } from "~/lib/runtime.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
@@ -9,17 +10,22 @@ import { Effect } from "effect"
 import { Button } from "@base-ui/react/button"
 import { Field } from "@base-ui/react/field"
 import { Input } from "@base-ui/react/input"
+import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
+import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
+import { Alert } from "~/components/Alert/Alert"
+import { config } from "~/lib/config.server"
+import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
 import shared from "./shared.module.css"
 import styles from "./invite-create-account.module.css"
 
-export function meta() {
-  return [{ title: "Create Account — Daddyshome" }]
+export function meta({ data }: Route.MetaArgs) {
+  return [{ title: data?.appName ? `Create Account — ${data.appName}` : "Create Account" }]
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ request, params }: Route.LoaderArgs) {
   const token = params.token
   if (!token) {
-    return { valid: false as const, error: "Missing invite token" }
+    return { valid: false as const, error: "Missing invite token", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
   }
 
   try {
@@ -31,29 +37,40 @@ export async function loader({ params }: Route.LoaderArgs) {
 
         const invite = yield* repo.findByTokenHash(tokenHash)
         if (!invite) {
-          return { valid: false as const, error: "Invalid invite link" }
+          return { valid: false as const, error: "Invalid invite link", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+        }
+
+        // Set locale cookie from invite if different from current
+        const currentLocale = resolveLocale(request)
+        if (invite.locale && invite.locale !== currentLocale) {
+          throw redirect(request.url, {
+            headers: { "Set-Cookie": localeCookieHeader(invite.locale) },
+          })
         }
 
         if (invite.usedAt) {
-          return { valid: false as const, error: "This invite has already been used." }
+          return { valid: false as const, error: "This invite has already been used.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
         }
 
         if (new Date(invite.expiresAt) < new Date()) {
-          return { valid: false as const, error: "This invite has expired." }
+          return { valid: false as const, error: "This invite has expired.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
         }
 
         if (invite.attempts >= 5) {
-          return { valid: false as const, error: "Too many attempts. Please contact an administrator." }
+          return { valid: false as const, error: "Too many attempts. Please contact an administrator.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
         }
 
         return {
           valid: true as const,
           email: invite.email,
+          appName: config.appName,
+          healthUrl: `${config.homeUrl}/health`,
         }
       }),
     )
-  } catch {
-    return { valid: false as const, error: "Something went wrong" }
+  } catch (e) {
+    if (e instanceof Response) throw e
+    return { valid: false as const, error: "Something went wrong", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
   }
 }
 
@@ -65,7 +82,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   // CSRF: verify origin
   const origin = request.headers.get("Origin")
-  if (origin && !origin.endsWith("daddyshome.fr")) {
+  if (origin && !origin.endsWith(config.allowedOriginSuffix)) {
     return { error: "Invalid request origin" }
   }
 
@@ -95,147 +112,123 @@ export async function action({ request, params }: Route.ActionArgs) {
         yield* acceptInvite(token, { username, password })
       }),
     )
-    return redirect("https://home.daddyshome.fr/welcome")
+    return redirect(`${config.homeUrl}/welcome`)
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to create account"
     return { error: message }
   }
 }
 
-function checkCert(): Promise<boolean> {
-  return fetch("https://home.daddyshome.fr/health", { mode: "cors" })
+function checkCert(healthUrl: string): Promise<boolean> {
+  return fetch(healthUrl, { mode: "cors" })
     .then((r) => r.ok)
     .catch(() => false)
 }
 
 export default function CreateAccountPage({ loaderData, actionData }: Route.ComponentProps) {
+  const { t } = useTranslation()
   const [certInstalled, setCertInstalled] = useState<boolean | null>(null)
+  const { healthUrl } = loaderData
   const navigation = useNavigation()
   const isSubmitting = navigation.state === "submitting"
 
   useEffect(() => {
-    checkCert().then(setCertInstalled)
+    checkCert(healthUrl).then(setCertInstalled)
   }, [])
 
   if (!loaderData.valid) {
-    return (
-      <main className={shared.page}>
-        <div className={shared.card}>
-          <div className={shared.errorIcon}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="48" height="48">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="15" y1="9" x2="9" y2="15" />
-              <line x1="9" y1="9" x2="15" y2="15" />
-            </svg>
-          </div>
-          <h1>Unable to Create Account</h1>
-          <p className={styles.errorMessage}>{loaderData.error}</p>
-        </div>
-      </main>
-    )
+    return <ErrorCard title={t("createAccount.heading")} message={loaderData.error} />
   }
 
   // Still checking cert
   if (certInstalled === null) {
     return (
-      <main className={shared.page}>
-        <div className={shared.card}>
-          <h1>Create Your Account</h1>
-          <p className={styles.subtitle}>
-            Setting up for <strong>{loaderData.email}</strong>
-          </p>
-          <p className={styles.checkingCert}>Checking certificate...</p>
-        </div>
-      </main>
+      <CenteredCardPage>
+        <h1>{t("createAccount.heading")}</h1>
+        <p className={styles.subtitle} dangerouslySetInnerHTML={{ __html: t("createAccount.subtitle", { email: loaderData.email }) }} />
+        <p className={styles.checkingCert}>{t("createAccount.certCheck")}</p>
+      </CenteredCardPage>
     )
   }
 
   // Cert not installed
   if (!certInstalled) {
     return (
-      <main className={shared.page}>
-        <div className={shared.card}>
-          <div className={styles.certWarning}>
-            <h2>Certificate Required</h2>
-            <p>
-              Your certificate isn't installed yet. Go back to install it first, then return here.
-            </p>
-            <a href=".." className={`${shared.btn} ${shared.btnPrimary}`}>
-              Back to Invite
-            </a>
-          </div>
+      <CenteredCardPage>
+        <div className={styles.certWarning}>
+          <h2>{t("createAccount.certRequired.title")}</h2>
+          <p>{t("createAccount.certRequired.message")}</p>
+          <a href=".." className={`${shared.btn} ${shared.btnPrimary}`}>
+            {t("createAccount.certRequired.back")}
+          </a>
         </div>
-      </main>
+      </CenteredCardPage>
     )
   }
 
   return (
-    <main className={shared.page}>
-      <div className={shared.card}>
-        <h1>Create Your Account</h1>
-        <p className={styles.subtitle}>
-          Setting up for <strong>{loaderData.email}</strong>
-        </p>
+    <CenteredCardPage>
+      <h1>{t("createAccount.heading")}</h1>
+      <p className={styles.subtitle} dangerouslySetInnerHTML={{ __html: t("createAccount.subtitle", { email: loaderData.email }) }} />
 
-        {actionData && "error" in actionData && <div className={shared.alertError}>{actionData.error}</div>}
+      {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
 
-        <form method="post" className={styles.accountForm}>
-          <fieldset disabled={isSubmitting}>
-            <Field.Root className={styles.formGroup}>
-              <Field.Label className={styles.label}>Username</Field.Label>
-              <Input
-                name="username"
-                required
-                pattern="^[a-zA-Z0-9_-]{3,32}$"
-                placeholder="Choose a username"
-                className={styles.input}
-                autoComplete="username"
-              />
-              <Field.Description className={styles.hint}>
-                3-32 characters: letters, numbers, hyphens, underscores
-              </Field.Description>
-              <Field.Error className={styles.fieldError} />
-            </Field.Root>
+      <form method="post" className={styles.accountForm}>
+        <fieldset disabled={isSubmitting}>
+          <Field.Root className={styles.formGroup}>
+            <Field.Label className={styles.label}>{t("createAccount.username.label")}</Field.Label>
+            <Input
+              name="username"
+              required
+              pattern="^[a-zA-Z0-9_-]{3,32}$"
+              placeholder={t("createAccount.username.placeholder")}
+              className={styles.input}
+              autoComplete="username"
+            />
+            <Field.Description className={styles.hint}>
+              {t("createAccount.username.hint")}
+            </Field.Description>
+            <Field.Error className={styles.fieldError} />
+          </Field.Root>
 
-            <Field.Root className={styles.formGroup}>
-              <Field.Label className={styles.label}>Password</Field.Label>
-              <Input
-                name="password"
-                type="password"
-                required
-                minLength={12}
-                placeholder="Choose a strong password"
-                className={styles.input}
-                autoComplete="new-password"
-              />
-              <Field.Description className={styles.hint}>At least 12 characters</Field.Description>
-              <Field.Error className={styles.fieldError} />
-            </Field.Root>
+          <Field.Root className={styles.formGroup}>
+            <Field.Label className={styles.label}>{t("createAccount.password.label")}</Field.Label>
+            <Input
+              name="password"
+              type="password"
+              required
+              minLength={12}
+              placeholder={t("createAccount.password.placeholder")}
+              className={styles.input}
+              autoComplete="new-password"
+            />
+            <Field.Description className={styles.hint}>{t("createAccount.password.hint")}</Field.Description>
+            <Field.Error className={styles.fieldError} />
+          </Field.Root>
 
-            <Field.Root className={styles.formGroup}>
-              <Field.Label className={styles.label}>Confirm Password</Field.Label>
-              <Input
-                name="confirmPassword"
-                type="password"
-                required
-                minLength={12}
-                placeholder="Confirm your password"
-                className={styles.input}
-                autoComplete="new-password"
-              />
-              <Field.Error className={styles.fieldError} />
-            </Field.Root>
+          <Field.Root className={styles.formGroup}>
+            <Field.Label className={styles.label}>{t("createAccount.confirm.label")}</Field.Label>
+            <Input
+              name="confirmPassword"
+              type="password"
+              required
+              minLength={12}
+              placeholder={t("createAccount.confirm.placeholder")}
+              className={styles.input}
+              autoComplete="new-password"
+            />
+            <Field.Error className={styles.fieldError} />
+          </Field.Root>
 
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className={`${shared.btn} ${shared.btnPrimary} ${shared.btnFull}`}
-            >
-              {isSubmitting ? "Creating Account..." : "Create Account"}
-            </Button>
-          </fieldset>
-        </form>
-      </div>
-    </main>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className={`${shared.btn} ${shared.btnPrimary} ${shared.btnFull}`}
+          >
+            {isSubmitting ? t("createAccount.submitting") : t("createAccount.submit")}
+          </Button>
+        </fieldset>
+      </form>
+    </CenteredCardPage>
   )
 }

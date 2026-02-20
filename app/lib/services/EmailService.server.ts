@@ -5,6 +5,8 @@ import type SMTPTransport from "nodemailer/lib/smtp-transport"
 import { render } from "@react-email/render"
 import { InviteEmail } from "~/lib/emails/invite-email"
 import { CertRenewalEmail } from "~/lib/emails/cert-renewal-email"
+import { config } from "~/lib/config.server"
+import { createI18nInstance } from "~/lib/i18n.server"
 
 export class EmailError extends Data.TaggedError("EmailError")<{
   readonly message: string
@@ -19,8 +21,9 @@ export class EmailService extends Context.Tag("EmailService")<
       token: string,
       invitedBy: string,
       p12Buffer: Buffer,
+      locale?: string,
     ) => Effect.Effect<void, EmailError>
-    readonly sendCertRenewalEmail: (email: string, p12Buffer: Buffer) => Effect.Effect<void, EmailError>
+    readonly sendCertRenewalEmail: (email: string, p12Buffer: Buffer, locale?: string) => Effect.Effect<void, EmailError>
   }
 >() {}
 
@@ -31,8 +34,7 @@ export const EmailServiceLive = Layer.scoped(
     const port = yield* Config.integer("SMTP_PORT").pipe(Config.withDefault(587))
     const user = yield* Config.string("SMTP_USER")
     const pass = Redacted.value(yield* Config.redacted("SMTP_PASS"))
-    const from = yield* Config.string("SMTP_FROM").pipe(Config.withDefault("noreply@daddyshome.fr"))
-    const inviteBaseUrl = yield* Config.string("INVITE_BASE_URL").pipe(Config.withDefault("https://join.daddyshome.fr"))
+    const from = yield* Config.string("SMTP_FROM").pipe(Config.withDefault(`noreply@${config.allowedOriginSuffix}`))
 
     // Load internal CA cert for SMTP TLS verification
     let ca: string | undefined
@@ -56,10 +58,17 @@ export const EmailServiceLive = Layer.scoped(
     )
 
     return {
-      sendInviteEmail: (email: string, token: string, invitedBy: string, p12Buffer: Buffer) =>
+      sendInviteEmail: (email: string, token: string, invitedBy: string, p12Buffer: Buffer, locale?: string) =>
         Effect.gen(function* () {
-          const inviteUrl = `${inviteBaseUrl}/invite/${token}`
-          const reinviteUrl = `${inviteBaseUrl}/reinvite/${token}`
+          const lng = locale ?? "en"
+          const i18n = yield* Effect.tryPromise({
+            try: () => createI18nInstance(lng),
+            catch: (e) => new EmailError({ message: "Failed to create i18n instance", cause: e }),
+          })
+          const t = i18n.getFixedT(lng)
+
+          const inviteUrl = `${config.inviteBaseUrl}/invite/${token}`
+          const reinviteUrl = `${config.inviteBaseUrl}/reinvite/${token}`
 
           const html = yield* Effect.tryPromise({
             try: () =>
@@ -68,6 +77,9 @@ export const EmailServiceLive = Layer.scoped(
                   inviteUrl,
                   reinviteUrl,
                   invitedBy,
+                  appName: config.appName,
+                  appDescription: config.appDescription,
+                  t,
                 }),
               ),
             catch: (e) =>
@@ -82,7 +94,7 @@ export const EmailServiceLive = Layer.scoped(
               transporter.sendMail({
                 from,
                 to: email,
-                subject: "You've been invited to Daddyshome",
+                subject: t("email.invite.subject", { appName: config.appName }),
                 html,
                 attachments: [
                   {
@@ -100,10 +112,17 @@ export const EmailServiceLive = Layer.scoped(
           })
         }),
 
-      sendCertRenewalEmail: (email: string, p12Buffer: Buffer) =>
+      sendCertRenewalEmail: (email: string, p12Buffer: Buffer, locale?: string) =>
         Effect.gen(function* () {
+          const lng = locale ?? "en"
+          const i18n = yield* Effect.tryPromise({
+            try: () => createI18nInstance(lng),
+            catch: (e) => new EmailError({ message: "Failed to create i18n instance", cause: e }),
+          })
+          const t = i18n.getFixedT(lng)
+
           const html = yield* Effect.tryPromise({
-            try: () => render(CertRenewalEmail()),
+            try: () => render(CertRenewalEmail({ appName: config.appName, t })),
             catch: (e) =>
               new EmailError({
                 message: "Failed to render cert renewal email template",
@@ -116,7 +135,7 @@ export const EmailServiceLive = Layer.scoped(
               transporter.sendMail({
                 from,
                 to: email,
-                subject: "Your Daddyshome certificate has been renewed",
+                subject: t("email.renewal.subject", { appName: config.appName }),
                 html,
                 attachments: [
                   {

@@ -1,68 +1,67 @@
 "use no memo"
 
 import { Body, Container, Head, Heading, Html, Link, Preview, Section, Text, Button, Hr } from "@react-email/components"
+import type { TFunction } from "i18next"
 
 interface InviteEmailProps {
   inviteUrl: string
   reinviteUrl: string
   invitedBy: string
+  appName: string
+  appDescription: string
+  t: TFunction
 }
 
-export function InviteEmail({ inviteUrl, reinviteUrl, invitedBy }: InviteEmailProps) {
+export function InviteEmail({ inviteUrl, reinviteUrl, invitedBy, appName, appDescription, t }: InviteEmailProps) {
   return (
     <Html>
       <Head />
-      <Preview>You've been invited to Daddyshome</Preview>
+      <Preview>{t("email.invite.preview", { appName })}</Preview>
       <Body style={main}>
         <Container style={container}>
-          <Heading style={heading}>Welcome to Daddyshome</Heading>
+          <Heading style={heading}>{t("email.invite.heading", { appName })}</Heading>
 
           <Text style={text}>
-            {invitedBy} has invited you to join Daddyshome, a private platform for media, productivity, and more.
+            {t("email.invite.body", { invitedBy, appName, appDescription })}
           </Text>
 
           <Hr style={hr} />
 
           <Section style={section}>
             <Heading as="h2" style={subheading}>
-              Step 1: Install Your Certificate
+              {t("email.invite.step1.title")}
             </Heading>
-            <Text style={text}>
-              Your security certificate is attached to this email as <strong>certificate.p12</strong>. You'll see the
-              password to install it when you click the link below.
-            </Text>
-
-            <Text style={textSmall}>
-              <strong>macOS:</strong> Double-click the .p12 file to open Keychain Access, enter the password when
-              prompted, then trust the certificate.
-            </Text>
-            <Text style={textSmall}>
-              <strong>Windows:</strong> Double-click the .p12 file, follow the Certificate Import Wizard, and enter the
-              password when prompted.
-            </Text>
+            <Text style={text} dangerouslySetInnerHTML={{ __html: t("email.invite.step1.body") }} />
+            <Text style={textSmall} dangerouslySetInnerHTML={{ __html: t("email.invite.step1.macos") }} />
+            <Text style={textSmall} dangerouslySetInnerHTML={{ __html: t("email.invite.step1.windows") }} />
           </Section>
 
           <Section style={section}>
             <Heading as="h2" style={subheading}>
-              Step 2: Create Your Account
+              {t("email.invite.step2.title")}
             </Heading>
-            <Text style={text}>After installing your certificate, click the button below to create your account.</Text>
+            <Text style={text}>{t("email.invite.step2.body")}</Text>
           </Section>
 
           <Section style={buttonContainer}>
             <Button style={button} href={inviteUrl}>
-              Create Your Account
+              {t("email.invite.cta")}
             </Button>
           </Section>
 
           <Hr style={hr} />
 
           <Text style={footer}>
-            This link expires in 7 days. Need a new invite?{" "}
-            <Link href={reinviteUrl} style={footerLink}>
-              Request one here
-            </Link>
-            . If you didn't expect this invitation, you can safely ignore this email.
+            {t("email.invite.footer", { reinviteUrl }).split("<a").length > 1 ? (
+              <span dangerouslySetInnerHTML={{ __html: t("email.invite.footer", { reinviteUrl }) }} />
+            ) : (
+              <>
+                {t("email.invite.footer", { reinviteUrl })}{" "}
+                <Link href={reinviteUrl} style={footerLink}>
+                  Request one here
+                </Link>
+              </>
+            )}
           </Text>
         </Container>
       </Body>

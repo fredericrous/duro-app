@@ -1,11 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest"
+import { describe, it, expect, afterEach, vi } from "vitest"
 import { render, screen, act, waitFor, cleanup } from "@testing-library/react"
 import { Suspense, use } from "react"
-import { http, HttpResponse } from "msw"
-import { setupServer } from "msw/node"
 
-function checkCert(): Promise<boolean> {
-  return fetch("https://home.daddyshome.fr/health", { mode: "cors" })
+function checkCert(healthUrl: string): Promise<boolean> {
+  return fetch(healthUrl, { mode: "cors" })
     .then((r) => r.ok)
     .catch(() => false)
 }
@@ -22,24 +20,16 @@ function CertCheckResult({ certPromise }: { certPromise: Promise<boolean> }) {
   return <p data-testid="cert-warning">Certificate not installed</p>
 }
 
-const server = setupServer()
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
 afterEach(() => {
   cleanup()
-  server.resetHandlers()
+  vi.restoreAllMocks()
 })
-afterAll(() => server.close())
 
-describe("CertCheck with MSW", () => {
+describe("CertCheck", () => {
   it("shows success when health endpoint returns 200", async () => {
-    server.use(
-      http.get("https://home.daddyshome.fr/health", () => {
-        return HttpResponse.text("ok", { status: 200 })
-      }),
-    )
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("ok", { status: 200 }))
 
-    const promise = checkCert()
+    const promise = checkCert("https://home.example.com/health")
 
     await act(async () => {
       render(
@@ -56,13 +46,9 @@ describe("CertCheck with MSW", () => {
   })
 
   it("shows warning when health endpoint returns 500", async () => {
-    server.use(
-      http.get("https://home.daddyshome.fr/health", () => {
-        return HttpResponse.text("error", { status: 500 })
-      }),
-    )
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("error", { status: 500 }))
 
-    const promise = checkCert()
+    const promise = checkCert("https://home.example.com/health")
 
     await act(async () => {
       render(
@@ -79,13 +65,9 @@ describe("CertCheck with MSW", () => {
   })
 
   it("shows warning when health endpoint is unreachable", async () => {
-    server.use(
-      http.get("https://home.daddyshome.fr/health", () => {
-        return HttpResponse.error()
-      }),
-    )
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Failed to fetch"))
 
-    const promise = checkCert()
+    const promise = checkCert("https://home.example.com/health")
 
     await act(async () => {
       render(

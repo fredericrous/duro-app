@@ -1,23 +1,30 @@
-import { useNavigation } from "react-router"
+import { redirect, useNavigation } from "react-router"
+import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/reinvite"
 import { runEffect } from "~/lib/runtime.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
-import { VaultPki } from "~/lib/services/VaultPki.server"
+import { CertManager } from "~/lib/services/CertManager.server"
+import { config } from "~/lib/config.server"
 import { queueInvite } from "~/lib/workflows/invite.server"
 import { hashToken } from "~/lib/crypto.server"
+import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
 import { Effect } from "effect"
 import { Button } from "@base-ui/react/button"
+import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
+import { StatusIcon } from "~/components/StatusIcon/StatusIcon"
+import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
+import { Alert } from "~/components/Alert/Alert"
 import shared from "./shared.module.css"
 import local from "./reinvite.module.css"
 
-export function meta() {
-  return [{ title: "Request New Invite - Daddyshome" }]
+export function meta({ data }: Route.MetaArgs) {
+  return [{ title: data?.appName ? `Request New Invite - ${data.appName}` : "Request New Invite" }]
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ request, params }: Route.LoaderArgs) {
   const token = params.token
   if (!token) {
-    return { canReinvite: false as const, error: "Missing token" }
+    return { canReinvite: false as const, error: "Missing token", appName: config.appName }
   }
 
   try {
@@ -26,11 +33,19 @@ export async function loader({ params }: Route.LoaderArgs) {
     return await runEffect(
       Effect.gen(function* () {
         const repo = yield* InviteRepo
-        const vault = yield* VaultPki
+        const cert = yield* CertManager
 
         const invite = yield* repo.findByTokenHash(tokenHash)
         if (!invite) {
-          return { canReinvite: false as const, error: "Invalid link" }
+          return { canReinvite: false as const, error: "Invalid link", appName: config.appName }
+        }
+
+        // Set locale cookie from invite if different from current
+        const currentLocale = resolveLocale(request)
+        if (invite.locale && invite.locale !== currentLocale) {
+          throw redirect(request.url, {
+            headers: { "Set-Cookie": localeCookieHeader(invite.locale) },
+          })
         }
 
         // If account was already created, no re-invite
@@ -39,29 +54,33 @@ export async function loader({ params }: Route.LoaderArgs) {
             canReinvite: false as const,
             error:
               "This invite has already been used to create an account. If you need help, contact the person who invited you.",
+            appName: config.appName,
           }
         }
 
         // Only allow re-invite if expired or password already consumed
         const isExpired = new Date(invite.expiresAt) < new Date()
-        const pw = yield* vault.getP12Password(invite.id)
+        const pw = yield* cert.getP12Password(invite.id)
         const passwordConsumed = pw === null
 
         if (!isExpired && !passwordConsumed) {
           return {
             canReinvite: false as const,
             error: "Your invite is still valid. Check your email for the original invitation link.",
+            appName: config.appName,
           }
         }
 
         return {
           canReinvite: true as const,
           email: invite.email,
+          appName: config.appName,
         }
       }),
     )
-  } catch {
-    return { canReinvite: false as const, error: "Something went wrong" }
+  } catch (e) {
+    if (e instanceof Response) throw e
+    return { canReinvite: false as const, error: "Something went wrong", appName: config.appName }
   }
 }
 
@@ -77,7 +96,7 @@ export async function action({ params }: Route.ActionArgs) {
     const result = await runEffect(
       Effect.gen(function* () {
         const repo = yield* InviteRepo
-        const vault = yield* VaultPki
+        const cert = yield* CertManager
 
         const invite = yield* repo.findByTokenHash(tokenHash)
         if (!invite) {
@@ -91,8 +110,8 @@ export async function action({ params }: Route.ActionArgs) {
         // Revoke old invite
         yield* repo.revoke(invite.id).pipe(Effect.catchAll(() => Effect.void))
 
-        // Clean up old Vault secret
-        yield* vault.deleteP12Secret(invite.id)
+        // Clean up old cert secret
+        yield* cert.deleteP12Secret(invite.id)
 
         // Queue new invite with same details
         const groups = JSON.parse(invite.groups) as number[]
@@ -103,6 +122,7 @@ export async function action({ params }: Route.ActionArgs) {
           groups,
           groupNames,
           invitedBy: invite.invitedBy,
+          locale: invite.locale,
         })
 
         return { success: true as const, email: invite.email }
@@ -117,68 +137,40 @@ export async function action({ params }: Route.ActionArgs) {
 }
 
 export default function ReinvitePage({ loaderData, actionData }: Route.ComponentProps) {
+  const { t } = useTranslation()
   const navigation = useNavigation()
   const isSubmitting = navigation.state === "submitting"
 
   if (actionData && "success" in actionData && actionData.success) {
     return (
-      <main className={shared.page}>
-        <div className={shared.card}>
-          <div className={shared.successIcon}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="48" height="48">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-          </div>
-          <h1>New Invite Sent</h1>
-          <p className={local.infoText}>
-            A new invitation email has been sent to <strong>{actionData.email}</strong>. Check your inbox for the new
-            link and certificate.
-          </p>
-        </div>
-      </main>
+      <CenteredCardPage>
+        <StatusIcon name="check-done" variant="success" />
+        <h1>{t("reinvite.success.title")}</h1>
+        <p className={local.infoText} dangerouslySetInnerHTML={{ __html: t("reinvite.success.message", { email: actionData.email }) }} />
+      </CenteredCardPage>
     )
   }
 
   if (!loaderData.canReinvite) {
-    return (
-      <main className={shared.page}>
-        <div className={shared.card}>
-          <div className={shared.errorIcon}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="48" height="48">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="15" y1="9" x2="9" y2="15" />
-              <line x1="9" y1="9" x2="15" y2="15" />
-            </svg>
-          </div>
-          <h1>Cannot Re-invite</h1>
-          <p className={local.infoText}>{loaderData.error}</p>
-        </div>
-      </main>
-    )
+    return <ErrorCard title={t("reinvite.error.title")} message={loaderData.error} />
   }
 
   return (
-    <main className={shared.page}>
-      <div className={shared.card}>
-        <h1>Request New Invite</h1>
-        <p className={local.infoText}>
-          Your previous invite for <strong>{loaderData.email}</strong> has expired or the certificate password was
-          already revealed. You can request a fresh invite below.
-        </p>
+    <CenteredCardPage>
+      <h1>{t("reinvite.heading")}</h1>
+      <p className={local.infoText} dangerouslySetInnerHTML={{ __html: t("reinvite.message", { email: loaderData.email }) }} />
 
-        {actionData && "error" in actionData && <div className={shared.alertError}>{actionData.error}</div>}
+      {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
 
-        <form method="post">
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className={`${shared.btn} ${shared.btnPrimary} ${shared.btnFull}`}
-          >
-            {isSubmitting ? "Sending..." : "Send Me a New Invite"}
-          </Button>
-        </form>
-      </div>
-    </main>
+      <form method="post">
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className={`${shared.btn} ${shared.btnPrimary} ${shared.btnFull}`}
+        >
+          {isSubmitting ? t("reinvite.submitting") : t("reinvite.submit")}
+        </Button>
+      </form>
+    </CenteredCardPage>
   )
 }

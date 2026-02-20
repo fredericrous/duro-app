@@ -42,6 +42,7 @@ export interface Invite {
   certVerifiedAt: string | null
   revertPrNumber: number | null
   revertPrMerged: boolean
+  locale: string
 }
 
 export interface Revocation {
@@ -66,6 +67,7 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
       groups: number[]
       groupNames: string[]
       invitedBy: string
+      locale?: string
     }) => Effect.Effect<{ id: string; token: string }, InviteError>
     readonly findByTokenHash: (tokenHash: string) => Effect.Effect<Invite | null, InviteError>
     readonly consumeByToken: (rawToken: string) => Effect.Effect<Invite, InviteError>
@@ -148,6 +150,7 @@ const InviteRow = Schema.Struct({
   certVerifiedAt: Coerced.NullableDateString,
   revertPrNumber: Coerced.NullableNumber,
   revertPrMerged: Coerced.Boolean,
+  locale: Schema.optionalWith(Schema.String, { default: () => "en" }),
 })
 
 const decodeInviteRow = Schema.decodeUnknownSync(InviteRow)
@@ -200,9 +203,10 @@ export const InviteRepoLive = Layer.effect(
           const token = crypto.randomBytes(32).toString("base64url")
           const tokenHash = hashToken(token)
 
+          const locale = input.locale ?? "en"
           yield* withErr(
-            sql`INSERT INTO invites (id, token, token_hash, email, groups, group_names, invited_by, created_at, expires_at)
-                VALUES (${id}, ${token}, ${tokenHash}, ${input.email}, ${JSON.stringify(input.groups)}, ${JSON.stringify(input.groupNames)}, ${input.invitedBy}, ${ts}, ${expires})`,
+            sql`INSERT INTO invites (id, token, token_hash, email, groups, group_names, invited_by, created_at, expires_at, locale)
+                VALUES (${id}, ${token}, ${tokenHash}, ${input.email}, ${JSON.stringify(input.groups)}, ${JSON.stringify(input.groupNames)}, ${input.invitedBy}, ${ts}, ${expires}, ${locale})`,
             "Failed to create invite",
           )
 

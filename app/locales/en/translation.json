@@ -1,0 +1,229 @@
+{
+  "common": {
+    "appTitle": "Duro",
+    "logout": "Logout",
+    "admin": "Admin",
+    "cancel": "Cancel",
+    "email": "Email",
+    "groups": "Groups",
+    "settings": "Settings",
+    "save": "Save",
+    "language": "Language",
+    "actions": "Actions"
+  },
+  "header": {
+    "welcome": "Welcome, {{user}}"
+  },
+  "home": {
+    "title": "Home - Duro",
+    "description": "Your personal app dashboard"
+  },
+  "noAccess": {
+    "title": "No Access",
+    "messageUser": "Hi {{user}}, you don't have permission to access any applications.",
+    "messageAnon": "You don't have permission to access any applications.",
+    "hint": "Please contact an administrator if you believe this is an error."
+  },
+  "categories": {
+    "media": "Media",
+    "ai": "AI",
+    "productivity": "Productivity",
+    "development": "Development",
+    "admin": "Admin"
+  },
+  "settings": {
+    "title": "Settings - Duro",
+    "heading": "Settings",
+    "languageLabel": "Language",
+    "languageHint": "Choose your preferred language for the interface.",
+    "saved": "Settings saved."
+  },
+  "welcome": {
+    "title": "Welcome",
+    "heading": "Welcome, {{user}}!",
+    "message": "Your account has been created and you're all set. You now have access to your personal dashboard.",
+    "cta": "Go to Dashboard"
+  },
+  "invite": {
+    "title": "Join {{appName}}",
+    "subtitle": "You've been invited as <strong>{{email}}</strong>",
+    "groupsLabel": "Groups: {{groups}}",
+    "expired": {
+      "title": "Invite Expired",
+      "message": "This invite has expired. Use the link in your invitation email to request a new one."
+    },
+    "used": {
+      "title": "Already Joined",
+      "message": "This invite has already been used. If you need help, contact the person who invited you."
+    },
+    "error": {
+      "title": "Unable to Join"
+    },
+    "password": {
+      "title": "Certificate Password",
+      "warning": "Scratch to reveal your certificate password. Save it — you'll need it to install the certificate from your email.",
+      "consumed": "The certificate password has already been revealed. If you need a new invite, use the link in your original invitation email.",
+      "copy": "Copy",
+      "copied": "Copied!"
+    },
+    "cert": {
+      "checking": "Checking certificate...",
+      "detected": "Certificate detected",
+      "continue": "Continue to Create Account",
+      "notInstalled": "It looks like your certificate isn't installed yet. Install the .p12 file from your email, then refresh this page."
+    }
+  },
+  "createAccount": {
+    "title": "Create Account",
+    "heading": "Create Your Account",
+    "subtitle": "Setting up for <strong>{{email}}</strong>",
+    "certCheck": "Checking certificate...",
+    "certRequired": {
+      "title": "Certificate Required",
+      "message": "Your certificate isn't installed yet. Go back to install it first, then return here.",
+      "back": "Back to Invite"
+    },
+    "username": {
+      "label": "Username",
+      "placeholder": "Choose a username",
+      "hint": "3-32 characters: letters, numbers, hyphens, underscores"
+    },
+    "password": {
+      "label": "Password",
+      "placeholder": "Choose a strong password",
+      "hint": "At least 12 characters"
+    },
+    "confirm": {
+      "label": "Confirm Password",
+      "placeholder": "Confirm your password"
+    },
+    "submit": "Create Account",
+    "submitting": "Creating Account...",
+    "validation": {
+      "usernameFormat": "Username must be 3-32 characters (letters, numbers, hyphens, underscores)",
+      "passwordLength": "Password must be at least 12 characters",
+      "passwordMismatch": "Passwords do not match"
+    }
+  },
+  "reinvite": {
+    "title": "Request New Invite",
+    "heading": "Request New Invite",
+    "message": "Your previous invite for <strong>{{email}}</strong> has expired or the certificate password was already revealed. You can request a fresh invite below.",
+    "submit": "Send Me a New Invite",
+    "submitting": "Sending...",
+    "success": {
+      "title": "New Invite Sent",
+      "message": "A new invitation email has been sent to <strong>{{email}}</strong>. Check your inbox for the new link and certificate."
+    },
+    "error": {
+      "title": "Cannot Re-invite"
+    }
+  },
+  "admin": {
+    "title": "Admin - Duro",
+    "tabs": {
+      "invites": "Invites",
+      "users": "Users"
+    },
+    "invites": {
+      "sendTitle": "Send Invite",
+      "emailLabel": "Email",
+      "emailPlaceholder": "user@example.com",
+      "groupsLabel": "Groups",
+      "languageLabel": "Invite language",
+      "submit": "Send Invite",
+      "submitting": "Sending...",
+      "proceedAnyway": "Proceed anyway",
+      "activeTitle": "Active Invites",
+      "failedTitle": "Failed Invites",
+      "noActive": "No active invites",
+      "cols": {
+        "email": "Email",
+        "groups": "Groups",
+        "status": "Status",
+        "invitedBy": "Invited By",
+        "expires": "Expires",
+        "error": "Error",
+        "failedAt": "Failed At",
+        "actions": "Actions"
+      },
+      "badge": {
+        "failed": "Failed",
+        "sent": "Sent",
+        "certIssued": "Cert issued",
+        "processing": "Processing..."
+      },
+      "action": {
+        "resend": "Resend",
+        "resending": "Resending...",
+        "revoke": "Revoke",
+        "revoking": "Revoking...",
+        "retry": "Retry",
+        "retrying": "Retrying..."
+      }
+    },
+    "users": {
+      "title": "Users",
+      "revokedTitle": "Revoked Users",
+      "cols": {
+        "username": "Username",
+        "displayName": "Display Name",
+        "email": "Email",
+        "created": "Created",
+        "reason": "Reason",
+        "revoked": "Revoked",
+        "by": "By",
+        "actions": "Actions"
+      },
+      "actions": {
+        "sendCert": "Send Cert",
+        "sendingCert": "Sending...",
+        "revoke": "Revoke",
+        "confirmRevoke": "Confirm Revoke",
+        "revoking": "Revoking...",
+        "reasonPlaceholder": "Reason (optional)",
+        "reinvite": "Re-invite",
+        "processing": "Processing..."
+      }
+    }
+  },
+  "error": {
+    "title": "Oops!",
+    "details": "An unexpected error occurred.",
+    "404": "404",
+    "404msg": "The requested page could not be found."
+  },
+  "email": {
+    "invite": {
+      "subject": "You've been invited to {{appName}}",
+      "preview": "You've been invited to {{appName}}",
+      "heading": "Welcome to {{appName}}",
+      "body": "{{invitedBy}} has invited you to join {{appName}}, {{appDescription}}.",
+      "step1": {
+        "title": "Step 1: Install Your Certificate",
+        "body": "Your security certificate is attached to this email as <strong>certificate.p12</strong>. You'll see the password to install it when you click the link below.",
+        "macos": "<strong>macOS:</strong> Double-click the .p12 file to open Keychain Access, enter the password when prompted, then trust the certificate.",
+        "windows": "<strong>Windows:</strong> Double-click the .p12 file, follow the Certificate Import Wizard, and enter the password when prompted."
+      },
+      "step2": {
+        "title": "Step 2: Create Your Account",
+        "body": "After installing your certificate, click the button below to create your account."
+      },
+      "cta": "Create Your Account",
+      "footer": "This link expires in 7 days. Need a new invite? <a href=\"{{reinviteUrl}}\">Request one here</a>. If you didn't expect this invitation, you can safely ignore this email."
+    },
+    "renewal": {
+      "subject": "Your {{appName}} certificate has been renewed",
+      "preview": "Your {{appName}} certificate has been renewed",
+      "heading": "Certificate Renewed",
+      "body": "Your security certificate for {{appName}} has been renewed. A new certificate is attached to this email as <strong>certificate.p12</strong>.",
+      "install": {
+        "title": "Install Your New Certificate",
+        "body": "Please install this certificate to continue accessing {{appName}} services. You may need to remove the old certificate first.",
+        "macos": "<strong>macOS:</strong> Double-click the .p12 file to open Keychain Access, enter the password when prompted, then trust the certificate. You can remove the old certificate from Keychain Access.",
+        "windows": "<strong>Windows:</strong> Double-click the .p12 file, follow the Certificate Import Wizard, and enter the password when prompted. You can remove the old certificate from the Certificate Manager."
+      },
+      "footer": "This is an automated renewal. Your account and access remain unchanged — only the certificate has been updated. If you didn't expect this, please contact your administrator."
+    }
+  }
+}

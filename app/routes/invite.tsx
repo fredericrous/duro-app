@@ -1,23 +1,30 @@
 import { Suspense, use, useState, useEffect, useRef } from "react"
+import { redirect } from "react-router"
+import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/invite"
 import { runEffect } from "~/lib/runtime.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
-import { VaultPki } from "~/lib/services/VaultPki.server"
+import { CertManager } from "~/lib/services/CertManager.server"
+import { config } from "~/lib/config.server"
 import { hashToken } from "~/lib/crypto.server"
+import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
 import { Effect } from "effect"
 import { Button } from "@base-ui/react/button"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
+import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
+import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
+import { Alert } from "~/components/Alert/Alert"
 import shared from "./shared.module.css"
 import styles from "./invite.module.css"
 
-export function meta() {
-  return [{ title: "Join Daddyshome" }]
+export function meta({ data }: Route.MetaArgs) {
+  return [{ title: data?.appName ? `Join ${data.appName}` : "Join" }]
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ request, params }: Route.LoaderArgs) {
   const token = params.token
   if (!token) {
-    return { valid: false as const, error: "Missing invite token" }
+    return { valid: false as const, error: "Missing invite token", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
   }
 
   try {
@@ -26,38 +33,50 @@ export async function loader({ params }: Route.LoaderArgs) {
     return await runEffect(
       Effect.gen(function* () {
         const repo = yield* InviteRepo
-        const vault = yield* VaultPki
+        const cert = yield* CertManager
 
         const invite = yield* repo.findByTokenHash(tokenHash)
         if (!invite) {
-          return { valid: false as const, error: "Invalid invite link" }
+          return { valid: false as const, error: "Invalid invite link", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+        }
+
+        // Set locale cookie from invite if different from current
+        const currentLocale = resolveLocale(request)
+        if (invite.locale && invite.locale !== currentLocale) {
+          throw redirect(request.url, {
+            headers: { "Set-Cookie": localeCookieHeader(invite.locale) },
+          })
         }
 
         if (invite.usedAt) {
-          return { valid: false as const, error: "already_used" }
+          return { valid: false as const, error: "already_used", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
         }
 
         if (new Date(invite.expiresAt) < new Date()) {
-          return { valid: false as const, error: "expired" }
+          return { valid: false as const, error: "expired", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
         }
 
         if (invite.attempts >= 5) {
-          return { valid: false as const, error: "Too many attempts. Please contact an administrator." }
+          return { valid: false as const, error: "Too many attempts. Please contact an administrator.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
         }
 
         // Read P12 password (non-destructive). Consumed via "reveal" action on scratch.
-        const p12Password = yield* vault.getP12Password(invite.id)
+        const p12Password = yield* cert.getP12Password(invite.id)
 
         return {
           valid: true as const,
           email: invite.email,
           groupNames: JSON.parse(invite.groupNames) as string[],
           p12Password,
+          appName: config.appName,
+          healthUrl: `${config.homeUrl}/health`,
         }
       }),
     )
-  } catch {
-    return { valid: false as const, error: "Something went wrong" }
+  } catch (e) {
+    // Re-throw redirects
+    if (e instanceof Response) throw e
+    return { valid: false as const, error: "Something went wrong", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
   }
 }
 
@@ -69,7 +88,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   // CSRF: verify origin
   const origin = request.headers.get("Origin")
-  if (origin && !origin.endsWith("daddyshome.fr")) {
+  if (origin && !origin.endsWith(config.allowedOriginSuffix)) {
     return { error: "Invalid request origin" }
   }
 
@@ -86,8 +105,8 @@ export async function action({ request, params }: Route.ActionArgs) {
           const invite = yield* repo.findByTokenHash(tokenHash)
           if (!invite) return { password: null }
 
-          const vault = yield* VaultPki
-          const password = yield* vault.consumeP12Password(invite.id)
+          const cert = yield* CertManager
+          const password = yield* cert.consumeP12Password(invite.id)
           return { password }
         }),
       )
@@ -100,101 +119,67 @@ export async function action({ request, params }: Route.ActionArgs) {
   return { error: "Unknown action" }
 }
 
-function checkCert(): Promise<boolean> {
-  return fetch("https://home.daddyshome.fr/health", { mode: "cors" })
+function checkCert(healthUrl: string): Promise<boolean> {
+  return fetch(healthUrl, { mode: "cors" })
     .then((r) => r.ok)
     .catch(() => false)
 }
 
 export default function InvitePage({ loaderData, actionData }: Route.ComponentProps) {
-  const [certPromise] = useState(() => checkCert())
+  const { t } = useTranslation()
+  const [certPromise] = useState(() => checkCert(loaderData.healthUrl))
 
   if (!loaderData.valid) {
     const { error } = loaderData
 
     if (error === "expired") {
       return (
-        <main className={shared.page}>
-          <div className={shared.card}>
-            <div className={shared.errorIcon}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="48" height="48">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-            </div>
-            <h1>Invite Expired</h1>
-            <p className={styles.errorMessage}>
-              This invite has expired. Use the link in your invitation email to request a new one.
-            </p>
-          </div>
-        </main>
+        <ErrorCard
+          icon="clock"
+          title={t("invite.expired.title")}
+          message={t("invite.expired.message")}
+        />
       )
     }
 
     if (error === "already_used") {
       return (
-        <main className={shared.page}>
-          <div className={shared.card}>
-            <div className={shared.errorIcon}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="48" height="48">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-            </div>
-            <h1>Already Joined</h1>
-            <p className={styles.errorMessage}>
-              This invite has already been used. If you need help, contact the person who invited you.
-            </p>
-          </div>
-        </main>
+        <ErrorCard
+          icon="check-done"
+          title={t("invite.used.title")}
+          message={t("invite.used.message")}
+        />
       )
     }
 
-    return (
-      <main className={shared.page}>
-        <div className={shared.card}>
-          <div className={shared.errorIcon}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="48" height="48">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="15" y1="9" x2="9" y2="15" />
-              <line x1="9" y1="9" x2="15" y2="15" />
-            </svg>
-          </div>
-          <h1>Unable to Join</h1>
-          <p className={styles.errorMessage}>{error}</p>
-        </div>
-      </main>
-    )
+    return <ErrorCard title={t("invite.error.title")} message={error} />
   }
 
   return (
-    <main className={shared.page}>
-      <div className={shared.card}>
-        <h1>Join Daddyshome</h1>
-        <p className={styles.subtitle}>
-          You've been invited as <strong>{loaderData.email}</strong>
-        </p>
+    <CenteredCardPage>
+      <h1>{t("invite.title", { appName: loaderData.appName })}</h1>
+      <p className={styles.subtitle} dangerouslySetInnerHTML={{ __html: t("invite.subtitle", { email: loaderData.email }) }} />
 
-        {loaderData.groupNames && loaderData.groupNames.length > 0 && (
-          <p className={styles.groupsInfo}>Groups: {loaderData.groupNames.join(", ")}</p>
-        )}
+      {loaderData.groupNames && loaderData.groupNames.length > 0 && (
+        <p className={styles.groupsInfo}>{t("invite.groupsLabel", { groups: loaderData.groupNames.join(", ") })}</p>
+      )}
 
-        {/* P12 Password Section */}
-        <PasswordReveal p12Password={loaderData.p12Password} />
+      {/* P12 Password Section */}
+      <PasswordReveal p12Password={loaderData.p12Password} />
 
-        {/* Cert Check */}
-        <Suspense fallback={<CertCheckLoading />}>
-          <CertCheckResult certPromise={certPromise} />
-        </Suspense>
+      {/* Cert Check */}
+      <Suspense fallback={<CertCheckLoading />}>
+        <CertCheckResult certPromise={certPromise} />
+      </Suspense>
 
-        {/* Error */}
-        {actionData && "error" in actionData && <div className={shared.alertError}>{actionData.error}</div>}
-      </div>
-    </main>
+      {/* Error */}
+      {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
+    </CenteredCardPage>
   )
 }
 
 function PasswordReveal({ p12Password }: { p12Password: string | null }) {
+  const { t } = useTranslation()
   const [revealed, setRevealed] = useState(false)
   const [copied, setCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
@@ -207,7 +192,6 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
 
   const handleReveal = () => {
     setRevealed(true)
-    // Consume the password in Vault so it's gone on next page load
     fetch("", {
       method: "POST",
       body: new URLSearchParams({ intent: "reveal" }),
@@ -217,22 +201,16 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
   if (!p12Password) {
     return (
       <div className={styles.passwordSection}>
-        <h2>Certificate Password</h2>
-        <p className={styles.infoText}>
-          The certificate password has already been revealed. If you need a new invite, use the link in your original
-          invitation email.
-        </p>
+        <h2>{t("invite.password.title")}</h2>
+        <p className={styles.infoText}>{t("invite.password.consumed")}</p>
       </div>
     )
   }
 
   return (
     <div className={styles.passwordSection}>
-      <h2>Certificate Password</h2>
-      <p className={styles.warningText}>
-        Scratch to reveal your certificate password. Save it — you'll need it to install the certificate from your
-        email.
-      </p>
+      <h2>{t("invite.password.title")}</h2>
+      <p className={styles.warningText}>{t("invite.password.warning")}</p>
       <ScratchCard width={320} height={48} onReveal={handleReveal}>
         <div className={styles.passwordPlaceholder}>
           <code>{p12Password}</code>
@@ -249,7 +227,7 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
               timerRef.current = setTimeout(() => setCopied(false), 2000)
             }}
           >
-            {copied ? "Copied!" : "Copy"}
+            {copied ? t("invite.password.copied") : t("invite.password.copy")}
           </Button>
         </div>
       )}
@@ -258,31 +236,30 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
 }
 
 function CertCheckLoading() {
+  const { t } = useTranslation()
   return (
     <div className={styles.certCheck}>
-      <p className={`${styles.certStatus} ${styles.certStatusChecking}`}>Checking certificate...</p>
+      <p className={`${styles.certStatus} ${styles.certStatusChecking}`}>{t("invite.cert.checking")}</p>
     </div>
   )
 }
 
 function CertCheckResult({ certPromise }: { certPromise: Promise<boolean> }) {
+  const { t } = useTranslation()
   const installed = use(certPromise)
 
   return (
     <div className={styles.certCheck}>
       {installed ? (
         <>
-          <p className={`${styles.certStatus} ${styles.certStatusSuccess}`}>Certificate detected</p>
+          <p className={`${styles.certStatus} ${styles.certStatusSuccess}`}>{t("invite.cert.detected")}</p>
           <a href="create-account" className={`${shared.btn} ${shared.btnPrimary} ${shared.btnFull}`}>
-            Continue to Create Account
+            {t("invite.cert.continue")}
           </a>
         </>
       ) : (
         <div className={styles.certWarning}>
-          <p>
-            It looks like your certificate isn't installed yet. Install the .p12 file from your email, then refresh this
-            page.
-          </p>
+          <p>{t("invite.cert.notInstalled")}</p>
         </div>
       )}
     </div>

@@ -12,7 +12,7 @@ export const makeJsonApi = <E>(
     client.execute(req.pipe(HttpClientRequest.prependUrl(baseUrl), HttpClientRequest.setHeaders(defaultHeaders))).pipe(
       Effect.flatMap((response) => {
         if (response.status >= 200 && response.status < 300) {
-          return response.json
+          return response.json.pipe(Effect.mapError(String))
         }
         return response.text.pipe(
           Effect.catchAll(() => Effect.succeed("")),

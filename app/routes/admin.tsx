@@ -1,6 +1,8 @@
-import { Link, NavLink, Outlet } from "react-router"
+import { NavLink, Outlet } from "react-router"
+import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/admin"
 import { getAuth } from "~/lib/auth.server"
+import { config } from "~/lib/config.server"
 import styles from "./admin.module.css"
 
 export function meta() {
@@ -9,30 +11,23 @@ export function meta() {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const auth = await getAuth(request)
-  if (!auth.groups.includes("lldap_admin")) {
+  if (!auth.groups.includes(config.adminGroupName)) {
     throw new Response("Forbidden", { status: 403 })
   }
-  return { user: auth.user }
+  return {}
 }
 
-export default function AdminLayout({ loaderData }: Route.ComponentProps) {
-  const { user } = loaderData
+export default function AdminLayout() {
+  const { t } = useTranslation()
 
   return (
     <main className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Admin</h1>
-          <Link to="/" className={styles.backLink}>
-            Back to Dashboard
-          </Link>
-        </div>
-        <span className={styles.userLabel}>{user}</span>
-      </header>
-
       <nav className={styles.tabs}>
         <NavLink to="/admin" end className={({ isActive }) => `${styles.tab} ${isActive ? styles.tabActive : ""}`}>
-          Users
+          {t("admin.tabs.invites")}
+        </NavLink>
+        <NavLink to="/admin/users" className={({ isActive }) => `${styles.tab} ${isActive ? styles.tabActive : ""}`}>
+          {t("admin.tabs.users")}
         </NavLink>
       </nav>
 

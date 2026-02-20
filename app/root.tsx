@@ -1,11 +1,21 @@
 import type { ReactNode } from "react"
-import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse } from "react-router"
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse, useRouteLoaderData } from "react-router"
+import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/root"
+import { resolveLocale } from "~/lib/i18n.server"
 import "./styles/global.css"
 
+export async function loader({ request }: Route.LoaderArgs) {
+  const locale = resolveLocale(request)
+  return { locale }
+}
+
 export function Layout({ children }: { children: ReactNode }) {
+  const data = useRouteLoaderData<typeof loader>("root")
+  const locale = data?.locale ?? "en"
+
   return (
-    <html lang="en">
+    <html lang={locale}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -26,12 +36,13 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Oops!"
-  let details = "An unexpected error occurred."
+  const { t } = useTranslation()
+  let message = t("error.title")
+  let details = t("error.details")
 
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? "404" : "Error"
-    details = error.status === 404 ? "The requested page could not be found." : error.statusText || details
+    message = error.status === 404 ? t("error.404") : "Error"
+    details = error.status === 404 ? t("error.404msg") : error.statusText || details
   } else if (error instanceof Error) {
     details = error.message
   }

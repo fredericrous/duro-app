@@ -38,6 +38,12 @@ env:
   NAS_VAULT_ADDR: "https://vault.vault.mesh:15443"
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy.monitoring.svc.cluster.local.:4318"
   DURO_DB_PATH: "/db/duro.sqlite"
+  APP_NAME: "Daddyshome"
+  APP_DESCRIPTION: "a private platform for media, productivity, and more"
+  ALLOWED_ORIGIN_SUFFIX: "daddyshome.fr"
+  HOME_URL: "https://home.daddyshome.fr"
+  ADMIN_GROUP_NAME: "lldap_admin"
+  SYSTEM_USERS: "admin,gitea-service"
 
 envFrom: []
 
@@ -58,6 +64,56 @@ web:
   appsConfig:
     enabled: true
     configMapName: "duro-apps"
+    apps:
+      - id: plex
+        name: Plex
+        url: https://plex.daddyshome.fr
+        category: media
+        icon: plex
+        groups: [lldap_password_manager, lldap_admin]
+        priority: 1
+      - id: stremio
+        name: Stremio
+        url: https://stremio.daddyshome.fr
+        category: media
+        icon: stremio
+        groups: [lldap_password_manager, lldap_admin]
+        priority: 2
+      - id: kyoo
+        name: Kyoo
+        url: https://kyoo.daddyshome.fr
+        category: media
+        icon: kyoo
+        groups: [lldap_password_manager, lldap_admin]
+        priority: 3
+      - id: openwebui
+        name: Open WebUI
+        url: https://ai.daddyshome.fr
+        category: ai
+        icon: openwebui
+        groups: [lldap_password_manager, lldap_admin]
+        priority: 1
+      - id: nextcloud
+        name: Nextcloud
+        url: https://cloud.daddyshome.fr
+        category: productivity
+        icon: nextcloud
+        groups: [lldap_password_manager, lldap_admin]
+        priority: 1
+      - id: immich
+        name: Immich
+        url: https://photos.daddyshome.fr
+        category: productivity
+        icon: immich
+        groups: [lldap_password_manager, lldap_admin]
+        priority: 2
+      - id: lldap
+        name: LLDAP
+        url: https://lldap.daddyshome.fr
+        category: admin
+        icon: lldap
+        groups: [lldap_admin]
+        priority: 1
 
 # Worker config
 worker:

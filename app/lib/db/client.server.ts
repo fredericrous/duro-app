@@ -97,7 +97,7 @@ const runMigrations = <R>(loader: Migrator.Loader<R>, dialect: Dialect) =>
       // load is Effect.promise(() => module); resolve and extract default export
       const mod = yield* load
       const migration = Effect.isEffect(mod) ? mod : ((mod as any).default?.default ?? (mod as any).default)
-      yield* migration
+      yield* migration as Effect.Effect<void>
       yield* sql`INSERT INTO _migrations (id, name) VALUES (${id}, ${name})`
       yield* Effect.log(`migration ${id}_${name} applied`)
     }

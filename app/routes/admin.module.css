@@ -4,34 +4,6 @@
   padding: 2rem 1.5rem;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1.5rem;
-}
-
-.title {
-  font-size: 1.75rem;
-  font-weight: 700;
-  margin-bottom: 0.25rem;
-}
-
-.backLink {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  text-decoration: none;
-}
-
-.backLink:hover {
-  color: var(--color-accent);
-}
-
-.userLabel {
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-}
-
 .tabs {
   display: flex;
   gap: 0;

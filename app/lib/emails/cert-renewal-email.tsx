@@ -1,48 +1,41 @@
 "use no memo"
 
 import { Body, Container, Head, Heading, Html, Preview, Section, Text, Hr } from "@react-email/components"
+import type { TFunction } from "i18next"
 
-export function CertRenewalEmail() {
+interface CertRenewalEmailProps {
+  appName: string
+  t: TFunction
+}
+
+export function CertRenewalEmail({ appName, t }: CertRenewalEmailProps) {
   return (
     <Html>
       <Head />
-      <Preview>Your Daddyshome certificate has been renewed</Preview>
+      <Preview>{t("email.renewal.preview", { appName })}</Preview>
       <Body style={main}>
         <Container style={container}>
-          <Heading style={heading}>Certificate Renewed</Heading>
+          <Heading style={heading}>{t("email.renewal.heading")}</Heading>
 
-          <Text style={text}>
-            Your security certificate for Daddyshome has been renewed. A new certificate is attached to this email as{" "}
-            <strong>certificate.p12</strong>.
-          </Text>
+          <Text style={text} dangerouslySetInnerHTML={{ __html: t("email.renewal.body", { appName }) }} />
 
           <Hr style={hr} />
 
           <Section style={section}>
             <Heading as="h2" style={subheading}>
-              Install Your New Certificate
+              {t("email.renewal.install.title")}
             </Heading>
             <Text style={text}>
-              Please install this certificate to continue accessing Daddyshome services. You may need to remove the old
-              certificate first.
+              {t("email.renewal.install.body", { appName })}
             </Text>
 
-            <Text style={textSmall}>
-              <strong>macOS:</strong> Double-click the .p12 file to open Keychain Access, enter the password when
-              prompted, then trust the certificate. You can remove the old certificate from Keychain Access.
-            </Text>
-            <Text style={textSmall}>
-              <strong>Windows:</strong> Double-click the .p12 file, follow the Certificate Import Wizard, and enter the
-              password when prompted. You can remove the old certificate from the Certificate Manager.
-            </Text>
+            <Text style={textSmall} dangerouslySetInnerHTML={{ __html: t("email.renewal.install.macos") }} />
+            <Text style={textSmall} dangerouslySetInnerHTML={{ __html: t("email.renewal.install.windows") }} />
           </Section>
 
           <Hr style={hr} />
 
-          <Text style={footer}>
-            This is an automated renewal. Your account and access remain unchanged — only the certificate has been
-            updated. If you didn't expect this, please contact your administrator.
-          </Text>
+          <Text style={footer}>{t("email.renewal.footer")}</Text>
         </Container>
       </Body>
     </Html>

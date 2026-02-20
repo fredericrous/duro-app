@@ -1,0 +1,229 @@
+{
+  "common": {
+    "appTitle": "Duro",
+    "logout": "Deconnexion",
+    "admin": "Admin",
+    "cancel": "Annuler",
+    "email": "E-mail",
+    "groups": "Groupes",
+    "settings": "Parametres",
+    "save": "Enregistrer",
+    "language": "Langue",
+    "actions": "Actions"
+  },
+  "header": {
+    "welcome": "Bienvenue, {{user}}"
+  },
+  "home": {
+    "title": "Accueil - Duro",
+    "description": "Votre tableau de bord personnel"
+  },
+  "noAccess": {
+    "title": "Acces refuse",
+    "messageUser": "Bonjour {{user}}, vous n'avez pas la permission d'acceder aux applications.",
+    "messageAnon": "Vous n'avez pas la permission d'acceder aux applications.",
+    "hint": "Veuillez contacter un administrateur si vous pensez qu'il s'agit d'une erreur."
+  },
+  "categories": {
+    "media": "Medias",
+    "ai": "IA",
+    "productivity": "Productivite",
+    "development": "Developpement",
+    "admin": "Admin"
+  },
+  "settings": {
+    "title": "Parametres - Duro",
+    "heading": "Parametres",
+    "languageLabel": "Langue",
+    "languageHint": "Choisissez votre langue preferee pour l'interface.",
+    "saved": "Parametres enregistres."
+  },
+  "welcome": {
+    "title": "Bienvenue",
+    "heading": "Bienvenue, {{user}} !",
+    "message": "Votre compte a ete cree et tout est pret. Vous avez maintenant acces a votre tableau de bord personnel.",
+    "cta": "Aller au tableau de bord"
+  },
+  "invite": {
+    "title": "Rejoindre {{appName}}",
+    "subtitle": "Vous avez ete invite en tant que <strong>{{email}}</strong>",
+    "groupsLabel": "Groupes : {{groups}}",
+    "expired": {
+      "title": "Invitation expiree",
+      "message": "Cette invitation a expire. Utilisez le lien dans votre e-mail d'invitation pour en demander une nouvelle."
+    },
+    "used": {
+      "title": "Deja inscrit",
+      "message": "Cette invitation a deja ete utilisee. Si vous avez besoin d'aide, contactez la personne qui vous a invite."
+    },
+    "error": {
+      "title": "Impossible de rejoindre"
+    },
+    "password": {
+      "title": "Mot de passe du certificat",
+      "warning": "Grattez pour reveler le mot de passe de votre certificat. Sauvegardez-le — vous en aurez besoin pour installer le certificat joint a votre e-mail.",
+      "consumed": "Le mot de passe du certificat a deja ete revele. Si vous avez besoin d'une nouvelle invitation, utilisez le lien dans votre e-mail d'invitation original.",
+      "copy": "Copier",
+      "copied": "Copie !"
+    },
+    "cert": {
+      "checking": "Verification du certificat...",
+      "detected": "Certificat detecte",
+      "continue": "Continuer pour creer un compte",
+      "notInstalled": "Il semble que votre certificat ne soit pas encore installe. Installez le fichier .p12 de votre e-mail, puis actualisez cette page."
+    }
+  },
+  "createAccount": {
+    "title": "Creer un compte",
+    "heading": "Creez votre compte",
+    "subtitle": "Configuration pour <strong>{{email}}</strong>",
+    "certCheck": "Verification du certificat...",
+    "certRequired": {
+      "title": "Certificat requis",
+      "message": "Votre certificat n'est pas encore installe. Retournez en arriere pour l'installer d'abord, puis revenez ici.",
+      "back": "Retour a l'invitation"
+    },
+    "username": {
+      "label": "Nom d'utilisateur",
+      "placeholder": "Choisissez un nom d'utilisateur",
+      "hint": "3-32 caracteres : lettres, chiffres, tirets, underscores"
+    },
+    "password": {
+      "label": "Mot de passe",
+      "placeholder": "Choisissez un mot de passe fort",
+      "hint": "Au moins 12 caracteres"
+    },
+    "confirm": {
+      "label": "Confirmer le mot de passe",
+      "placeholder": "Confirmez votre mot de passe"
+    },
+    "submit": "Creer le compte",
+    "submitting": "Creation du compte...",
+    "validation": {
+      "usernameFormat": "Le nom d'utilisateur doit contenir 3 a 32 caracteres (lettres, chiffres, tirets, underscores)",
+      "passwordLength": "Le mot de passe doit contenir au moins 12 caracteres",
+      "passwordMismatch": "Les mots de passe ne correspondent pas"
+    }
+  },
+  "reinvite": {
+    "title": "Demander une nouvelle invitation",
+    "heading": "Demander une nouvelle invitation",
+    "message": "Votre invitation precedente pour <strong>{{email}}</strong> a expire ou le mot de passe du certificat a deja ete revele. Vous pouvez demander une nouvelle invitation ci-dessous.",
+    "submit": "Envoyez-moi une nouvelle invitation",
+    "submitting": "Envoi...",
+    "success": {
+      "title": "Nouvelle invitation envoyee",
+      "message": "Un nouvel e-mail d'invitation a ete envoye a <strong>{{email}}</strong>. Verifiez votre boite de reception pour le nouveau lien et certificat."
+    },
+    "error": {
+      "title": "Impossible de reinviter"
+    }
+  },
+  "admin": {
+    "title": "Admin - Duro",
+    "tabs": {
+      "invites": "Invitations",
+      "users": "Utilisateurs"
+    },
+    "invites": {
+      "sendTitle": "Envoyer une invitation",
+      "emailLabel": "E-mail",
+      "emailPlaceholder": "utilisateur@exemple.com",
+      "groupsLabel": "Groupes",
+      "languageLabel": "Langue de l'invitation",
+      "submit": "Envoyer l'invitation",
+      "submitting": "Envoi...",
+      "proceedAnyway": "Continuer quand meme",
+      "activeTitle": "Invitations actives",
+      "failedTitle": "Invitations echouees",
+      "noActive": "Aucune invitation active",
+      "cols": {
+        "email": "E-mail",
+        "groups": "Groupes",
+        "status": "Statut",
+        "invitedBy": "Invite par",
+        "expires": "Expire",
+        "error": "Erreur",
+        "failedAt": "Echoue le",
+        "actions": "Actions"
+      },
+      "badge": {
+        "failed": "Echoue",
+        "sent": "Envoye",
+        "certIssued": "Cert emis",
+        "processing": "Traitement..."
+      },
+      "action": {
+        "resend": "Renvoyer",
+        "resending": "Renvoi...",
+        "revoke": "Revoquer",
+        "revoking": "Revocation...",
+        "retry": "Reessayer",
+        "retrying": "Nouvelle tentative..."
+      }
+    },
+    "users": {
+      "title": "Utilisateurs",
+      "revokedTitle": "Utilisateurs revoques",
+      "cols": {
+        "username": "Nom d'utilisateur",
+        "displayName": "Nom d'affichage",
+        "email": "E-mail",
+        "created": "Cree le",
+        "reason": "Raison",
+        "revoked": "Revoque le",
+        "by": "Par",
+        "actions": "Actions"
+      },
+      "actions": {
+        "sendCert": "Envoyer cert",
+        "sendingCert": "Envoi...",
+        "revoke": "Revoquer",
+        "confirmRevoke": "Confirmer la revocation",
+        "revoking": "Revocation...",
+        "reasonPlaceholder": "Raison (optionnel)",
+        "reinvite": "Reinviter",
+        "processing": "Traitement..."
+      }
+    }
+  },
+  "error": {
+    "title": "Oups !",
+    "details": "Une erreur inattendue s'est produite.",
+    "404": "404",
+    "404msg": "La page demandee n'a pas pu etre trouvee."
+  },
+  "email": {
+    "invite": {
+      "subject": "Vous avez ete invite a rejoindre {{appName}}",
+      "preview": "Vous avez ete invite a rejoindre {{appName}}",
+      "heading": "Bienvenue sur {{appName}}",
+      "body": "{{invitedBy}} vous a invite a rejoindre {{appName}}, {{appDescription}}.",
+      "step1": {
+        "title": "Etape 1 : Installez votre certificat",
+        "body": "Votre certificat de securite est joint a cet e-mail sous le nom <strong>certificate.p12</strong>. Vous verrez le mot de passe pour l'installer lorsque vous cliquerez sur le lien ci-dessous.",
+        "macos": "<strong>macOS :</strong> Double-cliquez sur le fichier .p12 pour ouvrir Trousseau d'acces, entrez le mot de passe lorsqu'il est demande, puis faites confiance au certificat.",
+        "windows": "<strong>Windows :</strong> Double-cliquez sur le fichier .p12, suivez l'assistant d'importation de certificat et entrez le mot de passe lorsqu'il est demande."
+      },
+      "step2": {
+        "title": "Etape 2 : Creez votre compte",
+        "body": "Apres avoir installe votre certificat, cliquez sur le bouton ci-dessous pour creer votre compte."
+      },
+      "cta": "Creer votre compte",
+      "footer": "Ce lien expire dans 7 jours. Besoin d'une nouvelle invitation ? <a href=\"{{reinviteUrl}}\">Demandez-en une ici</a>. Si vous n'attendiez pas cette invitation, vous pouvez ignorer cet e-mail en toute securite."
+    },
+    "renewal": {
+      "subject": "Votre certificat {{appName}} a ete renouvele",
+      "preview": "Votre certificat {{appName}} a ete renouvele",
+      "heading": "Certificat renouvele",
+      "body": "Votre certificat de securite pour {{appName}} a ete renouvele. Un nouveau certificat est joint a cet e-mail sous le nom <strong>certificate.p12</strong>.",
+      "install": {
+        "title": "Installez votre nouveau certificat",
+        "body": "Veuillez installer ce certificat pour continuer a acceder aux services de {{appName}}. Vous devrez peut-etre supprimer l'ancien certificat au prealable.",
+        "macos": "<strong>macOS :</strong> Double-cliquez sur le fichier .p12 pour ouvrir Trousseau d'acces, entrez le mot de passe lorsqu'il est demande, puis faites confiance au certificat. Vous pouvez supprimer l'ancien certificat depuis Trousseau d'acces.",
+        "windows": "<strong>Windows :</strong> Double-cliquez sur le fichier .p12, suivez l'assistant d'importation de certificat et entrez le mot de passe lorsqu'il est demande. Vous pouvez supprimer l'ancien certificat depuis le Gestionnaire de certificats."
+      },
+      "footer": "Ceci est un renouvellement automatique. Votre compte et vos acces restent inchanges — seul le certificat a ete mis a jour. Si vous n'attendiez pas cela, veuillez contacter votre administrateur."
+    }
+  }
+}

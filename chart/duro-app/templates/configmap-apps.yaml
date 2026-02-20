@@ -1,0 +1,11 @@
+{{- if .Values.web.appsConfig.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.web.appsConfig.configMapName }}
+  labels:
+    {{- include "duro-app.labels" . | nindent 4 }}
+data:
+  apps.json: |
+    {{- .Values.web.appsConfig.apps | toJson | nindent 4 }}
+{{- end }}
