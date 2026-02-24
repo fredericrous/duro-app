@@ -65,7 +65,8 @@
       "warning": "Grattez pour reveler le mot de passe de votre certificat. Sauvegardez-le — vous en aurez besoin pour installer le certificat joint a votre e-mail.",
       "consumed": "Le mot de passe du certificat a deja ete revele. Si vous avez besoin d'une nouvelle invitation, utilisez le lien dans votre e-mail d'invitation original.",
       "copy": "Copier",
-      "copied": "Copie !"
+      "copied": "Copie !",
+      "oneTime": "Ce mot de passe disparaitra si vous actualisez la page. Assurez-vous de le sauvegarder."
     },
     "cert": {
       "checking": "Verification du certificat...",

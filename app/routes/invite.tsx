@@ -9,7 +9,6 @@ import { config } from "~/lib/config.server"
 import { hashToken } from "~/lib/crypto.server"
 import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
 import { Effect } from "effect"
-import { Button } from "@base-ui/react/button"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
@@ -238,19 +237,22 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
         </div>
       </ScratchCard>
       {revealed && (
-        <div className={styles.passwordCopyRow}>
-          <Button
-            className={styles.btnSmall}
-            onClick={() => {
-              navigator.clipboard.writeText(p12Password)
-              setCopied(true)
-              if (timerRef.current) clearTimeout(timerRef.current)
-              timerRef.current = setTimeout(() => setCopied(false), 2000)
-            }}
-          >
-            {copied ? t("invite.password.copied") : t("invite.password.copy")}
-          </Button>
-        </div>
+        <>
+          <div className={styles.passwordCopyRow}>
+            <button
+              className={styles.btnSmall}
+              onClick={() => {
+                navigator.clipboard.writeText(p12Password)
+                setCopied(true)
+                if (timerRef.current) clearTimeout(timerRef.current)
+                timerRef.current = setTimeout(() => setCopied(false), 2000)
+              }}
+            >
+              {copied ? t("invite.password.copied") : t("invite.password.copy")}
+            </button>
+          </div>
+          <p className={styles.warningText}>{t("invite.password.oneTime")}</p>
+        </>
       )}
     </div>
   )

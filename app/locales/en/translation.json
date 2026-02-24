@@ -65,7 +65,8 @@
       "warning": "Scratch to reveal your certificate password. Save it — you'll need it to install the certificate from your email.",
       "consumed": "The certificate password has already been revealed. If you need a new invite, use the link in your original invitation email.",
       "copy": "Copy",
-      "copied": "Copied!"
+      "copied": "Copied!",
+      "oneTime": "This password will disappear if you refresh the page. Make sure to save it first."
     },
     "cert": {
       "checking": "Checking certificate...",

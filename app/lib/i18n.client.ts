@@ -4,13 +4,13 @@ import { supportedLngs, fallbackLng, defaultNS } from "./i18n"
 import en from "~/locales/en/translation.json"
 import fr from "~/locales/fr/translation.json"
 
-i18next.use(initReactI18next).init({
-  supportedLngs: [...supportedLngs],
-  fallbackLng,
-  defaultNS,
-  resources: { en: { translation: en }, fr: { translation: fr } },
-  interpolation: { escapeValue: false },
-  detection: { order: ["htmlTag"], caches: [] },
-})
-
-export default i18next
+export function initI18nClient(lng: string) {
+  return i18next.use(initReactI18next).init({
+    lng,
+    supportedLngs: [...supportedLngs],
+    fallbackLng,
+    defaultNS,
+    resources: { en: { translation: en }, fr: { translation: fr } },
+    interpolation: { escapeValue: false },
+  })
+}
