@@ -169,11 +169,8 @@ function UserRow({
   const revokeFetcher = useFetcher()
   const isSendingCert = certFetcher.state !== "idle"
   const isRevoking = revokeFetcher.state !== "idle"
-
   const revokeSucceeded = revokeFetcher.data && "success" in revokeFetcher.data
-  if (revokeSucceeded && showRevoke) {
-    setShowRevoke(false)
-  }
+  const isRevokeVisible = showRevoke && !revokeSucceeded
 
   return (
     <>
@@ -205,7 +202,7 @@ function UserRow({
           )}
         </td>
       </tr>
-      {showRevoke && (
+      {isRevokeVisible && (
         <tr>
           <td colSpan={5}>
             <revokeFetcher.Form method="post" className={u.inlineRevokeForm}>

@@ -28,6 +28,22 @@
   margin-bottom: 1rem;
 }
 
+.certBackLink {
+  display: inline-block;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: var(--color-accent);
+  color: #fff;
+  text-decoration: none;
+  transition: background-color var(--transition);
+}
+
+.certBackLink:hover {
+  background: var(--color-accent-hover);
+}
+
 .accountForm {
   margin-top: 1rem;
 }
@@ -36,46 +52,4 @@
   border: none;
   padding: 0;
   margin: 0;
-}
-
-.formGroup {
-  margin-bottom: 1rem;
-}
-
-.formGroup label,
-.label {
-  display: block;
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-  margin-bottom: 0.375rem;
-}
-
-.input {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-  font-size: 0.875rem;
-  box-sizing: border-box;
-}
-
-.input:focus,
-.input[data-focused] {
-  outline: none;
-  border-color: var(--color-accent);
-}
-
-.hint {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-  margin-top: 0.25rem;
-  display: block;
-}
-
-.fieldError {
-  font-size: 0.75rem;
-  color: #ef4444;
-  margin-top: 0.25rem;
 }

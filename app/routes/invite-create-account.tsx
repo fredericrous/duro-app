@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { Suspense, use, useState } from "react"
 import { redirect, useNavigation } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/invite-create-account"
@@ -7,15 +7,11 @@ import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { acceptInvite } from "~/lib/workflows/invite.server"
 import { hashToken } from "~/lib/crypto.server"
 import { Effect } from "effect"
-import { Button } from "@base-ui/react/button"
-import { Field } from "@base-ui/react/field"
-import { Input } from "@base-ui/react/input"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
-import { Alert } from "~/components/Alert/Alert"
+import { Alert, Field, Input, Button } from "@fredericrous/duro-design-system"
 import { config } from "~/lib/config.server"
 import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
-import shared from "./shared.module.css"
 import styles from "./invite-create-account.module.css"
 
 export function meta({ data }: Route.MetaArgs) {
@@ -158,46 +154,10 @@ function checkCert(healthUrl: string): Promise<boolean> {
 
 export default function CreateAccountPage({ loaderData, actionData }: Route.ComponentProps) {
   const { t } = useTranslation()
-  const [certInstalled, setCertInstalled] = useState<boolean | null>(null)
-  const { healthUrl } = loaderData
-  const navigation = useNavigation()
-  const isSubmitting = navigation.state === "submitting"
-
-  useEffect(() => {
-    checkCert(healthUrl).then(setCertInstalled)
-  }, [])
+  const [certPromise] = useState(() => checkCert(loaderData.healthUrl))
 
   if (!loaderData.valid) {
     return <ErrorCard title={t("createAccount.heading")} message={loaderData.error} />
-  }
-
-  // Still checking cert
-  if (certInstalled === null) {
-    return (
-      <CenteredCardPage>
-        <h1>{t("createAccount.heading")}</h1>
-        <p
-          className={styles.subtitle}
-          dangerouslySetInnerHTML={{ __html: t("createAccount.subtitle", { email: loaderData.email }) }}
-        />
-        <p className={styles.checkingCert}>{t("createAccount.certCheck")}</p>
-      </CenteredCardPage>
-    )
-  }
-
-  // Cert not installed
-  if (!certInstalled) {
-    return (
-      <CenteredCardPage>
-        <div className={styles.certWarning}>
-          <h2>{t("createAccount.certRequired.title")}</h2>
-          <p>{t("createAccount.certRequired.message")}</p>
-          <a href=".." className={`${shared.btn} ${shared.btnPrimary}`}>
-            {t("createAccount.certRequired.back")}
-          </a>
-        </div>
-      </CenteredCardPage>
-    )
   }
 
   return (
@@ -208,62 +168,85 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
         dangerouslySetInnerHTML={{ __html: t("createAccount.subtitle", { email: loaderData.email }) }}
       />
 
+      <Suspense fallback={<p className={styles.checkingCert}>{t("createAccount.certCheck")}</p>}>
+        <CertGate certPromise={certPromise} actionData={actionData} />
+      </Suspense>
+    </CenteredCardPage>
+  )
+}
+
+function CertGate({
+  certPromise,
+  actionData,
+}: {
+  certPromise: Promise<boolean>
+  actionData: Route.ComponentProps["actionData"]
+}) {
+  const { t } = useTranslation()
+  const navigation = useNavigation()
+  const isSubmitting = navigation.state === "submitting"
+  const certInstalled = use(certPromise)
+
+  if (!certInstalled) {
+    return (
+      <div className={styles.certWarning}>
+        <h2>{t("createAccount.certRequired.title")}</h2>
+        <p>{t("createAccount.certRequired.message")}</p>
+        <a href=".." className={styles.certBackLink}>
+          {t("createAccount.certRequired.back")}
+        </a>
+      </div>
+    )
+  }
+
+  return (
+    <>
       {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
 
       <form method="post" className={styles.accountForm}>
         <fieldset disabled={isSubmitting}>
-          <Field.Root className={styles.formGroup}>
-            <Field.Label className={styles.label}>{t("createAccount.username.label")}</Field.Label>
+          <Field.Root>
+            <Field.Label>{t("createAccount.username.label")}</Field.Label>
             <Input
               name="username"
               required
               pattern="^[a-zA-Z0-9_-]{3,32}$"
               placeholder={t("createAccount.username.placeholder")}
-              className={styles.input}
               autoComplete="username"
             />
-            <Field.Description className={styles.hint}>{t("createAccount.username.hint")}</Field.Description>
-            <Field.Error className={styles.fieldError} />
+            <Field.Description>{t("createAccount.username.hint")}</Field.Description>
           </Field.Root>
 
-          <Field.Root className={styles.formGroup}>
-            <Field.Label className={styles.label}>{t("createAccount.password.label")}</Field.Label>
+          <Field.Root>
+            <Field.Label>{t("createAccount.password.label")}</Field.Label>
             <Input
               name="password"
               type="password"
               required
               minLength={12}
               placeholder={t("createAccount.password.placeholder")}
-              className={styles.input}
               autoComplete="new-password"
             />
-            <Field.Description className={styles.hint}>{t("createAccount.password.hint")}</Field.Description>
-            <Field.Error className={styles.fieldError} />
+            <Field.Description>{t("createAccount.password.hint")}</Field.Description>
           </Field.Root>
 
-          <Field.Root className={styles.formGroup}>
-            <Field.Label className={styles.label}>{t("createAccount.confirm.label")}</Field.Label>
+          <Field.Root>
+            <Field.Label>{t("createAccount.confirm.label")}</Field.Label>
             <Input
               name="confirmPassword"
               type="password"
               required
               minLength={12}
               placeholder={t("createAccount.confirm.placeholder")}
-              className={styles.input}
               autoComplete="new-password"
             />
-            <Field.Error className={styles.fieldError} />
           </Field.Root>
 
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className={`${shared.btn} ${shared.btnPrimary} ${shared.btnFull}`}
-          >
+          <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
             {isSubmitting ? t("createAccount.submitting") : t("createAccount.submit")}
           </Button>
         </fieldset>
       </form>
-    </CenteredCardPage>
+    </>
   )
 }

@@ -8,7 +8,7 @@ import { config } from "~/lib/config.server"
 import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
 import { queueInvite, revokeInvite } from "~/lib/workflows/invite.server"
 import { Effect } from "effect"
-import { Alert } from "~/components/Alert/Alert"
+import { Alert, Button } from "@fredericrous/duro-design-system"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 import s from "./admin.shared.module.css"
@@ -240,9 +240,9 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
               {(actionData.groups as string[]).map((g) => (
                 <input key={g} type="hidden" name="groups" value={g} />
               ))}
-              <button type="submit" className={`${s.btn} ${s.btnPrimary}`}>
+              <Button type="submit" variant="primary">
                 {t("admin.invites.proceedAnyway")}
-              </button>
+              </Button>
             </fetcher.Form>
           </Alert>
         )}
@@ -277,9 +277,9 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
             <LanguageSelect />
           </div>
 
-          <button type="submit" className={`${s.btn} ${s.btnPrimary}`} disabled={isSubmitting}>
+          <Button type="submit" variant="primary" disabled={isSubmitting}>
             {isSubmitting ? t("admin.invites.submitting") : t("admin.invites.submit")}
-          </button>
+          </Button>
         </fetcher.Form>
       </CardSection>
 

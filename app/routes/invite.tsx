@@ -12,7 +12,7 @@ import { Effect } from "effect"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
-import { Alert } from "~/components/Alert/Alert"
+import { Alert } from "@fredericrous/duro-design-system"
 import shared from "./shared.module.css"
 import styles from "./invite.module.css"
 

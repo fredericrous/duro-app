@@ -9,12 +9,10 @@ import { queueInvite } from "~/lib/workflows/invite.server"
 import { hashToken } from "~/lib/crypto.server"
 import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
 import { Effect } from "effect"
-import { Button } from "@base-ui/react/button"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { StatusIcon } from "~/components/StatusIcon/StatusIcon"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
-import { Alert } from "~/components/Alert/Alert"
-import shared from "./shared.module.css"
+import { Alert, Button } from "@fredericrous/duro-design-system"
 import local from "./reinvite.module.css"
 
 export function meta({ data }: Route.MetaArgs) {
@@ -171,11 +169,7 @@ export default function ReinvitePage({ loaderData, actionData }: Route.Component
       {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
 
       <form method="post">
-        <Button
-          type="submit"
-          disabled={isSubmitting}
-          className={`${shared.btn} ${shared.btnPrimary} ${shared.btnFull}`}
-        >
+        <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
           {isSubmitting ? t("reinvite.submitting") : t("reinvite.submit")}
         </Button>
       </form>
