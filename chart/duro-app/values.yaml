@@ -35,7 +35,7 @@ env:
   SMTP_USER: "admin"
   SMTP_FROM: "noreply@daddyshome.fr"
   INVITE_BASE_URL: "https://join.daddyshome.fr"
-  NAS_VAULT_ADDR: "https://vault.vault.mesh:15443"
+  NAS_VAULT_ADDR: "https://nas-vault.vault.mesh:15443"
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy.monitoring.svc.cluster.local.:4318"
   DURO_DB_PATH: "/db/duro.sqlite"
   APP_NAME: "Daddyshome"
