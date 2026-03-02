@@ -17,9 +17,7 @@ export function Header({ user, isAdmin }: HeaderProps) {
         {t("common.appTitle")}
       </Link>
       <Menu.Root>
-        <Menu.Trigger>
-          {t("header.welcome", { user })} &#9662;
-        </Menu.Trigger>
+        <Menu.Trigger>{t("header.welcome", { user })} &#9662;</Menu.Trigger>
         <Menu.Popup align="end">
           {isAdmin && <Menu.LinkItem href="/admin">{t("common.admin")}</Menu.LinkItem>}
           <Menu.LinkItem href="/settings">{t("common.settings")}</Menu.LinkItem>
