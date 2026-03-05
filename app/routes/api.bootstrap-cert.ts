@@ -80,9 +80,13 @@ export async function action({ request }: Route.ActionArgs) {
         yield* emailSvc.sendCertRenewalEmail(email, p12Buffer)
 
         // Clean up the temp P12 secret from NAS Vault after sending
-        yield* certMgr.deleteP12Secret(certId).pipe(
-          Effect.catchAll((e) => Effect.logWarning("bootstrap-cert: failed to clean up temp secret", { error: String(e) })),
-        )
+        yield* certMgr
+          .deleteP12Secret(certId)
+          .pipe(
+            Effect.catchAll((e) =>
+              Effect.logWarning("bootstrap-cert: failed to clean up temp secret", { error: String(e) }),
+            ),
+          )
 
         return { p12Buffer, password }
       }),
