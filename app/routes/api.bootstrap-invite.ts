@@ -1,8 +1,9 @@
 import { Effect } from "effect"
 import * as fs from "node:fs/promises"
-import type { Route } from "./+types/api.bootstrap-cert"
-import { CertManager } from "~/lib/services/CertManager.server"
-import { EmailService } from "~/lib/services/EmailService.server"
+import type { Route } from "./+types/api.bootstrap-invite"
+import { UserManager } from "~/lib/services/UserManager.server"
+import { config } from "~/lib/config.server"
+import { queueInvite } from "~/lib/workflows/invite.server"
 import { runEffect } from "~/lib/runtime.server"
 
 const VAULT_ADDR = process.env.VAULT_ADDR ?? ""
@@ -16,9 +17,9 @@ export async function action({ request }: Route.ActionArgs) {
     return Response.json({ error: "VAULT_ADDR not configured" }, { status: 500 })
   }
 
-  const { token, username, email } = await request.json()
-  if (!token || !username || !email) {
-    return Response.json({ error: "Missing required fields: token, username, email" }, { status: 400 })
+  const { token, email } = await request.json()
+  if (!token || !email) {
+    return Response.json({ error: "Missing required fields: token, email" }, { status: 400 })
   }
 
   // 1. Authenticate to homelab Vault (Kubernetes SA auth)
@@ -68,36 +69,28 @@ export async function action({ request }: Route.ActionArgs) {
     }).catch(() => {})
   }
 
-  // 3. Issue cert + email via existing Effect services
+  // 3. Look up lldap_admin group ID and send invite
   try {
     const result = await runEffect(
       Effect.gen(function* () {
-        const certMgr = yield* CertManager
-        const emailSvc = yield* EmailService
+        const userMgr = yield* UserManager
+        const groups = yield* userMgr.getGroups
+        const adminGroup = groups.find((g) => g.displayName === config.adminGroupName)
+        if (!adminGroup) {
+          return yield* Effect.fail(new Error(`Admin group '${config.adminGroupName}' not found in LLDAP`))
+        }
 
-        const certId = `bootstrap-${username}`
-        const { p12Buffer, password } = yield* certMgr.issueCertAndP12(email, certId)
-        yield* emailSvc.sendCertRenewalEmail(email, p12Buffer)
-
-        // Clean up the temp P12 secret from NAS Vault after sending
-        yield* certMgr
-          .deleteP12Secret(certId)
-          .pipe(
-            Effect.catchAll((e) =>
-              Effect.logWarning("bootstrap-cert: failed to clean up temp secret", { error: String(e) }),
-            ),
-          )
-
-        return { p12Buffer, password }
+        return yield* queueInvite({
+          email,
+          groups: [adminGroup.id],
+          groupNames: [config.adminGroupName],
+          invitedBy: "bootstrap",
+        })
       }),
     )
 
-    return Response.json({
-      success: true,
-      p12: result.p12Buffer.toString("base64"),
-      password: result.password,
-    })
+    return Response.json({ success: true, message: result.message })
   } catch (err) {
-    return Response.json({ error: `Certificate issuance failed: ${err}` }, { status: 500 })
+    return Response.json({ error: `Invite failed: ${err}` }, { status: 500 })
   }
 }
