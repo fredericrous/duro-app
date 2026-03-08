@@ -2,8 +2,9 @@ import { Effect } from "effect"
 import * as fs from "node:fs/promises"
 import type { Route } from "./+types/api.bootstrap-invite"
 import { UserManager } from "~/lib/services/UserManager.server"
+import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { config } from "~/lib/config.server"
-import { queueInvite } from "~/lib/workflows/invite.server"
+import { queueInvite, revokeInvite } from "~/lib/workflows/invite.server"
 import { runEffect } from "~/lib/runtime.server"
 
 const VAULT_ADDR = process.env.VAULT_ADDR ?? ""
@@ -74,10 +75,19 @@ export async function action({ request }: Route.ActionArgs) {
     const result = await runEffect(
       Effect.gen(function* () {
         const userMgr = yield* UserManager
+        const inviteRepo = yield* InviteRepo
         const groups = yield* userMgr.getGroups
         const adminGroup = groups.find((g) => g.displayName === config.adminGroupName)
         if (!adminGroup) {
           return yield* Effect.fail(new Error(`Admin group '${config.adminGroupName}' not found in LLDAP`))
+        }
+
+        // Revoke any existing pending invite for this email so we can send a fresh one
+        const pending = yield* inviteRepo.findPending()
+        const existing = pending.find((i) => i.email === email)
+        if (existing) {
+          yield* Effect.logWarning(`Revoking existing pending invite for ${email} before sending new one`)
+          yield* revokeInvite(existing.id)
         }
 
         return yield* queueInvite({
