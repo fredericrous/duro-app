@@ -13,5 +13,5 @@ export default [
   route("invite/:token/create-account", "routes/invite-create-account.tsx"),
   route("reinvite/:token", "routes/reinvite.tsx"),
   route("welcome", "routes/welcome.tsx"),
-  route("api/bootstrap-cert", "routes/api.bootstrap-cert.ts"),
+  route("api/bootstrap-invite", "routes/api.bootstrap-invite.ts"),
 ] satisfies RouteConfig

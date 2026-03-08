@@ -34,7 +34,7 @@ function makeActionArgs(request: Request) {
 const VALID_TOKEN = "test-bootstrap-token"
 
 function mockVaultFetch(overrides?: { tokenData?: Record<string, unknown>; loginFail?: boolean }) {
-  return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+  return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, _init) => {
     const url =
       typeof input === "string"
         ? input
