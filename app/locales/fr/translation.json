@@ -66,13 +66,15 @@
       "consumed": "Le mot de passe du certificat a deja ete revele. Si vous avez besoin d'une nouvelle invitation, utilisez le lien dans votre e-mail d'invitation original.",
       "copy": "Copier",
       "copied": "Copie !",
-      "oneTime": "Ce mot de passe disparaitra si vous actualisez la page. Assurez-vous de le sauvegarder."
+      "oneTime": "Sauvegardez ce mot de passe — vous en aurez besoin pour installer le certificat."
     },
     "cert": {
       "checking": "Verification du certificat...",
       "detected": "Certificat detecte",
       "continue": "Continuer pour creer un compte",
-      "notInstalled": "Il semble que votre certificat ne soit pas encore installe. Installez le fichier .p12 de votre e-mail, puis actualisez cette page."
+      "notInstalled": "Il semble que votre certificat ne soit pas encore installe. Installez le fichier .p12 de votre e-mail, puis cliquez sur le bouton ci-dessous.",
+      "hint": "Apres l'installation du certificat, vous devrez peut-etre fermer et rouvrir votre navigateur pour qu'il soit reconnu.",
+      "retry": "Verifier a nouveau"
     }
   },
   "createAccount": {

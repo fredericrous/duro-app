@@ -66,13 +66,15 @@
       "consumed": "The certificate password has already been revealed. If you need a new invite, use the link in your original invitation email.",
       "copy": "Copy",
       "copied": "Copied!",
-      "oneTime": "This password will disappear if you refresh the page. Make sure to save it first."
+      "oneTime": "Save this password — you'll need it to install the certificate."
     },
     "cert": {
       "checking": "Checking certificate...",
       "detected": "Certificate detected",
       "continue": "Continue to Create Account",
-      "notInstalled": "It looks like your certificate isn't installed yet. Install the .p12 file from your email, then refresh this page."
+      "notInstalled": "It looks like your certificate isn't installed yet. Install the .p12 file from your email, then click the button below.",
+      "hint": "After installing the certificate, you may need to close and reopen your browser for it to be recognized.",
+      "retry": "Check again"
     }
   },
   "createAccount": {

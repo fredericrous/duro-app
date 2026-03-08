@@ -1,4 +1,4 @@
-import { Suspense, use, useState, useEffect, useRef } from "react"
+import { Suspense, use, useState, useEffect, useRef, useCallback } from "react"
 import { redirect } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/invite"
@@ -123,26 +123,9 @@ export async function action({ request, params }: Route.ActionArgs) {
   const formData = await request.formData()
   const intent = formData.get("intent") as string | null
 
-  // Handle scratch-to-reveal: consume password from Vault
+  // Mark password as revealed (but don't consume — consumed on create-account)
   if (intent === "reveal") {
-    try {
-      const tokenHash = hashToken(token)
-      const result = await runEffect(
-        Effect.gen(function* () {
-          const repo = yield* InviteRepo
-          const invite = yield* repo.findByTokenHash(tokenHash)
-          if (!invite) return { password: null }
-
-          const cert = yield* CertManager
-          const password = yield* cert.consumeP12Password(invite.id)
-          return { password }
-        }),
-      )
-      return result
-    } catch (e) {
-      console.error("[invite] reveal action error:", e)
-      return { password: null }
-    }
+    return { revealed: true }
   }
 
   return { error: "Unknown action" }
@@ -156,7 +139,13 @@ function checkCert(healthUrl: string): Promise<boolean> {
 
 export default function InvitePage({ loaderData, actionData }: Route.ComponentProps) {
   const { t } = useTranslation()
-  const [certPromise] = useState(() => checkCert(loaderData.healthUrl))
+  const [certPromise, setCertPromise] = useState(() => checkCert(loaderData.healthUrl))
+  const [checkKey, setCheckKey] = useState(0)
+
+  const recheck = useCallback(() => {
+    setCheckKey((k) => k + 1)
+    setCertPromise(checkCert(loaderData.healthUrl))
+  }, [loaderData.healthUrl])
 
   if (!loaderData.valid) {
     const { error } = loaderData
@@ -188,8 +177,8 @@ export default function InvitePage({ loaderData, actionData }: Route.ComponentPr
       <PasswordReveal p12Password={loaderData.p12Password} />
 
       {/* Cert Check */}
-      <Suspense fallback={<CertCheckLoading />}>
-        <CertCheckResult certPromise={certPromise} />
+      <Suspense key={checkKey} fallback={<CertCheckLoading />}>
+        <CertCheckResult certPromise={certPromise} onRetry={recheck} />
       </Suspense>
 
       {/* Error */}
@@ -212,10 +201,6 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
 
   const handleReveal = () => {
     setRevealed(true)
-    fetch("", {
-      method: "POST",
-      body: new URLSearchParams({ intent: "reveal" }),
-    }).catch(() => {})
   }
 
   if (!p12Password) {
@@ -267,7 +252,13 @@ function CertCheckLoading() {
   )
 }
 
-function CertCheckResult({ certPromise }: { certPromise: Promise<boolean> }) {
+function CertCheckResult({
+  certPromise,
+  onRetry,
+}: {
+  certPromise: Promise<boolean>
+  onRetry: () => void
+}) {
   const { t } = useTranslation()
   const installed = use(certPromise)
 
@@ -283,6 +274,10 @@ function CertCheckResult({ certPromise }: { certPromise: Promise<boolean> }) {
       ) : (
         <div className={styles.certWarning}>
           <p>{t("invite.cert.notInstalled")}</p>
+          <p className={styles.certHint}>{t("invite.cert.hint")}</p>
+          <button type="button" className={styles.btnRetry} onClick={onRetry}>
+            {t("invite.cert.retry")}
+          </button>
         </div>
       )}
     </div>

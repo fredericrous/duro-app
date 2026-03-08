@@ -111,3 +111,24 @@
   font-size: 0.8rem;
   margin: 0;
 }
+
+.certHint {
+  color: var(--color-text-muted) !important;
+  margin-top: 0.5rem !important;
+}
+
+.btnRetry {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  width: 100%;
+}
+
+.btnRetry:hover {
+  background: rgba(251, 191, 36, 0.25);
+}

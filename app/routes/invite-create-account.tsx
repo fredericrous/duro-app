@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/invite-create-account"
 import { runEffect } from "~/lib/runtime.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
+import { CertManager } from "~/lib/services/CertManager.server"
 import { acceptInvite } from "~/lib/workflows/invite.server"
 import { hashToken } from "~/lib/crypto.server"
 import { Effect } from "effect"
@@ -35,7 +36,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     const invite = await runEffect(
       Effect.gen(function* () {
         const repo = yield* InviteRepo
-        return yield* repo.findByTokenHash(tokenHash)
+        const inv = yield* repo.findByTokenHash(tokenHash)
+        if (inv) {
+          // Consume the P12 password now that the user has reached create-account
+          const cert = yield* CertManager
+          yield* cert.consumeP12Password(inv.id).pipe(Effect.ignore)
+        }
+        return inv
       }),
     )
 
