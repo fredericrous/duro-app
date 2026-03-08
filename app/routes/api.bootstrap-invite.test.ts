@@ -40,7 +40,7 @@ function mockVaultFetch(overrides?: { tokenData?: Record<string, unknown>; login
         ? input
         : input instanceof URL
           ? input.toString()
-          : (input as { url?: string }).url ?? ""
+          : ((input as { url?: string }).url ?? "")
 
     if (url.includes("/auth/kubernetes/login")) {
       if (overrides?.loginFail) {
@@ -92,9 +92,7 @@ describe("POST /api/bootstrap-invite", () => {
 
   it("returns 500 when Vault login fails", async () => {
     mockVaultFetch({ loginFail: true })
-    const resp = await action(
-      makeActionArgs(makeRequest("POST", { token: VALID_TOKEN, email: "a@b.com" })),
-    )
+    const resp = await action(makeActionArgs(makeRequest("POST", { token: VALID_TOKEN, email: "a@b.com" })))
     expect(resp.status).toBe(500)
     const body = await resp.json()
     expect(body.error).toContain("Vault login failed")
@@ -102,9 +100,7 @@ describe("POST /api/bootstrap-invite", () => {
 
   it("returns 401 when bootstrap token is invalid", async () => {
     mockVaultFetch()
-    const resp = await action(
-      makeActionArgs(makeRequest("POST", { token: "wrong-token", email: "a@b.com" })),
-    )
+    const resp = await action(makeActionArgs(makeRequest("POST", { token: "wrong-token", email: "a@b.com" })))
     expect(resp.status).toBe(401)
     const body = await resp.json()
     expect(body.error).toContain("Invalid token")
@@ -112,9 +108,7 @@ describe("POST /api/bootstrap-invite", () => {
 
   it("returns 401 when bootstrap token is expired", async () => {
     mockVaultFetch({ tokenData: { token: VALID_TOKEN, expires_at: String(Date.now() - 60_000) } })
-    const resp = await action(
-      makeActionArgs(makeRequest("POST", { token: VALID_TOKEN, email: "a@b.com" })),
-    )
+    const resp = await action(makeActionArgs(makeRequest("POST", { token: VALID_TOKEN, email: "a@b.com" })))
     expect(resp.status).toBe(401)
     const body = await resp.json()
     expect(body.error).toContain("expired")
@@ -126,12 +120,7 @@ describe("POST /api/bootstrap-invite", () => {
     await action(makeActionArgs(makeRequest("POST", { token: "wrong", email: "a@b.com" })))
 
     const deleteCalls = fetchSpy.mock.calls.filter(([input, init]) => {
-      const url =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.toString()
-            : ""
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : ""
       return url.includes("/secret/metadata/duro/bootstrap-token") && (init as RequestInit)?.method === "DELETE"
     })
     expect(deleteCalls.length).toBe(1)
@@ -141,9 +130,7 @@ describe("POST /api/bootstrap-invite", () => {
     mockVaultFetch()
     mockRunEffect.mockResolvedValue({ success: true, message: "Invite sent to admin@example.com" })
 
-    const resp = await action(
-      makeActionArgs(makeRequest("POST", { token: VALID_TOKEN, email: "admin@example.com" })),
-    )
+    const resp = await action(makeActionArgs(makeRequest("POST", { token: VALID_TOKEN, email: "admin@example.com" })))
     expect(resp.status).toBe(200)
     const body = await resp.json()
     expect(body.success).toBe(true)
@@ -155,9 +142,7 @@ describe("POST /api/bootstrap-invite", () => {
     mockVaultFetch()
     mockRunEffect.mockRejectedValue(new Error("LLDAP unreachable"))
 
-    const resp = await action(
-      makeActionArgs(makeRequest("POST", { token: VALID_TOKEN, email: "admin@example.com" })),
-    )
+    const resp = await action(makeActionArgs(makeRequest("POST", { token: VALID_TOKEN, email: "admin@example.com" })))
     expect(resp.status).toBe(500)
     const body = await resp.json()
     expect(body.error).toContain("LLDAP unreachable")
