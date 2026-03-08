@@ -252,13 +252,7 @@ function CertCheckLoading() {
   )
 }
 
-function CertCheckResult({
-  certPromise,
-  onRetry,
-}: {
-  certPromise: Promise<boolean>
-  onRetry: () => void
-}) {
+function CertCheckResult({ certPromise, onRetry }: { certPromise: Promise<boolean>; onRetry: () => void }) {
   const { t } = useTranslation()
   const installed = use(certPromise)
 
