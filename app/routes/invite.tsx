@@ -1,4 +1,4 @@
-import { Suspense, use, useState, useEffect, useRef, useCallback } from "react"
+import { Suspense, use, useState, useEffect, useRef } from "react"
 import { redirect } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/invite"
@@ -137,15 +137,14 @@ function checkCert(healthUrl: string): Promise<boolean> {
     .catch(() => false)
 }
 
+function buildCertCheckUrl(healthUrl: string): string {
+  const returnTo = window.location.href
+  return `${healthUrl}?return=${encodeURIComponent(returnTo)}`
+}
+
 export default function InvitePage({ loaderData, actionData }: Route.ComponentProps) {
   const { t } = useTranslation()
-  const [certPromise, setCertPromise] = useState(() => checkCert(loaderData.healthUrl))
-  const [checkKey, setCheckKey] = useState(0)
-
-  const recheck = useCallback(() => {
-    setCheckKey((k) => k + 1)
-    setCertPromise(checkCert(loaderData.healthUrl))
-  }, [loaderData.healthUrl])
+  const [certPromise] = useState(() => checkCert(loaderData.healthUrl))
 
   if (!loaderData.valid) {
     const { error } = loaderData
@@ -177,8 +176,8 @@ export default function InvitePage({ loaderData, actionData }: Route.ComponentPr
       <PasswordReveal p12Password={loaderData.p12Password} />
 
       {/* Cert Check */}
-      <Suspense key={checkKey} fallback={<CertCheckLoading />}>
-        <CertCheckResult certPromise={certPromise} onRetry={recheck} />
+      <Suspense fallback={<CertCheckLoading />}>
+        <CertCheckResult certPromise={certPromise} healthUrl={loaderData.healthUrl} />
       </Suspense>
 
       {/* Error */}
@@ -189,7 +188,10 @@ export default function InvitePage({ loaderData, actionData }: Route.ComponentPr
 
 function PasswordReveal({ p12Password }: { p12Password: string | null }) {
   const { t } = useTranslation()
-  const [revealed, setRevealed] = useState(false)
+  const storageKey = `scratch:${window.location.pathname}`
+  const [revealed, setRevealed] = useState(() => {
+    try { return localStorage.getItem(storageKey) === "1" } catch { return false }
+  })
   const [copied, setCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
 
@@ -201,6 +203,7 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
 
   const handleReveal = () => {
     setRevealed(true)
+    try { localStorage.setItem(storageKey, "1") } catch {}
   }
 
   if (!p12Password) {
@@ -216,11 +219,17 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
     <div className={styles.passwordSection}>
       <h2>{t("invite.password.title")}</h2>
       <p className={styles.warningText}>{t("invite.password.warning")}</p>
-      <ScratchCard width={320} height={48} onReveal={handleReveal}>
+      {!revealed ? (
+        <ScratchCard width={320} height={48} onReveal={handleReveal}>
+          <div className={styles.passwordPlaceholder}>
+            <code>{p12Password}</code>
+          </div>
+        </ScratchCard>
+      ) : (
         <div className={styles.passwordPlaceholder}>
           <code>{p12Password}</code>
         </div>
-      </ScratchCard>
+      )}
       {revealed && (
         <>
           <div className={styles.passwordCopyRow}>
@@ -252,7 +261,7 @@ function CertCheckLoading() {
   )
 }
 
-function CertCheckResult({ certPromise, onRetry }: { certPromise: Promise<boolean>; onRetry: () => void }) {
+function CertCheckResult({ certPromise, healthUrl }: { certPromise: Promise<boolean>; healthUrl: string }) {
   const { t } = useTranslation()
   const installed = use(certPromise)
 
@@ -269,9 +278,9 @@ function CertCheckResult({ certPromise, onRetry }: { certPromise: Promise<boolea
         <div className={styles.certWarning}>
           <p>{t("invite.cert.notInstalled")}</p>
           <p className={styles.certHint}>{t("invite.cert.hint")}</p>
-          <button type="button" className={styles.btnRetry} onClick={onRetry}>
+          <a href={buildCertCheckUrl(healthUrl)} className={styles.btnRetry}>
             {t("invite.cert.retry")}
-          </button>
+          </a>
         </div>
       )}
     </div>
