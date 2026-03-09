@@ -211,11 +211,7 @@ function UserRow({
               <input type="hidden" name="intent" value="revokeUser" />
               <input type="hidden" name="username" value={user.id} />
               <input type="hidden" name="email" value={user.email} />
-              <Input
-                name="reason"
-                type="text"
-                placeholder={t("admin.users.actions.reasonPlaceholder")}
-              />
+              <Input name="reason" type="text" placeholder={t("admin.users.actions.reasonPlaceholder")} />
               <Button type="submit" variant="danger" disabled={isRevoking}>
                 {isRevoking ? t("admin.users.actions.revoking") : t("admin.users.actions.confirmRevoke")}
               </Button>

@@ -254,12 +254,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
         <fetcher.Form method="post" ref={formRef}>
           <Field.Root>
             <Field.Label>{t("admin.invites.emailLabel")}</Field.Label>
-            <Input
-              name="email"
-              type="email"
-              required
-              placeholder={t("admin.invites.emailPlaceholder")}
-            />
+            <Input name="email" type="email" required placeholder={t("admin.invites.emailPlaceholder")} />
           </Field.Root>
 
           <Field.Root>
