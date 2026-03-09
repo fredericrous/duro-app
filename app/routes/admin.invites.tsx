@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react"
+import { useEffect, useRef } from "react"
 import { useFetcher, useRevalidator } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/admin.invites"
@@ -199,7 +199,10 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
   const isSubmitting = fetcher.state !== "idle"
   const revalidator = useRevalidator()
   const revalidatorRef = useRef(revalidator)
-  revalidatorRef.current = revalidator
+
+  useEffect(() => {
+    revalidatorRef.current = revalidator
+  })
 
   useEffect(() => {
     if (fetcher.data && "success" in fetcher.data && fetcher.data.success) {
