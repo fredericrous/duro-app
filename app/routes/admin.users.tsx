@@ -8,6 +8,7 @@ import { config } from "~/lib/config.server"
 import { InviteRepo, type Revocation } from "~/lib/services/InviteRepo.server"
 import { revokeUser, resendCert } from "~/lib/workflows/invite.server"
 import { Effect } from "effect"
+import { Button, Input } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import s from "./admin.shared.module.css"
 import u from "./admin.users.module.css"
@@ -186,18 +187,19 @@ function UserRow({
                 <input type="hidden" name="intent" value="resendCert" />
                 <input type="hidden" name="username" value={user.id} />
                 <input type="hidden" name="email" value={user.email} />
-                <button type="submit" className={s.btnGhost} disabled={isSendingCert || isRevoking}>
+                <Button type="submit" variant="secondary" size="small" disabled={isSendingCert || isRevoking}>
                   {isSendingCert ? t("admin.users.actions.sendingCert") : t("admin.users.actions.sendCert")}
-                </button>
+                </Button>
               </certFetcher.Form>
-              <button
+              <Button
                 type="button"
-                className={`${s.btnGhost} ${s.btnGhostDanger}`}
+                variant="danger"
+                size="small"
                 disabled={isRevoking}
                 onClick={() => setShowRevoke(!showRevoke)}
               >
                 {t("admin.users.actions.revoke")}
-              </button>
+              </Button>
             </div>
           )}
         </td>
@@ -209,19 +211,17 @@ function UserRow({
               <input type="hidden" name="intent" value="revokeUser" />
               <input type="hidden" name="username" value={user.id} />
               <input type="hidden" name="email" value={user.email} />
-              <input
+              <Input
                 name="reason"
                 type="text"
                 placeholder={t("admin.users.actions.reasonPlaceholder")}
-                className={s.input}
-                style={{ flex: 1 }}
               />
-              <button type="submit" className={`${s.btn} ${s.btnDanger}`} disabled={isRevoking}>
+              <Button type="submit" variant="danger" disabled={isRevoking}>
                 {isRevoking ? t("admin.users.actions.revoking") : t("admin.users.actions.confirmRevoke")}
-              </button>
-              <button type="button" className={s.btnGhost} onClick={() => setShowRevoke(false)}>
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setShowRevoke(false)}>
                 {t("common.cancel")}
-              </button>
+              </Button>
             </revokeFetcher.Form>
           </td>
         </tr>
@@ -246,9 +246,9 @@ function RevokedUserRow({ revocation }: { revocation: Revocation }) {
         <fetcher.Form method="post">
           <input type="hidden" name="intent" value="reinviteRevoked" />
           <input type="hidden" name="revocationId" value={revocation.id} />
-          <button type="submit" className={s.btnGhost} disabled={isSubmitting}>
+          <Button type="submit" variant="secondary" size="small" disabled={isSubmitting}>
             {isSubmitting ? t("admin.users.actions.processing") : t("admin.users.actions.reinvite")}
-          </button>
+          </Button>
         </fetcher.Form>
       </td>
     </tr>

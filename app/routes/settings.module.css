@@ -14,20 +14,3 @@
   flex-direction: column;
   gap: 1.5rem;
 }
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-
-.label {
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-}
-
-.hint {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  margin: 0;
-}

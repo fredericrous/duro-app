@@ -1,5 +1,5 @@
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
-import { StatusIcon } from "~/components/StatusIcon/StatusIcon"
+import { StatusIcon } from "@duro-app/ui"
 import styles from "./ErrorCard.module.css"
 
 interface ErrorCardProps {

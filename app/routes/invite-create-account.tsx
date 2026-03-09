@@ -10,7 +10,7 @@ import { hashToken } from "~/lib/crypto.server"
 import { Effect } from "effect"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
-import { Alert, Field, Input, Button } from "@fredericrous/duro-design-system"
+import { Alert, Button, Field, Input } from "@duro-app/ui"
 import { config } from "~/lib/config.server"
 import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
 import styles from "./invite-create-account.module.css"
@@ -199,13 +199,13 @@ function CertGate({
 
   if (!certInstalled) {
     return (
-      <div className={styles.certWarning}>
-        <h2>{t("createAccount.certRequired.title")}</h2>
+      <Alert variant="warning">
+        <h2 className={styles.certWarningTitle}>{t("createAccount.certRequired.title")}</h2>
         <p>{t("createAccount.certRequired.message")}</p>
         <a href=".." className={styles.certBackLink}>
           {t("createAccount.certRequired.back")}
         </a>
-      </div>
+      </Alert>
     )
   }
 

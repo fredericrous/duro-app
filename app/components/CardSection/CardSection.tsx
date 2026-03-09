@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { Card } from "@duro-app/ui"
 import styles from "./CardSection.module.css"
 
 interface CardSectionProps {
@@ -8,9 +9,8 @@ interface CardSectionProps {
 
 export function CardSection({ title, children }: CardSectionProps) {
   return (
-    <section className={styles.card}>
-      <h2 className={styles.title}>{title}</h2>
-      {children}
+    <section className={styles.wrapper}>
+      <Card header={title}>{children}</Card>
     </section>
   )
 }

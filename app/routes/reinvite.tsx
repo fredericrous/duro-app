@@ -10,9 +10,8 @@ import { hashToken } from "~/lib/crypto.server"
 import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
 import { Effect } from "effect"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
-import { StatusIcon } from "~/components/StatusIcon/StatusIcon"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
-import { Alert, Button } from "@fredericrous/duro-design-system"
+import { Alert, Button, StatusIcon } from "@duro-app/ui"
 import local from "./reinvite.module.css"
 
 export function meta({ data }: Route.MetaArgs) {

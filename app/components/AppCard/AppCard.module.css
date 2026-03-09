@@ -1,23 +1,13 @@
-.card {
+.link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.content {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.75rem;
-  padding: 1.5rem 1rem;
-  background-color: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  transition:
-    background-color var(--transition),
-    border-color var(--transition),
-    transform var(--transition);
-  cursor: pointer;
-}
-
-.card:hover {
-  background-color: var(--color-bg-card-hover);
-  border-color: var(--color-accent);
-  transform: translateY(-2px);
 }
 
 .icon {

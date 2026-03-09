@@ -1,10 +1,10 @@
 import type { ReactNode } from "react"
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
-import { ThemeProvider } from "@fredericrous/duro-design-system"
+import { ThemeProvider } from "@duro-app/ui"
 import type { Route } from "./+types/root"
 import { resolveLocale } from "~/lib/i18n.server"
-import "@fredericrous/duro-design-system/dist/index.css"
+import "@duro-app/ui/dist/index.css"
 import "./styles/global.css"
 
 export async function loader({ request }: Route.LoaderArgs) {

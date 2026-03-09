@@ -7,7 +7,7 @@ import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { Effect } from "effect"
 import { supportedLngs } from "~/lib/i18n"
 import { localeCookieHeader, resolveLocale } from "~/lib/i18n.server"
-import { Alert, Button } from "@fredericrous/duro-design-system"
+import { Alert, Button, Field } from "@duro-app/ui"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 import styles from "./settings.module.css"
 
@@ -59,13 +59,11 @@ export default function SettingsPage({ loaderData }: Route.ComponentProps) {
       {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
 
       <fetcher.Form method="post" className={styles.form}>
-        <div className={styles.field}>
-          <label htmlFor="locale" className={styles.label}>
-            {t("settings.languageLabel")}
-          </label>
+        <Field.Root>
+          <Field.Label>{t("settings.languageLabel")}</Field.Label>
           <LanguageSelect defaultValue={loaderData.locale} />
-          <p className={styles.hint}>{t("settings.languageHint")}</p>
-        </div>
+          <Field.Description>{t("settings.languageHint")}</Field.Description>
+        </Field.Root>
 
         <Button type="submit" variant="primary">
           {t("common.save")}

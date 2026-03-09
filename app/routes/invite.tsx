@@ -12,8 +12,7 @@ import { Effect } from "effect"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
-import { Alert } from "@fredericrous/duro-design-system"
-import shared from "./shared.module.css"
+import { Alert, Button } from "@duro-app/ui"
 import styles from "./invite.module.css"
 
 export function meta({ data }: Route.MetaArgs) {
@@ -219,33 +218,30 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
 
   if (!p12Password) {
     return (
-      <div className={styles.passwordSection}>
-        <h2>{t("invite.password.title")}</h2>
-        <p className={styles.infoText}>{t("invite.password.consumed")}</p>
+      <div className={styles.section}>
+        <Alert variant="info">
+          <h2 className={styles.sectionTitle}>{t("invite.password.title")}</h2>
+          <p>{t("invite.password.consumed")}</p>
+        </Alert>
       </div>
     )
   }
 
   return (
-    <div className={styles.passwordSection}>
-      <h2>{t("invite.password.title")}</h2>
-      <p className={styles.warningText}>{t("invite.password.warning")}</p>
-      {!revealed ? (
+    <div className={styles.section}>
+      <Alert variant="info">
+        <h2 className={styles.sectionTitle}>{t("invite.password.title")}</h2>
+        <p>{t("invite.password.warning")}</p>
         <ScratchCard width={320} height={48} onReveal={handleReveal}>
           <div className={styles.passwordPlaceholder}>
             <code>{p12Password}</code>
           </div>
         </ScratchCard>
-      ) : (
-        <div className={styles.passwordPlaceholder} style={{ width: 320, height: 48 }}>
-          <code>{p12Password}</code>
-        </div>
-      )}
-      {revealed && (
-        <>
+        <div style={!revealed ? { visibility: "hidden" } : undefined}>
           <div className={styles.passwordCopyRow}>
-            <button
-              className={styles.btnSmall}
+            <Button
+              variant="secondary"
+              size="small"
               onClick={() => {
                 navigator.clipboard.writeText(p12Password)
                 setCopied(true)
@@ -254,11 +250,11 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
               }}
             >
               {copied ? t("invite.password.copied") : t("invite.password.copy")}
-            </button>
+            </Button>
           </div>
-          <p className={styles.warningText}>{t("invite.password.oneTime")}</p>
-        </>
-      )}
+          <p>{t("invite.password.oneTime")}</p>
+        </div>
+      </Alert>
     </div>
   )
 }
@@ -278,21 +274,27 @@ function CertCheckResult({ certPromise, healthUrl }: { certPromise: Promise<bool
 
   return (
     <div className={styles.certCheck}>
+      <Alert variant={installed ? "success" : "warning"}>
+        {installed ? (
+          <p>{t("invite.cert.detected")}</p>
+        ) : (
+          <div className={styles.certWarningContent}>
+            <p>{t("invite.cert.notInstalled")}</p>
+            <p className={styles.certHint}>{t("invite.cert.hint")}</p>
+            <a href={buildCertCheckUrl(healthUrl)} className={styles.btnRetry}>
+              {t("invite.cert.retry")}
+            </a>
+          </div>
+        )}
+      </Alert>
       {installed ? (
-        <>
-          <p className={`${styles.certStatus} ${styles.certStatusSuccess}`}>{t("invite.cert.detected")}</p>
-          <a href="create-account" className={`${shared.btn} ${shared.btnPrimary} ${shared.btnFull}`}>
-            {t("invite.cert.continue")}
-          </a>
-        </>
+        <a href="create-account" className={styles.continueLink}>
+          {t("invite.cert.continue")}
+        </a>
       ) : (
-        <div className={styles.certWarning}>
-          <p>{t("invite.cert.notInstalled")}</p>
-          <p className={styles.certHint}>{t("invite.cert.hint")}</p>
-          <a href={buildCertCheckUrl(healthUrl)} className={styles.btnRetry}>
-            {t("invite.cert.retry")}
-          </a>
-        </div>
+        <Button fullWidth disabled>
+          {t("invite.cert.continue")}
+        </Button>
       )}
     </div>
   )

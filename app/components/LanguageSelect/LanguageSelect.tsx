@@ -1,4 +1,4 @@
-import { Select } from "@fredericrous/duro-design-system"
+import { Select } from "@duro-app/ui"
 import { supportedLngs } from "~/lib/i18n"
 
 const languageNames: Record<string, string> = {

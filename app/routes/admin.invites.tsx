@@ -8,7 +8,7 @@ import { config } from "~/lib/config.server"
 import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
 import { queueInvite, revokeInvite } from "~/lib/workflows/invite.server"
 import { Effect } from "effect"
-import { Alert, Button } from "@fredericrous/duro-design-system"
+import { Alert, Badge, Button, Field, Input } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 import s from "./admin.shared.module.css"
@@ -184,11 +184,10 @@ export async function action({ request }: Route.ActionArgs) {
 
 function StepBadges({ invite }: { invite: Invite }) {
   const { t } = useTranslation()
-  if (invite.failedAt) return <span className={`${s.badge} ${s.badgeError}`}>{t("admin.invites.badge.failed")}</span>
-  if (invite.emailSent) return <span className={`${s.badge} ${s.badgeSuccess}`}>{t("admin.invites.badge.sent")}</span>
-  if (invite.certIssued)
-    return <span className={`${s.badge} ${s.badgeDone}`}>{t("admin.invites.badge.certIssued")}</span>
-  return <span className={`${s.badge} ${s.badgePending}`}>{t("admin.invites.badge.processing")}</span>
+  if (invite.failedAt) return <Badge variant="error">{t("admin.invites.badge.failed")}</Badge>
+  if (invite.emailSent) return <Badge variant="success">{t("admin.invites.badge.sent")}</Badge>
+  if (invite.certIssued) return <Badge variant="success">{t("admin.invites.badge.certIssued")}</Badge>
+  return <Badge variant="warning">{t("admin.invites.badge.processing")}</Badge>
 }
 
 export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
@@ -253,20 +252,18 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
         )}
 
         <fetcher.Form method="post" ref={formRef}>
-          <div className={inv.formGroup}>
-            <label htmlFor="email">{t("admin.invites.emailLabel")}</label>
-            <input
-              id="email"
+          <Field.Root>
+            <Field.Label>{t("admin.invites.emailLabel")}</Field.Label>
+            <Input
               name="email"
               type="email"
               required
               placeholder={t("admin.invites.emailPlaceholder")}
-              className={s.input}
             />
-          </div>
+          </Field.Root>
 
-          <div className={inv.formGroup}>
-            <label>{t("admin.invites.groupsLabel")}</label>
+          <Field.Root>
+            <Field.Label>{t("admin.invites.groupsLabel")}</Field.Label>
             <div className={inv.checkboxGrid}>
               {groups.map((g) => (
                 <label key={g.id} className={inv.checkboxLabel}>
@@ -275,12 +272,12 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
                 </label>
               ))}
             </div>
-          </div>
+          </Field.Root>
 
-          <div className={inv.formGroup}>
-            <label>{t("admin.invites.languageLabel")}</label>
+          <Field.Root>
+            <Field.Label>{t("admin.invites.languageLabel")}</Field.Label>
             <LanguageSelect />
-          </div>
+          </Field.Root>
 
           <Button type="submit" variant="primary" disabled={isSubmitting}>
             {isSubmitting ? t("admin.invites.submitting") : t("admin.invites.submit")}
@@ -362,16 +359,16 @@ function PendingInviteRow({ invite }: { invite: Invite }) {
           <resendFetcher.Form method="post">
             <input type="hidden" name="intent" value="resend" />
             <input type="hidden" name="inviteId" value={invite.id} />
-            <button type="submit" className={s.btnGhost} disabled={isResending || isRevoking}>
+            <Button type="submit" variant="secondary" size="small" disabled={isResending || isRevoking}>
               {isResending ? t("admin.invites.action.resending") : t("admin.invites.action.resend")}
-            </button>
+            </Button>
           </resendFetcher.Form>
           <revokeFetcher.Form method="post">
             <input type="hidden" name="intent" value="revoke" />
             <input type="hidden" name="inviteId" value={invite.id} />
-            <button type="submit" className={`${s.btnGhost} ${s.btnGhostDanger}`} disabled={isRevoking || isResending}>
+            <Button type="submit" variant="danger" size="small" disabled={isRevoking || isResending}>
               {isRevoking ? t("admin.invites.action.revoking") : t("admin.invites.action.revoke")}
-            </button>
+            </Button>
           </revokeFetcher.Form>
         </div>
       </td>
@@ -396,16 +393,16 @@ function FailedInviteRow({ invite }: { invite: Invite }) {
           <retryFetcher.Form method="post">
             <input type="hidden" name="intent" value="retry" />
             <input type="hidden" name="inviteId" value={invite.id} />
-            <button type="submit" className={s.btnGhost} disabled={isRetrying || isRevoking}>
+            <Button type="submit" variant="secondary" size="small" disabled={isRetrying || isRevoking}>
               {isRetrying ? t("admin.invites.action.retrying") : t("admin.invites.action.retry")}
-            </button>
+            </Button>
           </retryFetcher.Form>
           <revokeFetcher.Form method="post">
             <input type="hidden" name="intent" value="revoke" />
             <input type="hidden" name="inviteId" value={invite.id} />
-            <button type="submit" className={`${s.btnGhost} ${s.btnGhostDanger}`} disabled={isRevoking || isRetrying}>
+            <Button type="submit" variant="danger" size="small" disabled={isRevoking || isRetrying}>
               {isRevoking ? t("admin.invites.action.revoking") : t("admin.invites.action.revoke")}
-            </button>
+            </Button>
           </revokeFetcher.Form>
         </div>
       </td>
