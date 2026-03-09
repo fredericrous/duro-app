@@ -188,10 +188,10 @@ export default function InvitePage({ loaderData, actionData }: Route.ComponentPr
 
 function PasswordReveal({ p12Password }: { p12Password: string | null }) {
   const { t } = useTranslation()
-  const storageKey = `scratch:${window.location.pathname}`
   const [revealed, setRevealed] = useState(() => {
+    if (typeof window === "undefined") return false
     try {
-      return localStorage.getItem(storageKey) === "1"
+      return localStorage.getItem(`scratch:${window.location.pathname}`) === "1"
     } catch {
       return false
     }
@@ -208,7 +208,7 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
   const handleReveal = () => {
     setRevealed(true)
     try {
-      localStorage.setItem(storageKey, "1")
+      localStorage.setItem(`scratch:${window.location.pathname}`, "1")
     } catch {
       // localStorage may be unavailable in private browsing
     }
