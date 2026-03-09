@@ -145,7 +145,7 @@ function buildCertCheckUrl(healthUrl: string): string {
 export default function InvitePage({ loaderData, actionData }: Route.ComponentProps) {
   const { t } = useTranslation()
   const [certPromise] = useState(() => {
-    if (typeof window === "undefined") return Promise.resolve(false)
+    if (typeof window === "undefined") return new Promise<boolean>(() => {})
     return checkCert(loaderData.healthUrl)
   })
 
