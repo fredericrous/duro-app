@@ -190,7 +190,11 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
   const { t } = useTranslation()
   const storageKey = `scratch:${window.location.pathname}`
   const [revealed, setRevealed] = useState(() => {
-    try { return localStorage.getItem(storageKey) === "1" } catch { return false }
+    try {
+      return localStorage.getItem(storageKey) === "1"
+    } catch {
+      return false
+    }
   })
   const [copied, setCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
@@ -203,7 +207,9 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
 
   const handleReveal = () => {
     setRevealed(true)
-    try { localStorage.setItem(storageKey, "1") } catch {}
+    try {
+      localStorage.setItem(storageKey, "1")
+    } catch {}
   }
 
   if (!p12Password) {
