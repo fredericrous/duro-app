@@ -237,7 +237,7 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
           </div>
         </ScratchCard>
       ) : (
-        <div className={styles.passwordPlaceholder}>
+        <div className={styles.passwordPlaceholder} style={{ width: 320, height: 48 }}>
           <code>{p12Password}</code>
         </div>
       )}
