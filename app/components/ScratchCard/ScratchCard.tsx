@@ -112,13 +112,8 @@ export function ScratchCard({
   }
 
   return (
-    <div
-      className={styles.container}
-      style={{ width, height, background: canvasReady ? undefined : "#333" }}
-    >
-      <div style={{ visibility: canvasReady || fadeOut ? "visible" : "hidden" }}>
-        {children}
-      </div>
+    <div className={styles.container} style={{ width, height, background: canvasReady ? undefined : "#333" }}>
+      <div style={{ visibility: canvasReady || fadeOut ? "visible" : "hidden" }}>{children}</div>
       {!fadeOut && (
         <canvas
           ref={canvasRef}
