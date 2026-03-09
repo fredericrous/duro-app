@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, type ReactNode } from "react"
+import { useRef, useState, useCallback, type ReactNode } from "react"
 import styles from "./ScratchCard.module.css"
 
 interface ScratchCardProps {
@@ -9,6 +9,20 @@ interface ScratchCardProps {
   onScratchStart?: () => void
   label?: string
   children: ReactNode
+}
+
+function paintCanvas(canvas: HTMLCanvasElement, width: number, height: number, label: string) {
+  const ctx = canvas.getContext("2d")
+  if (!ctx) return
+  canvas.width = width
+  canvas.height = height
+  ctx.fillStyle = "#333"
+  ctx.fillRect(0, 0, width, height)
+  ctx.fillStyle = "#999"
+  ctx.font = "14px -apple-system, BlinkMacSystemFont, sans-serif"
+  ctx.textAlign = "center"
+  ctx.textBaseline = "middle"
+  ctx.fillText(label, width / 2, height / 2)
 }
 
 export function ScratchCard({
@@ -25,27 +39,16 @@ export function ScratchCard({
   const revealed = useRef(false)
   const scratchStarted = useRef(false)
   const [fadeOut, setFadeOut] = useState(false)
-  const [canvasReady, setCanvasReady] = useState(false)
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
-
-    canvas.width = width
-    canvas.height = height
-
-    ctx.fillStyle = "#333"
-    ctx.fillRect(0, 0, width, height)
-
-    ctx.fillStyle = "#999"
-    ctx.font = "14px -apple-system, BlinkMacSystemFont, sans-serif"
-    ctx.textAlign = "center"
-    ctx.textBaseline = "middle"
-    ctx.fillText(label, width / 2, height / 2)
-    setCanvasReady(true)
-  }, [width, height, label])
+  const canvasCallbackRef = useCallback(
+    (node: HTMLCanvasElement | null) => {
+      canvasRef.current = node
+      if (node) {
+        paintCanvas(node, width, height, label)
+      }
+    },
+    [width, height, label],
+  )
 
   const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect()
@@ -112,11 +115,11 @@ export function ScratchCard({
   }
 
   return (
-    <div className={styles.container} style={{ width, height, background: canvasReady ? undefined : "#333" }}>
-      <div style={{ visibility: canvasReady || fadeOut ? "visible" : "hidden" }}>{children}</div>
+    <div className={styles.container} style={{ width, height }}>
+      {children}
       {!fadeOut && (
         <canvas
-          ref={canvasRef}
+          ref={canvasCallbackRef}
           className={styles.canvas}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
