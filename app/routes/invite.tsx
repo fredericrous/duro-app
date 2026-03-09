@@ -137,6 +137,7 @@ function checkCert(healthUrl: string): Promise<boolean> {
 }
 
 function buildCertCheckUrl(healthUrl: string): string {
+  if (typeof window === "undefined") return healthUrl
   const returnTo = window.location.href
   return `${healthUrl}?return=${encodeURIComponent(returnTo)}`
 }
