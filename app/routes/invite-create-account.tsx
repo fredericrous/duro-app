@@ -161,7 +161,10 @@ function checkCert(healthUrl: string): Promise<boolean> {
 
 export default function CreateAccountPage({ loaderData, actionData }: Route.ComponentProps) {
   const { t } = useTranslation()
-  const [certPromise] = useState(() => checkCert(loaderData.healthUrl))
+  const [certPromise] = useState(() => {
+    if (typeof window === "undefined") return Promise.resolve(false)
+    return checkCert(loaderData.healthUrl)
+  })
 
   if (!loaderData.valid) {
     return <ErrorCard title={t("createAccount.heading")} message={loaderData.error} />

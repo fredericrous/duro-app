@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, type RefObject } from "react"
 import { useFetcher, useRevalidator } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/admin.invites"
@@ -198,6 +198,8 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
   const formRef = useRef<HTMLFormElement>(null)
   const isSubmitting = fetcher.state !== "idle"
   const revalidator = useRevalidator()
+  const revalidatorRef = useRef(revalidator)
+  revalidatorRef.current = revalidator
 
   useEffect(() => {
     if (fetcher.data && "success" in fetcher.data && fetcher.data.success) {
@@ -211,13 +213,13 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
     if (!hasIncomplete) return
 
     const interval = setInterval(() => {
-      if (revalidator.state === "idle") {
-        revalidator.revalidate()
+      if (revalidatorRef.current.state === "idle") {
+        revalidatorRef.current.revalidate()
       }
     }, 5000)
 
     return () => clearInterval(interval)
-  }, [pendingInvites, revalidator])
+  }, [pendingInvites])
 
   const actionData = fetcher.data
   const hasRevocationWarning = actionData && "warning" in actionData && "groups" in actionData

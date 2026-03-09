@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState, type ReactNode } from "react"
+import { useRef, useEffect, useState, type ReactNode } from "react"
 import styles from "./ScratchCard.module.css"
 
 interface ScratchCardProps {
@@ -35,11 +35,9 @@ export function ScratchCard({
     canvas.width = width
     canvas.height = height
 
-    // Fill with scratch overlay
     ctx.fillStyle = "#333"
     ctx.fillRect(0, 0, width, height)
 
-    // Draw label text
     ctx.fillStyle = "#999"
     ctx.font = "14px -apple-system, BlinkMacSystemFont, sans-serif"
     ctx.textAlign = "center"
@@ -47,28 +45,24 @@ export function ScratchCard({
     ctx.fillText(label, width / 2, height / 2)
   }, [width, height, label])
 
-  const getPos = useCallback(
-    (e: React.PointerEvent<HTMLCanvasElement>) => {
-      const rect = canvasRef.current!.getBoundingClientRect()
-      return {
-        x: (e.clientX - rect.left) * (width / rect.width),
-        y: (e.clientY - rect.top) * (height / rect.height),
-      }
-    },
-    [width, height],
-  )
+  const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current!.getBoundingClientRect()
+    return {
+      x: (e.clientX - rect.left) * (width / rect.width),
+      y: (e.clientY - rect.top) * (height / rect.height),
+    }
+  }
 
-  const scratch = useCallback((x: number, y: number) => {
+  const scratch = (x: number, y: number) => {
     const ctx = canvasRef.current?.getContext("2d")
     if (!ctx) return
-
     ctx.globalCompositeOperation = "destination-out"
     ctx.beginPath()
     ctx.arc(x, y, 20, 0, Math.PI * 2)
     ctx.fill()
-  }, [])
+  }
 
-  const checkReveal = useCallback(() => {
+  const checkReveal = () => {
     if (revealed.current) return
     const canvas = canvasRef.current
     if (!canvas) return
@@ -89,37 +83,31 @@ export function ScratchCard({
       setFadeOut(true)
       onReveal()
     }
-  }, [revealThreshold, onReveal])
+  }
 
-  const onPointerDown = useCallback(
-    (e: React.PointerEvent<HTMLCanvasElement>) => {
-      if (revealed.current) return
-      if (!scratchStarted.current) {
-        scratchStarted.current = true
-        onScratchStart?.()
-      }
-      isDrawing.current = true
-      canvasRef.current?.setPointerCapture(e.pointerId)
-      const pos = getPos(e)
-      scratch(pos.x, pos.y)
-    },
-    [getPos, scratch, onScratchStart],
-  )
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (revealed.current) return
+    if (!scratchStarted.current) {
+      scratchStarted.current = true
+      onScratchStart?.()
+    }
+    isDrawing.current = true
+    canvasRef.current?.setPointerCapture(e.pointerId)
+    const pos = getPos(e)
+    scratch(pos.x, pos.y)
+  }
 
-  const onPointerMove = useCallback(
-    (e: React.PointerEvent<HTMLCanvasElement>) => {
-      if (!isDrawing.current || revealed.current) return
-      const pos = getPos(e)
-      scratch(pos.x, pos.y)
-    },
-    [getPos, scratch],
-  )
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawing.current || revealed.current) return
+    const pos = getPos(e)
+    scratch(pos.x, pos.y)
+  }
 
-  const onPointerUp = useCallback(() => {
+  const handlePointerUp = () => {
     if (!isDrawing.current) return
     isDrawing.current = false
     checkReveal()
-  }, [checkReveal])
+  }
 
   return (
     <div className={styles.container} style={{ width, height }}>
@@ -128,10 +116,10 @@ export function ScratchCard({
         <canvas
           ref={canvasRef}
           className={styles.canvas}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerLeave={onPointerUp}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
         />
       )}
     </div>
