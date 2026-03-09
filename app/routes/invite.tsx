@@ -209,7 +209,9 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
     setRevealed(true)
     try {
       localStorage.setItem(storageKey, "1")
-    } catch {}
+    } catch {
+      // localStorage may be unavailable in private browsing
+    }
   }
 
   if (!p12Password) {
