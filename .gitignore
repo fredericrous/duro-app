@@ -3,6 +3,10 @@ build
 .react-router
 .env
 .env.local
+.env.dev
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 *.log
 .DS_Store
 coverage/
