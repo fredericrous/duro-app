@@ -7,7 +7,7 @@ COPY . .
 RUN pnpm build
 
 FROM node:22-alpine
-RUN adduser -u 1001 -D appuser && corepack enable
+RUN adduser -u 1001 -D appuser && corepack enable && corepack prepare pnpm@10.30.2 --activate
 WORKDIR /app
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./package.json
