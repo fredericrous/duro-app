@@ -8,6 +8,7 @@ export interface AuthInfo {
 }
 
 const DEV_AUTH: AuthInfo = { user: "dev", groups: ["family", "media", "lldap_admin"] }
+const isDevServer = import.meta.env.DEV && !import.meta.env.VITEST
 
 /**
  * Require authentication. Returns AuthInfo if the user has a valid session,
@@ -19,7 +20,7 @@ export async function requireAuth(request: Request): Promise<AuthInfo> {
     return { user: session.name, groups: session.groups }
   }
 
-  if (import.meta.env.DEV) {
+  if (isDevServer) {
     return DEV_AUTH
   }
 
@@ -41,7 +42,7 @@ export async function getAuth(request: Request): Promise<AuthInfo> {
   if (session) {
     return { user: session.name, groups: session.groups }
   }
-  if (import.meta.env.DEV) {
+  if (isDevServer) {
     return DEV_AUTH
   }
   return { user: null, groups: [] }

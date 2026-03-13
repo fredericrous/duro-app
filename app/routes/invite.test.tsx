@@ -1,6 +1,11 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest"
 import { render, screen, waitFor, cleanup, act } from "@testing-library/react"
 
+vi.mock("react-router", () => ({
+  redirect: vi.fn(),
+  useParams: () => ({ token: "test-token" }),
+}))
+
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, string>) => {
@@ -74,9 +79,9 @@ describe("InvitePage", () => {
     expect(screen.getByText("Your Certificate Password")).toBeInTheDocument()
     expect(screen.getByDisplayValue("s3cret-pass")).toBeInTheDocument()
 
-    // Cert check shows loading then resolves to warning (fetch rejected)
+    // Cert check resolves to warning (fetch rejected) — wait for "Retry" button
     await waitFor(() => {
-      expect(screen.getByText("Certificate not installed")).toBeInTheDocument()
+      expect(screen.getByText("Retry")).toBeInTheDocument()
     })
   })
 
@@ -142,7 +147,7 @@ describe("InvitePage", () => {
 
     // Continue link should be present and clickable
     const continueLink = screen.getByText("Continue")
-    expect(continueLink.closest("a")).toHaveAttribute("href", "create-account")
+    expect(continueLink.closest("a")).toHaveAttribute("href", "/invite/test-token/create-account")
   })
 
   it("shows consumed password message when p12Password is null", async () => {
@@ -193,8 +198,9 @@ describe("InvitePage", () => {
       render(<InvitePage loaderData={loaderData} actionData={undefined} />)
     })
 
+    // Wait for cert check to resolve (button label changes from "Checking..." to "Retry")
     await waitFor(() => {
-      expect(screen.getByText("Certificate not installed")).toBeInTheDocument()
+      expect(screen.getByText("Retry")).toBeInTheDocument()
     })
 
     const continueBtn = screen.getByText("Continue")

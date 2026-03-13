@@ -134,7 +134,7 @@ let certCheckCount = 0
 
 function checkCert(healthUrl: string): Promise<boolean> {
   certCheckCount++
-  if (import.meta.env.DEV && certCheckCount > 1) {
+  if (import.meta.env.DEV && !import.meta.env.VITEST && certCheckCount > 1) {
     return Promise.resolve(true)
   }
   return fetch(healthUrl, { mode: "cors" })
