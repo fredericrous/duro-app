@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useCallback, useState, useEffect, useRef } from "react"
 import { redirect, useParams } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/invite"
@@ -146,14 +146,22 @@ export default function InvitePage({ loaderData, actionData }: Route.ComponentPr
   const { t } = useTranslation()
   const [certStatus, setCertStatus] = useState<"checking" | "installed" | "not-installed">("checking")
 
-  const recheck = () => {
+  const { healthUrl } = loaderData
+
+  const recheck = useCallback(() => {
     setCertStatus("checking")
-    checkCert(loaderData.healthUrl).then((ok) => setCertStatus(ok ? "installed" : "not-installed"))
-  }
+    checkCert(healthUrl).then((ok) => setCertStatus(ok ? "installed" : "not-installed"))
+  }, [healthUrl])
 
   useEffect(() => {
-    recheck()
-  }, [loaderData.healthUrl])
+    let cancelled = false
+    checkCert(healthUrl).then((ok) => {
+      if (!cancelled) setCertStatus(ok ? "installed" : "not-installed")
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [healthUrl])
 
   if (!loaderData.valid) {
     const { error } = loaderData
@@ -187,7 +195,7 @@ export default function InvitePage({ loaderData, actionData }: Route.ComponentPr
       <PasswordReveal p12Password={loaderData.p12Password} />
 
       {/* Cert Check */}
-      <CertCheck status={certStatus} healthUrl={loaderData.healthUrl} onRecheck={recheck} />
+      <CertCheck status={certStatus} onRecheck={recheck} />
 
       {/* Error */}
       {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
@@ -204,6 +212,7 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
   useEffect(() => {
     try {
       if (localStorage.getItem(`scratch:${window.location.pathname}`) === "1") {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- reading from localStorage
         setRevealed(true)
       }
     } catch {
@@ -269,11 +278,9 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
 
 function CertCheck({
   status,
-  healthUrl,
   onRecheck,
 }: {
   status: "checking" | "installed" | "not-installed"
-  healthUrl: string
   onRecheck: () => void
 }) {
   const { t } = useTranslation()
