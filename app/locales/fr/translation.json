@@ -107,6 +107,11 @@
       "usernameFormat": "Le nom d'utilisateur doit contenir 3 a 32 caracteres (lettres, chiffres, tirets, underscores)",
       "passwordLength": "Le mot de passe doit contenir au moins 12 caracteres",
       "passwordMismatch": "Les mots de passe ne correspondent pas"
+    },
+    "success": {
+      "title": "Compte créé",
+      "message": "Votre compte a été créé avec succès. Vous pouvez maintenant vous connecter.",
+      "goHome": "Aller à l'accueil"
     }
   },
   "reinvite": {

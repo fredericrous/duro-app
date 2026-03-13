@@ -66,9 +66,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     if (invite.usedAt) {
       return {
         valid: false as const,
-        error: "This invite has already been used.",
+        error: "already_used",
         appName: config.appName,
         healthUrl: `${config.homeUrl}/health`,
+        homeUrl: config.homeUrl,
       }
     }
 
@@ -146,8 +147,9 @@ export async function action({ request, params }: Route.ActionArgs) {
         yield* acceptInvite(token, { username, password })
       }),
     )
-    return redirect(`${config.homeUrl}/welcome`)
+    throw redirect(`${config.homeUrl}/welcome`)
   } catch (e) {
+    if (e instanceof Response) throw e
     const message = e instanceof Error ? e.message : "Failed to create account"
     return { error: message }
   }
@@ -167,6 +169,19 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
   })
 
   if (!loaderData.valid) {
+    if (loaderData.error === "already_used") {
+      return (
+        <CenteredCardPage>
+          <Heading level={1}>{t("createAccount.success.title")}</Heading>
+          <Alert variant="success">
+            <p>{t("createAccount.success.message")}</p>
+          </Alert>
+          <a href={loaderData.homeUrl} className={styles.homeLink}>
+            {t("createAccount.success.goHome")}
+          </a>
+        </CenteredCardPage>
+      )
+    }
     return <ErrorCard title={t("createAccount.heading")} message={loaderData.error} />
   }
 

@@ -107,6 +107,11 @@
       "usernameFormat": "Username must be 3-32 characters (letters, numbers, hyphens, underscores)",
       "passwordLength": "Password must be at least 12 characters",
       "passwordMismatch": "Passwords do not match"
+    },
+    "success": {
+      "title": "Account Created",
+      "message": "Your account has been created successfully. You can now sign in.",
+      "goHome": "Go to Home"
     }
   },
   "reinvite": {
