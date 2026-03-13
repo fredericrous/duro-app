@@ -8,7 +8,7 @@ export const DEV_P12_PASSWORD = "dev-p12-s3cret"
 
 export const handlers = [
   // ─── Vault KV: read secret (getP12Password) ───
-  http.get(`${VAULT_ADDR}/v1/secret/data/pki/clients/:id`, ({ params }) => {
+  http.get(`${VAULT_ADDR}/v1/secret/data/pki/clients/:id`, () => {
     return HttpResponse.json({
       data: {
         data: {
