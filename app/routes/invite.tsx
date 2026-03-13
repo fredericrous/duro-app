@@ -1,5 +1,5 @@
-import { Suspense, use, useState, useEffect, useRef } from "react"
-import { redirect } from "react-router"
+import { useState, useEffect, useRef } from "react"
+import { redirect, useParams } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/invite"
 import { runEffect } from "~/lib/runtime.server"
@@ -12,7 +12,7 @@ import { Effect } from "effect"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
-import { Alert, Button } from "@duro-app/ui"
+import { Alert, Button, Heading, Input, InputGroup, Text } from "@duro-app/ui"
 import styles from "./invite.module.css"
 
 export function meta({ data }: Route.MetaArgs) {
@@ -130,24 +130,30 @@ export async function action({ request, params }: Route.ActionArgs) {
   return { error: "Unknown action" }
 }
 
+let certCheckCount = 0
+
 function checkCert(healthUrl: string): Promise<boolean> {
+  certCheckCount++
+  if (import.meta.env.DEV && certCheckCount > 1) {
+    return Promise.resolve(true)
+  }
   return fetch(healthUrl, { mode: "cors" })
     .then((r) => r.ok)
     .catch(() => false)
 }
 
-function buildCertCheckUrl(healthUrl: string): string {
-  if (typeof window === "undefined") return healthUrl
-  const returnTo = window.location.href
-  return `${healthUrl}?return=${encodeURIComponent(returnTo)}`
-}
-
 export default function InvitePage({ loaderData, actionData }: Route.ComponentProps) {
   const { t } = useTranslation()
-  const [certPromise] = useState(() => {
-    if (typeof window === "undefined") return new Promise<boolean>(() => {})
-    return checkCert(loaderData.healthUrl)
-  })
+  const [certStatus, setCertStatus] = useState<"checking" | "installed" | "not-installed">("checking")
+
+  const recheck = () => {
+    setCertStatus("checking")
+    checkCert(loaderData.healthUrl).then((ok) => setCertStatus(ok ? "installed" : "not-installed"))
+  }
+
+  useEffect(() => {
+    recheck()
+  }, [loaderData.healthUrl])
 
   if (!loaderData.valid) {
     const { error } = loaderData
@@ -165,23 +171,21 @@ export default function InvitePage({ loaderData, actionData }: Route.ComponentPr
 
   return (
     <CenteredCardPage>
-      <h1>{t("invite.title", { appName: loaderData.appName })}</h1>
+      <Heading level={1}>{t("invite.title", { appName: loaderData.appName })}</Heading>
       <p
         className={styles.subtitle}
         dangerouslySetInnerHTML={{ __html: t("invite.subtitle", { email: loaderData.email }) }}
       />
 
       {loaderData.groupNames && loaderData.groupNames.length > 0 && (
-        <p className={styles.groupsInfo}>{t("invite.groupsLabel", { groups: loaderData.groupNames.join(", ") })}</p>
+        <Text variant="bodySm" color="muted" as="p">{t("invite.groupsLabel", { groups: loaderData.groupNames.join(", ") })}</Text>
       )}
 
       {/* P12 Password Section */}
       <PasswordReveal p12Password={loaderData.p12Password} />
 
       {/* Cert Check */}
-      <Suspense fallback={<CertCheckLoading />}>
-        <CertCheckResult certPromise={certPromise} healthUrl={loaderData.healthUrl} />
-      </Suspense>
+      <CertCheck status={certStatus} healthUrl={loaderData.healthUrl} onRecheck={recheck} />
 
       {/* Error */}
       {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
@@ -191,18 +195,18 @@ export default function InvitePage({ loaderData, actionData }: Route.ComponentPr
 
 function PasswordReveal({ p12Password }: { p12Password: string | null }) {
   const { t } = useTranslation()
-  const [revealed, setRevealed] = useState(() => {
-    if (typeof window === "undefined") return false
-    try {
-      return localStorage.getItem(`scratch:${window.location.pathname}`) === "1"
-    } catch {
-      return false
-    }
-  })
+  const [revealed, setRevealed] = useState(false)
   const [copied, setCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
 
   useEffect(() => {
+    try {
+      if (localStorage.getItem(`scratch:${window.location.pathname}`) === "1") {
+        setRevealed(true)
+      }
+    } catch {
+      // localStorage may be unavailable in private browsing
+    }
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
@@ -221,7 +225,7 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
     return (
       <div className={styles.section}>
         <Alert variant="info">
-          <h2 className={styles.sectionTitle}>{t("invite.password.title")}</h2>
+          <Heading level={2} variant="headingSm">{t("invite.password.title")}</Heading>
           <p>{t("invite.password.consumed")}</p>
         </Alert>
       </div>
@@ -231,28 +235,25 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
   return (
     <div className={styles.section}>
       <Alert variant="info">
-        <h2 className={styles.sectionTitle}>{t("invite.password.title")}</h2>
+        <Heading level={2} variant="headingSm">{t("invite.password.title")}</Heading>
         <p>{t("invite.password.warning")}</p>
-        <ScratchCard width={320} height={48} onReveal={handleReveal}>
-          <div className={styles.passwordPlaceholder}>
-            <code>{p12Password}</code>
-          </div>
-        </ScratchCard>
+        <InputGroup.Root>
+          <ScratchCard width={320} height={48} onReveal={handleReveal} className={styles.scratchInline}>
+            <Input defaultValue={p12Password} />
+          </ScratchCard>
+          <InputGroup.Addon
+            disabled={!revealed}
+            onClick={() => {
+              navigator.clipboard.writeText(p12Password)
+              setCopied(true)
+              if (timerRef.current) clearTimeout(timerRef.current)
+              timerRef.current = setTimeout(() => setCopied(false), 2000)
+            }}
+          >
+            {copied ? t("invite.password.copied") : t("invite.password.copy")}
+          </InputGroup.Addon>
+        </InputGroup.Root>
         <div style={!revealed ? { visibility: "hidden" } : undefined}>
-          <div className={styles.passwordCopyRow}>
-            <Button
-              variant="secondary"
-              size="small"
-              onClick={() => {
-                navigator.clipboard.writeText(p12Password)
-                setCopied(true)
-                if (timerRef.current) clearTimeout(timerRef.current)
-                timerRef.current = setTimeout(() => setCopied(false), 2000)
-              }}
-            >
-              {copied ? t("invite.password.copied") : t("invite.password.copy")}
-            </Button>
-          </div>
           <p>{t("invite.password.oneTime")}</p>
         </div>
       </Alert>
@@ -260,36 +261,30 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
   )
 }
 
-function CertCheckLoading() {
+function CertCheck({ status, healthUrl, onRecheck }: { status: "checking" | "installed" | "not-installed"; healthUrl: string; onRecheck: () => void }) {
   const { t } = useTranslation()
-  return (
-    <div className={styles.certCheck}>
-      <p className={`${styles.certStatus} ${styles.certStatusChecking}`}>{t("invite.cert.checking")}</p>
-    </div>
-  )
-}
-
-function CertCheckResult({ certPromise, healthUrl }: { certPromise: Promise<boolean>; healthUrl: string }) {
-  const { t } = useTranslation()
-  const installed = use(certPromise)
+  const { token } = useParams()
+  const installed = status === "installed"
 
   return (
-    <div className={styles.certCheck}>
-      <Alert variant={installed ? "success" : "warning"}>
-        {installed ? (
-          <p>{t("invite.cert.detected")}</p>
-        ) : (
-          <div className={styles.certWarningContent}>
-            <p>{t("invite.cert.notInstalled")}</p>
-            <p className={styles.certHint}>{t("invite.cert.hint")}</p>
-            <a href={buildCertCheckUrl(healthUrl)} className={styles.btnRetry}>
-              {t("invite.cert.retry")}
-            </a>
-          </div>
-        )}
-      </Alert>
+    <>
+      <div className={styles.certCheck}>
+        <Alert variant={installed ? "success" : "warning"}>
+          {installed ? (
+            <p>{t("invite.cert.detected")}</p>
+          ) : (
+            <div className={styles.certWarningContent}>
+              <p className={status === "checking" ? styles.certTextHidden : undefined}>{t("invite.cert.notInstalled")}</p>
+              <p className={status === "checking" ? styles.certTextHidden : styles.certHint}>{t("invite.cert.hint")}</p>
+              <button type="button" onClick={onRecheck} className={styles.btnRetry} disabled={status === "checking"} tabIndex={status === "checking" ? -1 : undefined}>
+                {status === "checking" ? t("invite.cert.checking") : t("invite.cert.retry")}
+              </button>
+            </div>
+          )}
+        </Alert>
+      </div>
       {installed ? (
-        <a href="create-account" className={styles.continueLink}>
+        <a href={`/invite/${token}/create-account`} className={styles.continueLink}>
           {t("invite.cert.continue")}
         </a>
       ) : (
@@ -297,6 +292,6 @@ function CertCheckResult({ certPromise, healthUrl }: { certPromise: Promise<bool
           {t("invite.cert.continue")}
         </Button>
       )}
-    </div>
+    </>
   )
 }

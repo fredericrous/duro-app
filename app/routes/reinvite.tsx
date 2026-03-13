@@ -11,7 +11,7 @@ import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
 import { Effect } from "effect"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
-import { Alert, Button, StatusIcon } from "@duro-app/ui"
+import { Alert, Button, Heading, StatusIcon } from "@duro-app/ui"
 import local from "./reinvite.module.css"
 
 export function meta({ data }: Route.MetaArgs) {
@@ -144,7 +144,7 @@ export default function ReinvitePage({ loaderData, actionData }: Route.Component
     return (
       <CenteredCardPage>
         <StatusIcon name="check-done" variant="success" />
-        <h1>{t("reinvite.success.title")}</h1>
+        <Heading level={1}>{t("reinvite.success.title")}</Heading>
         <p
           className={local.infoText}
           dangerouslySetInnerHTML={{ __html: t("reinvite.success.message", { email: actionData.email }) }}
@@ -159,7 +159,7 @@ export default function ReinvitePage({ loaderData, actionData }: Route.Component
 
   return (
     <CenteredCardPage>
-      <h1>{t("reinvite.heading")}</h1>
+      <Heading level={1}>{t("reinvite.heading")}</Heading>
       <p
         className={local.infoText}
         dangerouslySetInnerHTML={{ __html: t("reinvite.message", { email: loaderData.email }) }}

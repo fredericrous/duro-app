@@ -1,6 +1,5 @@
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
-import { StatusIcon } from "@duro-app/ui"
-import styles from "./ErrorCard.module.css"
+import { Heading, StatusIcon, Text } from "@duro-app/ui"
 
 interface ErrorCardProps {
   icon?: "x-circle" | "clock" | "check-done"
@@ -12,8 +11,8 @@ export function ErrorCard({ icon = "x-circle", title, message }: ErrorCardProps)
   return (
     <CenteredCardPage>
       <StatusIcon name={icon} variant="error" />
-      <h1>{title}</h1>
-      <p className={styles.message}>{message}</p>
+      <Heading level={1}>{title}</Heading>
+      <Text variant="bodyLg" color="muted" as="p">{message}</Text>
     </CenteredCardPage>
   )
 }

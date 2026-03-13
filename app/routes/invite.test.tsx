@@ -72,7 +72,7 @@ describe("InvitePage", () => {
 
     // Password section
     expect(screen.getByText("Your Certificate Password")).toBeInTheDocument()
-    expect(screen.getByText("s3cret-pass")).toBeInTheDocument()
+    expect(screen.getByDisplayValue("s3cret-pass")).toBeInTheDocument()
 
     // Cert check shows loading then resolves to warning (fetch rejected)
     await waitFor(() => {

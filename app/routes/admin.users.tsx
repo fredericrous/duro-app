@@ -8,10 +8,9 @@ import { config } from "~/lib/config.server"
 import { InviteRepo, type Revocation } from "~/lib/services/InviteRepo.server"
 import { revokeUser, resendCert } from "~/lib/workflows/invite.server"
 import { Effect } from "effect"
-import { Button, Input } from "@duro-app/ui"
+import { Button, Inline, Input } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import s from "./admin.shared.module.css"
-import u from "./admin.users.module.css"
 
 export async function loader() {
   const [users, revocations] = await Promise.all([
@@ -182,7 +181,7 @@ function UserRow({
         <td>{new Date(user.creationDate).toLocaleDateString()}</td>
         <td>
           {!isSystem && (
-            <div className={s.actionBtns}>
+            <Inline gap="sm">
               <certFetcher.Form method="post">
                 <input type="hidden" name="intent" value="resendCert" />
                 <input type="hidden" name="username" value={user.id} />
@@ -200,24 +199,26 @@ function UserRow({
               >
                 {t("admin.users.actions.revoke")}
               </Button>
-            </div>
+            </Inline>
           )}
         </td>
       </tr>
       {isRevokeVisible && (
         <tr>
           <td colSpan={5}>
-            <revokeFetcher.Form method="post" className={u.inlineRevokeForm}>
-              <input type="hidden" name="intent" value="revokeUser" />
-              <input type="hidden" name="username" value={user.id} />
-              <input type="hidden" name="email" value={user.email} />
-              <Input name="reason" type="text" placeholder={t("admin.users.actions.reasonPlaceholder")} />
-              <Button type="submit" variant="danger" disabled={isRevoking}>
-                {isRevoking ? t("admin.users.actions.revoking") : t("admin.users.actions.confirmRevoke")}
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setShowRevoke(false)}>
-                {t("common.cancel")}
-              </Button>
+            <revokeFetcher.Form method="post">
+              <Inline gap="sm" align="center">
+                <input type="hidden" name="intent" value="revokeUser" />
+                <input type="hidden" name="username" value={user.id} />
+                <input type="hidden" name="email" value={user.email} />
+                <Input name="reason" type="text" placeholder={t("admin.users.actions.reasonPlaceholder")} />
+                <Button type="submit" variant="danger" disabled={isRevoking}>
+                  {isRevoking ? t("admin.users.actions.revoking") : t("admin.users.actions.confirmRevoke")}
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => setShowRevoke(false)}>
+                  {t("common.cancel")}
+                </Button>
+              </Inline>
             </revokeFetcher.Form>
           </td>
         </tr>

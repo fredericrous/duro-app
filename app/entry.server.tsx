@@ -1,3 +1,7 @@
+if (import.meta.env.DEV) {
+  await import("./mocks/dev-setup.server")
+}
+
 import { isbot } from "isbot"
 import { renderToPipeableStream } from "react-dom/server"
 import { ServerRouter } from "react-router"

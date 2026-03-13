@@ -20,13 +20,3 @@
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid rgba(51, 51, 51, 0.5);
 }
-
-.emptyState {
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
-}
-
-.actionBtns {
-  display: flex;
-  gap: 0.5rem;
-}

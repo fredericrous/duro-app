@@ -3,54 +3,19 @@
   margin-bottom: 0.5rem;
 }
 
-.groupsInfo {
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
-  margin-bottom: 1.5rem;
-}
-
 .section {
   margin-bottom: 1.5rem;
 }
 
-.sectionTitle {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-bottom: 0.75rem;
-}
-
-.passwordPlaceholder {
-  display: flex;
-  align-items: center;
-  height: 100%;
-  padding: 0 0.75rem;
-  background: var(--color-bg);
-}
-
-.passwordPlaceholder code {
-  font-size: 0.8rem;
-  color: #e5e5e5;
-  letter-spacing: 0.05em;
-  word-break: break-all;
-}
-
-.passwordCopyRow {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 0.5rem;
+.scratchInline {
+  flex: 1;
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0;
 }
 
 .certCheck {
   margin-bottom: 1.5rem;
-}
-
-.certStatus {
-  font-size: 0.875rem;
-  padding: 0.5rem 0;
-}
-
-.certStatusChecking {
-  color: var(--color-text-muted);
 }
 
 .certWarningContent {
@@ -65,6 +30,10 @@
 
 .certHint {
   color: var(--color-text-muted) !important;
+}
+
+.certTextHidden {
+  visibility: hidden;
 }
 
 .btnRetry {

@@ -7,6 +7,8 @@ export interface AuthInfo {
   groups: string[]
 }
 
+const DEV_AUTH: AuthInfo = { user: "dev", groups: ["family", "media", "lldap_admin"] }
+
 /**
  * Require authentication. Returns AuthInfo if the user has a valid session,
  * or throws a redirect to the OIDC login flow.
@@ -15,6 +17,10 @@ export async function requireAuth(request: Request): Promise<AuthInfo> {
   const session = await getSession(request)
   if (session) {
     return { user: session.name, groups: session.groups }
+  }
+
+  if (import.meta.env.DEV) {
+    return DEV_AUTH
   }
 
   const { authorizationUrl, codeVerifier, state } = await buildAuthRequest()
@@ -32,8 +38,11 @@ export async function requireAuth(request: Request): Promise<AuthInfo> {
  */
 export async function getAuth(request: Request): Promise<AuthInfo> {
   const session = await getSession(request)
-  return {
-    user: session?.name ?? null,
-    groups: session?.groups ?? [],
+  if (session) {
+    return { user: session.name, groups: session.groups }
   }
+  if (import.meta.env.DEV) {
+    return DEV_AUTH
+  }
+  return { user: null, groups: [] }
 }

@@ -8,7 +8,7 @@ import { config } from "~/lib/config.server"
 import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
 import { queueInvite, revokeInvite } from "~/lib/workflows/invite.server"
 import { Effect } from "effect"
-import { Alert, Badge, Button, Field, Input } from "@duro-app/ui"
+import { Alert, Badge, Button, Cluster, Field, Inline, Input, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 import s from "./admin.shared.module.css"
@@ -259,14 +259,14 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
 
           <Field.Root>
             <Field.Label>{t("admin.invites.groupsLabel")}</Field.Label>
-            <div className={inv.checkboxGrid}>
+            <Cluster gap="ms">
               {groups.map((g) => (
                 <label key={g.id} className={inv.checkboxLabel}>
                   <input type="checkbox" name="groups" value={`${g.id}|${g.displayName}`} />
                   <span>{g.displayName}</span>
                 </label>
               ))}
-            </div>
+            </Cluster>
           </Field.Root>
 
           <Field.Root>
@@ -306,7 +306,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
       {/* Active Invites */}
       <CardSection title={`${t("admin.invites.activeTitle")} (${pendingInvites.length})`}>
         {pendingInvites.length === 0 ? (
-          <p className={s.emptyState}>{t("admin.invites.noActive")}</p>
+          <Text variant="bodySm" color="muted" as="p">{t("admin.invites.noActive")}</Text>
         ) : (
           <div className={s.tableContainer}>
             <table className={s.table}>
@@ -350,7 +350,7 @@ function PendingInviteRow({ invite }: { invite: Invite }) {
       <td>{invite.invitedBy}</td>
       <td>{new Date(invite.expiresAt).toLocaleDateString()}</td>
       <td>
-        <div className={s.actionBtns}>
+        <Inline gap="sm">
           <resendFetcher.Form method="post">
             <input type="hidden" name="intent" value="resend" />
             <input type="hidden" name="inviteId" value={invite.id} />
@@ -365,7 +365,7 @@ function PendingInviteRow({ invite }: { invite: Invite }) {
               {isRevoking ? t("admin.invites.action.revoking") : t("admin.invites.action.revoke")}
             </Button>
           </revokeFetcher.Form>
-        </div>
+        </Inline>
       </td>
     </tr>
   )
@@ -384,7 +384,7 @@ function FailedInviteRow({ invite }: { invite: Invite }) {
       <td className={inv.errorText}>{invite.lastError ?? "Unknown error"}</td>
       <td>{invite.failedAt ? new Date(invite.failedAt).toLocaleString() : "\u2014"}</td>
       <td>
-        <div className={s.actionBtns}>
+        <Inline gap="sm">
           <retryFetcher.Form method="post">
             <input type="hidden" name="intent" value="retry" />
             <input type="hidden" name="inviteId" value={invite.id} />
@@ -399,7 +399,7 @@ function FailedInviteRow({ invite }: { invite: Invite }) {
               {isRevoking ? t("admin.invites.action.revoking") : t("admin.invites.action.revoke")}
             </Button>
           </revokeFetcher.Form>
-        </div>
+        </Inline>
       </td>
     </tr>
   )

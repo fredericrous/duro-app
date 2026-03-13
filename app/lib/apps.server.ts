@@ -1,6 +1,7 @@
 import { readFileSync } from "fs"
 import { createHash } from "crypto"
 import type { AppDefinition } from "./apps"
+import { devApps } from "~/mocks/dev-apps"
 
 const APPS_JSON_PATH = "/data/apps.json"
 
@@ -26,10 +27,10 @@ export function loadApps(): AppDefinition[] {
 
 export function getVisibleApps(userGroups: string[]): AppDefinition[] {
   const apps = loadApps()
-  return apps.filter((app) => app.groups.some((group) => userGroups.includes(group)))
+  return apps.filter((app) => app.groups.length === 0 || app.groups.some((group) => userGroups.includes(group)))
 }
 
 export function getDefaultApps(): AppDefinition[] {
-  // Provide your apps via /data/apps.json
+  if (import.meta.env.DEV) return devApps
   return []
 }

@@ -7,7 +7,7 @@ import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { Effect } from "effect"
 import { supportedLngs } from "~/lib/i18n"
 import { localeCookieHeader, resolveLocale } from "~/lib/i18n.server"
-import { Alert, Button, Field } from "@duro-app/ui"
+import { Alert, Button, Field, Heading, Stack } from "@duro-app/ui"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 import styles from "./settings.module.css"
 
@@ -54,20 +54,22 @@ export default function SettingsPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <main className={styles.page}>
-      <h1 className={styles.heading}>{t("settings.heading")}</h1>
+      <Heading level={1}>{t("settings.heading")}</Heading>
 
       {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
 
-      <fetcher.Form method="post" className={styles.form}>
-        <Field.Root>
-          <Field.Label>{t("settings.languageLabel")}</Field.Label>
-          <LanguageSelect defaultValue={loaderData.locale} />
-          <Field.Description>{t("settings.languageHint")}</Field.Description>
-        </Field.Root>
+      <fetcher.Form method="post">
+        <Stack gap="lg">
+          <Field.Root>
+            <Field.Label>{t("settings.languageLabel")}</Field.Label>
+            <LanguageSelect defaultValue={loaderData.locale} />
+            <Field.Description>{t("settings.languageHint")}</Field.Description>
+          </Field.Root>
 
-        <Button type="submit" variant="primary">
-          {t("common.save")}
-        </Button>
+          <Button type="submit" variant="primary">
+            {t("common.save")}
+          </Button>
+        </Stack>
       </fetcher.Form>
     </main>
   )

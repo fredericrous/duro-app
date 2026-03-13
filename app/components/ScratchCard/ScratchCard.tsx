@@ -8,6 +8,7 @@ interface ScratchCardProps {
   onReveal: () => void
   onScratchStart?: () => void
   label?: string
+  className?: string
   children: ReactNode
 }
 
@@ -32,6 +33,7 @@ export function ScratchCard({
   onReveal,
   onScratchStart,
   label = "Scratch to reveal",
+  className,
   children,
 }: ScratchCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -115,7 +117,7 @@ export function ScratchCard({
   }
 
   return (
-    <div className={styles.container} style={{ width, height }}>
+    <div className={`${styles.container}${className ? ` ${className}` : ""}`} style={{ width, height }}>
       {children}
       {!fadeOut && (
         <canvas

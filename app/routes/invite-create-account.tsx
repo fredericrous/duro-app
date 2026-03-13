@@ -10,7 +10,7 @@ import { hashToken } from "~/lib/crypto.server"
 import { Effect } from "effect"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
-import { Alert, Button, Field, Input } from "@duro-app/ui"
+import { Alert, Button, Field, Heading, Input } from "@duro-app/ui"
 import { config } from "~/lib/config.server"
 import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
 import styles from "./invite-create-account.module.css"
@@ -172,7 +172,7 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
 
   return (
     <CenteredCardPage>
-      <h1>{t("createAccount.heading")}</h1>
+      <Heading level={1}>{t("createAccount.heading")}</Heading>
       <p
         className={styles.subtitle}
         dangerouslySetInnerHTML={{ __html: t("createAccount.subtitle", { email: loaderData.email }) }}
@@ -200,7 +200,7 @@ function CertGate({
   if (!certInstalled) {
     return (
       <Alert variant="warning">
-        <h2 className={styles.certWarningTitle}>{t("createAccount.certRequired.title")}</h2>
+        <Heading level={2} variant="headingSm">{t("createAccount.certRequired.title")}</Heading>
         <p>{t("createAccount.certRequired.message")}</p>
         <a href=".." className={styles.certBackLink}>
           {t("createAccount.certRequired.back")}

@@ -1,5 +1,5 @@
 import type { AppDefinition } from "~/lib/apps"
-import { Card } from "@duro-app/ui"
+import { Card, Text } from "@duro-app/ui"
 import { Icon } from "../Icon"
 import styles from "./AppCard.module.css"
 
@@ -15,7 +15,7 @@ export function AppCard({ app }: AppCardProps) {
           <div className={styles.icon}>
             <Icon svg={app.icon} size={32} />
           </div>
-          <span className={styles.name}>{app.name}</span>
+          <Text variant="label">{app.name}</Text>
         </div>
       </Card>
     </a>
