@@ -306,7 +306,9 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
       {/* Active Invites */}
       <CardSection title={`${t("admin.invites.activeTitle")} (${pendingInvites.length})`}>
         {pendingInvites.length === 0 ? (
-          <Text variant="bodySm" color="muted" as="p">{t("admin.invites.noActive")}</Text>
+          <Text variant="bodySm" color="muted" as="p">
+            {t("admin.invites.noActive")}
+          </Text>
         ) : (
           <div className={s.tableContainer}>
             <table className={s.table}>

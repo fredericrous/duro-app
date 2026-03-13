@@ -15,8 +15,12 @@ export function NoAccess({ user }: NoAccessProps) {
         <StatusIcon name="forbidden" size={64} />
       </div>
       <Heading level={1}>{t("noAccess.title")}</Heading>
-      <Text variant="bodyLg" color="muted" as="p">{user ? t("noAccess.messageUser", { user }) : t("noAccess.messageAnon")}</Text>
-      <Text variant="bodySm" color="muted" as="p">{t("noAccess.hint")}</Text>
+      <Text variant="bodyLg" color="muted" as="p">
+        {user ? t("noAccess.messageUser", { user }) : t("noAccess.messageAnon")}
+      </Text>
+      <Text variant="bodySm" color="muted" as="p">
+        {t("noAccess.hint")}
+      </Text>
     </div>
   )
 }

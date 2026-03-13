@@ -12,7 +12,9 @@ export function ErrorCard({ icon = "x-circle", title, message }: ErrorCardProps)
     <CenteredCardPage>
       <StatusIcon name={icon} variant="error" />
       <Heading level={1}>{title}</Heading>
-      <Text variant="bodyLg" color="muted" as="p">{message}</Text>
+      <Text variant="bodyLg" color="muted" as="p">
+        {message}
+      </Text>
     </CenteredCardPage>
   )
 }

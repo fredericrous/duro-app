@@ -27,7 +27,9 @@ export default function WelcomePage({ loaderData }: Route.ComponentProps) {
       </div>
 
       <Heading level={1}>{t("welcome.heading", { user })}</Heading>
-      <Text color="muted" as="p">{t("welcome.message")}</Text>
+      <Text color="muted" as="p">
+        {t("welcome.message")}
+      </Text>
 
       <Link to="/" className={styles.ctaLink}>
         <Button variant="primary">{t("welcome.cta")}</Button>

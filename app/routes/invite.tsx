@@ -178,7 +178,9 @@ export default function InvitePage({ loaderData, actionData }: Route.ComponentPr
       />
 
       {loaderData.groupNames && loaderData.groupNames.length > 0 && (
-        <Text variant="bodySm" color="muted" as="p">{t("invite.groupsLabel", { groups: loaderData.groupNames.join(", ") })}</Text>
+        <Text variant="bodySm" color="muted" as="p">
+          {t("invite.groupsLabel", { groups: loaderData.groupNames.join(", ") })}
+        </Text>
       )}
 
       {/* P12 Password Section */}
@@ -225,7 +227,9 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
     return (
       <div className={styles.section}>
         <Alert variant="info">
-          <Heading level={2} variant="headingSm">{t("invite.password.title")}</Heading>
+          <Heading level={2} variant="headingSm">
+            {t("invite.password.title")}
+          </Heading>
           <p>{t("invite.password.consumed")}</p>
         </Alert>
       </div>
@@ -235,7 +239,9 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
   return (
     <div className={styles.section}>
       <Alert variant="info">
-        <Heading level={2} variant="headingSm">{t("invite.password.title")}</Heading>
+        <Heading level={2} variant="headingSm">
+          {t("invite.password.title")}
+        </Heading>
         <p>{t("invite.password.warning")}</p>
         <InputGroup.Root>
           <ScratchCard width={320} height={48} onReveal={handleReveal} className={styles.scratchInline}>
@@ -261,7 +267,15 @@ function PasswordReveal({ p12Password }: { p12Password: string | null }) {
   )
 }
 
-function CertCheck({ status, healthUrl, onRecheck }: { status: "checking" | "installed" | "not-installed"; healthUrl: string; onRecheck: () => void }) {
+function CertCheck({
+  status,
+  healthUrl,
+  onRecheck,
+}: {
+  status: "checking" | "installed" | "not-installed"
+  healthUrl: string
+  onRecheck: () => void
+}) {
   const { t } = useTranslation()
   const { token } = useParams()
   const installed = status === "installed"
@@ -274,9 +288,17 @@ function CertCheck({ status, healthUrl, onRecheck }: { status: "checking" | "ins
             <p>{t("invite.cert.detected")}</p>
           ) : (
             <div className={styles.certWarningContent}>
-              <p className={status === "checking" ? styles.certTextHidden : undefined}>{t("invite.cert.notInstalled")}</p>
+              <p className={status === "checking" ? styles.certTextHidden : undefined}>
+                {t("invite.cert.notInstalled")}
+              </p>
               <p className={status === "checking" ? styles.certTextHidden : styles.certHint}>{t("invite.cert.hint")}</p>
-              <button type="button" onClick={onRecheck} className={styles.btnRetry} disabled={status === "checking"} tabIndex={status === "checking" ? -1 : undefined}>
+              <button
+                type="button"
+                onClick={onRecheck}
+                className={styles.btnRetry}
+                disabled={status === "checking"}
+                tabIndex={status === "checking" ? -1 : undefined}
+              >
                 {status === "checking" ? t("invite.cert.checking") : t("invite.cert.retry")}
               </button>
             </div>

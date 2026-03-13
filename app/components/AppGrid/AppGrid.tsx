@@ -30,7 +30,9 @@ export function AppGrid({ apps, categoryOrder }: AppGridProps) {
         return (
           <section key={category}>
             <Stack gap="md">
-              <Text variant="overline" color="muted" as="div">{categoryLabel(category)}</Text>
+              <Text variant="overline" color="muted" as="div">
+                {categoryLabel(category)}
+              </Text>
               <div className={styles.grid}>
                 {categoryApps.map((app) => (
                   <AppCard key={app.id} app={app} />

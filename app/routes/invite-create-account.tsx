@@ -200,7 +200,9 @@ function CertGate({
   if (!certInstalled) {
     return (
       <Alert variant="warning">
-        <Heading level={2} variant="headingSm">{t("createAccount.certRequired.title")}</Heading>
+        <Heading level={2} variant="headingSm">
+          {t("createAccount.certRequired.title")}
+        </Heading>
         <p>{t("createAccount.certRequired.message")}</p>
         <a href=".." className={styles.certBackLink}>
           {t("createAccount.certRequired.back")}

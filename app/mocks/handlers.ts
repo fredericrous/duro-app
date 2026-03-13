@@ -66,7 +66,9 @@ export const handlers = [
     if (query.includes("users")) {
       return HttpResponse.json({
         data: {
-          users: [{ id: "admin", email: "admin@example.com", displayName: "Admin", creationDate: new Date().toISOString() }],
+          users: [
+            { id: "admin", email: "admin@example.com", displayName: "Admin", creationDate: new Date().toISOString() },
+          ],
         },
       })
     }
