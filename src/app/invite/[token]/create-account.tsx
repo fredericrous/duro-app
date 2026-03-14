@@ -7,7 +7,27 @@ import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { CertGate } from "~/components/CertGate/CertGate"
 import { Alert, Heading } from "@duro-app/ui"
-import styles from "~/routes/invite-create-account.module.css"
+import { css, html } from "react-strict-dom"
+
+const styles = css.create({
+  checkingCert: {
+    color: "#999",
+    fontSize: "0.875rem",
+  },
+  homeLink: {
+    display: "block",
+    width: "100%",
+    marginTop: 16,
+    padding: "8px 16px",
+    borderRadius: 4,
+    fontSize: "0.875rem",
+    fontWeight: "500",
+    textAlign: "center",
+    textDecoration: "none",
+    backgroundColor: "#6366f1",
+    color: "#fff",
+  },
+})
 
 type CreateAccountLoaderData =
   | { valid: false; error: string; appName: string; healthUrl: string; homeUrl?: string }
@@ -74,7 +94,7 @@ export default function CreateAccountPage() {
         <CenteredCardPage>
           <Heading level={1}>{t("createAccount.success.title")}</Heading>
           <Alert variant="success"><p>{t("createAccount.success.message")}</p></Alert>
-          <a href={loaderData.homeUrl} className={styles.homeLink}>{t("createAccount.success.goHome")}</a>
+          <html.a href={loaderData.homeUrl} style={styles.homeLink}>{t("createAccount.success.goHome")}</html.a>
         </CenteredCardPage>
       )
     }
@@ -84,8 +104,8 @@ export default function CreateAccountPage() {
   return (
     <CenteredCardPage>
       <Heading level={1}>{t("createAccount.heading")}</Heading>
-      <p className={styles.subtitle} dangerouslySetInnerHTML={{ __html: t("createAccount.subtitle", { email: loaderData.email }) }} />
-      <Suspense fallback={<p className={styles.checkingCert}>{t("createAccount.certCheck")}</p>}>
+      <p style={{ color: "#999", marginBottom: 16 }} dangerouslySetInnerHTML={{ __html: t("createAccount.subtitle", { email: loaderData.email }) }} />
+      <Suspense fallback={<html.p style={styles.checkingCert}>{t("createAccount.certCheck")}</html.p>}>
         <CertGate certPromise={certPromise} actionData={undefined} />
       </Suspense>
     </CenteredCardPage>

@@ -3,7 +3,16 @@ import { useTranslation } from "react-i18next"
 import { useScratchReveal } from "~/hooks/useScratchReveal"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
 import { Alert, Heading, Input, InputGroup } from "@duro-app/ui"
-import styles from "~/routes/invite.module.css"
+import { css, html } from "react-strict-dom"
+
+const styles = css.create({
+  section: {
+    marginBottom: 24,
+  },
+  oneTimeHidden: {
+    visibility: "hidden",
+  },
+})
 
 export function InvitePasswordReveal({ p12Password }: { p12Password: string | null }) {
   const { t } = useTranslation()
@@ -13,26 +22,26 @@ export function InvitePasswordReveal({ p12Password }: { p12Password: string | nu
 
   if (!p12Password) {
     return (
-      <div className={styles.section}>
+      <html.div style={styles.section}>
         <Alert variant="info">
           <Heading level={2} variant="headingSm">
             {t("invite.password.title")}
           </Heading>
-          <p>{t("invite.password.consumed")}</p>
+          <html.p>{t("invite.password.consumed")}</html.p>
         </Alert>
-      </div>
+      </html.div>
     )
   }
 
   return (
-    <div className={styles.section}>
+    <html.div style={styles.section}>
       <Alert variant="info">
         <Heading level={2} variant="headingSm">
           {t("invite.password.title")}
         </Heading>
-        <p>{t("invite.password.warning")}</p>
+        <html.p>{t("invite.password.warning")}</html.p>
         <InputGroup.Root>
-          <ScratchCard width={320} height={48} onReveal={onReveal} className={styles.scratchInline}>
+          <ScratchCard width={320} height={48} onReveal={onReveal}>
             <Input defaultValue={p12Password} />
           </ScratchCard>
           <InputGroup.Addon
@@ -47,10 +56,10 @@ export function InvitePasswordReveal({ p12Password }: { p12Password: string | nu
             {copied ? t("invite.password.copied") : t("invite.password.copy")}
           </InputGroup.Addon>
         </InputGroup.Root>
-        <div style={!revealed ? { visibility: "hidden" } : undefined}>
-          <p>{t("invite.password.oneTime")}</p>
-        </div>
+        <html.div style={!revealed ? styles.oneTimeHidden : undefined}>
+          <html.p>{t("invite.password.oneTime")}</html.p>
+        </html.div>
       </Alert>
-    </div>
+    </html.div>
   )
 }

@@ -7,7 +7,14 @@ import type { Revocation } from "~/lib/services/InviteRepo.server"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { UserRow } from "~/components/admin/UserRow"
 import { RevokedUserRow } from "~/components/admin/RevokedUserRow"
-import s from "~/routes/admin.shared.module.css"
+import { Table } from "@duro-app/ui"
+import { css, html } from "react-strict-dom"
+
+const s = css.create({
+  tableContainer: {
+    overflowX: "auto",
+  },
+})
 
 interface User {
   id: string
@@ -82,18 +89,18 @@ export default function AdminUsersPage() {
   return (
     <>
       <CardSection title={`${t("admin.users.title")} (${users.length})`}>
-        <div className={s.tableContainer}>
-          <table className={s.table}>
-            <thead>
-              <tr>
-                <th>{t("admin.users.cols.username")}</th>
-                <th>{t("admin.users.cols.displayName")}</th>
-                <th>{t("admin.users.cols.email")}</th>
-                <th>{t("admin.users.cols.created")}</th>
-                <th>{t("admin.users.cols.actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
+        <html.div style={s.tableContainer}>
+          <Table.Root columns={5}>
+            <Table.Header>
+              <Table.Row>
+                <Table.HeaderCell>{t("admin.users.cols.username")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.users.cols.displayName")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.users.cols.email")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.users.cols.created")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.users.cols.actions")}</Table.HeaderCell>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
               {users.map((user) => (
                 <UserRow
                   key={user.id}
@@ -102,32 +109,32 @@ export default function AdminUsersPage() {
                   certs={certsByUser[user.id] ?? []}
                 />
               ))}
-            </tbody>
-          </table>
-        </div>
+            </Table.Body>
+          </Table.Root>
+        </html.div>
       </CardSection>
 
       {revocations.length > 0 && (
         <CardSection title={`${t("admin.users.revokedTitle")} (${revocations.length})`}>
-          <div className={s.tableContainer}>
-            <table className={s.table}>
-              <thead>
-                <tr>
-                  <th>{t("admin.users.cols.email")}</th>
-                  <th>{t("admin.users.cols.username")}</th>
-                  <th>{t("admin.users.cols.reason")}</th>
-                  <th>{t("admin.users.cols.revoked")}</th>
-                  <th>{t("admin.users.cols.by")}</th>
-                  <th>{t("admin.users.cols.actions")}</th>
-                </tr>
-              </thead>
-              <tbody>
+          <html.div style={s.tableContainer}>
+            <Table.Root columns={6}>
+              <Table.Header>
+                <Table.Row>
+                  <Table.HeaderCell>{t("admin.users.cols.email")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.users.cols.username")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.users.cols.reason")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.users.cols.revoked")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.users.cols.by")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.users.cols.actions")}</Table.HeaderCell>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
                 {revocations.map((r) => (
                   <RevokedUserRow key={r.id} revocation={r} />
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </Table.Body>
+            </Table.Root>
+          </html.div>
         </CardSection>
       )}
     </>

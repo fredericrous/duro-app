@@ -6,8 +6,12 @@ import { certStatus } from "~/lib/cert-status"
 import { useAction } from "~/hooks/useAction"
 import { AdminCertRow } from "./AdminCertRow"
 import { RevokeAllButton } from "./RevokeAllButton"
-import { Badge, Button, Inline, Input } from "@duro-app/ui"
-import s from "~/routes/admin.shared.module.css"
+import { Badge, Button, Inline, Input, Table } from "@duro-app/ui"
+import { css, html } from "react-strict-dom"
+
+const styles = css.create({
+  revokeAllWrapper: { marginTop: 8 },
+})
 
 const API_URL = "/admin/users"
 
@@ -34,8 +38,8 @@ export function UserRow({
 
   return (
     <>
-      <tr>
-        <td>
+      <Table.Row>
+        <Table.Cell>
           {user.id}
           {certs.length > 0 && (
             <>
@@ -45,11 +49,11 @@ export function UserRow({
               </Badge>
             </>
           )}
-        </td>
-        <td>{user.displayName}</td>
-        <td>{user.email}</td>
-        <td>{new Date(user.creationDate).toLocaleDateString()}</td>
-        <td>
+        </Table.Cell>
+        <Table.Cell>{user.displayName}</Table.Cell>
+        <Table.Cell>{user.email}</Table.Cell>
+        <Table.Cell>{new Date(user.creationDate).toLocaleDateString()}</Table.Cell>
+        <Table.Cell>
           {!isSystem && (
             <Inline gap="sm">
               <certAction.Form>
@@ -81,10 +85,10 @@ export function UserRow({
               </Button>
             </Inline>
           )}
-        </td>
-      </tr>
+        </Table.Cell>
+      </Table.Row>
       {isRevokeVisible && (
-        <tr>
+        <Table.Row>
           <td colSpan={5}>
             <revokeAction.Form>
               <Inline gap="sm" align="center">
@@ -101,34 +105,34 @@ export function UserRow({
               </Inline>
             </revokeAction.Form>
           </td>
-        </tr>
+        </Table.Row>
       )}
       {showCerts && (
-        <tr>
+        <Table.Row>
           <td colSpan={5}>
-            <table className={s.table}>
-              <thead>
-                <tr>
-                  <th>{t("admin.users.certs.serial")}</th>
-                  <th>{t("admin.users.certs.issued")}</th>
-                  <th>{t("admin.users.certs.expires")}</th>
-                  <th>{t("admin.users.certs.status")}</th>
-                  <th>{t("common.actions")}</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table.Root columns={5}>
+              <Table.Header>
+                <Table.Row>
+                  <Table.HeaderCell>{t("admin.users.certs.serial")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.users.certs.issued")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.users.certs.expires")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.users.certs.status")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("common.actions")}</Table.HeaderCell>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
                 {certs.map((cert) => (
                   <AdminCertRow key={cert.id} cert={cert} />
                 ))}
-              </tbody>
-            </table>
+              </Table.Body>
+            </Table.Root>
             {activeCerts.length > 1 && (
-              <div style={{ marginTop: "0.5rem" }}>
+              <html.div style={styles.revokeAllWrapper}>
                 <RevokeAllButton username={user.id} action={revokeAllAction} />
-              </div>
+              </html.div>
             )}
           </td>
-        </tr>
+        </Table.Row>
       )}
     </>
   )

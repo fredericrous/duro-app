@@ -2,8 +2,19 @@ import { useTranslation } from "react-i18next"
 import type { Invite } from "~/lib/services/InviteRepo.server"
 import type { AdminInvitesResult } from "~/lib/mutations/admin-invites"
 import { useAction } from "~/hooks/useAction"
-import { Button, Inline } from "@duro-app/ui"
-import inv from "~/routes/admin.invites.module.css"
+import { Button, Inline, Table } from "@duro-app/ui"
+import { css, html } from "react-strict-dom"
+
+const styles = css.create({
+  errorText: {
+    color: "#fca5a5",
+    fontSize: "0.8rem",
+    maxWidth: 300,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+})
 
 export function FailedInviteRow({ invite }: { invite: Invite }) {
   const { t } = useTranslation()
@@ -13,11 +24,13 @@ export function FailedInviteRow({ invite }: { invite: Invite }) {
   const isRevoking = revokeAction.state !== "idle"
 
   return (
-    <tr>
-      <td>{invite.email}</td>
-      <td className={inv.errorText}>{invite.lastError ?? "Unknown error"}</td>
-      <td>{invite.failedAt ? new Date(invite.failedAt).toLocaleString() : "\u2014"}</td>
-      <td>
+    <Table.Row>
+      <Table.Cell>{invite.email}</Table.Cell>
+      <Table.Cell>
+        <html.span style={styles.errorText}>{invite.lastError ?? "Unknown error"}</html.span>
+      </Table.Cell>
+      <Table.Cell>{invite.failedAt ? new Date(invite.failedAt).toLocaleString() : "\u2014"}</Table.Cell>
+      <Table.Cell>
         <Inline gap="sm">
           <retryAction.Form>
             <input type="hidden" name="intent" value="retry" />
@@ -34,7 +47,7 @@ export function FailedInviteRow({ invite }: { invite: Invite }) {
             </Button>
           </revokeAction.Form>
         </Inline>
-      </td>
-    </tr>
+      </Table.Cell>
+    </Table.Row>
   )
 }

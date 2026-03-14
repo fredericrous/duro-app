@@ -1,20 +1,33 @@
 import type { ReactNode } from "react"
 import { Card } from "@duro-app/ui"
-import styles from "./CenteredCardPage.module.css"
+import { css, html } from "react-strict-dom"
+
+const styles = css.create({
+  page: {
+    minHeight: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+  },
+  cardWrapper: {
+    maxWidth: 480,
+    width: "100%",
+  },
+})
 
 interface CenteredCardPageProps {
   children: ReactNode
-  className?: string
 }
 
-export function CenteredCardPage({ children, className }: CenteredCardPageProps) {
+export function CenteredCardPage({ children }: CenteredCardPageProps) {
   return (
-    <main className={styles.page}>
-      <div className={`${styles.cardWrapper} ${className || ""}`}>
+    <html.main style={styles.page}>
+      <html.div style={styles.cardWrapper}>
         <Card variant="elevated" size="full">
           {children}
         </Card>
-      </div>
-    </main>
+      </html.div>
+    </html.main>
   )
 }

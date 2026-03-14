@@ -4,8 +4,32 @@ import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 import type { SettingsResult } from "~/lib/mutations/settings"
 import { useAction } from "~/hooks/useAction"
 import { PasswordReveal } from "~/components/PasswordReveal/PasswordReveal"
-import { Alert, Button, Heading, Text } from "@duro-app/ui"
-import styles from "~/routes/settings.module.css"
+import { Alert, Button, Heading, Table, Text } from "@duro-app/ui"
+import { css, html } from "react-strict-dom"
+
+const styles = css.create({
+  certSection: {
+    marginTop: 32,
+    paddingTop: 32,
+    borderTop: "1px solid #e5e5e5",
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+  },
+  confirmRow: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  confirmButtons: {
+    display: "flex",
+    gap: 8,
+    alignItems: "center",
+  },
+  tableContainer: {
+    overflowX: "auto",
+  },
+})
 
 const API_URL = "/settings"
 
@@ -21,15 +45,15 @@ function CertRow({ cert }: { cert: UserCertificate }) {
   const serialShort = cert.serialNumber.slice(-8)
 
   return (
-    <tr>
-      <td title={cert.serialNumber}>
-        <code>{serialShort}</code>
-      </td>
-      <td>{new Date(cert.issuedAt).toLocaleDateString()}</td>
-      <td>{new Date(cert.expiresAt).toLocaleDateString()}</td>
-      <td>
+    <Table.Row>
+      <Table.Cell>
+        <code title={cert.serialNumber} style={{ fontFamily: "monospace" }}>{serialShort}</code>
+      </Table.Cell>
+      <Table.Cell>{new Date(cert.issuedAt).toLocaleDateString()}</Table.Cell>
+      <Table.Cell>{new Date(cert.expiresAt).toLocaleDateString()}</Table.Cell>
+      <Table.Cell>
         {confirming ? (
-          <div className={styles.confirmButtons}>
+          <html.div style={styles.confirmButtons}>
             <action.Form>
               <input type="hidden" name="intent" value="revokeCert" />
               <input type="hidden" name="serialNumber" value={cert.serialNumber} />
@@ -40,7 +64,7 @@ function CertRow({ cert }: { cert: UserCertificate }) {
             <Button variant="secondary" size="small" onClick={() => setConfirming(false)}>
               {t("common.cancel")}
             </Button>
-          </div>
+          </html.div>
         ) : cert.revokeState === "pending" ? (
           <Text variant="bodySm" color="muted">
             {t("settings.cert.list.revoking")}
@@ -54,8 +78,8 @@ function CertRow({ cert }: { cert: UserCertificate }) {
             {t("settings.cert.list.revoke")}
           </Button>
         )}
-      </td>
-    </tr>
+      </Table.Cell>
+    </Table.Row>
   )
 }
 
@@ -112,7 +136,7 @@ export function CertificateSection({
   }
 
   return (
-    <div className={styles.certSection}>
+    <html.div style={styles.certSection}>
       <Heading level={2}>{t("settings.cert.heading")}</Heading>
       <Text as="p" color="muted">
         {t("settings.cert.description")}
@@ -129,23 +153,23 @@ export function CertificateSection({
       {effectivePassword && <PasswordReveal p12Password={effectivePassword} />}
 
       {certificates.length > 0 && (
-        <div className={styles.certTableContainer}>
-          <table className={styles.certTable}>
-            <thead>
-              <tr>
-                <th>{t("settings.cert.list.serial")}</th>
-                <th>{t("settings.cert.list.issued")}</th>
-                <th>{t("settings.cert.list.expires")}</th>
-                <th>{t("common.actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
+        <html.div style={styles.tableContainer}>
+          <Table.Root columns={4}>
+            <Table.Header>
+              <Table.Row>
+                <Table.HeaderCell>{t("settings.cert.list.serial")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("settings.cert.list.issued")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("settings.cert.list.expires")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("common.actions")}</Table.HeaderCell>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
               {certificates.map((cert) => (
                 <CertRow key={cert.id} cert={cert} />
               ))}
-            </tbody>
-          </table>
-        </div>
+            </Table.Body>
+          </Table.Root>
+        </html.div>
       )}
 
       {certificates.length === 0 && !effectivePassword && (
@@ -155,16 +179,16 @@ export function CertificateSection({
       )}
 
       {cooldownRemaining && !effectivePassword ? (
-        <div>
+        <html.div>
           <Button disabled>{t("settings.cert.newCert")}</Button>
           <Text as="p" variant="bodySm" color="muted">
             {t("settings.cert.nextAvailable", { time: nextAvailableText })}
           </Text>
-        </div>
+        </html.div>
       ) : confirming ? (
-        <div className={styles.confirmRow}>
+        <html.div style={styles.confirmRow}>
           <Text as="p">{t("settings.cert.confirm", { email })}</Text>
-          <div className={styles.confirmButtons}>
+          <html.div style={styles.confirmButtons}>
             <certAction.Form>
               <input type="hidden" name="intent" value="issueCert" />
               <Button type="submit" variant="primary" disabled={isSubmitting}>
@@ -174,8 +198,8 @@ export function CertificateSection({
             <Button variant="secondary" onClick={() => setConfirming(false)}>
               {t("common.cancel")}
             </Button>
-          </div>
-        </div>
+          </html.div>
+        </html.div>
       ) : (
         !effectivePassword && (
           <Button variant="primary" onClick={() => setConfirming(true)}>
@@ -183,6 +207,6 @@ export function CertificateSection({
           </Button>
         )
       )}
-    </div>
+    </html.div>
   )
 }

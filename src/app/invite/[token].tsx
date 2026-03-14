@@ -8,7 +8,6 @@ import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { InvitePasswordReveal } from "~/components/InvitePasswordReveal/InvitePasswordReveal"
 import { CertCheck } from "~/components/CertCheck/CertCheck"
 import { Alert, Heading, Text } from "@duro-app/ui"
-import styles from "~/routes/invite.module.css"
 
 type InviteLoaderData =
   | { valid: false; error: string; appName: string; healthUrl: string }
@@ -99,7 +98,7 @@ export default function InvitePage() {
   return (
     <CenteredCardPage>
       <Heading level={1}>{t("invite.title", { appName: loaderData.appName })}</Heading>
-      <p className={styles.subtitle} dangerouslySetInnerHTML={{ __html: t("invite.subtitle", { email: loaderData.email }) }} />
+      <p style={{ color: "#999", marginBottom: 8 }} dangerouslySetInnerHTML={{ __html: t("invite.subtitle", { email: loaderData.email }) }} />
 
       {loaderData.groupNames?.length > 0 && (
         <Text variant="bodySm" color="muted" as="p">

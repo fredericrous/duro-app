@@ -4,12 +4,14 @@
     "app/**/*.tsx",
     "src/**/*.ts",
     "src/**/*.tsx",
-    ".react-router/types/**/*"
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
   ],
   "exclude": ["node_modules", "dist", "build"],
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
-    "types": ["node", "vite/client"],
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types"],
     "isolatedModules": true,
     "esModuleInterop": true,
     "jsx": "react-jsx",
@@ -21,10 +23,10 @@
     "skipLibCheck": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
-    "rootDirs": [".", "./.react-router/types"],
     "baseUrl": ".",
     "paths": {
       "~/*": ["./app/*"]
     }
-  }
+  },
+  "extends": "expo/tsconfig.base"
 }

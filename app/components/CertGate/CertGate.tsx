@@ -1,8 +1,22 @@
-import { use } from "react"
-import { useNavigation } from "react-router"
+import { use, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Alert, Button, Field, Heading, Input } from "@duro-app/ui"
-import styles from "~/routes/invite-create-account.module.css"
+import { useAction } from "~/hooks/useAction"
+import { css, html } from "react-strict-dom"
+
+const styles = css.create({
+  certBackLink: {
+    display: "inline-block",
+    marginTop: 8,
+    padding: "8px 20px",
+    borderRadius: 4,
+    fontSize: "0.875rem",
+    fontWeight: "500",
+    backgroundColor: "#6366f1",
+    color: "#fff",
+    textDecoration: "none",
+  },
+})
 
 export function CertGate({
   certPromise,
@@ -12,9 +26,10 @@ export function CertGate({
   actionData: { error?: string } | undefined
 }) {
   const { t } = useTranslation()
-  const navigation = useNavigation()
-  const isSubmitting = navigation.state === "submitting"
   const certInstalled = use(certPromise)
+  const action = useAction<{ error?: string }>("/invite/create-account")
+  const isSubmitting = action.state === "submitting"
+  const error = action.data?.error ?? actionData?.error
 
   if (!certInstalled) {
     return (
@@ -22,20 +37,20 @@ export function CertGate({
         <Heading level={2} variant="headingSm">
           {t("createAccount.certRequired.title")}
         </Heading>
-        <p>{t("createAccount.certRequired.message")}</p>
-        <a href=".." className={styles.certBackLink}>
+        <html.p>{t("createAccount.certRequired.message")}</html.p>
+        <html.a href=".." style={styles.certBackLink}>
           {t("createAccount.certRequired.back")}
-        </a>
+        </html.a>
       </Alert>
     )
   }
 
   return (
     <>
-      {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
+      {error && <Alert variant="error">{error}</Alert>}
 
-      <form method="post" className={styles.accountForm}>
-        <fieldset disabled={isSubmitting}>
+      <action.Form>
+        <fieldset disabled={isSubmitting} style={{ borderWidth: 0, padding: 0, margin: 0 }}>
           <Field.Root>
             <Field.Label>{t("createAccount.username.label")}</Field.Label>
             <Input
@@ -77,7 +92,7 @@ export function CertGate({
             {isSubmitting ? t("createAccount.submitting") : t("createAccount.submit")}
           </Button>
         </fieldset>
-      </form>
+      </action.Form>
     </>
   )
 }

@@ -11,8 +11,24 @@ import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 import { PendingInviteRow } from "~/components/admin/PendingInviteRow"
 import { FailedInviteRow } from "~/components/admin/FailedInviteRow"
-import s from "~/routes/admin.shared.module.css"
-import inv from "~/routes/admin.invites.module.css"
+import { Table } from "@duro-app/ui"
+import { css, html } from "react-strict-dom"
+
+const s = css.create({
+  tableContainer: {
+    overflowX: "auto",
+  },
+})
+
+const inv = css.create({
+  checkboxLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: "0.875rem",
+    cursor: "pointer",
+  },
+})
 
 interface Group {
   id: number
@@ -117,10 +133,10 @@ export default function AdminInvitesPage() {
             <Field.Label>{t("admin.invites.groupsLabel")}</Field.Label>
             <Cluster gap="ms">
               {groups.map((g) => (
-                <label key={g.id} className={inv.checkboxLabel}>
+                <html.label key={g.id} style={inv.checkboxLabel}>
                   <input type="checkbox" name="groups" value={`${g.id}|${g.displayName}`} />
-                  <span>{g.displayName}</span>
-                </label>
+                  <html.span>{g.displayName}</html.span>
+                </html.label>
               ))}
             </Cluster>
           </Field.Root>
@@ -138,23 +154,23 @@ export default function AdminInvitesPage() {
 
       {failedInvites.length > 0 && (
         <CardSection title={`${t("admin.invites.failedTitle")} (${failedInvites.length})`}>
-          <div className={s.tableContainer}>
-            <table className={s.table}>
-              <thead>
-                <tr>
-                  <th>{t("admin.invites.cols.email")}</th>
-                  <th>{t("admin.invites.cols.error")}</th>
-                  <th>{t("admin.invites.cols.failedAt")}</th>
-                  <th>{t("admin.invites.cols.actions")}</th>
-                </tr>
-              </thead>
-              <tbody>
+          <html.div style={s.tableContainer}>
+            <Table.Root columns={4}>
+              <Table.Header>
+                <Table.Row>
+                  <Table.HeaderCell>{t("admin.invites.cols.email")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.invites.cols.error")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.invites.cols.failedAt")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.invites.cols.actions")}</Table.HeaderCell>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
                 {failedInvites.map((i) => (
                   <FailedInviteRow key={i.id} invite={i} />
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </Table.Body>
+            </Table.Root>
+          </html.div>
         </CardSection>
       )}
 
@@ -164,25 +180,25 @@ export default function AdminInvitesPage() {
             {t("admin.invites.noActive")}
           </Text>
         ) : (
-          <div className={s.tableContainer}>
-            <table className={s.table}>
-              <thead>
-                <tr>
-                  <th>{t("admin.invites.cols.email")}</th>
-                  <th>{t("admin.invites.cols.groups")}</th>
-                  <th>{t("admin.invites.cols.status")}</th>
-                  <th>{t("admin.invites.cols.invitedBy")}</th>
-                  <th>{t("admin.invites.cols.expires")}</th>
-                  <th>{t("admin.invites.cols.actions")}</th>
-                </tr>
-              </thead>
-              <tbody>
+          <html.div style={s.tableContainer}>
+            <Table.Root columns={6}>
+              <Table.Header>
+                <Table.Row>
+                  <Table.HeaderCell>{t("admin.invites.cols.email")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.invites.cols.groups")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.invites.cols.status")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.invites.cols.invitedBy")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.invites.cols.expires")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("admin.invites.cols.actions")}</Table.HeaderCell>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
                 {pendingInvites.map((i) => (
                   <PendingInviteRow key={i.id} invite={i} />
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </Table.Body>
+            </Table.Root>
+          </html.div>
         )}
       </CardSection>
     </>

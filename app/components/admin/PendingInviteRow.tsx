@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next"
 import type { Invite } from "~/lib/services/InviteRepo.server"
 import type { AdminInvitesResult } from "~/lib/mutations/admin-invites"
 import { useAction } from "~/hooks/useAction"
-import { Badge, Button, Inline } from "@duro-app/ui"
+import { Badge, Button, Inline, Table } from "@duro-app/ui"
 
 function StepBadges({ invite }: { invite: Invite }) {
   const { t } = useTranslation()
@@ -20,15 +20,15 @@ export function PendingInviteRow({ invite }: { invite: Invite }) {
   const isResending = resendAction.state !== "idle"
 
   return (
-    <tr>
-      <td>{invite.email}</td>
-      <td>{JSON.parse(invite.groupNames).join(", ")}</td>
-      <td>
+    <Table.Row>
+      <Table.Cell>{invite.email}</Table.Cell>
+      <Table.Cell>{JSON.parse(invite.groupNames).join(", ")}</Table.Cell>
+      <Table.Cell>
         <StepBadges invite={invite} />
-      </td>
-      <td>{invite.invitedBy}</td>
-      <td>{new Date(invite.expiresAt).toLocaleDateString()}</td>
-      <td>
+      </Table.Cell>
+      <Table.Cell>{invite.invitedBy}</Table.Cell>
+      <Table.Cell>{new Date(invite.expiresAt).toLocaleDateString()}</Table.Cell>
+      <Table.Cell>
         <Inline gap="sm">
           <resendAction.Form>
             <input type="hidden" name="intent" value="resend" />
@@ -45,7 +45,7 @@ export function PendingInviteRow({ invite }: { invite: Invite }) {
             </Button>
           </revokeAction.Form>
         </Inline>
-      </td>
-    </tr>
+      </Table.Cell>
+    </Table.Row>
   )
 }

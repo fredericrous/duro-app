@@ -1,6 +1,12 @@
 import type { ReactNode } from "react"
 import { Card } from "@duro-app/ui"
-import styles from "./CardSection.module.css"
+import { css, html } from "react-strict-dom"
+
+const styles = css.create({
+  wrapper: {
+    marginBottom: 24,
+  },
+})
 
 interface CardSectionProps {
   title: string
@@ -9,8 +15,8 @@ interface CardSectionProps {
 
 export function CardSection({ title, children }: CardSectionProps) {
   return (
-    <section className={styles.wrapper}>
+    <html.section style={styles.wrapper}>
       <Card header={title}>{children}</Card>
-    </section>
+    </html.section>
   )
 }

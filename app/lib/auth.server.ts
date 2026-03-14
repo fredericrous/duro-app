@@ -1,5 +1,4 @@
 import { Effect } from "effect"
-import { redirect } from "react-router"
 import { getSession, createPkceCookie } from "./session.server"
 import { OidcClient } from "./services/OidcClient.server"
 import { runEffect } from "./runtime.server"
@@ -36,8 +35,12 @@ export async function requireAuth(request: Request): Promise<AuthInfo> {
   const returnUrl = new URL(request.url).pathname
   const pkceCookie = await createPkceCookie({ codeVerifier, state, returnUrl })
 
-  throw redirect(authorizationUrl.toString(), {
-    headers: { "Set-Cookie": pkceCookie },
+  throw new Response(null, {
+    status: 302,
+    headers: {
+      Location: authorizationUrl.toString(),
+      "Set-Cookie": pkceCookie,
+    },
   })
 }
 

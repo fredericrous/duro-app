@@ -8,7 +8,15 @@ import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 import { Alert, Button, Field, Heading, Stack } from "@duro-app/ui"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 import { CertificateSection } from "~/components/CertificateSection/CertificateSection"
-import styles from "~/routes/settings.module.css"
+import { css, html } from "react-strict-dom"
+
+const styles = css.create({
+  page: {
+    maxWidth: 600,
+    margin: "0 auto",
+    padding: "32px 16px",
+  },
+})
 
 interface SettingsLoaderData {
   locale: string
@@ -71,7 +79,7 @@ export default function SettingsPage() {
   const actionData = localeAction.data
 
   return (
-    <main className={styles.page}>
+    <html.main style={styles.page}>
       <Heading level={1}>{t("settings.heading")}</Heading>
 
       {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
@@ -97,6 +105,6 @@ export default function SettingsPage() {
         lastCertRenewalAt={loaderData.lastCertRenewalAt}
         certificates={loaderData.certificates}
       />
-    </main>
+    </html.main>
   )
 }

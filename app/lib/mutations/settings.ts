@@ -1,5 +1,4 @@
 import { Effect } from "effect"
-import { redirect } from "react-router"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"

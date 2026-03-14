@@ -4,7 +4,7 @@ import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 import type { AdminUsersResult } from "~/lib/mutations/admin-users"
 import { certStatus, statusVariant } from "~/lib/cert-status"
 import { useAction } from "~/hooks/useAction"
-import { Badge, Button, Inline } from "@duro-app/ui"
+import { Badge, Button, Inline, Table } from "@duro-app/ui"
 
 export function AdminCertRow({ cert }: { cert: UserCertificate }) {
   const { t } = useTranslation()
@@ -16,16 +16,16 @@ export function AdminCertRow({ cert }: { cert: UserCertificate }) {
   const effectiveStatus = revoked ? "revoked" : status
 
   return (
-    <tr>
-      <td title={cert.serialNumber}>
-        <code>{cert.serialNumber.slice(-8)}</code>
-      </td>
-      <td>{new Date(cert.issuedAt).toLocaleDateString()}</td>
-      <td>{new Date(cert.expiresAt).toLocaleDateString()}</td>
-      <td>
+    <Table.Row>
+      <Table.Cell>
+        <code title={cert.serialNumber} style={{ fontFamily: "monospace" }}>{cert.serialNumber.slice(-8)}</code>
+      </Table.Cell>
+      <Table.Cell>{new Date(cert.issuedAt).toLocaleDateString()}</Table.Cell>
+      <Table.Cell>{new Date(cert.expiresAt).toLocaleDateString()}</Table.Cell>
+      <Table.Cell>
         <Badge variant={statusVariant(effectiveStatus)}>{t(`admin.users.certs.${effectiveStatus}`)}</Badge>
-      </td>
-      <td>
+      </Table.Cell>
+      <Table.Cell>
         {effectiveStatus === "active" && !confirming && (
           <Button variant="danger" size="small" onClick={() => setConfirming(true)}>
             {t("admin.users.certs.revokeCert")}
@@ -54,7 +54,7 @@ export function AdminCertRow({ cert }: { cert: UserCertificate }) {
             </Button>
           </action.Form>
         )}
-      </td>
-    </tr>
+      </Table.Cell>
+    </Table.Row>
   )
 }

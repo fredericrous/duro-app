@@ -5,6 +5,7 @@ import type { SettingsResult } from "~/lib/mutations/settings"
 import { useAction } from "~/hooks/useAction"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
 import { Alert, Heading, Input, InputGroup } from "@duro-app/ui"
+import { html } from "react-strict-dom"
 
 export function PasswordReveal({ p12Password }: { p12Password: string }) {
   const { t } = useTranslation()
@@ -20,12 +21,12 @@ export function PasswordReveal({ p12Password }: { p12Password: string }) {
   }, [consumeAction, onReveal])
 
   return (
-    <div>
+    <html.div>
       <Alert variant="info">
         <Heading level={3} variant="headingSm">
           {t("settings.cert.passwordTitle")}
         </Heading>
-        <p>{t("settings.cert.passwordWarning")}</p>
+        <html.p>{t("settings.cert.passwordWarning")}</html.p>
         <InputGroup.Root>
           <ScratchCard width={320} height={48} onReveal={handleReveal}>
             <Input defaultValue={p12Password} />
@@ -43,6 +44,6 @@ export function PasswordReveal({ p12Password }: { p12Password: string }) {
           </InputGroup.Addon>
         </InputGroup.Root>
       </Alert>
-    </div>
+    </html.div>
   )
 }
