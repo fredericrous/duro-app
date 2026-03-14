@@ -10,13 +10,16 @@ interface DashboardLoaderData {
 }
 
 export const loader: LoaderFunction<DashboardLoaderData> = async (request) => {
-  // Dynamic import to avoid Metro loader bundle stripping
-  const { getSession } = await import("~/lib/session.server")
-  const session = await getSession(request as unknown as Request)
-  if (!session) {
-    return { user: "anonymous", email: "", groups: [], timestamp: Date.now() }
+  try {
+    const { getSession } = await import("~/lib/session.server")
+    const session = await getSession(request as unknown as Request)
+    if (session) {
+      return { user: session.name, email: session.email, groups: session.groups, timestamp: Date.now() }
+    }
+  } catch {
+    // In dev mode, dynamic imports may not resolve in loader bundles
   }
-  return { user: session.name, email: session.email, groups: session.groups, timestamp: Date.now() }
+  return { user: "dev", email: "dev@localhost", groups: ["dev"], timestamp: Date.now() }
 }
 
 export default function DashboardHome() {

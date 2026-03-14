@@ -12,7 +12,8 @@
         {
           "root": "./src/app",
           "unstable_useServerRendering": true,
-          "unstable_useServerDataLoaders": true
+          "unstable_useServerDataLoaders": true,
+          "unstable_useServerMiddleware": true
         }
       ]
     ],

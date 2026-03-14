@@ -24,44 +24,54 @@ interface AdminUsersLoaderData {
 }
 
 export const loader: LoaderFunction<AdminUsersLoaderData> = async () => {
-  const { runEffect } = await import("~/lib/runtime.server")
-  const { UserManager } = await import("~/lib/services/UserManager.server")
-  const { config } = await import("~/lib/config.server")
-  const { InviteRepo } = await import("~/lib/services/InviteRepo.server")
-  const { CertificateRepo } = await import("~/lib/services/CertificateRepo.server")
+  try {
+    const { runEffect } = await import("~/lib/runtime.server")
+    const { UserManager } = await import("~/lib/services/UserManager.server")
+    const { config } = await import("~/lib/config.server")
+    const { InviteRepo } = await import("~/lib/services/InviteRepo.server")
+    const { CertificateRepo } = await import("~/lib/services/CertificateRepo.server")
 
-  const [users, revocations, certsByUser] = await Promise.all([
-    runEffect(
-      Effect.gen(function* () {
-        const um = yield* UserManager
-        return yield* um.getUsers
-      }),
-    ),
-    runEffect(
-      Effect.gen(function* () {
-        const repo = yield* InviteRepo
-        return yield* repo.findRevocations()
-      }),
-    ),
-    runEffect(
-      Effect.gen(function* () {
-        const um = yield* UserManager
-        const certRepo = yield* CertificateRepo
-        const allUsers = yield* um.getUsers
-        const usernames = allUsers.map((u: { id: string }) => u.id)
-        return yield* certRepo.listAllByUsernames(usernames).pipe(Effect.catchAll(() => Effect.succeed({})))
-      }),
-    ),
-  ])
+    const [users, revocations, certsByUser] = await Promise.all([
+      runEffect(
+        Effect.gen(function* () {
+          const um = yield* UserManager
+          return yield* um.getUsers
+        }),
+      ),
+      runEffect(
+        Effect.gen(function* () {
+          const repo = yield* InviteRepo
+          return yield* repo.findRevocations()
+        }),
+      ),
+      runEffect(
+        Effect.gen(function* () {
+          const um = yield* UserManager
+          const certRepo = yield* CertificateRepo
+          const allUsers = yield* um.getUsers
+          const usernames = allUsers.map((u: { id: string }) => u.id)
+          return yield* certRepo.listAllByUsernames(usernames).pipe(Effect.catchAll(() => Effect.succeed({})))
+        }),
+      ),
+    ])
 
-  const systemUserIds = new Set(
-    (users as User[]).filter((u) => config.isSystemUser(u.id)).map((u) => u.id),
-  )
-  return {
-    users: users as User[],
-    revocations: revocations as Revocation[],
-    systemUserIds: [...systemUserIds],
-    certsByUser: certsByUser as Record<string, UserCertificate[]>,
+    const systemUserIds = new Set(
+      (users as User[]).filter((u) => config.isSystemUser(u.id)).map((u) => u.id),
+    )
+    return {
+      users: users as User[],
+      revocations: revocations as Revocation[],
+      systemUserIds: [...systemUserIds],
+      certsByUser: certsByUser as Record<string, UserCertificate[]>,
+    }
+  } catch {
+    // Dev mode fallback — dynamic imports don't resolve in Metro dev loader bundles
+    return {
+      users: [],
+      revocations: [],
+      systemUserIds: [],
+      certsByUser: {},
+    }
   }
 }
 

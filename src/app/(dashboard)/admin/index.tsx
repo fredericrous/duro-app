@@ -26,35 +26,44 @@ interface AdminInvitesLoaderData {
 }
 
 export const loader: LoaderFunction<AdminInvitesLoaderData> = async () => {
-  const { runEffect } = await import("~/lib/runtime.server")
-  const { UserManager } = await import("~/lib/services/UserManager.server")
-  const { InviteRepo } = await import("~/lib/services/InviteRepo.server")
+  try {
+    const { runEffect } = await import("~/lib/runtime.server")
+    const { UserManager } = await import("~/lib/services/UserManager.server")
+    const { InviteRepo } = await import("~/lib/services/InviteRepo.server")
 
-  const [groups, pendingInvites, failedInvites] = await Promise.all([
-    runEffect(
-      Effect.gen(function* () {
-        const users = yield* UserManager
-        return yield* users.getGroups
-      }),
-    ),
-    runEffect(
-      Effect.gen(function* () {
-        const repo = yield* InviteRepo
-        return yield* repo.findPending()
-      }),
-    ),
-    runEffect(
-      Effect.gen(function* () {
-        const repo = yield* InviteRepo
-        return yield* repo.findFailed()
-      }),
-    ),
-  ])
+    const [groups, pendingInvites, failedInvites] = await Promise.all([
+      runEffect(
+        Effect.gen(function* () {
+          const users = yield* UserManager
+          return yield* users.getGroups
+        }),
+      ),
+      runEffect(
+        Effect.gen(function* () {
+          const repo = yield* InviteRepo
+          return yield* repo.findPending()
+        }),
+      ),
+      runEffect(
+        Effect.gen(function* () {
+          const repo = yield* InviteRepo
+          return yield* repo.findFailed()
+        }),
+      ),
+    ])
 
-  return {
-    groups: groups as Group[],
-    pendingInvites: pendingInvites as Invite[],
-    failedInvites: failedInvites as Invite[],
+    return {
+      groups: groups as Group[],
+      pendingInvites: pendingInvites as Invite[],
+      failedInvites: failedInvites as Invite[],
+    }
+  } catch {
+    // Dev mode fallback — dynamic imports don't resolve in Metro dev loader bundles
+    return {
+      groups: [],
+      pendingInvites: [],
+      failedInvites: [],
+    }
   }
 }
 

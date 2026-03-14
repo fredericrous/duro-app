@@ -20,35 +20,47 @@ interface SettingsLoaderData {
 }
 
 export const loader: LoaderFunction<SettingsLoaderData> = async (request) => {
-  const { requireAuth } = await import("~/lib/auth.server")
-  const { runEffect } = await import("~/lib/runtime.server")
-  const { PreferencesRepo } = await import("~/lib/services/PreferencesRepo.server")
-  const { CertManager } = await import("~/lib/services/CertManager.server")
-  const { CertificateRepo } = await import("~/lib/services/CertificateRepo.server")
-  const { resolveLocale } = await import("~/lib/i18n.server")
+  try {
+    const { requireAuth } = await import("~/lib/auth.server")
+    const { runEffect } = await import("~/lib/runtime.server")
+    const { PreferencesRepo } = await import("~/lib/services/PreferencesRepo.server")
+    const { CertManager } = await import("~/lib/services/CertManager.server")
+    const { CertificateRepo } = await import("~/lib/services/CertificateRepo.server")
+    const { resolveLocale } = await import("~/lib/i18n.server")
 
-  const auth = await requireAuth(request as unknown as Request)
-  const { locale, lastCertRenewal, p12Password, certificates } = await runEffect(
-    Effect.gen(function* () {
-      const prefs = yield* PreferencesRepo
-      const cert = yield* CertManager
-      const certRepo = yield* CertificateRepo
-      const locale = yield* prefs.getLocale(auth.user!)
-      const lastCertRenewal = yield* prefs.getLastCertRenewal(auth.user!)
-      const p12Password = lastCertRenewal.renewalId
-        ? yield* cert.getP12Password(lastCertRenewal.renewalId).pipe(Effect.catchAll(() => Effect.succeed(null)))
-        : null
-      const certificates = yield* certRepo.listValid(auth.user!).pipe(Effect.catchAll(() => Effect.succeed([])))
-      return { locale, lastCertRenewal, p12Password, certificates }
-    }),
-  )
-  return {
-    locale,
-    currentLocale: resolveLocale(request as unknown as Request),
-    email: auth.email,
-    lastCertRenewalAt: lastCertRenewal.at?.toISOString() ?? null,
-    p12Password,
-    certificates,
+    const auth = await requireAuth(request as unknown as Request)
+    const { locale, lastCertRenewal, p12Password, certificates } = await runEffect(
+      Effect.gen(function* () {
+        const prefs = yield* PreferencesRepo
+        const cert = yield* CertManager
+        const certRepo = yield* CertificateRepo
+        const locale = yield* prefs.getLocale(auth.user!)
+        const lastCertRenewal = yield* prefs.getLastCertRenewal(auth.user!)
+        const p12Password = lastCertRenewal.renewalId
+          ? yield* cert.getP12Password(lastCertRenewal.renewalId).pipe(Effect.catchAll(() => Effect.succeed(null)))
+          : null
+        const certificates = yield* certRepo.listValid(auth.user!).pipe(Effect.catchAll(() => Effect.succeed([])))
+        return { locale, lastCertRenewal, p12Password, certificates }
+      }),
+    )
+    return {
+      locale,
+      currentLocale: resolveLocale(request as unknown as Request),
+      email: auth.email,
+      lastCertRenewalAt: lastCertRenewal.at?.toISOString() ?? null,
+      p12Password,
+      certificates,
+    }
+  } catch {
+    // Dev mode fallback — dynamic imports don't resolve in Metro dev loader bundles
+    return {
+      locale: "en",
+      currentLocale: "en",
+      email: null,
+      lastCertRenewalAt: null,
+      p12Password: null,
+      certificates: [],
+    }
   }
 }
 
