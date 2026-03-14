@@ -1,16 +1,17 @@
-import { Suspense, use, useState } from "react"
-import { redirect, useNavigation } from "react-router"
+import { Suspense, useState } from "react"
+import { redirect } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/invite-create-account"
 import { runEffect } from "~/lib/runtime.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
-import { acceptInvite } from "~/lib/workflows/invite.server"
 import { hashToken } from "~/lib/crypto.server"
 import { Effect } from "effect"
+import { handleCreateAccount, parseCreateAccountMutation } from "~/lib/mutations/create-account"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
-import { Alert, Button, Field, Heading, Input } from "@duro-app/ui"
+import { CertGate } from "~/components/CertGate/CertGate"
+import { Alert, Heading } from "@duro-app/ui"
 import { config } from "~/lib/config.server"
 import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
 import styles from "./invite-create-account.module.css"
@@ -122,37 +123,14 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   const formData = await request.formData()
-  const username = (formData.get("username") as string)?.trim()
-  const password = formData.get("password") as string
-  const confirmPassword = formData.get("confirmPassword") as string
+  const parsed = parseCreateAccountMutation(formData as any, token)
+  if ("error" in parsed) return parsed
 
-  if (!username || !/^[a-zA-Z0-9_-]{3,32}$/.test(username)) {
-    return {
-      error: "Username must be 3-32 characters (letters, numbers, hyphens, underscores)",
-    }
+  const result = await runEffect(handleCreateAccount(parsed))
+  if ("_redirect" in result) {
+    throw redirect(result._redirect)
   }
-  if (!password || password.length < 12) {
-    return { error: "Password must be at least 12 characters" }
-  }
-  if (password !== confirmPassword) {
-    return { error: "Passwords do not match" }
-  }
-
-  try {
-    const tokenHash = hashToken(token)
-    await runEffect(
-      Effect.gen(function* () {
-        const repo = yield* InviteRepo
-        yield* repo.incrementAttempt(tokenHash).pipe(Effect.ignore)
-        yield* acceptInvite(token, { username, password })
-      }),
-    )
-    throw redirect(`${config.homeUrl}/welcome`)
-  } catch (e) {
-    if (e instanceof Response) throw e
-    const message = e instanceof Error ? e.message : "Failed to create account"
-    return { error: message }
-  }
+  return result
 }
 
 function checkCert(healthUrl: string): Promise<boolean> {
@@ -197,83 +175,5 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
         <CertGate certPromise={certPromise} actionData={actionData} />
       </Suspense>
     </CenteredCardPage>
-  )
-}
-
-function CertGate({
-  certPromise,
-  actionData,
-}: {
-  certPromise: Promise<boolean>
-  actionData: Route.ComponentProps["actionData"]
-}) {
-  const { t } = useTranslation()
-  const navigation = useNavigation()
-  const isSubmitting = navigation.state === "submitting"
-  const certInstalled = use(certPromise)
-
-  if (!certInstalled) {
-    return (
-      <Alert variant="warning">
-        <Heading level={2} variant="headingSm">
-          {t("createAccount.certRequired.title")}
-        </Heading>
-        <p>{t("createAccount.certRequired.message")}</p>
-        <a href=".." className={styles.certBackLink}>
-          {t("createAccount.certRequired.back")}
-        </a>
-      </Alert>
-    )
-  }
-
-  return (
-    <>
-      {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
-
-      <form method="post" className={styles.accountForm}>
-        <fieldset disabled={isSubmitting}>
-          <Field.Root>
-            <Field.Label>{t("createAccount.username.label")}</Field.Label>
-            <Input
-              name="username"
-              required
-              pattern="^[a-zA-Z0-9_-]{3,32}$"
-              placeholder={t("createAccount.username.placeholder")}
-              autoComplete="username"
-            />
-            <Field.Description>{t("createAccount.username.hint")}</Field.Description>
-          </Field.Root>
-
-          <Field.Root>
-            <Field.Label>{t("createAccount.password.label")}</Field.Label>
-            <Input
-              name="password"
-              type="password"
-              required
-              minLength={12}
-              placeholder={t("createAccount.password.placeholder")}
-              autoComplete="new-password"
-            />
-            <Field.Description>{t("createAccount.password.hint")}</Field.Description>
-          </Field.Root>
-
-          <Field.Root>
-            <Field.Label>{t("createAccount.confirm.label")}</Field.Label>
-            <Input
-              name="confirmPassword"
-              type="password"
-              required
-              minLength={12}
-              placeholder={t("createAccount.confirm.placeholder")}
-              autoComplete="new-password"
-            />
-          </Field.Root>
-
-          <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
-            {isSubmitting ? t("createAccount.submitting") : t("createAccount.submit")}
-          </Button>
-        </fieldset>
-      </form>
-    </>
   )
 }

@@ -37,7 +37,35 @@
     "heading": "Settings",
     "languageLabel": "Language",
     "languageHint": "Choose your preferred language for the interface.",
-    "saved": "Settings saved."
+    "saved": "Settings saved.",
+    "cert": {
+      "heading": "Certificates",
+      "description": "Manage your security certificates. Add a new certificate to set up a new device.",
+      "renew": "New Certificate",
+      "newCert": "New Certificate",
+      "renewing": "Sending...",
+      "issuing": "Sending...",
+      "confirm": "A new certificate will be sent to {{email}}. Continue?",
+      "confirmButton": "Yes, send it",
+      "success": "Certificate sent to your email. Scratch below to reveal the install password.",
+      "nextAvailable": "Next certificate available {{time}}",
+      "passwordTitle": "Certificate Password",
+      "passwordWarning": "Save this password — you'll need it to install the certificate from your email.",
+      "copy": "Copy",
+      "copied": "Copied!",
+      "list": {
+        "serial": "Serial",
+        "issued": "Issued",
+        "expires": "Expires",
+        "revoke": "Revoke",
+        "revoking": "Revoking...",
+        "revokeConfirm": "Revoke this certificate?",
+        "revokeYes": "Yes, revoke",
+        "revoked": "Certificate revoked.",
+        "revokeFailed": "Revocation failed. Retry?",
+        "empty": "No certificates yet."
+      }
+    }
   },
   "welcome": {
     "title": "Welcome",
@@ -192,7 +220,24 @@
         "revoking": "Revoking...",
         "reasonPlaceholder": "Reason (optional)",
         "reinvite": "Re-invite",
-        "processing": "Processing..."
+        "processing": "Processing...",
+        "viewCerts": "Certificates"
+      },
+      "certs": {
+        "serial": "Serial",
+        "issued": "Issued",
+        "expires": "Expires",
+        "status": "Status",
+        "active": "Active",
+        "expired": "Expired",
+        "revoked": "Revoked",
+        "pending": "Revoking...",
+        "failed": "Failed",
+        "revokeCert": "Revoke",
+        "revokeAll": "Revoke All",
+        "revokeAllConfirm": "Revoke all certificates for this user?",
+        "empty": "No certificates",
+        "count": "{{count}} cert(s)"
       }
     }
   },
@@ -222,17 +267,17 @@
       "footer": "This link expires in 7 days. Need a new invite? <a href=\"{{reinviteUrl}}\">Request one here</a>. If you didn't expect this invitation, you can safely ignore this email."
     },
     "renewal": {
-      "subject": "Your {{appName}} certificate has been renewed",
-      "preview": "Your {{appName}} certificate has been renewed",
-      "heading": "Certificate Renewed",
-      "body": "Your security certificate for {{appName}} has been renewed. A new certificate is attached to this email as <strong>certificate.p12</strong>.",
+      "subject": "Your new {{appName}} certificate",
+      "preview": "Your new {{appName}} certificate",
+      "heading": "New Certificate",
+      "body": "A new security certificate for {{appName}} has been issued. It is attached to this email as <strong>certificate.p12</strong>.",
       "install": {
         "title": "Install Your New Certificate",
         "body": "Please install this certificate to continue accessing {{appName}} services. You may need to remove the old certificate first.",
         "macos": "<strong>macOS:</strong> Double-click the .p12 file to open Keychain Access, enter the password when prompted, then trust the certificate. You can remove the old certificate from Keychain Access.",
         "windows": "<strong>Windows:</strong> Double-click the .p12 file, follow the Certificate Import Wizard, and enter the password when prompted. You can remove the old certificate from the Certificate Manager."
       },
-      "footer": "This is an automated renewal. Your account and access remain unchanged — only the certificate has been updated. If you didn't expect this, please contact your administrator."
+      "footer": "Your account and access remain unchanged — only the certificate has been updated. If you didn't expect this, please contact your administrator."
     }
   }
 }

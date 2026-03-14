@@ -3,7 +3,7 @@ import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import * as crypto from "node:crypto"
 import { hashToken } from "~/lib/crypto.server"
-import { MigrationsRan, currentDialect } from "~/lib/db/client.server"
+import { MigrationsRan } from "~/lib/db/client.server"
 
 const now = () => new Date().toISOString()
 const addDays = (days: number) => {
@@ -11,8 +11,8 @@ const addDays = (days: number) => {
   d.setDate(d.getDate() + days)
   return d.toISOString()
 }
-const TRUE = currentDialect === "sqlite" ? 1 : true
-const FALSE = currentDialect === "sqlite" ? 0 : false
+const TRUE = true
+const FALSE = false
 
 export interface Invite {
   id: string

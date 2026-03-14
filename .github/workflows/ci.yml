@@ -13,29 +13,49 @@ jobs:
     permissions:
       contents: read
       packages: read
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: duro_test
+          POSTGRES_PASSWORD: duro_test
+          POSTGRES_DB: duro_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U duro_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://duro_test:duro_test@localhost:5432/duro_test
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+          cache: npm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
 
       - name: Format check
-        run: pnpm format:check
+        run: npm run format:check
 
       - name: Lint
-        run: pnpm lint
+        run: npm run lint
 
       - name: Run tests
-        run: pnpm test
+        run: npm test
 
-      - name: Build
-        run: pnpm build
+      - name: Build (Expo)
+        run: npx expo export --platform web

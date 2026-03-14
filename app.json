@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "duro",
+    "slug": "duro",
+    "scheme": "duro",
+    "web": {
+      "output": "server"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "root": "./src/app",
+          "unstable_useServerRendering": true,
+          "unstable_useServerDataLoaders": true
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

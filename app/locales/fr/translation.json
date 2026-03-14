@@ -37,7 +37,35 @@
     "heading": "Parametres",
     "languageLabel": "Langue",
     "languageHint": "Choisissez votre langue preferee pour l'interface.",
-    "saved": "Parametres enregistres."
+    "saved": "Parametres enregistres.",
+    "cert": {
+      "heading": "Certificats",
+      "description": "Gerez vos certificats de securite. Ajoutez un nouveau certificat pour configurer un nouvel appareil.",
+      "renew": "Nouveau certificat",
+      "newCert": "Nouveau certificat",
+      "renewing": "Envoi...",
+      "issuing": "Envoi...",
+      "confirm": "Un nouveau certificat sera envoye a {{email}}. Continuer ?",
+      "confirmButton": "Oui, envoyer",
+      "success": "Certificat envoye a votre e-mail. Grattez ci-dessous pour reveler le mot de passe d'installation.",
+      "nextAvailable": "Prochain certificat disponible {{time}}",
+      "passwordTitle": "Mot de passe du certificat",
+      "passwordWarning": "Sauvegardez ce mot de passe — vous en aurez besoin pour installer le certificat joint a votre e-mail.",
+      "copy": "Copier",
+      "copied": "Copie !",
+      "list": {
+        "serial": "N° de serie",
+        "issued": "Emis le",
+        "expires": "Expire le",
+        "revoke": "Revoquer",
+        "revoking": "Revocation...",
+        "revokeConfirm": "Revoquer ce certificat ?",
+        "revokeYes": "Oui, revoquer",
+        "revoked": "Certificat revoque.",
+        "revokeFailed": "La revocation a echoue. Reessayer ?",
+        "empty": "Aucun certificat."
+      }
+    }
   },
   "welcome": {
     "title": "Bienvenue",
@@ -192,7 +220,24 @@
         "revoking": "Revocation...",
         "reasonPlaceholder": "Raison (optionnel)",
         "reinvite": "Reinviter",
-        "processing": "Traitement..."
+        "processing": "Traitement...",
+        "viewCerts": "Certificats"
+      },
+      "certs": {
+        "serial": "N° de serie",
+        "issued": "Emis le",
+        "expires": "Expire le",
+        "status": "Statut",
+        "active": "Actif",
+        "expired": "Expire",
+        "revoked": "Revoque",
+        "pending": "Revocation...",
+        "failed": "Echoue",
+        "revokeCert": "Revoquer",
+        "revokeAll": "Tout revoquer",
+        "revokeAllConfirm": "Revoquer tous les certificats de cet utilisateur ?",
+        "empty": "Aucun certificat",
+        "count": "{{count}} certificat(s)"
       }
     }
   },
@@ -222,17 +267,17 @@
       "footer": "Ce lien expire dans 7 jours. Besoin d'une nouvelle invitation ? <a href=\"{{reinviteUrl}}\">Demandez-en une ici</a>. Si vous n'attendiez pas cette invitation, vous pouvez ignorer cet e-mail en toute securite."
     },
     "renewal": {
-      "subject": "Votre certificat {{appName}} a ete renouvele",
-      "preview": "Votre certificat {{appName}} a ete renouvele",
-      "heading": "Certificat renouvele",
-      "body": "Votre certificat de securite pour {{appName}} a ete renouvele. Un nouveau certificat est joint a cet e-mail sous le nom <strong>certificate.p12</strong>.",
+      "subject": "Votre nouveau certificat {{appName}}",
+      "preview": "Votre nouveau certificat {{appName}}",
+      "heading": "Nouveau certificat",
+      "body": "Un nouveau certificat de securite pour {{appName}} a ete emis. Il est joint a cet e-mail sous le nom <strong>certificate.p12</strong>.",
       "install": {
         "title": "Installez votre nouveau certificat",
         "body": "Veuillez installer ce certificat pour continuer a acceder aux services de {{appName}}. Vous devrez peut-etre supprimer l'ancien certificat au prealable.",
         "macos": "<strong>macOS :</strong> Double-cliquez sur le fichier .p12 pour ouvrir Trousseau d'acces, entrez le mot de passe lorsqu'il est demande, puis faites confiance au certificat. Vous pouvez supprimer l'ancien certificat depuis Trousseau d'acces.",
         "windows": "<strong>Windows :</strong> Double-cliquez sur le fichier .p12, suivez l'assistant d'importation de certificat et entrez le mot de passe lorsqu'il est demande. Vous pouvez supprimer l'ancien certificat depuis le Gestionnaire de certificats."
       },
-      "footer": "Ceci est un renouvellement automatique. Votre compte et vos acces restent inchanges — seul le certificat a ete mis a jour. Si vous n'attendiez pas cela, veuillez contacter votre administrateur."
+      "footer": "Votre compte et vos acces restent inchanges — seul le certificat a ete mis a jour. Si vous n'attendiez pas cela, veuillez contacter votre administrateur."
     }
   }
 }

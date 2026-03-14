@@ -3,3 +3,47 @@
   margin: 0 auto;
   padding: 2rem 1rem;
 }
+
+.certSection {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--color-border, #e5e5e5);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.confirmRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.confirmButtons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.certTableContainer {
+  overflow-x: auto;
+}
+
+.certTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.certTable th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.certTable td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(51, 51, 51, 0.5);
+}

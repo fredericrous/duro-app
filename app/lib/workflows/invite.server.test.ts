@@ -7,6 +7,7 @@ import { UserManager, UserManagerError } from "~/lib/services/UserManager.server
 import { CertManager } from "~/lib/services/CertManager.server"
 import { EmailService, EmailError } from "~/lib/services/EmailService.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
+import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 
 // --- Mock helpers ---
 
@@ -216,7 +217,12 @@ const mockCertManager = (calls: { method: string; args: unknown[] }[] = []) =>
   Layer.succeed(CertManager, {
     issueCertAndP12: (_email, _id) => {
       calls.push({ method: "issueCertAndP12", args: [_email, _id] })
-      return Effect.succeed({ p12Buffer: Buffer.from("fake"), password: "pass" })
+      return Effect.succeed({
+        p12Buffer: Buffer.from("fake"),
+        password: "pass",
+        serialNumber: "aa:bb:cc:dd",
+        notAfter: new Date(Date.now() + 90 * 24 * 3600_000),
+      })
     },
     getP12Password: () => Effect.succeed("pass"),
     consumeP12Password: () => Effect.succeed("pass"),
@@ -227,6 +233,45 @@ const mockCertManager = (calls: { method: string; args: unknown[] }[] = []) =>
     checkCertProcessed: () => Effect.succeed(false),
     deleteCertByUsername: (username) => {
       calls.push({ method: "deleteCertByUsername", args: [username] })
+      return Effect.void
+    },
+    revokeCert: (serialNumber) => {
+      calls.push({ method: "revokeCert", args: [serialNumber] })
+      return Effect.void
+    },
+  })
+
+const mockCertificateRepo = (calls: { method: string; args: unknown[] }[] = []) =>
+  Layer.succeed(CertificateRepo, {
+    store: (cert) => {
+      calls.push({ method: "store", args: [cert] })
+      return Effect.void
+    },
+    listValid: () => Effect.succeed([]),
+    listAllByUsernames: () => Effect.succeed({}),
+    findBySerial: () => Effect.succeed(null),
+    markRevokePending: (_serial, _username?) => {
+      calls.push({ method: "markRevokePending", args: [_serial, _username] })
+      return Effect.succeed(1)
+    },
+    markRevokeCompleted: (serial) => {
+      calls.push({ method: "markRevokeCompleted", args: [serial] })
+      return Effect.void
+    },
+    markRevokeFailed: (serial, error) => {
+      calls.push({ method: "markRevokeFailed", args: [serial, error] })
+      return Effect.void
+    },
+    revokeAllForUser: (_username) => {
+      calls.push({ method: "revokeAllForUser", args: [_username] })
+      return Effect.succeed([])
+    },
+    setUserId: (inviteId, userId) => {
+      calls.push({ method: "setUserId", args: [inviteId, userId] })
+      return Effect.void
+    },
+    updateUsername: (oldUsername, newUsername) => {
+      calls.push({ method: "updateUsername", args: [oldUsername, newUsername] })
       return Effect.void
     },
   })
@@ -247,6 +292,9 @@ const mockPreferencesRepo = () =>
   Layer.succeed(PreferencesRepo, {
     getLocale: () => Effect.succeed("en"),
     setLocale: () => Effect.void,
+    getLastCertRenewal: () => Effect.succeed({ at: null, renewalId: null }),
+    setCertRenewal: () => Effect.void,
+    clearCertRenewalId: () => Effect.void,
   })
 
 // --- Tests ---
@@ -283,7 +331,7 @@ describe("queueInvite", () => {
           expect(emailCall!.args[0]).toBe("alice@example.com")
         }),
       ),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls), mockEmailService(emailCalls))),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls), mockEmailService(emailCalls), mockCertificateRepo())),
     )
   })
 
@@ -312,7 +360,7 @@ describe("queueInvite", () => {
           expect(invite.lastError).toBe("SMTP down")
         }),
       ),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls), failingEmail)),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls), failingEmail, mockCertificateRepo())),
     )
   })
 })
@@ -324,7 +372,7 @@ describe("acceptInvite", () => {
     const userCalls: { method: string; args: unknown[] }[] = []
     const certCalls: { method: string; args: unknown[] }[] = []
 
-    const layer = Layer.mergeAll(mockInviteRepo(store), mockUserManager(userCalls), mockCertManager(certCalls))
+    const layer = Layer.mergeAll(mockInviteRepo(store), mockUserManager(userCalls), mockCertManager(certCalls), mockCertificateRepo())
 
     return acceptInvite("tok-inv-1", {
       username: "alice",
@@ -376,6 +424,7 @@ describe("acceptInvite", () => {
           }),
       }),
       mockCertManager(certCalls),
+      mockCertificateRepo(),
     )
 
     return acceptInvite("tok-inv-1", {
@@ -417,7 +466,7 @@ describe("revokeInvite", () => {
           expect(certCalls.find((c) => c.method === "deleteCertByUsername" && c.args[0] === "alice")).toBeDefined()
         }),
       ),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls))),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls), mockCertificateRepo())),
     )
   })
 
@@ -439,7 +488,7 @@ describe("revokeInvite", () => {
           expect(certCalls.find((c) => c.method === "deleteCertByUsername" && c.args[0] === "bobsmith")).toBeDefined()
         }),
       ),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls))),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls), mockCertificateRepo())),
     )
   })
 })
@@ -468,7 +517,7 @@ describe("revokeUser", () => {
         }),
       ),
       Effect.provide(
-        Layer.mergeAll(mockInviteRepo(new Map(), revocations), mockUserManager(userCalls), mockCertManager(certCalls)),
+        Layer.mergeAll(mockInviteRepo(new Map(), revocations), mockUserManager(userCalls), mockCertManager(certCalls), mockCertificateRepo()),
       ),
     )
   })
@@ -499,7 +548,7 @@ describe("resendCert", () => {
           expect(certCalls.find((c) => c.method === "deleteP12Secret")).toBeDefined()
         }),
       ),
-      Effect.provide(Layer.mergeAll(mockCertManager(certCalls), mockEmailService(emailCalls), mockPreferencesRepo())),
+      Effect.provide(Layer.mergeAll(mockCertManager(certCalls), mockEmailService(emailCalls), mockPreferencesRepo(), mockCertificateRepo())),
     )
   })
 })

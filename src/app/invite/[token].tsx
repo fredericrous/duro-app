@@ -1,0 +1,109 @@
+import { useCallback, useState, useEffect } from "react"
+import { useTranslation } from "react-i18next"
+import { useLoaderData } from "expo-router"
+import type { LoaderFunction } from "expo-server"
+import { Effect } from "effect"
+import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
+import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
+import { InvitePasswordReveal } from "~/components/InvitePasswordReveal/InvitePasswordReveal"
+import { CertCheck } from "~/components/CertCheck/CertCheck"
+import { Alert, Heading, Text } from "@duro-app/ui"
+import styles from "~/routes/invite.module.css"
+
+type InviteLoaderData =
+  | { valid: false; error: string; appName: string; healthUrl: string }
+  | { valid: true; email: string; groupNames: string[]; p12Password: string | null; appName: string; healthUrl: string }
+
+export const loader: LoaderFunction<InviteLoaderData> = async (request, params) => {
+  const { config } = await import("~/lib/config.server")
+  const { hashToken } = await import("~/lib/crypto.server")
+  const { runEffect } = await import("~/lib/runtime.server")
+  const { InviteRepo } = await import("~/lib/services/InviteRepo.server")
+  const { CertManager } = await import("~/lib/services/CertManager.server")
+
+  const token = params.token as string | undefined
+  if (!token) {
+    return { valid: false, error: "Missing invite token", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+  }
+
+  try {
+    const tokenHash = hashToken(token)
+    const { invite, p12Password } = await runEffect(
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const cert = yield* CertManager
+        const invite = yield* repo.findByTokenHash(tokenHash)
+        const p12Password = invite ? yield* cert.getP12Password(invite.id) : null
+        return { invite, p12Password }
+      }),
+    )
+
+    if (!invite) return { valid: false as const, error: "Invalid invite link", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+    if (invite.usedAt) return { valid: false as const, error: "already_used", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+    if (new Date(invite.expiresAt) < new Date()) return { valid: false as const, error: "expired", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+    if (invite.attempts >= 5) return { valid: false as const, error: "Too many attempts.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+
+    return {
+      valid: true as const,
+      email: invite.email,
+      groupNames: JSON.parse(invite.groupNames) as string[],
+      p12Password,
+      appName: config.appName,
+      healthUrl: `${config.homeUrl}/health`,
+    }
+  } catch (e) {
+    if (e instanceof Response) throw e
+    return { valid: false as const, error: "Something went wrong", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+  }
+}
+
+let certCheckCount = 0
+function checkCert(healthUrl: string): Promise<boolean> {
+  certCheckCount++
+  if (process.env.NODE_ENV === "development" && process.env.VITEST !== "true" && certCheckCount > 1) {
+    return Promise.resolve(true)
+  }
+  return fetch(healthUrl, { mode: "cors" }).then((r) => r.ok).catch(() => false)
+}
+
+export default function InvitePage() {
+  const { t } = useTranslation()
+  const loaderData = useLoaderData<typeof loader>()
+  const [certStatus, setCertStatus] = useState<"checking" | "installed" | "not-installed">("checking")
+
+  const recheck = useCallback(() => {
+    setCertStatus("checking")
+    checkCert(loaderData.healthUrl).then((ok) => setCertStatus(ok ? "installed" : "not-installed"))
+  }, [loaderData.healthUrl])
+
+  useEffect(() => {
+    let cancelled = false
+    checkCert(loaderData.healthUrl).then((ok) => {
+      if (!cancelled) setCertStatus(ok ? "installed" : "not-installed")
+    })
+    return () => { cancelled = true }
+  }, [loaderData.healthUrl])
+
+  if (!loaderData.valid) {
+    const { error } = loaderData
+    if (error === "expired") return <ErrorCard icon="clock" title={t("invite.expired.title")} message={t("invite.expired.message")} />
+    if (error === "already_used") return <ErrorCard icon="check-done" title={t("invite.used.title")} message={t("invite.used.message")} />
+    return <ErrorCard title={t("invite.error.title")} message={error} />
+  }
+
+  return (
+    <CenteredCardPage>
+      <Heading level={1}>{t("invite.title", { appName: loaderData.appName })}</Heading>
+      <p className={styles.subtitle} dangerouslySetInnerHTML={{ __html: t("invite.subtitle", { email: loaderData.email }) }} />
+
+      {loaderData.groupNames?.length > 0 && (
+        <Text variant="bodySm" color="muted" as="p">
+          {t("invite.groupsLabel", { groups: loaderData.groupNames.join(", ") })}
+        </Text>
+      )}
+
+      <InvitePasswordReveal p12Password={loaderData.p12Password} />
+      <CertCheck status={certStatus} onRecheck={recheck} />
+    </CenteredCardPage>
+  )
+}

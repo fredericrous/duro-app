@@ -1,4 +1,4 @@
-if (import.meta.env.DEV) {
+if (process.env.NODE_ENV === "development") {
   await import("./mocks/dev-setup.server")
 }
 
