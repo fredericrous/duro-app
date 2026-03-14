@@ -13,7 +13,7 @@ interface LanguageSelectProps {
 
 export function LanguageSelect({ name = "locale", defaultValue = "en" }: LanguageSelectProps) {
   return (
-    <Select.Root name={name} defaultValue={defaultValue}>
+    <Select.Root name={name} defaultValue={defaultValue} initialLabels={languageNames}>
       <Select.Trigger>
         <Select.Value placeholder="Language" />
         <Select.Icon />

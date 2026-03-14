@@ -1,19 +1,21 @@
-import { useState } from "react"
-import { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/admin.users"
 import { runEffect } from "~/lib/runtime.server"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { config } from "~/lib/config.server"
-import { InviteRepo, type Revocation } from "~/lib/services/InviteRepo.server"
-import { revokeUser, resendCert } from "~/lib/workflows/invite.server"
+import { InviteRepo } from "~/lib/services/InviteRepo.server"
+import { CertificateRepo, type UserCertificate } from "~/lib/services/CertificateRepo.server"
 import { Effect } from "effect"
-import { Button, Inline, Input } from "@duro-app/ui"
+import { handleAdminUsersMutation, parseAdminUsersMutation } from "~/lib/mutations/admin-users"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { UserRow } from "~/components/admin/UserRow"
+import { RevokedUserRow } from "~/components/admin/RevokedUserRow"
 import s from "./admin.shared.module.css"
 
+export type AdminUsersAction = typeof action
+
 export async function loader() {
-  const [users, revocations] = await Promise.all([
+  const [users, revocations, certsByUser] = await Promise.all([
     runEffect(
       Effect.gen(function* () {
         const um = yield* UserManager
@@ -26,10 +28,19 @@ export async function loader() {
         return yield* repo.findRevocations()
       }),
     ),
+    runEffect(
+      Effect.gen(function* () {
+        const um = yield* UserManager
+        const certRepo = yield* CertificateRepo
+        const allUsers = yield* um.getUsers
+        const usernames = allUsers.map((u) => u.id)
+        return yield* certRepo.listAllByUsernames(usernames).pipe(Effect.catchAll(() => Effect.succeed({})))
+      }),
+    ),
   ])
 
   const systemUserIds = new Set(users.filter((u) => config.isSystemUser(u.id)).map((u) => u.id))
-  return { users, revocations, systemUserIds: [...systemUserIds] }
+  return { users, revocations, systemUserIds: [...systemUserIds], certsByUser }
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -39,70 +50,14 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const formData = await request.formData()
-  const intent = formData.get("intent") as string
-
-  if (intent === "revokeUser") {
-    const username = formData.get("username") as string
-    const email = formData.get("email") as string
-    const reason = (formData.get("reason") as string) || undefined
-    if (!username || !email) return { error: "Missing username or email" }
-    try {
-      await runEffect(revokeUser(username, email, "admin", reason))
-      return { success: true, message: `User ${username} revoked` }
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Failed to revoke user"
-      return { error: message }
-    }
-  }
-
-  if (intent === "resendCert") {
-    const username = formData.get("username") as string
-    const email = formData.get("email") as string
-    if (!username || !email) return { error: "Missing username or email" }
-    try {
-      const result = await runEffect(resendCert(email, username))
-      return result
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Failed to send certificate"
-      return { error: message }
-    }
-  }
-
-  if (intent === "reinviteRevoked") {
-    const revocationId = formData.get("revocationId") as string
-    if (!revocationId) return { error: "Missing revocation ID" }
-    try {
-      const revocation = await runEffect(
-        Effect.gen(function* () {
-          const repo = yield* InviteRepo
-          const revocations = yield* repo.findRevocations()
-          return revocations.find((r) => r.id === revocationId) ?? null
-        }),
-      )
-      if (!revocation) return { error: "Revocation not found" }
-      await runEffect(
-        Effect.gen(function* () {
-          const repo = yield* InviteRepo
-          yield* repo.deleteRevocation(revocationId)
-        }),
-      )
-      return {
-        success: true,
-        message: `Revocation cleared for ${revocation.email}. You can now re-invite them.`,
-        reinviteEmail: revocation.email,
-      }
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Failed to clear revocation"
-      return { error: message }
-    }
-  }
-
-  return { error: "Unknown action" }
+  const parsed = parseAdminUsersMutation(formData as any)
+  if ("error" in parsed) return parsed
+  return runEffect(handleAdminUsersMutation(parsed))
 }
 
 export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
-  const { users, revocations, systemUserIds } = loaderData
+  const { users, revocations, systemUserIds, certsByUser } = loaderData
 
   return (
     <>
@@ -121,7 +76,12 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
             </thead>
             <tbody>
               {users.map((user) => (
-                <UserRow key={user.id} user={user} isSystem={systemUserIds.includes(user.id)} />
+                <UserRow
+                  key={user.id}
+                  user={user}
+                  isSystem={systemUserIds.includes(user.id)}
+                  certs={(certsByUser as Record<string, UserCertificate[]>)[user.id] ?? []}
+                />
               ))}
             </tbody>
           </table>
@@ -153,101 +113,5 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
         </CardSection>
       )}
     </>
-  )
-}
-
-function UserRow({
-  user,
-  isSystem,
-}: {
-  user: { id: string; displayName: string; email: string; creationDate: string }
-  isSystem: boolean
-}) {
-  const { t } = useTranslation()
-  const [showRevoke, setShowRevoke] = useState(false)
-  const certFetcher = useFetcher()
-  const revokeFetcher = useFetcher()
-  const isSendingCert = certFetcher.state !== "idle"
-  const isRevoking = revokeFetcher.state !== "idle"
-  const revokeSucceeded = revokeFetcher.data && "success" in revokeFetcher.data
-  const isRevokeVisible = showRevoke && !revokeSucceeded
-
-  return (
-    <>
-      <tr>
-        <td>{user.id}</td>
-        <td>{user.displayName}</td>
-        <td>{user.email}</td>
-        <td>{new Date(user.creationDate).toLocaleDateString()}</td>
-        <td>
-          {!isSystem && (
-            <Inline gap="sm">
-              <certFetcher.Form method="post">
-                <input type="hidden" name="intent" value="resendCert" />
-                <input type="hidden" name="username" value={user.id} />
-                <input type="hidden" name="email" value={user.email} />
-                <Button type="submit" variant="secondary" size="small" disabled={isSendingCert || isRevoking}>
-                  {isSendingCert ? t("admin.users.actions.sendingCert") : t("admin.users.actions.sendCert")}
-                </Button>
-              </certFetcher.Form>
-              <Button
-                type="button"
-                variant="danger"
-                size="small"
-                disabled={isRevoking}
-                onClick={() => setShowRevoke(!showRevoke)}
-              >
-                {t("admin.users.actions.revoke")}
-              </Button>
-            </Inline>
-          )}
-        </td>
-      </tr>
-      {isRevokeVisible && (
-        <tr>
-          <td colSpan={5}>
-            <revokeFetcher.Form method="post">
-              <Inline gap="sm" align="center">
-                <input type="hidden" name="intent" value="revokeUser" />
-                <input type="hidden" name="username" value={user.id} />
-                <input type="hidden" name="email" value={user.email} />
-                <Input name="reason" type="text" placeholder={t("admin.users.actions.reasonPlaceholder")} />
-                <Button type="submit" variant="danger" disabled={isRevoking}>
-                  {isRevoking ? t("admin.users.actions.revoking") : t("admin.users.actions.confirmRevoke")}
-                </Button>
-                <Button type="button" variant="secondary" onClick={() => setShowRevoke(false)}>
-                  {t("common.cancel")}
-                </Button>
-              </Inline>
-            </revokeFetcher.Form>
-          </td>
-        </tr>
-      )}
-    </>
-  )
-}
-
-function RevokedUserRow({ revocation }: { revocation: Revocation }) {
-  const { t } = useTranslation()
-  const fetcher = useFetcher()
-  const isSubmitting = fetcher.state !== "idle"
-
-  return (
-    <tr>
-      <td>{revocation.email}</td>
-      <td>{revocation.username}</td>
-      <td>{revocation.reason ?? "\u2014"}</td>
-      <td>{new Date(revocation.revokedAt).toLocaleDateString()}</td>
-      <td>{revocation.revokedBy}</td>
-      <td>
-        <fetcher.Form method="post">
-          <input type="hidden" name="intent" value="reinviteRevoked" />
-          <input type="hidden" name="revocationId" value={revocation.id} />
-          <Button type="submit" variant="secondary" size="small" disabled={isSubmitting}>
-            {isSubmitting ? t("admin.users.actions.processing") : t("admin.users.actions.reinvite")}
-          </Button>
-        </fetcher.Form>
-      </td>
-    </tr>
   )
 }

@@ -5,6 +5,7 @@ import { CertManager } from "~/lib/services/CertManager.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { EmailService } from "~/lib/services/EmailService.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
+import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 
 export interface InviteInput {
   email: string
@@ -26,6 +27,7 @@ export const queueInvite = (input: InviteInput) =>
     const inviteRepo = yield* InviteRepo
     const cert = yield* CertManager
     const emailSvc = yield* EmailService
+    const certRepo = yield* CertificateRepo
 
     // Revoke any existing failed invite for this email so we can re-create
     const existingFailed = yield* inviteRepo.findFailed()
@@ -44,12 +46,25 @@ export const queueInvite = (input: InviteInput) =>
     yield* inviteRepo.setCertUsername(invite.id, certUsername)
 
     // Issue cert directly from Vault PKI
-    const { p12Buffer } = yield* cert.issueCertAndP12(input.email, invite.id)
+    const certResult = yield* cert.issueCertAndP12(input.email, invite.id)
     yield* inviteRepo.markCertIssued(invite.id)
+
+    // Track the certificate
+    yield* certRepo
+      .store({
+        inviteId: invite.id,
+        userId: null,
+        username: certUsername,
+        email: input.email,
+        serialNumber: certResult.serialNumber,
+        issuedAt: new Date(),
+        expiresAt: certResult.notAfter,
+      })
+      .pipe(Effect.catchAll((e) => Effect.logWarning("queueInvite: failed to store cert record", { error: String(e) })))
 
     // Send email inline
     const locale = input.locale ?? "en"
-    yield* emailSvc.sendInviteEmail(input.email, invite.token, input.invitedBy, p12Buffer, locale).pipe(
+    yield* emailSvc.sendInviteEmail(input.email, invite.token, input.invitedBy, certResult.p12Buffer, locale).pipe(
       Effect.tap(() => inviteRepo.markEmailSent(invite.id)),
       Effect.catchAll((e) =>
         Effect.gen(function* () {
@@ -62,13 +77,14 @@ export const queueInvite = (input: InviteInput) =>
     return { success: true as const, message: `Invite sent to ${input.email}` }
   }).pipe(Effect.withSpan("queueInvite", { attributes: { email: input.email } }))
 
-// --- Accept Invite (unchanged) ---
+// --- Accept Invite ---
 
 export const acceptInvite = (token: string, input: AcceptInput) =>
   Effect.gen(function* () {
     const inviteRepo = yield* InviteRepo
     const users = yield* UserManager
     const cert = yield* CertManager
+    const certRepo = yield* CertificateRepo
 
     // Atomic consume — marks invite as used
     const invite = yield* inviteRepo.consumeByToken(token)
@@ -104,6 +120,24 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
 
     yield* inviteRepo.markUsedBy(invite.id, input.username)
 
+    // Associate cert records with the real user
+    yield* certRepo
+      .setUserId(invite.id, input.username)
+      .pipe(
+        Effect.catchAll((e) => Effect.logWarning("acceptInvite: failed to set userId on cert", { error: String(e) })),
+      )
+    const certUsername = invite.email
+      .split("@")[0]
+      .replace(/[^a-z0-9_-]/gi, "")
+      .toLowerCase()
+    yield* certRepo
+      .updateUsername(certUsername, input.username)
+      .pipe(
+        Effect.catchAll((e) =>
+          Effect.logWarning("acceptInvite: failed to update username on cert", { error: String(e) }),
+        ),
+      )
+
     // Clean up P12 secret
     yield* cert.deleteP12Secret(invite.id)
 
@@ -116,6 +150,7 @@ export const revokeInvite = (inviteId: string) =>
   Effect.gen(function* () {
     const inviteRepo = yield* InviteRepo
     const cert = yield* CertManager
+    const certRepo = yield* CertificateRepo
 
     const invite = yield* inviteRepo.findById(inviteId)
     if (!invite) return
@@ -142,6 +177,23 @@ export const revokeInvite = (inviteId: string) =>
         ),
       )
 
+    // Revoke tracked certs for this invite's certUsername
+    const serials = yield* certRepo
+      .revokeAllForUser(certUsername)
+      .pipe(Effect.catchAll(() => Effect.succeed([] as string[])))
+    for (const serial of serials) {
+      yield* cert
+        .revokeCert(serial)
+        .pipe(
+          Effect.tap(() => certRepo.markRevokeCompleted(serial)),
+          Effect.catchAll((e) =>
+            certRepo
+              .markRevokeFailed(serial, String(e))
+              .pipe(Effect.catchAll(() => Effect.void)),
+          ),
+        )
+    }
+
     yield* inviteRepo.revoke(inviteId)
   }).pipe(Effect.withSpan("revokeInvite", { attributes: { inviteId } }))
 
@@ -152,6 +204,7 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
     const users = yield* UserManager
     const cert = yield* CertManager
     const inviteRepo = yield* InviteRepo
+    const certRepo = yield* CertificateRepo
 
     // Remove from user directory
     yield* users
@@ -169,33 +222,66 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
       .deleteCertByUsername(certUsername)
       .pipe(Effect.catchAll((e) => Effect.logWarning("revokeUser: failed to delete cert secret", { error: String(e) })))
 
+    // Revoke all tracked certs with partial-failure handling
+    const serials = yield* certRepo
+      .revokeAllForUser(username)
+      .pipe(Effect.catchAll(() => Effect.succeed([] as string[])))
+    for (const serial of serials) {
+      yield* cert
+        .revokeCert(serial)
+        .pipe(
+          Effect.tap(() => certRepo.markRevokeCompleted(serial)),
+          Effect.catchAll((e) =>
+            certRepo
+              .markRevokeFailed(serial, String(e))
+              .pipe(Effect.catchAll(() => Effect.void)),
+          ),
+        )
+    }
+
     // Record revocation in audit log
     yield* inviteRepo.recordRevocation(email, username, revokedBy, reason)
   }).pipe(Effect.withSpan("revokeUser", { attributes: { username, email } }))
 
 // --- Re-send Cert for Existing User ---
 
-export const resendCert = (email: string, username: string) =>
+export const resendCert = (email: string, username: string, keepSecret = false) =>
   Effect.gen(function* () {
     const cert = yield* CertManager
     const emailService = yield* EmailService
     const prefs = yield* PreferencesRepo
+    const certRepo = yield* CertificateRepo
 
     const tempId = crypto.randomUUID()
     const locale = yield* prefs.getLocale(username)
 
     // Issue fresh cert
-    const { p12Buffer } = yield* cert.issueCertAndP12(email, tempId)
+    const certResult = yield* cert.issueCertAndP12(email, tempId)
+
+    // Track the certificate
+    yield* certRepo
+      .store({
+        inviteId: null,
+        userId: username,
+        username,
+        email,
+        serialNumber: certResult.serialNumber,
+        issuedAt: new Date(),
+        expiresAt: certResult.notAfter,
+      })
+      .pipe(Effect.catchAll((e) => Effect.logWarning("resendCert: failed to store cert record", { error: String(e) })))
 
     // Send renewal email
-    yield* emailService.sendCertRenewalEmail(email, p12Buffer, locale)
+    yield* emailService.sendCertRenewalEmail(email, certResult.p12Buffer, locale)
 
-    // Clean up temp secret
-    yield* cert
-      .deleteP12Secret(tempId)
-      .pipe(
-        Effect.catchAll((e) => Effect.logWarning("resendCert: failed to clean up temp secret", { error: String(e) })),
-      )
+    // Clean up temp secret unless caller needs it for password reveal
+    if (!keepSecret) {
+      yield* cert
+        .deleteP12Secret(tempId)
+        .pipe(
+          Effect.catchAll((e) => Effect.logWarning("resendCert: failed to clean up temp secret", { error: String(e) })),
+        )
+    }
 
-    return { success: true as const, message: `Certificate sent to ${email}` }
+    return { success: true as const, message: `Certificate sent to ${email}`, renewalId: tempId }
   }).pipe(Effect.withSpan("resendCert", { attributes: { email, username } }))

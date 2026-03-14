@@ -1,7 +1,7 @@
 import { Context, Effect, Data, Layer } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
-import { MigrationsRan, currentDialect } from "~/lib/db/client.server"
+import { MigrationsRan } from "~/lib/db/client.server"
 
 export class PreferencesError extends Data.TaggedError("PreferencesError")<{
   readonly message: string
@@ -14,6 +14,11 @@ export class PreferencesRepo extends Context.Tag("PreferencesRepo")<
     /** Returns the user's locale, falling back to "en" on any error. */
     readonly getLocale: (username: string) => Effect.Effect<string>
     readonly setLocale: (username: string, locale: string) => Effect.Effect<void, PreferencesError>
+    readonly getLastCertRenewal: (
+      username: string,
+    ) => Effect.Effect<{ at: Date | null; renewalId: string | null }>
+    readonly setCertRenewal: (username: string, renewalId: string) => Effect.Effect<void, PreferencesError>
+    readonly clearCertRenewalId: (username: string) => Effect.Effect<void, PreferencesError>
   }
 >() {}
 
@@ -36,15 +41,38 @@ export const PreferencesRepoLive = Layer.effect(
           Effect.catchAll(() => Effect.succeed("en")),
         ),
 
-      setLocale: (username: string, locale: string) => {
-        const now = new Date().toISOString()
-        const upsert =
-          currentDialect === "sqlite"
-            ? sql`INSERT INTO user_preferences (username, locale, updated_at) VALUES (${username}, ${locale}, ${now})
-                  ON CONFLICT(username) DO UPDATE SET locale = ${locale}, updated_at = ${now}`
-            : sql`INSERT INTO user_preferences (username, locale, updated_at) VALUES (${username}, ${locale}, NOW())
-                  ON CONFLICT(username) DO UPDATE SET locale = ${locale}, updated_at = NOW()`
-        return withErr(upsert.pipe(Effect.asVoid), "Failed to set locale")
+      setLocale: (username: string, locale: string) =>
+        withErr(
+          sql`INSERT INTO user_preferences (username, locale, updated_at) VALUES (${username}, ${locale}, NOW())
+              ON CONFLICT(username) DO UPDATE SET locale = ${locale}, updated_at = NOW()`.pipe(Effect.asVoid),
+          "Failed to set locale",
+        ),
+
+      getLastCertRenewal: (username: string) =>
+        sql`SELECT last_cert_renewal_at, cert_renewal_id FROM user_preferences WHERE username = ${username}`.pipe(
+          Effect.map((rows) => {
+            const row = rows[0]
+            if (!row) return { at: null, renewalId: null }
+            const at = row.last_cert_renewal_at ? new Date(row.last_cert_renewal_at as string) : null
+            const renewalId = (row.cert_renewal_id as string) ?? null
+            return { at, renewalId }
+          }),
+          Effect.catchAll(() => Effect.succeed({ at: null, renewalId: null })),
+        ),
+
+      setCertRenewal: (username: string, renewalId: string) =>
+        withErr(
+          sql`INSERT INTO user_preferences (username, locale, updated_at, last_cert_renewal_at, cert_renewal_id)
+              VALUES (${username}, 'en', NOW(), NOW(), ${renewalId})
+              ON CONFLICT(username) DO UPDATE SET last_cert_renewal_at = NOW(), cert_renewal_id = ${renewalId}, updated_at = NOW()`.pipe(
+            Effect.asVoid,
+          ),
+          "Failed to set cert renewal",
+        ),
+
+      clearCertRenewalId: (username: string) => {
+        const stmt = sql`UPDATE user_preferences SET cert_renewal_id = NULL WHERE username = ${username}`
+        return withErr(stmt.pipe(Effect.asVoid), "Failed to clear cert renewal ID")
       },
     }
   }),

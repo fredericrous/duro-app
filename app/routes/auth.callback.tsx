@@ -1,6 +1,8 @@
+import { Effect } from "effect"
 import { redirect } from "react-router"
 import type { Route } from "./+types/auth.callback"
-import { exchangeCode } from "~/lib/oidc.server"
+import { OidcClient } from "~/lib/services/OidcClient.server"
+import { runEffect } from "~/lib/runtime.server"
 import { getPkceData, createSessionCookie, clearPkceCookie } from "~/lib/session.server"
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -15,7 +17,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   const callbackUrl = new URL(process.env.OIDC_REDIRECT_URI!)
   callbackUrl.search = reqUrl.search
 
-  const user = await exchangeCode(callbackUrl, pkce.codeVerifier, pkce.state)
+  const user = await runEffect(
+    Effect.gen(function* () {
+      const oidc = yield* OidcClient
+      return yield* oidc.exchangeCode(callbackUrl, pkce.codeVerifier, pkce.state)
+    }),
+  )
 
   const sessionCookie = await createSessionCookie({
     sub: user.sub,

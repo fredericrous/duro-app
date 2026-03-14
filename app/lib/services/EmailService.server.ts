@@ -31,6 +31,13 @@ export class EmailService extends Context.Tag("EmailService")<
   }
 >() {}
 
+export const EmailServiceDev = Layer.succeed(EmailService, {
+  sendInviteEmail: (email, _token, _invitedBy, _p12Buffer, locale) =>
+    Effect.log(`[DEV] Would send invite email to ${email} (locale=${locale ?? "en"})`),
+  sendCertRenewalEmail: (email, _p12Buffer, locale) =>
+    Effect.log(`[DEV] Would send cert renewal email to ${email} (locale=${locale ?? "en"})`),
+})
+
 export const EmailServiceLive = Layer.scoped(
   EmailService,
   Effect.gen(function* () {

@@ -44,6 +44,11 @@ afterEach(() => {
 // Dynamic import so vi.mock is applied first
 const { default: InvitePage } = await import("./invite")
 
+const routeProps = {
+  params: { token: "test-token" },
+  matches: [] as never,
+}
+
 describe("InvitePage", () => {
   beforeEach(() => {
     // Default: cert check fails (no certificate installed)
@@ -61,7 +66,7 @@ describe("InvitePage", () => {
     }
 
     await act(async () => {
-      render(<InvitePage loaderData={loaderData} actionData={undefined} />)
+      render(<InvitePage {...routeProps} loaderData={loaderData} actionData={undefined} />)
     })
 
     // Title
@@ -93,7 +98,7 @@ describe("InvitePage", () => {
       healthUrl: "https://home.example.com/health",
     }
 
-    render(<InvitePage loaderData={loaderData} actionData={undefined} />)
+    render(<InvitePage {...routeProps} loaderData={loaderData} actionData={undefined} />)
 
     expect(screen.getByText("Invite Expired")).toBeInTheDocument()
   })
@@ -106,7 +111,7 @@ describe("InvitePage", () => {
       healthUrl: "https://home.example.com/health",
     }
 
-    render(<InvitePage loaderData={loaderData} actionData={undefined} />)
+    render(<InvitePage {...routeProps} loaderData={loaderData} actionData={undefined} />)
 
     expect(screen.getByText("Already Used")).toBeInTheDocument()
   })
@@ -119,7 +124,7 @@ describe("InvitePage", () => {
       healthUrl: "https://home.example.com/health",
     }
 
-    render(<InvitePage loaderData={loaderData} actionData={undefined} />)
+    render(<InvitePage {...routeProps} loaderData={loaderData} actionData={undefined} />)
 
     expect(screen.getByText("Error")).toBeInTheDocument()
     expect(screen.getByText("Invalid invite link")).toBeInTheDocument()
@@ -138,7 +143,7 @@ describe("InvitePage", () => {
     }
 
     await act(async () => {
-      render(<InvitePage loaderData={loaderData} actionData={undefined} />)
+      render(<InvitePage {...routeProps} loaderData={loaderData} actionData={undefined} />)
     })
 
     await waitFor(() => {
@@ -161,7 +166,7 @@ describe("InvitePage", () => {
     }
 
     await act(async () => {
-      render(<InvitePage loaderData={loaderData} actionData={undefined} />)
+      render(<InvitePage {...routeProps} loaderData={loaderData} actionData={undefined} />)
     })
 
     expect(screen.getByText("Password already revealed.")).toBeInTheDocument()
@@ -178,7 +183,7 @@ describe("InvitePage", () => {
     }
 
     await act(async () => {
-      render(<InvitePage loaderData={loaderData} actionData={{ error: "Something went wrong" }} />)
+      render(<InvitePage {...routeProps} loaderData={loaderData} actionData={{ error: "Something went wrong" }} />)
     })
 
     expect(screen.getByText("Something went wrong")).toBeInTheDocument()
@@ -195,7 +200,7 @@ describe("InvitePage", () => {
     }
 
     await act(async () => {
-      render(<InvitePage loaderData={loaderData} actionData={undefined} />)
+      render(<InvitePage {...routeProps} loaderData={loaderData} actionData={undefined} />)
     })
 
     // Wait for cert check to resolve (button label changes from "Checking..." to "Retry")

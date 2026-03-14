@@ -5,14 +5,18 @@ import type { Route } from "./+types/admin.invites"
 import { runEffect } from "~/lib/runtime.server"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { config } from "~/lib/config.server"
-import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
-import { queueInvite, revokeInvite } from "~/lib/workflows/invite.server"
+import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { Effect } from "effect"
-import { Alert, Badge, Button, Cluster, Field, Inline, Input, Text } from "@duro-app/ui"
+import { handleAdminInvitesMutation, parseAdminInvitesMutation } from "~/lib/mutations/admin-invites"
+import { Alert, Button, Cluster, Field, Inline, Input, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
+import { PendingInviteRow } from "~/components/admin/PendingInviteRow"
+import { FailedInviteRow } from "~/components/admin/FailedInviteRow"
 import s from "./admin.shared.module.css"
 import inv from "./admin.invites.module.css"
+
+export type AdminInvitesAction = typeof action
 
 export async function loader() {
   const [groups, pendingInvites, failedInvites] = await Promise.all([
@@ -46,148 +50,9 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const formData = await request.formData()
-  const intent = formData.get("intent") as string
-
-  if (intent === "revoke") {
-    const inviteId = formData.get("inviteId") as string
-    if (!inviteId) return { error: "Missing invite ID" }
-    try {
-      await runEffect(revokeInvite(inviteId))
-      return { success: true, message: "Invite revoked" }
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Failed to revoke invite"
-      return { error: message }
-    }
-  }
-
-  if (intent === "retry") {
-    const inviteId = formData.get("inviteId") as string
-    if (!inviteId) return { error: "Missing invite ID" }
-    try {
-      const result = await runEffect(
-        Effect.gen(function* () {
-          const repo = yield* InviteRepo
-          const invite = yield* repo.findById(inviteId)
-          if (!invite) return { error: "Invite not found" as const }
-          yield* repo.revoke(inviteId)
-
-          return yield* queueInvite({
-            email: invite.email,
-            groups: JSON.parse(invite.groups) as number[],
-            groupNames: JSON.parse(invite.groupNames) as string[],
-            invitedBy: invite.invitedBy,
-            locale: invite.locale,
-          })
-        }),
-      )
-      return result
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Failed to retry invite"
-      return { error: message }
-    }
-  }
-
-  if (intent === "resend") {
-    const inviteId = formData.get("inviteId") as string
-    if (!inviteId) return { error: "Missing invite ID" }
-    try {
-      const result = await runEffect(
-        Effect.gen(function* () {
-          const repo = yield* InviteRepo
-          const invite = yield* repo.findById(inviteId)
-          if (!invite) return { error: "Invite not found" as const }
-          yield* repo.revoke(inviteId)
-
-          return yield* queueInvite({
-            email: invite.email,
-            groups: JSON.parse(invite.groups) as number[],
-            groupNames: JSON.parse(invite.groupNames) as string[],
-            invitedBy: invite.invitedBy,
-            locale: invite.locale,
-          })
-        }),
-      )
-      return result
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Failed to resend invite"
-      return { error: message }
-    }
-  }
-
-  // Default: send new invite
-  const email = formData.get("email") as string
-  const selectedGroups = formData.getAll("groups") as string[]
-  const locale = (formData.get("locale") as string) || "en"
-  const confirmed = formData.get("confirmed") as string
-
-  if (!email || !email.includes("@")) {
-    return { error: "Valid email is required" }
-  }
-  if (selectedGroups.length === 0) {
-    return { error: "Select at least one group" }
-  }
-
-  try {
-    // Check for previous revocation
-    if (confirmed !== "true") {
-      const revocation = await runEffect(
-        Effect.gen(function* () {
-          const repo = yield* InviteRepo
-          return yield* repo.findRevocationByEmail(email)
-        }),
-      )
-      if (revocation) {
-        return {
-          warning: `This email was previously revoked by ${revocation.revokedBy}${revocation.reason ? ` (reason: ${revocation.reason})` : ""}. Proceed anyway?`,
-          revocationId: revocation.id,
-          email,
-          groups: selectedGroups,
-        }
-      }
-    }
-
-    // Clear revocation if confirmed
-    const revocationId = formData.get("revocationId") as string
-    if (confirmed === "true" && revocationId) {
-      await runEffect(
-        Effect.gen(function* () {
-          const repo = yield* InviteRepo
-          yield* repo.deleteRevocation(revocationId)
-        }),
-      )
-    }
-
-    const groupIds = selectedGroups.map((g) => {
-      const [id] = g.split("|")
-      return parseInt(id, 10)
-    })
-    const groupNames = selectedGroups.map((g) => {
-      const [, name] = g.split("|")
-      return name
-    })
-
-    const result = await runEffect(
-      queueInvite({
-        email,
-        groups: groupIds,
-        groupNames,
-        invitedBy: "admin",
-        locale,
-      }),
-    )
-    return result
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to send invite"
-    return { error: message }
-  }
-}
-
-function StepBadges({ invite }: { invite: Invite }) {
-  const { t } = useTranslation()
-  if (invite.failedAt) return <Badge variant="error">{t("admin.invites.badge.failed")}</Badge>
-  if (invite.emailSent) return <Badge variant="success">{t("admin.invites.badge.sent")}</Badge>
-  if (invite.certIssued) return <Badge variant="success">{t("admin.invites.badge.certIssued")}</Badge>
-  return <Badge variant="warning">{t("admin.invites.badge.processing")}</Badge>
+  const parsed = parseAdminInvitesMutation(formData as any)
+  if ("error" in parsed) return parsed
+  return runEffect(handleAdminInvitesMutation(parsed))
 }
 
 export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
@@ -332,77 +197,5 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
         )}
       </CardSection>
     </>
-  )
-}
-
-function PendingInviteRow({ invite }: { invite: Invite }) {
-  const { t } = useTranslation()
-  const revokeFetcher = useFetcher()
-  const resendFetcher = useFetcher()
-  const isRevoking = revokeFetcher.state !== "idle"
-  const isResending = resendFetcher.state !== "idle"
-
-  return (
-    <tr>
-      <td>{invite.email}</td>
-      <td>{JSON.parse(invite.groupNames).join(", ")}</td>
-      <td>
-        <StepBadges invite={invite} />
-      </td>
-      <td>{invite.invitedBy}</td>
-      <td>{new Date(invite.expiresAt).toLocaleDateString()}</td>
-      <td>
-        <Inline gap="sm">
-          <resendFetcher.Form method="post">
-            <input type="hidden" name="intent" value="resend" />
-            <input type="hidden" name="inviteId" value={invite.id} />
-            <Button type="submit" variant="secondary" size="small" disabled={isResending || isRevoking}>
-              {isResending ? t("admin.invites.action.resending") : t("admin.invites.action.resend")}
-            </Button>
-          </resendFetcher.Form>
-          <revokeFetcher.Form method="post">
-            <input type="hidden" name="intent" value="revoke" />
-            <input type="hidden" name="inviteId" value={invite.id} />
-            <Button type="submit" variant="danger" size="small" disabled={isRevoking || isResending}>
-              {isRevoking ? t("admin.invites.action.revoking") : t("admin.invites.action.revoke")}
-            </Button>
-          </revokeFetcher.Form>
-        </Inline>
-      </td>
-    </tr>
-  )
-}
-
-function FailedInviteRow({ invite }: { invite: Invite }) {
-  const { t } = useTranslation()
-  const retryFetcher = useFetcher()
-  const revokeFetcher = useFetcher()
-  const isRetrying = retryFetcher.state !== "idle"
-  const isRevoking = revokeFetcher.state !== "idle"
-
-  return (
-    <tr>
-      <td>{invite.email}</td>
-      <td className={inv.errorText}>{invite.lastError ?? "Unknown error"}</td>
-      <td>{invite.failedAt ? new Date(invite.failedAt).toLocaleString() : "\u2014"}</td>
-      <td>
-        <Inline gap="sm">
-          <retryFetcher.Form method="post">
-            <input type="hidden" name="intent" value="retry" />
-            <input type="hidden" name="inviteId" value={invite.id} />
-            <Button type="submit" variant="secondary" size="small" disabled={isRetrying || isRevoking}>
-              {isRetrying ? t("admin.invites.action.retrying") : t("admin.invites.action.retry")}
-            </Button>
-          </retryFetcher.Form>
-          <revokeFetcher.Form method="post">
-            <input type="hidden" name="intent" value="revoke" />
-            <input type="hidden" name="inviteId" value={invite.id} />
-            <Button type="submit" variant="danger" size="small" disabled={isRevoking || isRetrying}>
-              {isRevoking ? t("admin.invites.action.revoking") : t("admin.invites.action.revoke")}
-            </Button>
-          </revokeFetcher.Form>
-        </Inline>
-      </td>
-    </tr>
   )
 }

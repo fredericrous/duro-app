@@ -31,6 +31,6 @@ export function getVisibleApps(userGroups: string[]): AppDefinition[] {
 }
 
 export function getDefaultApps(): AppDefinition[] {
-  if (import.meta.env.DEV) return devApps
+  if (process.env.NODE_ENV === "development") return devApps
   return []
 }

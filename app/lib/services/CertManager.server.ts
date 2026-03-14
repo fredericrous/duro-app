@@ -11,11 +11,12 @@ export class CertManager extends Context.Tag("CertManager")<
     readonly issueCertAndP12: (
       email: string,
       inviteId: string,
-    ) => Effect.Effect<{ p12Buffer: Buffer; password: string }, CertManagerError>
+    ) => Effect.Effect<{ p12Buffer: Buffer; password: string; serialNumber: string; notAfter: Date }, CertManagerError>
     readonly getP12Password: (inviteId: string) => Effect.Effect<string | null, CertManagerError>
     readonly consumeP12Password: (inviteId: string) => Effect.Effect<string | null, CertManagerError>
     readonly deleteP12Secret: (inviteId: string) => Effect.Effect<void, CertManagerError>
     readonly checkCertProcessed: (username: string) => Effect.Effect<boolean, CertManagerError>
     readonly deleteCertByUsername: (username: string) => Effect.Effect<void, CertManagerError>
+    readonly revokeCert: (serialNumber: string) => Effect.Effect<void, CertManagerError>
   }
 >() {}

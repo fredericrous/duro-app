@@ -19,6 +19,8 @@ const VaultKvSecret = Schema.Struct({
       password: Schema.optional(Schema.String),
       email: Schema.optional(Schema.String),
       source: Schema.optional(Schema.String),
+      serial_number: Schema.optional(Schema.String),
+      not_after: Schema.optional(Schema.String),
     }),
   }),
 })
@@ -29,6 +31,7 @@ const VaultCertIssueResponse = Schema.Struct({
     private_key: Schema.String,
     ca_chain: Schema.mutable(Schema.Array(Schema.String)),
     serial_number: Schema.String,
+    not_after: Schema.optional(Schema.String),
   }),
 })
 
@@ -41,12 +44,13 @@ export class VaultPki extends Context.Tag("VaultPki")<
     readonly issueCertAndP12: (
       email: string,
       inviteId: string,
-    ) => Effect.Effect<{ p12Buffer: Buffer; password: string }, VaultPkiError>
+    ) => Effect.Effect<{ p12Buffer: Buffer; password: string; serialNumber: string; notAfter: Date }, VaultPkiError>
     readonly getP12Password: (inviteId: string) => Effect.Effect<string | null, VaultPkiError>
     readonly consumeP12Password: (inviteId: string) => Effect.Effect<string | null, VaultPkiError>
     readonly deleteP12Secret: (inviteId: string) => Effect.Effect<void, VaultPkiError>
     readonly checkCertProcessed: (username: string) => Effect.Effect<boolean, VaultPkiError>
     readonly deleteCertByUsername: (username: string) => Effect.Effect<void, VaultPkiError>
+    readonly revokeCert: (serialNumber: string) => Effect.Effect<void, VaultPkiError>
   }
 >() {}
 
@@ -90,10 +94,13 @@ export const VaultPkiLive = Layer.effect(
             Effect.catchAll(() => Effect.succeed(null)),
           )
 
-          if (existing?.data.data.p12 && existing?.data.data.password) {
+          if (existing?.data.data.p12 && existing?.data.data.password
+              && existing.data.data.serial_number && existing.data.data.not_after) {
             return {
               p12Buffer: Buffer.from(existing.data.data.p12, "base64"),
               password: existing.data.data.password,
+              serialNumber: existing.data.data.serial_number,
+              notAfter: new Date(existing.data.data.not_after),
             }
           }
 
@@ -118,16 +125,23 @@ export const VaultPkiLive = Layer.effect(
           // Create P12 bundle
           const p12Buffer = createP12(certData.certificate, certData.private_key, certData.ca_chain ?? [], password)
 
-          // Store P12 + password in Vault
+          // Extract notAfter from Vault response or from the cert PEM
+          const notAfter = certData.not_after
+            ? new Date(certData.not_after)
+            : forge.pki.certificateFromPem(certData.certificate).validity.notAfter
+
+          // Store P12 + password + metadata in Vault
           yield* vault.post(`/secret/data/pki/clients/${inviteId}`, {
             data: {
               p12: p12Buffer.toString("base64"),
               password,
               email,
+              serial_number: certData.serial_number,
+              not_after: notAfter.toISOString(),
             },
           })
 
-          return { p12Buffer, password }
+          return { p12Buffer, password, serialNumber: certData.serial_number, notAfter }
         }),
 
       getP12Password: (inviteId: string) =>
@@ -196,6 +210,19 @@ export const VaultPkiLive = Layer.effect(
           ),
           Effect.catchAll(() => Effect.void),
         ),
+
+      revokeCert: (serialNumber: string) =>
+        vault.post(`/pki-client/revoke`, { serial_number: serialNumber }).pipe(
+          Effect.asVoid,
+          Effect.catchAll((e) => {
+            const msg = String(e)
+            // Idempotent: already revoked or cert not found
+            if (msg.includes("already revoked") || msg.includes("404")) {
+              return Effect.void
+            }
+            return Effect.fail(new VaultPkiError({ message: `Failed to revoke cert: ${msg}` }))
+          }),
+        ),
     }
   }),
 )
@@ -214,6 +241,7 @@ export const VaultCertManagerLive = Layer.effect(
       deleteP12Secret: (inviteId) => pipe(vault.deleteP12Secret(inviteId), Effect.mapError(mapVaultError)),
       checkCertProcessed: (username) => pipe(vault.checkCertProcessed(username), Effect.mapError(mapVaultError)),
       deleteCertByUsername: (username) => pipe(vault.deleteCertByUsername(username), Effect.mapError(mapVaultError)),
+      revokeCert: (serialNumber) => pipe(vault.revokeCert(serialNumber), Effect.mapError(mapVaultError)),
     }
   }),
 ).pipe(Layer.provide(VaultPkiLive))

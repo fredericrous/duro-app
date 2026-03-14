@@ -1,39 +1,16 @@
-import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient"
 import * as PgClient from "@effect/sql-pg/PgClient"
 import * as SqlClient from "@effect/sql/SqlClient"
-import * as Migrator from "@effect/sql/Migrator"
+import * as SqlError from "@effect/sql/SqlError"
 import { Context, Config, Effect, Layer } from "effect"
 
+import m0001 from "./migrations/pg/0001_create_schema"
+import m0002 from "./migrations/pg/0002_create_user_revocations"
+import m0003 from "./migrations/pg/0003_add_revert_pr_columns"
+import m0004 from "./migrations/pg/0004_add_locale"
+import m0005 from "./migrations/pg/0005_add_cert_renewal_tracking"
+import m0006 from "./migrations/pg/0006_create_user_certificates"
+
 const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
-
-// ---------------------------------------------------------------------------
-// Dialect detection
-// ---------------------------------------------------------------------------
-
-export type Dialect = "sqlite" | "pg"
-export const currentDialect: Dialect = process.env.DATABASE_URL ? "pg" : "sqlite"
-
-// ---------------------------------------------------------------------------
-// SqliteClient layer
-// ---------------------------------------------------------------------------
-
-export const SqliteClientLive = Layer.unwrapEffect(
-  Config.string("DURO_DB_PATH").pipe(
-    Config.withDefault("/db/duro.sqlite"),
-    Effect.map((filename) =>
-      SqliteClient.layer({
-        filename,
-        transformResultNames: snakeToCamel,
-      }),
-    ),
-  ),
-)
-
-export const makeTestClientLayer = (filename: string) =>
-  SqliteClient.layer({
-    filename,
-    transformResultNames: snakeToCamel,
-  })
 
 // ---------------------------------------------------------------------------
 // PgClient layer (Config-driven — resolves DATABASE_URL at layer build time)
@@ -57,84 +34,57 @@ const PgClientLive = Layer.unwrapEffect(
 export class MigrationsRan extends Context.Tag("MigrationsRan")<MigrationsRan, true>() {}
 
 // ---------------------------------------------------------------------------
-// Lightweight migration runner (no @effect/platform-node required)
+// Lightweight migration runner
 // ---------------------------------------------------------------------------
 
-const runMigrations = <R>(loader: Migrator.Loader<R>, dialect: Dialect) =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
+const migrations: Array<[id: number, name: string, effect: Effect.Effect<void, SqlError.SqlError, SqlClient.SqlClient>]> = [
+  [1, "create_schema", m0001],
+  [2, "create_user_revocations", m0002],
+  [3, "add_revert_pr_columns", m0003],
+  [4, "add_locale", m0004],
+  [5, "add_cert_renewal_tracking", m0005],
+  [6, "create_user_certificates", m0006],
+]
 
-    if (dialect === "sqlite") {
-      yield* sql`PRAGMA busy_timeout = 5000`
-    }
+const runMigrations = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
 
-    if (dialect === "sqlite") {
-      yield* sql`
-        CREATE TABLE IF NOT EXISTS _migrations (
-          id INTEGER PRIMARY KEY,
-          name TEXT NOT NULL,
-          applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-      `
-    } else {
-      yield* sql`
-        CREATE TABLE IF NOT EXISTS _migrations (
-          id INTEGER PRIMARY KEY,
-          name TEXT NOT NULL,
-          applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `
-    }
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS _migrations (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `
 
-    const applied = yield* sql`SELECT id FROM _migrations ORDER BY id`
-    const appliedIds = new Set(applied.map((r: any) => r.id))
+  const applied = yield* sql`SELECT id FROM _migrations ORDER BY id`
+  const appliedIds = new Set(applied.map((r: any) => r.id))
 
-    const migrations = yield* loader
-    const sorted = [...migrations].sort(([a], [b]) => a - b)
+  yield* Effect.log(`migrations: discovered ${migrations.length}, already applied ${appliedIds.size}`)
 
-    if (sorted.length === 0) {
-      yield* Effect.die(new Error(`No migrations discovered for dialect "${dialect}". Check import.meta.glob paths.`))
-    }
+  let newCount = 0
+  for (const [id, name, migration] of migrations) {
+    if (appliedIds.has(id)) continue
+    yield* migration.pipe(Effect.tapError((e) => Effect.logError(`migration ${id}_${name} failed`, e)))
+    yield* sql`INSERT INTO _migrations (id, name) VALUES (${id}, ${name})`
+    yield* Effect.log(`migration ${id}_${name} applied`)
+    newCount++
+  }
 
-    yield* Effect.log(`migrations: discovered ${sorted.length}, already applied ${appliedIds.size} [${dialect}]`)
-
-    let newCount = 0
-    for (const [id, name, load] of sorted) {
-      if (appliedIds.has(id)) continue
-      const mod = yield* load
-      const migration = Effect.isEffect(mod) ? mod : ((mod as any).default?.default ?? (mod as any).default)
-      if (!Effect.isEffect(migration)) {
-        yield* Effect.die(new Error(`Migration ${id}_${name}: default export is not an Effect`))
-      }
-      yield* (migration as Effect.Effect<void>).pipe(
-        Effect.tapError((e) => Effect.logError(`migration ${id}_${name} failed`, e)),
-      )
-      yield* sql`INSERT INTO _migrations (id, name) VALUES (${id}, ${name})`
-      yield* Effect.log(`migration ${id}_${name} applied`)
-      newCount++
-    }
-
-    if (newCount > 0) {
-      yield* Effect.log(`migrations: ${newCount} new migration(s) applied`)
-    } else {
-      yield* Effect.log(`migrations: all ${sorted.length} already applied, nothing to do`)
-    }
-  })
+  if (newCount > 0) {
+    yield* Effect.log(`migrations: ${newCount} new migration(s) applied`)
+  } else {
+    yield* Effect.log(`migrations: all ${migrations.length} already applied, nothing to do`)
+  }
+})
 
 // ---------------------------------------------------------------------------
-// Migrator layer (glob-based, works with Vite and Vitest)
+// Combined layer: Client + migrations
 // ---------------------------------------------------------------------------
-
-const sqliteMigrations = import.meta.glob("./migrations/sqlite/*.ts")
-const pgMigrations = import.meta.glob("./migrations/pg/*.ts")
-
-const ClientLive = currentDialect === "pg" ? PgClientLive : SqliteClientLive
 
 export const MigratorLive = Layer.effect(
   MigrationsRan,
-  runMigrations(Migrator.fromGlob(currentDialect === "pg" ? pgMigrations : sqliteMigrations), currentDialect).pipe(
-    Effect.as(true as const),
-  ),
+  runMigrations.pipe(Effect.as(true as const)),
 )
 
 /**
@@ -142,13 +92,20 @@ export const MigratorLive = Layer.effect(
  * Provides SqlClient.SqlClient and MigrationsRan.
  * Migrations run before any downstream layer is built.
  */
-export const DbLive = MigratorLive.pipe(Layer.provideMerge(ClientLive))
+export const DbLive = MigratorLive.pipe(Layer.provideMerge(PgClientLive))
 
-// Tests always use SQLite
-export const makeTestDbLayer = (filename: string) => {
-  const testMigrations = import.meta.glob("./migrations/sqlite/*.ts")
-  return Layer.effect(
-    MigrationsRan,
-    runMigrations(Migrator.fromGlob(testMigrations), "sqlite").pipe(Effect.as(true as const)),
-  ).pipe(Layer.provideMerge(makeTestClientLayer(filename)))
+/**
+ * Test layer: uses a PG connection from DATABASE_URL env var.
+ * Runs migrations then truncates all data tables for a clean test state.
+ */
+export const makeTestDbLayer = () => {
+  const migrateAndClean = Effect.gen(function* () {
+    yield* runMigrations
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`TRUNCATE invites, user_revocations, user_preferences, user_certificates RESTART IDENTITY CASCADE`
+  }).pipe(Effect.as(true as const))
+
+  return Layer.effect(MigrationsRan, migrateAndClean).pipe(
+    Layer.provideMerge(PgClientLive),
+  )
 }

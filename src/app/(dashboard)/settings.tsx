@@ -1,0 +1,90 @@
+import { useTranslation } from "react-i18next"
+import { useLoaderData } from "expo-router"
+import type { LoaderFunction } from "expo-server"
+import { Effect } from "effect"
+import { useAction } from "~/hooks/useAction"
+import type { SettingsResult } from "~/lib/mutations/settings"
+import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
+import { Alert, Button, Field, Heading, Stack } from "@duro-app/ui"
+import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
+import { CertificateSection } from "~/components/CertificateSection/CertificateSection"
+import styles from "~/routes/settings.module.css"
+
+interface SettingsLoaderData {
+  locale: string
+  currentLocale: string
+  email: string | null
+  lastCertRenewalAt: string | null
+  p12Password: string | null
+  certificates: UserCertificate[]
+}
+
+export const loader: LoaderFunction<SettingsLoaderData> = async (request) => {
+  const { requireAuth } = await import("~/lib/auth.server")
+  const { runEffect } = await import("~/lib/runtime.server")
+  const { PreferencesRepo } = await import("~/lib/services/PreferencesRepo.server")
+  const { CertManager } = await import("~/lib/services/CertManager.server")
+  const { CertificateRepo } = await import("~/lib/services/CertificateRepo.server")
+  const { resolveLocale } = await import("~/lib/i18n.server")
+
+  const auth = await requireAuth(request as unknown as Request)
+  const { locale, lastCertRenewal, p12Password, certificates } = await runEffect(
+    Effect.gen(function* () {
+      const prefs = yield* PreferencesRepo
+      const cert = yield* CertManager
+      const certRepo = yield* CertificateRepo
+      const locale = yield* prefs.getLocale(auth.user!)
+      const lastCertRenewal = yield* prefs.getLastCertRenewal(auth.user!)
+      const p12Password = lastCertRenewal.renewalId
+        ? yield* cert.getP12Password(lastCertRenewal.renewalId).pipe(Effect.catchAll(() => Effect.succeed(null)))
+        : null
+      const certificates = yield* certRepo.listValid(auth.user!).pipe(Effect.catchAll(() => Effect.succeed([])))
+      return { locale, lastCertRenewal, p12Password, certificates }
+    }),
+  )
+  return {
+    locale,
+    currentLocale: resolveLocale(request as unknown as Request),
+    email: auth.email,
+    lastCertRenewalAt: lastCertRenewal.at?.toISOString() ?? null,
+    p12Password,
+    certificates,
+  }
+}
+
+export default function SettingsPage() {
+  const { t } = useTranslation()
+  const loaderData = useLoaderData<typeof loader>()
+  const localeAction = useAction<SettingsResult>("/settings")
+  const actionData = localeAction.data
+
+  return (
+    <main className={styles.page}>
+      <Heading level={1}>{t("settings.heading")}</Heading>
+
+      {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
+
+      <localeAction.Form>
+        <input type="hidden" name="intent" value="saveLocale" />
+        <Stack gap="lg">
+          <Field.Root>
+            <Field.Label>{t("settings.languageLabel")}</Field.Label>
+            <LanguageSelect defaultValue={loaderData.locale} />
+            <Field.Description>{t("settings.languageHint")}</Field.Description>
+          </Field.Root>
+
+          <Button type="submit" variant="primary">
+            {t("common.save")}
+          </Button>
+        </Stack>
+      </localeAction.Form>
+
+      <CertificateSection
+        email={loaderData.email}
+        p12Password={loaderData.p12Password}
+        lastCertRenewalAt={loaderData.lastCertRenewalAt}
+        certificates={loaderData.certificates}
+      />
+    </main>
+  )
+}
