@@ -4,7 +4,7 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "dev": "expo start --web",
+    "dev": "NODE_ENV=development expo start --web",
     "build": "expo export --platform web",
     "start": "expo serve",
     "lint": "eslint app/ src/",
@@ -15,7 +15,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@duro-app/ui": "^0.8.5",
+    "@duro-app/ui": "^0.10.0",
     "@effect/experimental": "^0.58.0",
     "@effect/opentelemetry": "^0.61.0",
     "@effect/platform": "^0.94.5",

@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect } from "react"
-import { useTranslation } from "react-i18next"
+import { Trans, useTranslation } from "react-i18next"
 import { useLoaderData } from "expo-router"
 import type { LoaderFunction } from "expo-server"
 import { Effect } from "effect"
@@ -7,7 +7,7 @@ import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { InvitePasswordReveal } from "~/components/InvitePasswordReveal/InvitePasswordReveal"
 import { CertCheck } from "~/components/CertCheck/CertCheck"
-import { Alert, Heading, Text } from "@duro-app/ui"
+import { Alert, Heading, Stack, Text } from "@duro-app/ui"
 
 type InviteLoaderData =
   | { valid: false; error: string; appName: string; healthUrl: string }
@@ -57,7 +57,14 @@ export const loader: LoaderFunction<InviteLoaderData> = async (request, params) 
     }
   } catch {
     // Dev mode fallback — dynamic imports don't resolve in Metro dev loader bundles
-    return { valid: false, error: "Dev mode", appName: "Duro", healthUrl: "/health" }
+    return {
+      valid: true,
+      email: "dev@localhost",
+      groupNames: ["family"],
+      p12Password: "dev-p12-password",
+      appName: "Duro",
+      healthUrl: "/health",
+    }
   }
 }
 
@@ -97,17 +104,23 @@ export default function InvitePage() {
 
   return (
     <CenteredCardPage>
-      <Heading level={1}>{t("invite.title", { appName: loaderData.appName })}</Heading>
-      <p style={{ color: "#999", marginBottom: 8 }} dangerouslySetInnerHTML={{ __html: t("invite.subtitle", { email: loaderData.email }) }} />
+      <Stack gap="lg">
+        <Stack gap="sm">
+          <Heading level={1}>{t("invite.title", { appName: loaderData.appName })}</Heading>
+          <Text as="p" color="muted">
+            <Trans i18nKey="invite.subtitle" values={{ email: loaderData.email }} components={{ strong: <strong /> }} />
+          </Text>
 
-      {loaderData.groupNames?.length > 0 && (
-        <Text variant="bodySm" color="muted" as="p">
-          {t("invite.groupsLabel", { groups: loaderData.groupNames.join(", ") })}
-        </Text>
-      )}
+          {loaderData.groupNames?.length > 0 && (
+            <Text variant="bodySm" color="muted" as="p">
+              {t("invite.groupsLabel", { groups: loaderData.groupNames.join(", ") })}
+            </Text>
+          )}
+        </Stack>
 
-      <InvitePasswordReveal p12Password={loaderData.p12Password} />
-      <CertCheck status={certStatus} onRecheck={recheck} />
+        <InvitePasswordReveal p12Password={loaderData.p12Password} />
+        <CertCheck status={certStatus} onRecheck={recheck} />
+      </Stack>
     </CenteredCardPage>
   )
 }

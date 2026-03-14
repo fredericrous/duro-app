@@ -23,24 +23,27 @@ const styles = css.create({
 interface HeaderProps {
   user: string
   isAdmin: boolean
+  showMenu?: boolean
 }
 
-export function Header({ user, isAdmin }: HeaderProps) {
+export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
   const { t } = useTranslation()
 
   return (
     <html.header style={styles.header}>
-      <Link href="/" style={{ fontSize: 28, fontWeight: "700", textDecoration: "none", color: "#fff" } as any}>
+      <Link href="/" style={styles.title as any}>
         {t("common.appTitle")}
       </Link>
-      <Menu.Root>
-        <Menu.Trigger>{t("header.welcome", { user })} &#9662;</Menu.Trigger>
-        <Menu.Popup align="end">
-          {isAdmin && <Menu.LinkItem href="/admin">{t("common.admin")}</Menu.LinkItem>}
-          <Menu.LinkItem href="/settings">{t("common.settings")}</Menu.LinkItem>
-          <Menu.LinkItem href="/auth/logout">{t("common.logout")}</Menu.LinkItem>
-        </Menu.Popup>
-      </Menu.Root>
+      {showMenu && (
+        <Menu.Root>
+          <Menu.Trigger>{t("header.welcome", { user })} &#9662;</Menu.Trigger>
+          <Menu.Popup align="end">
+            {isAdmin && <Menu.LinkItem href="/admin">{t("common.admin")}</Menu.LinkItem>}
+            <Menu.LinkItem href="/settings">{t("common.settings")}</Menu.LinkItem>
+            <Menu.LinkItem href="/auth/logout">{t("common.logout")}</Menu.LinkItem>
+          </Menu.Popup>
+        </Menu.Root>
+      )}
     </html.header>
   )
 }

@@ -6,29 +6,13 @@ import { Effect } from "effect"
 import type { Invite } from "~/lib/services/InviteRepo.server"
 import { useAction } from "~/hooks/useAction"
 import type { AdminInvitesResult } from "~/lib/mutations/admin-invites"
-import { Alert, Button, Cluster, Field, Inline, Input, Text } from "@duro-app/ui"
+import { Alert, Button, Checkbox, Cluster, Field, Inline, Input, ScrollArea, Text } from "@duro-app/ui"
+import { Header } from "~/components/Header/Header"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 import { PendingInviteRow } from "~/components/admin/PendingInviteRow"
 import { FailedInviteRow } from "~/components/admin/FailedInviteRow"
 import { Table } from "@duro-app/ui"
-import { css, html } from "react-strict-dom"
-
-const s = css.create({
-  tableContainer: {
-    overflowX: "auto",
-  },
-})
-
-const inv = css.create({
-  checkboxLabel: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    fontSize: "0.875rem",
-    cursor: "pointer",
-  },
-})
 
 interface Group {
   id: number
@@ -36,16 +20,22 @@ interface Group {
 }
 
 interface AdminInvitesLoaderData {
+  user: string
+  isAdmin: boolean
   groups: Group[]
   pendingInvites: Invite[]
   failedInvites: Invite[]
 }
 
-export const loader: LoaderFunction<AdminInvitesLoaderData> = async () => {
+export const loader: LoaderFunction<AdminInvitesLoaderData> = async (request) => {
   try {
+    const { requireAuth } = await import("~/lib/auth.server")
+    const { config } = await import("~/lib/config.server")
     const { runEffect } = await import("~/lib/runtime.server")
     const { UserManager } = await import("~/lib/services/UserManager.server")
     const { InviteRepo } = await import("~/lib/services/InviteRepo.server")
+
+    const auth = await requireAuth(request as unknown as Request)
 
     const [groups, pendingInvites, failedInvites] = await Promise.all([
       runEffect(
@@ -69,13 +59,18 @@ export const loader: LoaderFunction<AdminInvitesLoaderData> = async () => {
     ])
 
     return {
+      user: auth.user ?? "",
+      isAdmin: auth.groups.includes(config.adminGroupName),
       groups: groups as Group[],
       pendingInvites: pendingInvites as Invite[],
       failedInvites: failedInvites as Invite[],
     }
-  } catch {
+  } catch (e) {
+    if (e instanceof Response) throw e
     // Dev mode fallback — dynamic imports don't resolve in Metro dev loader bundles
     return {
+      user: "dev",
+      isAdmin: true,
       groups: [],
       pendingInvites: [],
       failedInvites: [],
@@ -85,7 +80,7 @@ export const loader: LoaderFunction<AdminInvitesLoaderData> = async () => {
 
 export default function AdminInvitesPage() {
   const { t } = useTranslation()
-  const { groups, pendingInvites, failedInvites } = useLoaderData<typeof loader>()
+  const { user, isAdmin, groups, pendingInvites, failedInvites } = useLoaderData<typeof loader>()
   const inviteAction = useAction<AdminInvitesResult>("/admin/invites")
   const formRef = useRef<HTMLFormElement>(null)
   const isSubmitting = inviteAction.state !== "idle"
@@ -101,6 +96,7 @@ export default function AdminInvitesPage() {
 
   return (
     <>
+      <Header user={user} isAdmin={isAdmin} />
       <CardSection title={t("admin.invites.sendTitle")}>
         {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
         {actionData && "success" in actionData && actionData.success && (
@@ -108,7 +104,7 @@ export default function AdminInvitesPage() {
         )}
         {hasRevocationWarning && (
           <Alert variant="warning">
-            <p>{actionData.warning}</p>
+            <Text as="p">{actionData.warning}</Text>
             <inviteAction.Form>
               <input type="hidden" name="email" value={actionData.email} />
               <input type="hidden" name="confirmed" value="true" />
@@ -133,10 +129,9 @@ export default function AdminInvitesPage() {
             <Field.Label>{t("admin.invites.groupsLabel")}</Field.Label>
             <Cluster gap="ms">
               {groups.map((g) => (
-                <html.label key={g.id} style={inv.checkboxLabel}>
-                  <input type="checkbox" name="groups" value={`${g.id}|${g.displayName}`} />
-                  <html.span>{g.displayName}</html.span>
-                </html.label>
+                <Checkbox key={g.id} name="groups" value={`${g.id}|${g.displayName}`}>
+                  {g.displayName}
+                </Checkbox>
               ))}
             </Cluster>
           </Field.Root>
@@ -154,23 +149,30 @@ export default function AdminInvitesPage() {
 
       {failedInvites.length > 0 && (
         <CardSection title={`${t("admin.invites.failedTitle")} (${failedInvites.length})`}>
-          <html.div style={s.tableContainer}>
-            <Table.Root columns={4}>
-              <Table.Header>
-                <Table.Row>
-                  <Table.HeaderCell>{t("admin.invites.cols.email")}</Table.HeaderCell>
-                  <Table.HeaderCell>{t("admin.invites.cols.error")}</Table.HeaderCell>
-                  <Table.HeaderCell>{t("admin.invites.cols.failedAt")}</Table.HeaderCell>
-                  <Table.HeaderCell>{t("admin.invites.cols.actions")}</Table.HeaderCell>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {failedInvites.map((i) => (
-                  <FailedInviteRow key={i.id} invite={i} />
-                ))}
-              </Table.Body>
-            </Table.Root>
-          </html.div>
+          <ScrollArea.Root>
+            <ScrollArea.Viewport>
+              <ScrollArea.Content>
+                <Table.Root columns={4}>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.HeaderCell>{t("admin.invites.cols.email")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("admin.invites.cols.error")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("admin.invites.cols.failedAt")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("admin.invites.cols.actions")}</Table.HeaderCell>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {failedInvites.map((i) => (
+                      <FailedInviteRow key={i.id} invite={i} />
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+              </ScrollArea.Content>
+            </ScrollArea.Viewport>
+            <ScrollArea.Scrollbar orientation="horizontal">
+              <ScrollArea.Thumb orientation="horizontal" />
+            </ScrollArea.Scrollbar>
+          </ScrollArea.Root>
         </CardSection>
       )}
 
@@ -180,25 +182,32 @@ export default function AdminInvitesPage() {
             {t("admin.invites.noActive")}
           </Text>
         ) : (
-          <html.div style={s.tableContainer}>
-            <Table.Root columns={6}>
-              <Table.Header>
-                <Table.Row>
-                  <Table.HeaderCell>{t("admin.invites.cols.email")}</Table.HeaderCell>
-                  <Table.HeaderCell>{t("admin.invites.cols.groups")}</Table.HeaderCell>
-                  <Table.HeaderCell>{t("admin.invites.cols.status")}</Table.HeaderCell>
-                  <Table.HeaderCell>{t("admin.invites.cols.invitedBy")}</Table.HeaderCell>
-                  <Table.HeaderCell>{t("admin.invites.cols.expires")}</Table.HeaderCell>
-                  <Table.HeaderCell>{t("admin.invites.cols.actions")}</Table.HeaderCell>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {pendingInvites.map((i) => (
-                  <PendingInviteRow key={i.id} invite={i} />
-                ))}
-              </Table.Body>
-            </Table.Root>
-          </html.div>
+          <ScrollArea.Root>
+            <ScrollArea.Viewport>
+              <ScrollArea.Content>
+                <Table.Root columns={6}>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.HeaderCell>{t("admin.invites.cols.email")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("admin.invites.cols.groups")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("admin.invites.cols.status")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("admin.invites.cols.invitedBy")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("admin.invites.cols.expires")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("admin.invites.cols.actions")}</Table.HeaderCell>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {pendingInvites.map((i) => (
+                      <PendingInviteRow key={i.id} invite={i} />
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+              </ScrollArea.Content>
+            </ScrollArea.Viewport>
+            <ScrollArea.Scrollbar orientation="horizontal">
+              <ScrollArea.Thumb orientation="horizontal" />
+            </ScrollArea.Scrollbar>
+          </ScrollArea.Root>
         )}
       </CardSection>
     </>

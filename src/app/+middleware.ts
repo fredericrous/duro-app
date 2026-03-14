@@ -1,6 +1,6 @@
 import { getSession } from "~/lib/session.server"
 
-const PUBLIC_PREFIXES = ["/health", "/auth/"]
+const PUBLIC_PREFIXES = ["/health", "/auth/", "/invite/"]
 
 export default async function middleware(request: Request) {
   const url = new URL(request.url)

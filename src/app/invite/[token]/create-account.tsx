@@ -1,33 +1,12 @@
 import { Suspense, useState } from "react"
-import { useTranslation } from "react-i18next"
+import { Trans, useTranslation } from "react-i18next"
 import { useLoaderData } from "expo-router"
 import type { LoaderFunction } from "expo-server"
 import { Effect } from "effect"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { CertGate } from "~/components/CertGate/CertGate"
-import { Alert, Heading } from "@duro-app/ui"
-import { css, html } from "react-strict-dom"
-
-const styles = css.create({
-  checkingCert: {
-    color: "#999",
-    fontSize: "0.875rem",
-  },
-  homeLink: {
-    display: "block",
-    width: "100%",
-    marginTop: 16,
-    padding: "8px 16px",
-    borderRadius: 4,
-    fontSize: "0.875rem",
-    fontWeight: "500",
-    textAlign: "center",
-    textDecoration: "none",
-    backgroundColor: "#6366f1",
-    color: "#fff",
-  },
-})
+import { Alert, Heading, LinkButton, Text } from "@duro-app/ui"
 
 type CreateAccountLoaderData =
   | { valid: false; error: string; appName: string; healthUrl: string; homeUrl?: string }
@@ -93,8 +72,8 @@ export default function CreateAccountPage() {
       return (
         <CenteredCardPage>
           <Heading level={1}>{t("createAccount.success.title")}</Heading>
-          <Alert variant="success"><p>{t("createAccount.success.message")}</p></Alert>
-          <html.a href={loaderData.homeUrl} style={styles.homeLink}>{t("createAccount.success.goHome")}</html.a>
+          <Alert variant="success"><Text as="p">{t("createAccount.success.message")}</Text></Alert>
+          <LinkButton href={loaderData.homeUrl ?? "/"} variant="primary" fullWidth>{t("createAccount.success.goHome")}</LinkButton>
         </CenteredCardPage>
       )
     }
@@ -104,8 +83,10 @@ export default function CreateAccountPage() {
   return (
     <CenteredCardPage>
       <Heading level={1}>{t("createAccount.heading")}</Heading>
-      <p style={{ color: "#999", marginBottom: 16 }} dangerouslySetInnerHTML={{ __html: t("createAccount.subtitle", { email: loaderData.email }) }} />
-      <Suspense fallback={<html.p style={styles.checkingCert}>{t("createAccount.certCheck")}</html.p>}>
+      <Text as="p" color="muted">
+        <Trans i18nKey="createAccount.subtitle" values={{ email: loaderData.email }} components={{ strong: <strong /> }} />
+      </Text>
+      <Suspense fallback={<Text as="p" color="muted" variant="bodySm">{t("createAccount.certCheck")}</Text>}>
         <CertGate certPromise={certPromise} actionData={undefined} />
       </Suspense>
     </CenteredCardPage>

@@ -1,22 +1,7 @@
 import { use, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { Alert, Button, Field, Heading, Input } from "@duro-app/ui"
+import { Alert, Button, Field, Heading, Input, LinkButton, Text } from "@duro-app/ui"
 import { useAction } from "~/hooks/useAction"
-import { css, html } from "react-strict-dom"
-
-const styles = css.create({
-  certBackLink: {
-    display: "inline-block",
-    marginTop: 8,
-    padding: "8px 20px",
-    borderRadius: 4,
-    fontSize: "0.875rem",
-    fontWeight: "500",
-    backgroundColor: "#6366f1",
-    color: "#fff",
-    textDecoration: "none",
-  },
-})
 
 export function CertGate({
   certPromise,
@@ -37,10 +22,10 @@ export function CertGate({
         <Heading level={2} variant="headingSm">
           {t("createAccount.certRequired.title")}
         </Heading>
-        <html.p>{t("createAccount.certRequired.message")}</html.p>
-        <html.a href=".." style={styles.certBackLink}>
+        <Text as="p">{t("createAccount.certRequired.message")}</Text>
+        <LinkButton href=".." variant="primary">
           {t("createAccount.certRequired.back")}
-        </html.a>
+        </LinkButton>
       </Alert>
     )
   }

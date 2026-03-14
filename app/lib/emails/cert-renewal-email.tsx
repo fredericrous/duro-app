@@ -1,6 +1,7 @@
 "use no memo"
 
 import { Body, Container, Head, Heading, Html, Preview, Section, Text, Hr } from "@react-email/components"
+import { Trans } from "react-i18next/TransWithoutContext"
 import type { TFunction } from "i18next"
 
 interface CertRenewalEmailProps {
@@ -17,7 +18,9 @@ export function CertRenewalEmail({ appName, t }: CertRenewalEmailProps) {
         <Container style={container}>
           <Heading style={heading}>{t("email.renewal.heading")}</Heading>
 
-          <Text style={text} dangerouslySetInnerHTML={{ __html: t("email.renewal.body", { appName }) }} />
+          <Text style={text}>
+            <Trans t={t} i18nKey="email.renewal.body" values={{ appName }} components={{ strong: <strong /> }} />
+          </Text>
 
           <Hr style={hr} />
 
@@ -27,8 +30,12 @@ export function CertRenewalEmail({ appName, t }: CertRenewalEmailProps) {
             </Heading>
             <Text style={text}>{t("email.renewal.install.body", { appName })}</Text>
 
-            <Text style={textSmall} dangerouslySetInnerHTML={{ __html: t("email.renewal.install.macos") }} />
-            <Text style={textSmall} dangerouslySetInnerHTML={{ __html: t("email.renewal.install.windows") }} />
+            <Text style={textSmall}>
+              <Trans t={t} i18nKey="email.renewal.install.macos" components={{ strong: <strong /> }} />
+            </Text>
+            <Text style={textSmall}>
+              <Trans t={t} i18nKey="email.renewal.install.windows" components={{ strong: <strong /> }} />
+            </Text>
           </Section>
 
           <Hr style={hr} />

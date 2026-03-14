@@ -2,19 +2,7 @@ import { useTranslation } from "react-i18next"
 import type { Invite } from "~/lib/services/InviteRepo.server"
 import type { AdminInvitesResult } from "~/lib/mutations/admin-invites"
 import { useAction } from "~/hooks/useAction"
-import { Button, Inline, Table } from "@duro-app/ui"
-import { css, html } from "react-strict-dom"
-
-const styles = css.create({
-  errorText: {
-    color: "#fca5a5",
-    fontSize: "0.8rem",
-    maxWidth: 300,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-})
+import { Button, Inline, Table, Text } from "@duro-app/ui"
 
 export function FailedInviteRow({ invite }: { invite: Invite }) {
   const { t } = useTranslation()
@@ -27,7 +15,7 @@ export function FailedInviteRow({ invite }: { invite: Invite }) {
     <Table.Row>
       <Table.Cell>{invite.email}</Table.Cell>
       <Table.Cell>
-        <html.span style={styles.errorText}>{invite.lastError ?? "Unknown error"}</html.span>
+        <Text variant="bodySm" color="error">{invite.lastError ?? "Unknown error"}</Text>
       </Table.Cell>
       <Table.Cell>{invite.failedAt ? new Date(invite.failedAt).toLocaleString() : "\u2014"}</Table.Cell>
       <Table.Cell>

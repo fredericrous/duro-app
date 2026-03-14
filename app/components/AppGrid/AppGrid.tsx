@@ -1,9 +1,8 @@
 import { useTranslation } from "react-i18next"
 import type { AppDefinition } from "~/lib/apps"
 import { getCategoryOrder, formatCategory, groupAppsByCategory } from "~/lib/apps"
-import { Stack, Text } from "@duro-app/ui"
+import { Grid, Stack, Text } from "@duro-app/ui"
 import { AppCard } from "../AppCard/AppCard"
-import styles from "./AppGrid.module.css"
 
 interface AppGridProps {
   apps: AppDefinition[]
@@ -22,7 +21,7 @@ export function AppGrid({ apps, categoryOrder }: AppGridProps) {
   }
 
   return (
-    <div className={styles.container}>
+    <Stack gap="xl">
       {order.map((category) => {
         const categoryApps = grouped.get(category)
         if (!categoryApps || categoryApps.length === 0) return null
@@ -33,15 +32,15 @@ export function AppGrid({ apps, categoryOrder }: AppGridProps) {
               <Text variant="overline" color="muted" as="div">
                 {categoryLabel(category)}
               </Text>
-              <div className={styles.grid}>
+              <Grid gap="md" minColumnWidth="120px">
                 {categoryApps.map((app) => (
                   <AppCard key={app.id} app={app} />
                 ))}
-              </div>
+              </Grid>
             </Stack>
           </section>
         )
       })}
-    </div>
+    </Stack>
   )
 }

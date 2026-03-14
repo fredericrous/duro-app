@@ -1,1 +1,6 @@
 @react-strict-dom;
+
+body {
+  background-color: var(--xqkwqtp);
+  color: var(--xlpbogt);
+}

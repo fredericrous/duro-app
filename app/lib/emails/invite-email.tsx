@@ -1,6 +1,7 @@
 "use no memo"
 
 import { Body, Container, Head, Heading, Html, Link, Preview, Section, Text, Button, Hr } from "@react-email/components"
+import { Trans } from "react-i18next/TransWithoutContext"
 import type { TFunction } from "i18next"
 
 interface InviteEmailProps {
@@ -29,9 +30,15 @@ export function InviteEmail({ inviteUrl, reinviteUrl, invitedBy, appName, appDes
             <Heading as="h2" style={subheading}>
               {t("email.invite.step1.title")}
             </Heading>
-            <Text style={text} dangerouslySetInnerHTML={{ __html: t("email.invite.step1.body") }} />
-            <Text style={textSmall} dangerouslySetInnerHTML={{ __html: t("email.invite.step1.macos") }} />
-            <Text style={textSmall} dangerouslySetInnerHTML={{ __html: t("email.invite.step1.windows") }} />
+            <Text style={text}>
+              <Trans t={t} i18nKey="email.invite.step1.body" components={{ strong: <strong /> }} />
+            </Text>
+            <Text style={textSmall}>
+              <Trans t={t} i18nKey="email.invite.step1.macos" components={{ strong: <strong /> }} />
+            </Text>
+            <Text style={textSmall}>
+              <Trans t={t} i18nKey="email.invite.step1.windows" components={{ strong: <strong /> }} />
+            </Text>
           </Section>
 
           <Section style={section}>
@@ -50,16 +57,12 @@ export function InviteEmail({ inviteUrl, reinviteUrl, invitedBy, appName, appDes
           <Hr style={hr} />
 
           <Text style={footer}>
-            {t("email.invite.footer", { reinviteUrl }).split("<a").length > 1 ? (
-              <span dangerouslySetInnerHTML={{ __html: t("email.invite.footer", { reinviteUrl }) }} />
-            ) : (
-              <>
-                {t("email.invite.footer", { reinviteUrl })}{" "}
-                <Link href={reinviteUrl} style={footerLink}>
-                  Request one here
-                </Link>
-              </>
-            )}
+            <Trans
+              t={t}
+              i18nKey="email.invite.footer"
+              values={{ reinviteUrl }}
+              components={{ a: <Link href={reinviteUrl} style={footerLink} /> }}
+            />
           </Text>
         </Container>
       </Body>

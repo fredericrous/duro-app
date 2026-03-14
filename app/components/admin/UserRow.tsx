@@ -6,12 +6,7 @@ import { certStatus } from "~/lib/cert-status"
 import { useAction } from "~/hooks/useAction"
 import { AdminCertRow } from "./AdminCertRow"
 import { RevokeAllButton } from "./RevokeAllButton"
-import { Badge, Button, Inline, Input, Table } from "@duro-app/ui"
-import { css, html } from "react-strict-dom"
-
-const styles = css.create({
-  revokeAllWrapper: { marginTop: 8 },
-})
+import { Badge, Button, Inline, Input, Stack, Table } from "@duro-app/ui"
 
 const API_URL = "/admin/users"
 
@@ -127,9 +122,9 @@ export function UserRow({
               </Table.Body>
             </Table.Root>
             {activeCerts.length > 1 && (
-              <html.div style={styles.revokeAllWrapper}>
+              <Stack gap="sm">
                 <RevokeAllButton username={user.id} action={revokeAllAction} />
-              </html.div>
+              </Stack>
             )}
           </td>
         </Table.Row>

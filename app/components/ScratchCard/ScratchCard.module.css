@@ -2,6 +2,13 @@
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+}
+
+.container > *:not(.canvas) {
+  flex: 1;
+  min-height: 0;
 }
 
 .canvas {

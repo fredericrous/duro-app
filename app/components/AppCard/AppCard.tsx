@@ -1,7 +1,22 @@
 import type { AppDefinition } from "~/lib/apps"
-import { Card, Text } from "@duro-app/ui"
+import { Card, Stack, Text } from "@duro-app/ui"
 import { Icon } from "../Icon"
-import styles from "./AppCard.module.css"
+import { css, html } from "react-strict-dom"
+
+const styles = css.create({
+  link: {
+    textDecoration: "none",
+    color: "inherit",
+  },
+  icon: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 48,
+    height: 48,
+    color: "var(--color-accent)",
+  },
+})
 
 interface AppCardProps {
   app: AppDefinition
@@ -9,15 +24,15 @@ interface AppCardProps {
 
 export function AppCard({ app }: AppCardProps) {
   return (
-    <a href={app.url} className={styles.link} target="_blank" rel="noopener noreferrer">
+    <html.a href={app.url} style={styles.link} target="_blank" rel="noopener noreferrer">
       <Card variant="interactive" size="compact">
-        <div className={styles.content}>
-          <div className={styles.icon}>
+        <Stack align="center" gap="sm">
+          <html.div style={styles.icon}>
             <Icon svg={app.icon} size={32} />
-          </div>
+          </html.div>
           <Text variant="label">{app.name}</Text>
-        </div>
+        </Stack>
       </Card>
-    </a>
+    </html.a>
   )
 }
