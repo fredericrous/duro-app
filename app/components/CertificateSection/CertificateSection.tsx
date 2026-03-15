@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 import type { SettingsResult } from "~/lib/mutations/settings"
@@ -106,9 +106,9 @@ export function CertificateSection({
 
   const justSent = certData && "certSent" in certData
 
-  // Rate limit check
+  // Rate limit check — computed once on mount to avoid impure Date.now() during render
   const isRateLimited = certData && "rateLimited" in certData
-  const { cooldownRemaining, nextAvailableText } = useMemo(() => {
+  const [cooldownState] = useState(() => {
     let cooldown = false
     let text = ""
     if (lastCertRenewalAt) {
@@ -119,12 +119,13 @@ export function CertificateSection({
         text = new Date(new Date(lastCertRenewalAt).getTime() + twentyFourHours).toLocaleString()
       }
     }
-    if (isRateLimited && certData.nextAvailable) {
-      cooldown = true
-      text = new Date(certData.nextAvailable).toLocaleString()
-    }
-    return { cooldownRemaining: cooldown, nextAvailableText: text }
-  }, [lastCertRenewalAt, isRateLimited, certData])
+    return { cooldown, text }
+  })
+  let { cooldown: cooldownRemaining, text: nextAvailableText } = cooldownState
+  if (isRateLimited && certData.nextAvailable) {
+    cooldownRemaining = true
+    nextAvailableText = new Date(certData.nextAvailable).toLocaleString()
+  }
 
   return (
     <html.div style={styles.certSection}>
