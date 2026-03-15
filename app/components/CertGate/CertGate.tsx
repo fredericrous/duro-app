@@ -1,6 +1,7 @@
 import { use } from "react"
 import { useTranslation } from "react-i18next"
-import { Alert, Button, Field, Heading, Input, LinkButton, Text } from "@duro-app/ui"
+import { useLocalSearchParams } from "expo-router"
+import { Alert, Button, Field, Fieldset, Heading, Input, LinkButton, Text } from "@duro-app/ui"
 import { useAction } from "~/hooks/useAction"
 
 export function CertGate({
@@ -11,6 +12,7 @@ export function CertGate({
   actionData: { error?: string } | undefined
 }) {
   const { t } = useTranslation()
+  const { token } = useLocalSearchParams<{ token: string }>()
   const certInstalled = use(certPromise)
   const action = useAction<{ error?: string }>("/invite/create-account")
   const isSubmitting = action.state === "submitting"
@@ -23,7 +25,7 @@ export function CertGate({
           {t("createAccount.certRequired.title")}
         </Heading>
         <Text as="p">{t("createAccount.certRequired.message")}</Text>
-        <LinkButton href=".." variant="primary">
+        <LinkButton href={`/invite/${token}`} variant="primary">
           {t("createAccount.certRequired.back")}
         </LinkButton>
       </Alert>
@@ -35,7 +37,7 @@ export function CertGate({
       {error && <Alert variant="error">{error}</Alert>}
 
       <action.Form>
-        <fieldset disabled={isSubmitting} style={{ borderWidth: 0, padding: 0, margin: 0 }}>
+        <Fieldset.Root disabled={isSubmitting} gap="md">
           <Field.Root>
             <Field.Label>{t("createAccount.username.label")}</Field.Label>
             <Input
@@ -76,7 +78,7 @@ export function CertGate({
           <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
             {isSubmitting ? t("createAccount.submitting") : t("createAccount.submit")}
           </Button>
-        </fieldset>
+        </Fieldset.Root>
       </action.Form>
     </>
   )

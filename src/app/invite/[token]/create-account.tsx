@@ -1,4 +1,4 @@
-import { Suspense, useState } from "react"
+import { Suspense, useMemo, useState } from "react"
 import { Trans, useTranslation } from "react-i18next"
 import { useLoaderData } from "expo-router"
 import type { LoaderFunction } from "expo-server"
@@ -6,6 +6,7 @@ import { Effect } from "effect"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { CertGate } from "~/components/CertGate/CertGate"
+import { useDevOverrides } from "~/components/DevToolbar/DevToolbar"
 import { Alert, Heading, LinkButton, Text } from "@duro-app/ui"
 
 type CreateAccountLoaderData =
@@ -91,7 +92,7 @@ export const loader: LoaderFunction<CreateAccountLoaderData> = async (request, p
     }
   } catch {
     // Dev mode fallback — dynamic imports don't resolve in Metro dev loader bundles
-    return { valid: false, error: "Dev mode", appName: "Duro", healthUrl: "/health" }
+    return { valid: true, email: "dev@localhost", appName: "Duro", healthUrl: "/health" }
   }
 }
 
@@ -104,10 +105,15 @@ function checkCert(healthUrl: string): Promise<boolean> {
 export default function CreateAccountPage() {
   const { t } = useTranslation()
   const loaderData = useLoaderData<typeof loader>()
-  const [certPromise] = useState(() => {
+  const devOverrides = useDevOverrides()
+  const [realCertPromise] = useState(() => {
     if (typeof window === "undefined") return Promise.resolve(false)
     return checkCert(loaderData.healthUrl)
   })
+  const certPromise = useMemo(
+    () => (devOverrides?.certInstalled ? Promise.resolve(true) : realCertPromise),
+    [devOverrides?.certInstalled, realCertPromise],
+  )
 
   if (!loaderData.valid) {
     if (loaderData.error === "already_used") {

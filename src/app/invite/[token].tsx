@@ -7,6 +7,7 @@ import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { InvitePasswordReveal } from "~/components/InvitePasswordReveal/InvitePasswordReveal"
 import { CertCheck } from "~/components/CertCheck/CertCheck"
+import { useDevOverrides } from "~/components/DevToolbar/DevToolbar"
 import { Heading, Stack, Text } from "@duro-app/ui"
 
 type InviteLoaderData =
@@ -102,12 +103,7 @@ export const loader: LoaderFunction<InviteLoaderData> = async (request, params) 
   }
 }
 
-let certCheckCount = 0
 function checkCert(healthUrl: string): Promise<boolean> {
-  certCheckCount++
-  if (process.env.NODE_ENV === "development" && process.env.VITEST !== "true" && certCheckCount > 1) {
-    return Promise.resolve(true)
-  }
   return fetch(healthUrl, { mode: "cors" })
     .then((r) => r.ok)
     .catch(() => false)
@@ -116,7 +112,10 @@ function checkCert(healthUrl: string): Promise<boolean> {
 export default function InvitePage() {
   const { t } = useTranslation()
   const loaderData = useLoaderData<typeof loader>()
+  const devOverrides = useDevOverrides()
   const [certStatus, setCertStatus] = useState<"checking" | "installed" | "not-installed">("checking")
+
+  const effectiveCertStatus = devOverrides?.certInstalled ? "installed" : certStatus
 
   const recheck = useCallback(() => {
     setCertStatus("checking")
@@ -159,7 +158,7 @@ export default function InvitePage() {
         </Stack>
 
         <InvitePasswordReveal p12Password={loaderData.p12Password} />
-        <CertCheck status={certStatus} onRecheck={recheck} />
+        <CertCheck status={effectiveCertStatus} onRecheck={recheck} />
       </Stack>
     </CenteredCardPage>
   )

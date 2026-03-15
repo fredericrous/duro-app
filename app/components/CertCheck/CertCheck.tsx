@@ -9,9 +9,10 @@ const styles = css.create({
   },
   btnRetry: {
     padding: 8,
-    paddingLeft: 16,
-    paddingRight: 16,
-    fontSize: 13,
+    paddingLeft: 12,
+    paddingRight: 12,
+    fontSize: 14,
+    fontWeight: 500,
     backgroundColor: {
       default: "rgba(251, 191, 36, 0.15)",
       ":hover": "rgba(251, 191, 36, 0.25)",

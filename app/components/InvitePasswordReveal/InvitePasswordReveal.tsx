@@ -61,6 +61,7 @@ export function InvitePasswordReveal({ p12Password }: { p12Password: string | nu
           </ScratchCard>
           <InputGroup.Addon
             disabled={!revealed}
+            minWidth={72}
             onClick={() => {
               navigator.clipboard.writeText(p12Password)
               setCopied(true)
