@@ -9,7 +9,7 @@ RUN npm run build
 FROM node:24-alpine
 RUN adduser -u 1001 -D appuser
 WORKDIR /app
-COPY --from=builder /app/build ./build
+COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/package-lock.json ./package-lock.json
 RUN npm install --omit=dev
