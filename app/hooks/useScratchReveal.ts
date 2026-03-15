@@ -1,17 +1,13 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 export function useScratchReveal(storageKey: string) {
-  const [revealed, setRevealed] = useState(false)
-
-  useEffect(() => {
+  const [revealed, setRevealed] = useState(() => {
     try {
-      if (localStorage.getItem(storageKey) === "1") {
-        setRevealed(true)
-      }
+      return localStorage.getItem(storageKey) === "1"
     } catch {
-      // localStorage may be unavailable
+      return false
     }
-  }, [storageKey])
+  })
 
   const onReveal = () => {
     setRevealed(true)
