@@ -18,7 +18,9 @@ export function AdminCertRow({ cert }: { cert: UserCertificate }) {
   return (
     <Table.Row>
       <Table.Cell>
-        <code title={cert.serialNumber} style={{ fontFamily: "monospace" }}>{cert.serialNumber.slice(-8)}</code>
+        <code title={cert.serialNumber} style={{ fontFamily: "monospace" }}>
+          {cert.serialNumber.slice(-8)}
+        </code>
       </Table.Cell>
       <Table.Cell>{new Date(cert.issuedAt).toLocaleDateString()}</Table.Cell>
       <Table.Cell>{new Date(cert.expiresAt).toLocaleDateString()}</Table.Cell>

@@ -55,10 +55,17 @@ function handleIssueCert(auth: AuthInfo) {
     yield* prefs.setCertRenewal(auth.user!, result.renewalId)
 
     return { certSent: true as const, p12Password }
-  }).pipe(Effect.catchAll((e) => {
-    const message = e instanceof Error ? e.message : typeof e === "object" && e !== null && "message" in e ? String((e as any).message) : "Failed to send certificate"
-    return Effect.succeed({ certError: message } as SettingsResult)
-  }))
+  }).pipe(
+    Effect.catchAll((e) => {
+      const message =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null && "message" in e
+            ? String((e as any).message)
+            : "Failed to send certificate"
+      return Effect.succeed({ certError: message } as SettingsResult)
+    }),
+  )
 }
 
 function handleConsumePassword(auth: AuthInfo) {
@@ -67,11 +74,11 @@ function handleConsumePassword(auth: AuthInfo) {
     const cert = yield* CertManager
     const { renewalId } = yield* prefs.getLastCertRenewal(auth.user!)
     if (renewalId) {
-      yield* cert.deleteP12Secret(renewalId).pipe(
-        Effect.catchAll((e) =>
-          Effect.logWarning("consumePassword: failed to delete secret", { error: String(e) }),
-        ),
-      )
+      yield* cert
+        .deleteP12Secret(renewalId)
+        .pipe(
+          Effect.catchAll((e) => Effect.logWarning("consumePassword: failed to delete secret", { error: String(e) })),
+        )
       yield* prefs.clearCertRenewalId(auth.user!)
     }
     return { consumed: true as const } as SettingsResult
@@ -93,10 +100,17 @@ function handleRevokeCert(serialNumber: string, auth: AuthInfo) {
       ),
     )
     return { certRevoked: true as const } as SettingsResult
-  }).pipe(Effect.catchAll((e) => {
-    const message = e instanceof Error ? e.message : typeof e === "object" && e !== null && "message" in e ? String((e as any).message) : "Failed to revoke certificate"
-    return Effect.succeed({ certError: message } as SettingsResult)
-  }))
+  }).pipe(
+    Effect.catchAll((e) => {
+      const message =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null && "message" in e
+            ? String((e as any).message)
+            : "Failed to revoke certificate"
+      return Effect.succeed({ certError: message } as SettingsResult)
+    }),
+  )
 }
 
 function handleSaveLocale(locale: string, auth: AuthInfo) {

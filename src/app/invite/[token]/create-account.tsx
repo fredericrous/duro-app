@@ -22,7 +22,12 @@ export const loader: LoaderFunction<CreateAccountLoaderData> = async (request, p
 
     const token = params.token as string | undefined
     if (!token) {
-      return { valid: false, error: "Missing invite token", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+      return {
+        valid: false,
+        error: "Missing invite token",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
     }
 
     try {
@@ -39,15 +44,50 @@ export const loader: LoaderFunction<CreateAccountLoaderData> = async (request, p
         }),
       )
 
-      if (!invite) return { valid: false as const, error: "Invalid invite link", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
-      if (invite.usedAt) return { valid: false as const, error: "already_used", appName: config.appName, healthUrl: `${config.homeUrl}/health`, homeUrl: config.homeUrl }
-      if (new Date(invite.expiresAt) < new Date()) return { valid: false as const, error: "This invite has expired.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
-      if (invite.attempts >= 5) return { valid: false as const, error: "Too many attempts.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+      if (!invite)
+        return {
+          valid: false as const,
+          error: "Invalid invite link",
+          appName: config.appName,
+          healthUrl: `${config.homeUrl}/health`,
+        }
+      if (invite.usedAt)
+        return {
+          valid: false as const,
+          error: "already_used",
+          appName: config.appName,
+          healthUrl: `${config.homeUrl}/health`,
+          homeUrl: config.homeUrl,
+        }
+      if (new Date(invite.expiresAt) < new Date())
+        return {
+          valid: false as const,
+          error: "This invite has expired.",
+          appName: config.appName,
+          healthUrl: `${config.homeUrl}/health`,
+        }
+      if (invite.attempts >= 5)
+        return {
+          valid: false as const,
+          error: "Too many attempts.",
+          appName: config.appName,
+          healthUrl: `${config.homeUrl}/health`,
+        }
 
-      return { valid: true as const, email: invite.email, appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+      return {
+        valid: true as const,
+        email: invite.email,
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
     } catch (e) {
       if (e instanceof Response) throw e
-      return { valid: false as const, error: "Something went wrong", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+      return {
+        valid: false as const,
+        error: "Something went wrong",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
     }
   } catch {
     // Dev mode fallback — dynamic imports don't resolve in Metro dev loader bundles
@@ -56,7 +96,9 @@ export const loader: LoaderFunction<CreateAccountLoaderData> = async (request, p
 }
 
 function checkCert(healthUrl: string): Promise<boolean> {
-  return fetch(healthUrl, { mode: "cors" }).then((r) => r.ok).catch(() => false)
+  return fetch(healthUrl, { mode: "cors" })
+    .then((r) => r.ok)
+    .catch(() => false)
 }
 
 export default function CreateAccountPage() {
@@ -72,8 +114,12 @@ export default function CreateAccountPage() {
       return (
         <CenteredCardPage>
           <Heading level={1}>{t("createAccount.success.title")}</Heading>
-          <Alert variant="success"><Text as="p">{t("createAccount.success.message")}</Text></Alert>
-          <LinkButton href={loaderData.homeUrl ?? "/"} variant="primary" fullWidth>{t("createAccount.success.goHome")}</LinkButton>
+          <Alert variant="success">
+            <Text as="p">{t("createAccount.success.message")}</Text>
+          </Alert>
+          <LinkButton href={loaderData.homeUrl ?? "/"} variant="primary" fullWidth>
+            {t("createAccount.success.goHome")}
+          </LinkButton>
         </CenteredCardPage>
       )
     }
@@ -84,9 +130,19 @@ export default function CreateAccountPage() {
     <CenteredCardPage>
       <Heading level={1}>{t("createAccount.heading")}</Heading>
       <Text as="p" color="muted">
-        <Trans i18nKey="createAccount.subtitle" values={{ email: loaderData.email }} components={{ strong: <strong /> }} />
+        <Trans
+          i18nKey="createAccount.subtitle"
+          values={{ email: loaderData.email }}
+          components={{ strong: <strong /> }}
+        />
       </Text>
-      <Suspense fallback={<Text as="p" color="muted" variant="bodySm">{t("createAccount.certCheck")}</Text>}>
+      <Suspense
+        fallback={
+          <Text as="p" color="muted" variant="bodySm">
+            {t("createAccount.certCheck")}
+          </Text>
+        }
+      >
         <CertGate certPromise={certPromise} actionData={undefined} />
       </Suspense>
     </CenteredCardPage>

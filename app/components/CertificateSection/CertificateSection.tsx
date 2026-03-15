@@ -33,7 +33,9 @@ function CertRow({ cert }: { cert: UserCertificate }) {
   return (
     <Table.Row>
       <Table.Cell>
-        <code title={cert.serialNumber} style={{ fontFamily: "monospace" }}>{serialShort}</code>
+        <code title={cert.serialNumber} style={{ fontFamily: "monospace" }}>
+          {serialShort}
+        </code>
       </Table.Cell>
       <Table.Cell>{new Date(cert.issuedAt).toLocaleDateString()}</Table.Cell>
       <Table.Cell>{new Date(cert.expiresAt).toLocaleDateString()}</Table.Cell>
@@ -123,85 +125,83 @@ export function CertificateSection({
 
   return (
     <html.div style={styles.certSection}>
-    <Stack gap="md">
-      <Heading level={2}>{t("settings.cert.heading")}</Heading>
-      <Text as="p" color="muted">
-        {t("settings.cert.description")}
-      </Text>
-
-      {certData && "certError" in certData && <Alert variant="error">{certData.certError}</Alert>}
-
-      {justSent && <Alert variant="success">{t("settings.cert.success")}</Alert>}
-
-      {certData && "certRevoked" in certData && (
-        <Alert variant="success">{t("settings.cert.list.revoked")}</Alert>
-      )}
-
-      {effectivePassword && <PasswordReveal p12Password={effectivePassword} />}
-
-      {certificates.length > 0 && (
-        <ScrollArea.Root>
-          <ScrollArea.Viewport>
-            <ScrollArea.Content>
-              <Table.Root columns={4}>
-                <Table.Header>
-                  <Table.Row>
-                    <Table.HeaderCell>{t("settings.cert.list.serial")}</Table.HeaderCell>
-                    <Table.HeaderCell>{t("settings.cert.list.issued")}</Table.HeaderCell>
-                    <Table.HeaderCell>{t("settings.cert.list.expires")}</Table.HeaderCell>
-                    <Table.HeaderCell>{t("common.actions")}</Table.HeaderCell>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {certificates.map((cert) => (
-                    <CertRow key={cert.id} cert={cert} />
-                  ))}
-                </Table.Body>
-              </Table.Root>
-            </ScrollArea.Content>
-          </ScrollArea.Viewport>
-          <ScrollArea.Scrollbar orientation="horizontal">
-            <ScrollArea.Thumb orientation="horizontal" />
-          </ScrollArea.Scrollbar>
-        </ScrollArea.Root>
-      )}
-
-      {certificates.length === 0 && !effectivePassword && (
-        <Text as="p" color="muted" variant="bodySm">
-          {t("settings.cert.list.empty")}
+      <Stack gap="md">
+        <Heading level={2}>{t("settings.cert.heading")}</Heading>
+        <Text as="p" color="muted">
+          {t("settings.cert.description")}
         </Text>
-      )}
 
-      {cooldownRemaining && !effectivePassword ? (
-        <Stack gap="sm">
-          <Button disabled>{t("settings.cert.newCert")}</Button>
-          <Text as="p" variant="bodySm" color="muted">
-            {t("settings.cert.nextAvailable", { time: nextAvailableText })}
+        {certData && "certError" in certData && <Alert variant="error">{certData.certError}</Alert>}
+
+        {justSent && <Alert variant="success">{t("settings.cert.success")}</Alert>}
+
+        {certData && "certRevoked" in certData && <Alert variant="success">{t("settings.cert.list.revoked")}</Alert>}
+
+        {effectivePassword && <PasswordReveal p12Password={effectivePassword} />}
+
+        {certificates.length > 0 && (
+          <ScrollArea.Root>
+            <ScrollArea.Viewport>
+              <ScrollArea.Content>
+                <Table.Root columns={4}>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.HeaderCell>{t("settings.cert.list.serial")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("settings.cert.list.issued")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("settings.cert.list.expires")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("common.actions")}</Table.HeaderCell>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {certificates.map((cert) => (
+                      <CertRow key={cert.id} cert={cert} />
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+              </ScrollArea.Content>
+            </ScrollArea.Viewport>
+            <ScrollArea.Scrollbar orientation="horizontal">
+              <ScrollArea.Thumb orientation="horizontal" />
+            </ScrollArea.Scrollbar>
+          </ScrollArea.Root>
+        )}
+
+        {certificates.length === 0 && !effectivePassword && (
+          <Text as="p" color="muted" variant="bodySm">
+            {t("settings.cert.list.empty")}
           </Text>
-        </Stack>
-      ) : confirming ? (
-        <Stack gap="sm">
-          <Text as="p">{t("settings.cert.confirm", { email })}</Text>
-          <Inline gap="sm">
-            <certAction.Form>
-              <input type="hidden" name="intent" value="issueCert" />
-              <Button type="submit" variant="primary" disabled={isSubmitting}>
-                {isSubmitting ? t("settings.cert.issuing") : t("settings.cert.confirmButton")}
+        )}
+
+        {cooldownRemaining && !effectivePassword ? (
+          <Stack gap="sm">
+            <Button disabled>{t("settings.cert.newCert")}</Button>
+            <Text as="p" variant="bodySm" color="muted">
+              {t("settings.cert.nextAvailable", { time: nextAvailableText })}
+            </Text>
+          </Stack>
+        ) : confirming ? (
+          <Stack gap="sm">
+            <Text as="p">{t("settings.cert.confirm", { email })}</Text>
+            <Inline gap="sm">
+              <certAction.Form>
+                <input type="hidden" name="intent" value="issueCert" />
+                <Button type="submit" variant="primary" disabled={isSubmitting}>
+                  {isSubmitting ? t("settings.cert.issuing") : t("settings.cert.confirmButton")}
+                </Button>
+              </certAction.Form>
+              <Button variant="secondary" onClick={() => setConfirming(false)}>
+                {t("common.cancel")}
               </Button>
-            </certAction.Form>
-            <Button variant="secondary" onClick={() => setConfirming(false)}>
-              {t("common.cancel")}
+            </Inline>
+          </Stack>
+        ) : (
+          !effectivePassword && (
+            <Button variant="primary" onClick={() => setConfirming(true)}>
+              {t("settings.cert.newCert")}
             </Button>
-          </Inline>
-        </Stack>
-      ) : (
-        !effectivePassword && (
-          <Button variant="primary" onClick={() => setConfirming(true)}>
-            {t("settings.cert.newCert")}
-          </Button>
-        )
-      )}
-    </Stack>
+          )
+        )}
+      </Stack>
     </html.div>
   )
 }

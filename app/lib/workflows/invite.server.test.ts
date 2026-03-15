@@ -331,7 +331,14 @@ describe("queueInvite", () => {
           expect(emailCall!.args[0]).toBe("alice@example.com")
         }),
       ),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls), mockEmailService(emailCalls), mockCertificateRepo())),
+      Effect.provide(
+        Layer.mergeAll(
+          mockInviteRepo(store),
+          mockCertManager(certCalls),
+          mockEmailService(emailCalls),
+          mockCertificateRepo(),
+        ),
+      ),
     )
   })
 
@@ -360,7 +367,9 @@ describe("queueInvite", () => {
           expect(invite.lastError).toBe("SMTP down")
         }),
       ),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls), failingEmail, mockCertificateRepo())),
+      Effect.provide(
+        Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls), failingEmail, mockCertificateRepo()),
+      ),
     )
   })
 })
@@ -372,7 +381,12 @@ describe("acceptInvite", () => {
     const userCalls: { method: string; args: unknown[] }[] = []
     const certCalls: { method: string; args: unknown[] }[] = []
 
-    const layer = Layer.mergeAll(mockInviteRepo(store), mockUserManager(userCalls), mockCertManager(certCalls), mockCertificateRepo())
+    const layer = Layer.mergeAll(
+      mockInviteRepo(store),
+      mockUserManager(userCalls),
+      mockCertManager(certCalls),
+      mockCertificateRepo(),
+    )
 
     return acceptInvite("tok-inv-1", {
       username: "alice",
@@ -517,7 +531,12 @@ describe("revokeUser", () => {
         }),
       ),
       Effect.provide(
-        Layer.mergeAll(mockInviteRepo(new Map(), revocations), mockUserManager(userCalls), mockCertManager(certCalls), mockCertificateRepo()),
+        Layer.mergeAll(
+          mockInviteRepo(new Map(), revocations),
+          mockUserManager(userCalls),
+          mockCertManager(certCalls),
+          mockCertificateRepo(),
+        ),
       ),
     )
   })
@@ -548,7 +567,14 @@ describe("resendCert", () => {
           expect(certCalls.find((c) => c.method === "deleteP12Secret")).toBeDefined()
         }),
       ),
-      Effect.provide(Layer.mergeAll(mockCertManager(certCalls), mockEmailService(emailCalls), mockPreferencesRepo(), mockCertificateRepo())),
+      Effect.provide(
+        Layer.mergeAll(
+          mockCertManager(certCalls),
+          mockEmailService(emailCalls),
+          mockPreferencesRepo(),
+          mockCertificateRepo(),
+        ),
+      ),
     )
   })
 })

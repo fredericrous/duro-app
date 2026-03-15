@@ -19,7 +19,9 @@ const styles = css.create({
 
 export function InvitePasswordReveal({ p12Password }: { p12Password: string | null }) {
   const { t } = useTranslation()
-  const { revealed, onReveal } = useScratchReveal(`scratch:${typeof window !== "undefined" ? window.location.pathname : ""}`)
+  const { revealed, onReveal } = useScratchReveal(
+    `scratch:${typeof window !== "undefined" ? window.location.pathname : ""}`,
+  )
   const [copied, setCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
 
@@ -29,9 +31,13 @@ export function InvitePasswordReveal({ p12Password }: { p12Password: string | nu
         <Stack gap="sm">
           <html.div style={styles.headerRow}>
             <Icon name="lock-filled" size={20} />
-            <Heading level={2} variant="headingSm">{t("invite.password.title")}</Heading>
+            <Heading level={2} variant="headingSm">
+              {t("invite.password.title")}
+            </Heading>
           </html.div>
-          <Text as="p" color="muted">{t("invite.password.consumed")}</Text>
+          <Text as="p" color="muted">
+            {t("invite.password.consumed")}
+          </Text>
         </Stack>
       </Card>
     )
@@ -42,9 +48,13 @@ export function InvitePasswordReveal({ p12Password }: { p12Password: string | nu
       <Stack gap="sm">
         <html.div style={styles.headerRow}>
           <Icon name="lock-filled" size={20} />
-          <Heading level={2} variant="headingSm">{t("invite.password.title")}</Heading>
+          <Heading level={2} variant="headingSm">
+            {t("invite.password.title")}
+          </Heading>
         </html.div>
-        <Text as="p" color="muted">{t("invite.password.warning")}</Text>
+        <Text as="p" color="muted">
+          {t("invite.password.warning")}
+        </Text>
         <InputGroup.Root>
           <ScratchCard width={320} height={48} onReveal={onReveal}>
             <Input defaultValue={p12Password} />
@@ -62,7 +72,9 @@ export function InvitePasswordReveal({ p12Password }: { p12Password: string | nu
           </InputGroup.Addon>
         </InputGroup.Root>
         <html.div style={!revealed ? styles.oneTimeHidden : undefined}>
-          <Text as="p" variant="bodySm">{t("invite.password.oneTime")}</Text>
+          <Text as="p" variant="bodySm">
+            {t("invite.password.oneTime")}
+          </Text>
         </html.div>
       </Stack>
     </Card>

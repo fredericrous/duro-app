@@ -21,9 +21,6 @@ export async function POST(request: Request) {
       },
     })
   } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : "Login failed" },
-      { status: 500 },
-    )
+    return Response.json({ error: e instanceof Error ? e.message : "Login failed" }, { status: 500 })
   }
 }

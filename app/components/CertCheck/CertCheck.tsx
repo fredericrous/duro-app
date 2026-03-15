@@ -55,7 +55,9 @@ export function CertCheck({
             </html.div>
           </Alert>
           <html.div style={status === "checking" ? styles.certTextHidden : undefined}>
-            <Text as="p" color="muted" variant="bodySm">{t("invite.cert.hint")}</Text>
+            <Text as="p" color="muted" variant="bodySm">
+              {t("invite.cert.hint")}
+            </Text>
           </html.div>
           <html.button
             onClick={onRecheck}

@@ -4,13 +4,7 @@ import type { UseActionReturn } from "~/hooks/useAction"
 import type { AdminUsersResult } from "~/lib/mutations/admin-users"
 import { Button, Inline } from "@duro-app/ui"
 
-export function RevokeAllButton({
-  username,
-  action,
-}: {
-  username: string
-  action: UseActionReturn<AdminUsersResult>
-}) {
+export function RevokeAllButton({ username, action }: { username: string; action: UseActionReturn<AdminUsersResult> }) {
   const { t } = useTranslation()
   const [confirming, setConfirming] = useState(false)
   const isSubmitting = action.state !== "idle"

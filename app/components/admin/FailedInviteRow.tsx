@@ -15,7 +15,9 @@ export function FailedInviteRow({ invite }: { invite: Invite }) {
     <Table.Row>
       <Table.Cell>{invite.email}</Table.Cell>
       <Table.Cell>
-        <Text variant="bodySm" color="error">{invite.lastError ?? "Unknown error"}</Text>
+        <Text variant="bodySm" color="error">
+          {invite.lastError ?? "Unknown error"}
+        </Text>
       </Table.Cell>
       <Table.Cell>{invite.failedAt ? new Date(invite.failedAt).toLocaleString() : "\u2014"}</Table.Cell>
       <Table.Cell>

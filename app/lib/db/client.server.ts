@@ -37,7 +37,9 @@ export class MigrationsRan extends Context.Tag("MigrationsRan")<MigrationsRan, t
 // Lightweight migration runner
 // ---------------------------------------------------------------------------
 
-const migrations: Array<[id: number, name: string, effect: Effect.Effect<void, SqlError.SqlError, SqlClient.SqlClient>]> = [
+const migrations: Array<
+  [id: number, name: string, effect: Effect.Effect<void, SqlError.SqlError, SqlClient.SqlClient>]
+> = [
   [1, "create_schema", m0001],
   [2, "create_user_revocations", m0002],
   [3, "add_revert_pr_columns", m0003],
@@ -82,10 +84,7 @@ const runMigrations = Effect.gen(function* () {
 // Combined layer: Client + migrations
 // ---------------------------------------------------------------------------
 
-export const MigratorLive = Layer.effect(
-  MigrationsRan,
-  runMigrations.pipe(Effect.as(true as const)),
-)
+export const MigratorLive = Layer.effect(MigrationsRan, runMigrations.pipe(Effect.as(true as const)))
 
 /**
  * Combined layer: Client + migrations.
@@ -105,7 +104,5 @@ export const makeTestDbLayer = () => {
     yield* sql`TRUNCATE invites, user_revocations, user_preferences, user_certificates RESTART IDENTITY CASCADE`
   }).pipe(Effect.as(true as const))
 
-  return Layer.effect(MigrationsRan, migrateAndClean).pipe(
-    Layer.provideMerge(PgClientLive),
-  )
+  return Layer.effect(MigrationsRan, migrateAndClean).pipe(Layer.provideMerge(PgClientLive))
 }

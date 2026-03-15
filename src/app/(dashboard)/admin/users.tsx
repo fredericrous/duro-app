@@ -61,9 +61,7 @@ export const loader: LoaderFunction<AdminUsersLoaderData> = async (request) => {
       ),
     ])
 
-    const systemUserIds = new Set(
-      (users as User[]).filter((u) => config.isSystemUser(u.id)).map((u) => u.id),
-    )
+    const systemUserIds = new Set((users as User[]).filter((u) => config.isSystemUser(u.id)).map((u) => u.id))
     return {
       user: auth.user ?? "",
       isAdmin: auth.groups.includes(config.adminGroupName),

@@ -8,7 +8,14 @@ import type { PreferencesRepo } from "./services/PreferencesRepo.server"
 import type { OidcClient } from "./services/OidcClient.server"
 import type { CertificateRepo } from "./services/CertificateRepo.server"
 
-type AppServices = UserManager | CertManager | EmailService | InviteRepo | PreferencesRepo | OidcClient | CertificateRepo
+type AppServices =
+  | UserManager
+  | CertManager
+  | EmailService
+  | InviteRepo
+  | PreferencesRepo
+  | OidcClient
+  | CertificateRepo
 
 const appRuntime = ManagedRuntime.make(AppLayer)
 

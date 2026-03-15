@@ -59,16 +59,12 @@ export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
         const certRepo = yield* CertificateRepo
         const serials = yield* certRepo.revokeAllForUser(mutation.username)
         for (const serial of serials) {
-          yield* cert
-            .revokeCert(serial)
-            .pipe(
-              Effect.tap(() => certRepo.markRevokeCompleted(serial)),
-              Effect.catchAll((e) =>
-                certRepo
-                  .markRevokeFailed(serial, String(e))
-                  .pipe(Effect.catchAll(() => Effect.void)),
-              ),
-            )
+          yield* cert.revokeCert(serial).pipe(
+            Effect.tap(() => certRepo.markRevokeCompleted(serial)),
+            Effect.catchAll((e) =>
+              certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void)),
+            ),
+          )
         }
         return { certsRevoked: true as const, count: serials.length }
       }
@@ -86,10 +82,17 @@ export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
         }
       }
     }
-  }).pipe(Effect.catchAll((e) => {
-    const message = e instanceof Error ? e.message : typeof e === "object" && e !== null && "message" in e ? String((e as any).message) : "Operation failed"
-    return Effect.succeed({ error: message } as AdminUsersResult)
-  }))
+  }).pipe(
+    Effect.catchAll((e) => {
+      const message =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null && "message" in e
+            ? String((e as any).message)
+            : "Operation failed"
+      return Effect.succeed({ error: message } as AdminUsersResult)
+    }),
+  )
 }
 
 // ---------------------------------------------------------------------------

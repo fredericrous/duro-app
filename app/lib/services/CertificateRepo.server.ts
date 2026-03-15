@@ -55,10 +55,7 @@ export class CertificateRepo extends Context.Tag("CertificateRepo")<
     ) => Effect.Effect<Record<string, UserCertificate[]>, CertificateRepoError>
     readonly findBySerial: (serialNumber: string) => Effect.Effect<UserCertificate | null, CertificateRepoError>
     /** Marks cert as revoke-pending. Returns affected row count. Enforces ownership via username. */
-    readonly markRevokePending: (
-      serialNumber: string,
-      username?: string,
-    ) => Effect.Effect<number, CertificateRepoError>
+    readonly markRevokePending: (serialNumber: string, username?: string) => Effect.Effect<number, CertificateRepoError>
     readonly markRevokeCompleted: (serialNumber: string) => Effect.Effect<void, CertificateRepoError>
     readonly markRevokeFailed: (serialNumber: string, error: string) => Effect.Effect<void, CertificateRepoError>
     /** Marks all active certs as pending and returns their serial numbers. */

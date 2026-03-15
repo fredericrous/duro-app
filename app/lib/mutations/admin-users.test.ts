@@ -46,7 +46,9 @@ const mockCertRepo = (certs: Map<string, UserCertificate> = new Map()) =>
       return Effect.void
     },
     revokeAllForUser: (username: string) => {
-      const serials = [...certs.values()].filter((c) => c.username === username && !c.revokedAt).map((c) => c.serialNumber)
+      const serials = [...certs.values()]
+        .filter((c) => c.username === username && !c.revokedAt)
+        .map((c) => c.serialNumber)
       for (const sn of serials) {
         const cert = certs.get(sn)!
         certs.set(sn, { ...cert, revokeState: "pending" })
@@ -87,7 +89,14 @@ const mockInviteRepo = Layer.succeed(InviteRepo, {
   findAwaitingRevertMerge: () => Effect.succeed([]),
   recordRevocation: (email: string, username: string, revokedBy: string, reason?: string) =>
     Effect.sync(() => {
-      revocations.push({ id: `rev-${revocations.length + 1}`, email, username, reason: reason ?? null, revokedAt: new Date().toISOString(), revokedBy })
+      revocations.push({
+        id: `rev-${revocations.length + 1}`,
+        email,
+        username,
+        reason: reason ?? null,
+        revokedAt: new Date().toISOString(),
+        revokedBy,
+      })
     }),
   findRevocations: () => Effect.succeed(revocations),
   deleteRevocation: (id: string) =>
@@ -204,17 +213,13 @@ describe("handleAdminUsersMutation", () => {
     )
 
     const mutation: AdminUsersMutation = { intent: "revokeCert", serialNumber: "sn-1" }
-    const result = await Effect.runPromise(
-      handleAdminUsersMutation(mutation).pipe(Effect.provide(layer)),
-    )
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(layer)))
     expect(result).toEqual({ certRevoked: true, serialNumber: "sn-1" })
   })
 
   it("revokeCert returns error for non-existent serial", async () => {
     const mutation: AdminUsersMutation = { intent: "revokeCert", serialNumber: "nonexistent" }
-    const result = await Effect.runPromise(
-      handleAdminUsersMutation(mutation).pipe(Effect.provide(TestLayer)),
-    )
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(TestLayer)))
     expect(result).toEqual({ error: "Certificate not found or already revoked" })
   })
 
@@ -231,9 +236,7 @@ describe("handleAdminUsersMutation", () => {
     })
 
     const mutation: AdminUsersMutation = { intent: "reinviteRevoked", revocationId: "rev-1" }
-    const result = await Effect.runPromise(
-      handleAdminUsersMutation(mutation).pipe(Effect.provide(TestLayer)),
-    )
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(TestLayer)))
     expect(result).toMatchObject({ success: true, reinviteEmail: "bob@example.com" })
     expect(revocations).toHaveLength(0)
   })
@@ -242,9 +245,7 @@ describe("handleAdminUsersMutation", () => {
     revocations.length = 0
 
     const mutation: AdminUsersMutation = { intent: "reinviteRevoked", revocationId: "doesnt-exist" }
-    const result = await Effect.runPromise(
-      handleAdminUsersMutation(mutation).pipe(Effect.provide(TestLayer)),
-    )
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(TestLayer)))
     expect(result).toEqual({ error: "Revocation not found" })
   })
 })

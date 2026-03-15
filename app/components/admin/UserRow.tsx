@@ -60,12 +60,7 @@ export function UserRow({
                 </Button>
               </certAction.Form>
               {certs.length > 0 && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="small"
-                  onClick={() => setShowCerts(!showCerts)}
-                >
+                <Button type="button" variant="secondary" size="small" onClick={() => setShowCerts(!showCerts)}>
                   {t("admin.users.actions.viewCerts")}
                 </Button>
               )}

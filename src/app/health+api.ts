@@ -2,11 +2,7 @@ import { Effect, Config, Layer, ManagedRuntime } from "effect"
 import * as PgClient from "@effect/sql-pg/PgClient"
 import * as SqlClient from "@effect/sql/SqlClient"
 
-const PgLayer = Layer.unwrapEffect(
-  Config.redacted("DATABASE_URL").pipe(
-    Effect.map((url) => PgClient.layer({ url })),
-  ),
-)
+const PgLayer = Layer.unwrapEffect(Config.redacted("DATABASE_URL").pipe(Effect.map((url) => PgClient.layer({ url }))))
 
 const runtime = ManagedRuntime.make(PgLayer)
 
@@ -21,9 +17,6 @@ export async function GET() {
     )
     return Response.json(result)
   } catch (e) {
-    return Response.json(
-      { ok: false, error: e instanceof Error ? e.message : String(e) },
-      { status: 500 },
-    )
+    return Response.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 })
   }
 }

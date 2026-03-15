@@ -3,7 +3,9 @@ import { render, screen } from "@testing-library/react"
 
 vi.mock("expo-router", () => ({
   Link: ({ children, href, ...props }: any) => (
-    <a href={href} {...props}>{children}</a>
+    <a href={href} {...props}>
+      {children}
+    </a>
   ),
 }))
 
@@ -18,13 +20,21 @@ describe("ButtonLink", () => {
   })
 
   it("renders ghost variant when specified", () => {
-    render(<ButtonLink href={"/back" as any} variant="ghost">Back</ButtonLink>)
+    render(
+      <ButtonLink href={"/back" as any} variant="ghost">
+        Back
+      </ButtonLink>,
+    )
     const link = screen.getByRole("link", { name: "Back" })
     expect(link).toBeInTheDocument()
   })
 
   it("applies small size", () => {
-    render(<ButtonLink href={"/small" as any} size="small">Small Link</ButtonLink>)
+    render(
+      <ButtonLink href={"/small" as any} size="small">
+        Small Link
+      </ButtonLink>,
+    )
     const link = screen.getByRole("link", { name: "Small Link" })
     expect(link).toBeInTheDocument()
   })

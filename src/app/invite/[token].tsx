@@ -23,7 +23,12 @@ export const loader: LoaderFunction<InviteLoaderData> = async (request, params) 
 
     const token = params.token as string | undefined
     if (!token) {
-      return { valid: false, error: "Missing invite token", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+      return {
+        valid: false,
+        error: "Missing invite token",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
     }
 
     try {
@@ -38,10 +43,34 @@ export const loader: LoaderFunction<InviteLoaderData> = async (request, params) 
         }),
       )
 
-      if (!invite) return { valid: false as const, error: "Invalid invite link", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
-      if (invite.usedAt) return { valid: false as const, error: "already_used", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
-      if (new Date(invite.expiresAt) < new Date()) return { valid: false as const, error: "expired", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
-      if (invite.attempts >= 5) return { valid: false as const, error: "Too many attempts.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+      if (!invite)
+        return {
+          valid: false as const,
+          error: "Invalid invite link",
+          appName: config.appName,
+          healthUrl: `${config.homeUrl}/health`,
+        }
+      if (invite.usedAt)
+        return {
+          valid: false as const,
+          error: "already_used",
+          appName: config.appName,
+          healthUrl: `${config.homeUrl}/health`,
+        }
+      if (new Date(invite.expiresAt) < new Date())
+        return {
+          valid: false as const,
+          error: "expired",
+          appName: config.appName,
+          healthUrl: `${config.homeUrl}/health`,
+        }
+      if (invite.attempts >= 5)
+        return {
+          valid: false as const,
+          error: "Too many attempts.",
+          appName: config.appName,
+          healthUrl: `${config.homeUrl}/health`,
+        }
 
       return {
         valid: true as const,
@@ -53,7 +82,12 @@ export const loader: LoaderFunction<InviteLoaderData> = async (request, params) 
       }
     } catch (e) {
       if (e instanceof Response) throw e
-      return { valid: false as const, error: "Something went wrong", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+      return {
+        valid: false as const,
+        error: "Something went wrong",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
     }
   } catch {
     // Dev mode fallback — dynamic imports don't resolve in Metro dev loader bundles
@@ -74,7 +108,9 @@ function checkCert(healthUrl: string): Promise<boolean> {
   if (process.env.NODE_ENV === "development" && process.env.VITEST !== "true" && certCheckCount > 1) {
     return Promise.resolve(true)
   }
-  return fetch(healthUrl, { mode: "cors" }).then((r) => r.ok).catch(() => false)
+  return fetch(healthUrl, { mode: "cors" })
+    .then((r) => r.ok)
+    .catch(() => false)
 }
 
 export default function InvitePage() {
@@ -92,13 +128,17 @@ export default function InvitePage() {
     checkCert(loaderData.healthUrl).then((ok) => {
       if (!cancelled) setCertStatus(ok ? "installed" : "not-installed")
     })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [loaderData.healthUrl])
 
   if (!loaderData.valid) {
     const { error } = loaderData
-    if (error === "expired") return <ErrorCard icon="clock" title={t("invite.expired.title")} message={t("invite.expired.message")} />
-    if (error === "already_used") return <ErrorCard icon="check-done" title={t("invite.used.title")} message={t("invite.used.message")} />
+    if (error === "expired")
+      return <ErrorCard icon="clock" title={t("invite.expired.title")} message={t("invite.expired.message")} />
+    if (error === "already_used")
+      return <ErrorCard icon="check-done" title={t("invite.used.title")} message={t("invite.used.message")} />
     return <ErrorCard title={t("invite.error.title")} message={error} />
   }
 

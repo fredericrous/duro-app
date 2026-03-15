@@ -39,12 +39,8 @@ export default function SpikePage() {
         <MutationButton action={action2} intent="reset" label="Reset" />
       </View>
 
-      {action1.data && "error" in action1.data && (
-        <Text style={styles.error}>Error: {action1.data.error}</Text>
-      )}
-      {action2.data && "error" in action2.data && (
-        <Text style={styles.error}>Error: {action2.data.error}</Text>
-      )}
+      {action1.data && "error" in action1.data && <Text style={styles.error}>Error: {action1.data.error}</Text>}
+      {action2.data && "error" in action2.data && <Text style={styles.error}>Error: {action2.data.error}</Text>}
     </View>
   )
 }
@@ -64,9 +60,7 @@ function MutationButton({
       disabled={action.state === "submitting"}
       onPress={() => action.submit({ intent })}
     >
-      <Text style={styles.buttonText}>
-        {action.state === "submitting" ? "..." : label}
-      </Text>
+      <Text style={styles.buttonText}>{action.state === "submitting" ? "..." : label}</Text>
     </Pressable>
   )
 }

@@ -89,34 +89,34 @@ export default function SettingsPage() {
 
   return (
     <>
-    <Header user={loaderData.user} isAdmin={loaderData.isAdmin} />
-    <html.main style={styles.page}>
-      <Heading level={1}>{t("settings.heading")}</Heading>
+      <Header user={loaderData.user} isAdmin={loaderData.isAdmin} />
+      <html.main style={styles.page}>
+        <Heading level={1}>{t("settings.heading")}</Heading>
 
-      {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
+        {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
 
-      <localeAction.Form>
-        <input type="hidden" name="intent" value="saveLocale" />
-        <Stack gap="lg">
-          <Field.Root>
-            <Field.Label>{t("settings.languageLabel")}</Field.Label>
-            <LanguageSelect defaultValue={loaderData.locale} />
-            <Field.Description>{t("settings.languageHint")}</Field.Description>
-          </Field.Root>
+        <localeAction.Form>
+          <input type="hidden" name="intent" value="saveLocale" />
+          <Stack gap="lg">
+            <Field.Root>
+              <Field.Label>{t("settings.languageLabel")}</Field.Label>
+              <LanguageSelect defaultValue={loaderData.locale} />
+              <Field.Description>{t("settings.languageHint")}</Field.Description>
+            </Field.Root>
 
-          <Button type="submit" variant="primary">
-            {t("common.save")}
-          </Button>
-        </Stack>
-      </localeAction.Form>
+            <Button type="submit" variant="primary">
+              {t("common.save")}
+            </Button>
+          </Stack>
+        </localeAction.Form>
 
-      <CertificateSection
-        email={loaderData.email}
-        p12Password={loaderData.p12Password}
-        lastCertRenewalAt={loaderData.lastCertRenewalAt}
-        certificates={loaderData.certificates}
-      />
-    </html.main>
+        <CertificateSection
+          email={loaderData.email}
+          p12Password={loaderData.p12Password}
+          lastCertRenewalAt={loaderData.lastCertRenewalAt}
+          certificates={loaderData.certificates}
+        />
+      </html.main>
     </>
   )
 }

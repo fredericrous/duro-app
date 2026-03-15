@@ -14,9 +14,7 @@ export class PreferencesRepo extends Context.Tag("PreferencesRepo")<
     /** Returns the user's locale, falling back to "en" on any error. */
     readonly getLocale: (username: string) => Effect.Effect<string>
     readonly setLocale: (username: string, locale: string) => Effect.Effect<void, PreferencesError>
-    readonly getLastCertRenewal: (
-      username: string,
-    ) => Effect.Effect<{ at: Date | null; renewalId: string | null }>
+    readonly getLastCertRenewal: (username: string) => Effect.Effect<{ at: Date | null; renewalId: string | null }>
     readonly setCertRenewal: (username: string, renewalId: string) => Effect.Effect<void, PreferencesError>
     readonly clearCertRenewalId: (username: string) => Effect.Effect<void, PreferencesError>
   }

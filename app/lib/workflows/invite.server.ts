@@ -182,16 +182,10 @@ export const revokeInvite = (inviteId: string) =>
       .revokeAllForUser(certUsername)
       .pipe(Effect.catchAll(() => Effect.succeed([] as string[])))
     for (const serial of serials) {
-      yield* cert
-        .revokeCert(serial)
-        .pipe(
-          Effect.tap(() => certRepo.markRevokeCompleted(serial)),
-          Effect.catchAll((e) =>
-            certRepo
-              .markRevokeFailed(serial, String(e))
-              .pipe(Effect.catchAll(() => Effect.void)),
-          ),
-        )
+      yield* cert.revokeCert(serial).pipe(
+        Effect.tap(() => certRepo.markRevokeCompleted(serial)),
+        Effect.catchAll((e) => certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void))),
+      )
     }
 
     yield* inviteRepo.revoke(inviteId)
@@ -227,16 +221,10 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
       .revokeAllForUser(username)
       .pipe(Effect.catchAll(() => Effect.succeed([] as string[])))
     for (const serial of serials) {
-      yield* cert
-        .revokeCert(serial)
-        .pipe(
-          Effect.tap(() => certRepo.markRevokeCompleted(serial)),
-          Effect.catchAll((e) =>
-            certRepo
-              .markRevokeFailed(serial, String(e))
-              .pipe(Effect.catchAll(() => Effect.void)),
-          ),
-        )
+      yield* cert.revokeCert(serial).pipe(
+        Effect.tap(() => certRepo.markRevokeCompleted(serial)),
+        Effect.catchAll((e) => certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void))),
+      )
     }
 
     // Record revocation in audit log

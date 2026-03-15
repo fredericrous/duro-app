@@ -119,7 +119,13 @@ export default function AdminInvitesPage() {
           </Alert>
         )}
 
-        <form ref={formRef} onSubmit={(e) => { e.preventDefault(); inviteAction.submit(new FormData(e.currentTarget) as unknown as Record<string, string>) }}>
+        <form
+          ref={formRef}
+          onSubmit={(e) => {
+            e.preventDefault()
+            inviteAction.submit(new FormData(e.currentTarget) as unknown as Record<string, string>)
+          }}
+        >
           <Field.Root>
             <Field.Label>{t("admin.invites.emailLabel")}</Field.Label>
             <Input name="email" type="email" required placeholder={t("admin.invites.emailPlaceholder")} />

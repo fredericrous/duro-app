@@ -94,8 +94,12 @@ export const VaultPkiLive = Layer.effect(
             Effect.catchAll(() => Effect.succeed(null)),
           )
 
-          if (existing?.data.data.p12 && existing?.data.data.password
-              && existing.data.data.serial_number && existing.data.data.not_after) {
+          if (
+            existing?.data.data.p12 &&
+            existing?.data.data.password &&
+            existing.data.data.serial_number &&
+            existing.data.data.not_after
+          ) {
             return {
               p12Buffer: Buffer.from(existing.data.data.p12, "base64"),
               password: existing.data.data.password,
