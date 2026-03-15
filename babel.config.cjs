@@ -18,6 +18,7 @@ module.exports = function (api) {
 
 
   return {
+    plugins: [["babel-plugin-react-compiler"]],
     presets: [
       "babel-preset-expo",
       [reactStrictPreset, { debug: dev, dev, platform }],
