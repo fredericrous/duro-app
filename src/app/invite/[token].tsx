@@ -7,7 +7,7 @@ import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { InvitePasswordReveal } from "~/components/InvitePasswordReveal/InvitePasswordReveal"
 import { CertCheck } from "~/components/CertCheck/CertCheck"
-import { Alert, Heading, Stack, Text } from "@duro-app/ui"
+import { Heading, Stack, Text } from "@duro-app/ui"
 
 type InviteLoaderData =
   | { valid: false; error: string; appName: string; healthUrl: string }
