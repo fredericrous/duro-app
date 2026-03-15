@@ -20,7 +20,7 @@ const cssCreate = (styles: Record<string, any>) => {
 const htmlHandler: ProxyHandler<any> = {
   get(_target, prop: string) {
     return React.forwardRef((props: any, ref: any) => {
-      const { style, ...rest } = props
+      const { style: _style, ...rest } = props
       return React.createElement(prop, { ...rest, ref })
     })
   },

@@ -48,7 +48,7 @@ export const OidcClientDev = Layer.succeed(OidcClient, {
 
 export const OidcClientLive = Layer.effect(
   OidcClient,
-  Effect.gen(function* () {
+  Effect.sync(() => {
     let oidcConfig: client.Configuration | null = null
 
     const getConfig = (): Effect.Effect<client.Configuration, OidcError> =>

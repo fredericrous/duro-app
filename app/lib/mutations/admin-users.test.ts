@@ -4,9 +4,8 @@ import {
   handleAdminUsersMutation,
   parseAdminUsersMutation,
   type AdminUsersMutation,
-  type AdminUsersResult,
 } from "./admin-users"
-import { InviteRepo, type Invite, type Revocation } from "~/lib/services/InviteRepo.server"
+import { InviteRepo, type Revocation } from "~/lib/services/InviteRepo.server"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { EmailService } from "~/lib/services/EmailService.server"

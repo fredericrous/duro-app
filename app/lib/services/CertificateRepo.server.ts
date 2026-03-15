@@ -96,8 +96,6 @@ export const CertificateRepoLive = Layer.effect(
     yield* MigrationsRan
     const sql = yield* SqlClient.SqlClient
 
-    const nowExpr = sql`NOW()`
-
     return {
       store: (cert: StoreCertInput) => {
         const id = crypto.randomUUID()
