@@ -1,4 +1,4 @@
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
@@ -6,7 +6,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:22-alpine
+FROM node:24-alpine
 RUN adduser -u 1001 -D appuser
 WORKDIR /app
 COPY --from=builder /app/build ./build
