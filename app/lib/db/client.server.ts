@@ -2,6 +2,7 @@ import * as PgClient from "@effect/sql-pg/PgClient"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { Context, Config, Effect, Layer } from "effect"
+import * as crypto from "node:crypto"
 
 import m0001 from "./migrations/pg/0001_create_schema"
 import m0002 from "./migrations/pg/0002_create_user_revocations"
@@ -94,7 +95,51 @@ export const MigratorLive = Layer.effect(MigrationsRan, runMigrations.pipe(Effec
 export const DbLive = MigratorLive.pipe(Layer.provideMerge(PgClientLive))
 
 /**
- * Test layer: uses a PG connection from DATABASE_URL env var.
+ * Dev layer: uses an in-memory PGlite instance (no external Postgres needed).
+ * Data persists for the lifetime of the dev server process.
+ */
+const PgLiteClientLayer = PgClient.layerFromPool({
+  acquire: Effect.acquireRelease(
+    Effect.promise(async () => {
+      const { createPglitePool } = await import("./pglite-pool")
+      return createPglitePool()
+    }),
+    (pool) => Effect.promise(() => pool.end()),
+  ),
+  transformResultNames: snakeToCamel,
+})
+
+const seedDevData = Effect.gen(function* () {
+  yield* runMigrations
+  const sql = yield* SqlClient.SqlClient
+
+  // Only seed if empty
+  const existing = yield* sql`SELECT COUNT(*) as count FROM user_certificates`
+  if ((existing[0] as any).count > 0) return
+
+  yield* Effect.log("seeding dev data")
+  const now = new Date().toISOString()
+  const expires = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+
+  const users = [
+    { id: "dev", email: "dev@localhost", serial: "aa:bb:cc:dd:00:00:00:01" },
+    { id: "alice", email: "alice@example.com", serial: "aa:bb:cc:dd:00:00:00:02" },
+    { id: "bob", email: "bob@example.com", serial: "aa:bb:cc:dd:00:00:00:03" },
+  ]
+
+  for (const u of users) {
+    yield* sql`
+      INSERT INTO user_certificates (id, invite_id, user_id, username, email, serial_number, issued_at, expires_at)
+      VALUES (${crypto.randomUUID()}, ${crypto.randomUUID()}, ${u.id}, ${u.id}, ${u.email}, ${u.serial}, ${now}, ${expires})
+    `
+  }
+  yield* Effect.log("dev seed complete: 3 users with certificates")
+}).pipe(Effect.as(true as const))
+
+export const DbDevLive = Layer.effect(MigrationsRan, seedDevData).pipe(Layer.provideMerge(PgLiteClientLayer))
+
+/**
+ * Test layer: uses an in-memory PGlite instance (no external Postgres needed).
  * Runs migrations then truncates all data tables for a clean test state.
  */
 export const makeTestDbLayer = () => {
@@ -104,5 +149,5 @@ export const makeTestDbLayer = () => {
     yield* sql`TRUNCATE invites, user_revocations, user_preferences, user_certificates RESTART IDENTITY CASCADE`
   }).pipe(Effect.as(true as const))
 
-  return Layer.effect(MigrationsRan, migrateAndClean).pipe(Layer.provideMerge(PgClientLive))
+  return Layer.effect(MigrationsRan, migrateAndClean).pipe(Layer.provideMerge(PgLiteClientLayer))
 }

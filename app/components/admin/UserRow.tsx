@@ -1,14 +1,11 @@
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
-import type { AdminUsersResult } from "~/lib/mutations/admin-users"
 import { certStatus } from "~/lib/cert-status"
-import { useAction } from "~/hooks/useAction"
+import { useAdminUsersMutation } from "./useAdminUsersMutation"
 import { AdminCertRow } from "./AdminCertRow"
 import { RevokeAllButton } from "./RevokeAllButton"
 import { Badge, Button, Inline, Input, Stack, Table } from "@duro-app/ui"
-
-const API_URL = "/admin/users"
 
 export function UserRow({
   user,
@@ -22,12 +19,12 @@ export function UserRow({
   const { t } = useTranslation()
   const [showRevoke, setShowRevoke] = useState(false)
   const [showCerts, setShowCerts] = useState(false)
-  const certAction = useAction<AdminUsersResult>(API_URL)
-  const revokeAction = useAction<AdminUsersResult>(API_URL)
-  const revokeAllAction = useAction<AdminUsersResult>(API_URL)
-  const isSendingCert = certAction.state !== "idle"
-  const isRevoking = revokeAction.state !== "idle"
-  const revokeSucceeded = revokeAction.data && "success" in revokeAction.data
+  const certMutation = useAdminUsersMutation()
+  const revokeMutation = useAdminUsersMutation()
+  const revokeAllMutation = useAdminUsersMutation()
+  const isSendingCert = certMutation.isPending
+  const isRevoking = revokeMutation.isPending
+  const revokeSucceeded = revokeMutation.data && "success" in revokeMutation.data
   const isRevokeVisible = showRevoke && !revokeSucceeded
   const activeCerts = certs.filter((c) => certStatus(c) === "active")
 
@@ -51,14 +48,14 @@ export function UserRow({
         <Table.Cell>
           {!isSystem && (
             <Inline gap="sm">
-              <certAction.Form>
+              <form onSubmit={(e) => { e.preventDefault(); certMutation.mutate(new FormData(e.currentTarget)) }}>
                 <input type="hidden" name="intent" value="resendCert" />
                 <input type="hidden" name="username" value={user.id} />
                 <input type="hidden" name="email" value={user.email} />
                 <Button type="submit" variant="secondary" size="small" disabled={isSendingCert || isRevoking}>
                   {isSendingCert ? t("admin.users.actions.sendingCert") : t("admin.users.actions.sendCert")}
                 </Button>
-              </certAction.Form>
+              </form>
               {certs.length > 0 && (
                 <Button type="button" variant="secondary" size="small" onClick={() => setShowCerts(!showCerts)}>
                   {t("admin.users.actions.viewCerts")}
@@ -80,7 +77,7 @@ export function UserRow({
       {isRevokeVisible && (
         <Table.Row>
           <td colSpan={5}>
-            <revokeAction.Form>
+            <form onSubmit={(e) => { e.preventDefault(); revokeMutation.mutate(new FormData(e.currentTarget)) }}>
               <Inline gap="sm" align="center">
                 <input type="hidden" name="intent" value="revokeUser" />
                 <input type="hidden" name="username" value={user.id} />
@@ -93,7 +90,7 @@ export function UserRow({
                   {t("common.cancel")}
                 </Button>
               </Inline>
-            </revokeAction.Form>
+            </form>
           </td>
         </Table.Row>
       )}
@@ -118,7 +115,7 @@ export function UserRow({
             </Table.Root>
             {activeCerts.length > 1 && (
               <Stack gap="sm">
-                <RevokeAllButton username={user.id} action={revokeAllAction} />
+                <RevokeAllButton username={user.id} mutation={revokeAllMutation} />
               </Stack>
             )}
           </td>

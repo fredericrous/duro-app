@@ -1,8 +1,7 @@
-import { config } from "~/lib/config.server"
+import { isOriginAllowed } from "~/lib/config.server"
 
 export async function POST(request: Request) {
-  const origin = request.headers.get("Origin")
-  if (origin && !origin.endsWith(config.allowedOriginSuffix)) {
+  if (!isOriginAllowed(request.headers.get("Origin"))) {
     return Response.json({ error: "Invalid request origin" }, { status: 403 })
   }
 

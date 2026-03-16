@@ -1,5 +1,5 @@
 import { runEffect } from "~/lib/runtime.server"
-import { config } from "~/lib/config.server"
+import { isOriginAllowed } from "~/lib/config.server"
 import { handleCreateAccount, parseCreateAccountMutation } from "~/lib/mutations/create-account"
 
 export async function POST(request: Request, params: Record<string, string>) {
@@ -8,8 +8,7 @@ export async function POST(request: Request, params: Record<string, string>) {
     return Response.json({ error: "Missing invite token" }, { status: 400 })
   }
 
-  const origin = request.headers.get("Origin")
-  if (origin && !origin.endsWith(config.allowedOriginSuffix)) {
+  if (!isOriginAllowed(request.headers.get("Origin"))) {
     return Response.json({ error: "Invalid request origin" }, { status: 403 })
   }
 

@@ -9,6 +9,13 @@ config.resolver.extraNodeModules = {
   "~": path.resolve(__dirname, "app"),
 }
 
+// Resolve "source" export condition so @duro-app/ui and @duro-app/tokens
+// are compiled by Metro's babel (consistent CSS var hashes with the app).
+config.resolver.unstable_conditionNames = [
+  "source",
+  ...config.resolver.unstable_conditionNames ?? ["import", "require"],
+]
+
 // Block @effect/platform's HttpApiScalar from being bundled.
 // It embeds the entire Scalar API Reference UI as an inline string (~6MB)
 // which crashes Node when loaded as a Metro CJS bundle.

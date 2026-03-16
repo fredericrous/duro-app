@@ -1,18 +1,16 @@
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
-import type { AdminUsersResult } from "~/lib/mutations/admin-users"
 import { certStatus, statusVariant } from "~/lib/cert-status"
-import { useAction } from "~/hooks/useAction"
+import { useAdminUsersMutation } from "./useAdminUsersMutation"
 import { Badge, Button, Inline, Table } from "@duro-app/ui"
 
 export function AdminCertRow({ cert }: { cert: UserCertificate }) {
   const { t } = useTranslation()
-  const action = useAction<AdminUsersResult>("/admin/users")
+  const mutation = useAdminUsersMutation()
   const [confirming, setConfirming] = useState(false)
-  const isSubmitting = action.state !== "idle"
   const status = certStatus(cert)
-  const revoked = action.data && "certRevoked" in action.data
+  const revoked = mutation.data && "certRevoked" in mutation.data
   const effectiveStatus = revoked ? "revoked" : status
 
   return (
@@ -35,26 +33,26 @@ export function AdminCertRow({ cert }: { cert: UserCertificate }) {
         )}
         {effectiveStatus === "active" && confirming && (
           <Inline gap="sm">
-            <action.Form>
+            <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(new FormData(e.currentTarget)) }}>
               <input type="hidden" name="intent" value="revokeCert" />
               <input type="hidden" name="serialNumber" value={cert.serialNumber} />
-              <Button type="submit" variant="danger" size="small" disabled={isSubmitting}>
-                {isSubmitting ? t("admin.users.certs.pending") : t("admin.users.certs.revokeCert")}
+              <Button type="submit" variant="danger" size="small" disabled={mutation.isPending}>
+                {mutation.isPending ? t("admin.users.certs.pending") : t("admin.users.certs.revokeCert")}
               </Button>
-            </action.Form>
+            </form>
             <Button variant="secondary" size="small" onClick={() => setConfirming(false)}>
               {t("common.cancel")}
             </Button>
           </Inline>
         )}
         {effectiveStatus === "failed" && (
-          <action.Form>
+          <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(new FormData(e.currentTarget)) }}>
             <input type="hidden" name="intent" value="revokeCert" />
             <input type="hidden" name="serialNumber" value={cert.serialNumber} />
-            <Button type="submit" variant="danger" size="small" disabled={isSubmitting}>
+            <Button type="submit" variant="danger" size="small" disabled={mutation.isPending}>
               {t("admin.users.certs.failed")} — {t("admin.users.certs.revokeCert")}
             </Button>
-          </action.Form>
+          </form>
         )}
       </Table.Cell>
     </Table.Row>

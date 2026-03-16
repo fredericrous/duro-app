@@ -11,6 +11,7 @@ export { runEffect } from "~/lib/runtime.server"
 export { config } from "~/lib/config.server"
 export { hashToken } from "~/lib/crypto.server"
 export { resolveLocale } from "~/lib/i18n.server"
+export { getVisibleApps } from "~/lib/apps.server"
 
 // Service tags (for use inside Effect.gen)
 export { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"

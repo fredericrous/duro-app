@@ -3,6 +3,7 @@ import { Trans, useTranslation } from "react-i18next"
 import { useLoaderData } from "expo-router"
 import type { LoaderFunction } from "expo-server"
 import { Effect } from "effect"
+import { devCreateAccountFallback } from "../../../server/dev-fallbacks"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { CertGate } from "~/components/CertGate/CertGate"
@@ -14,85 +15,45 @@ type CreateAccountLoaderData =
   | { valid: true; email: string; appName: string; healthUrl: string }
 
 export const loader: LoaderFunction<CreateAccountLoaderData> = async (request, params) => {
+  const { config } = require("~/lib/config.server")
+  if (typeof config !== "object") return devCreateAccountFallback
+
+  const { hashToken } = require("~/lib/crypto.server")
+  const { runEffect } = require("~/lib/runtime.server")
+  const { InviteRepo } = require("~/lib/services/InviteRepo.server")
+  const { CertManager } = require("~/lib/services/CertManager.server")
+  const token = params.token as string | undefined
+  if (!token) {
+    return { valid: false, error: "Missing invite token", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+  }
+
   try {
-    const { config } = await import("~/lib/config.server")
-    const { hashToken } = await import("~/lib/crypto.server")
-    const { runEffect } = await import("~/lib/runtime.server")
-    const { InviteRepo } = await import("~/lib/services/InviteRepo.server")
-    const { CertManager } = await import("~/lib/services/CertManager.server")
-
-    const token = params.token as string | undefined
-    if (!token) {
-      return {
-        valid: false,
-        error: "Missing invite token",
-        appName: config.appName,
-        healthUrl: `${config.homeUrl}/health`,
-      }
-    }
-
-    try {
-      const tokenHash = hashToken(token)
-      const invite = await runEffect(
-        Effect.gen(function* () {
-          const repo = yield* InviteRepo
-          const inv = yield* repo.findByTokenHash(tokenHash)
-          if (inv) {
-            const cert = yield* CertManager
-            yield* cert.consumeP12Password(inv.id).pipe(Effect.ignore)
-          }
-          return inv
-        }),
-      )
-
-      if (!invite)
-        return {
-          valid: false as const,
-          error: "Invalid invite link",
-          appName: config.appName,
-          healthUrl: `${config.homeUrl}/health`,
+    const tokenHash = hashToken(token)
+    const invite = await runEffect(
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const inv = yield* repo.findByTokenHash(tokenHash)
+        if (inv) {
+          const cert = yield* CertManager
+          yield* cert.consumeP12Password(inv.id).pipe(Effect.ignore)
         }
-      if (invite.usedAt)
-        return {
-          valid: false as const,
-          error: "already_used",
-          appName: config.appName,
-          healthUrl: `${config.homeUrl}/health`,
-          homeUrl: config.homeUrl,
-        }
-      if (new Date(invite.expiresAt) < new Date())
-        return {
-          valid: false as const,
-          error: "This invite has expired.",
-          appName: config.appName,
-          healthUrl: `${config.homeUrl}/health`,
-        }
-      if (invite.attempts >= 5)
-        return {
-          valid: false as const,
-          error: "Too many attempts.",
-          appName: config.appName,
-          healthUrl: `${config.homeUrl}/health`,
-        }
+        return inv
+      }),
+    )
 
-      return {
-        valid: true as const,
-        email: invite.email,
-        appName: config.appName,
-        healthUrl: `${config.homeUrl}/health`,
-      }
-    } catch (e) {
-      if (e instanceof Response) throw e
-      return {
-        valid: false as const,
-        error: "Something went wrong",
-        appName: config.appName,
-        healthUrl: `${config.homeUrl}/health`,
-      }
-    }
-  } catch {
-    // Dev mode fallback — dynamic imports don't resolve in Metro dev loader bundles
-    return { valid: true, email: "dev@localhost", appName: "Duro", healthUrl: "/health" }
+    if (!invite)
+      return { valid: false as const, error: "Invalid invite link", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+    if (invite.usedAt)
+      return { valid: false as const, error: "already_used", appName: config.appName, healthUrl: `${config.homeUrl}/health`, homeUrl: config.homeUrl }
+    if (new Date(invite.expiresAt) < new Date())
+      return { valid: false as const, error: "This invite has expired.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+    if (invite.attempts >= 5)
+      return { valid: false as const, error: "Too many attempts.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+
+    return { valid: true as const, email: invite.email, appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+  } catch (e) {
+    if (e instanceof Response) throw e
+    return { valid: false as const, error: "Something went wrong", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
   }
 }
 

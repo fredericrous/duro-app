@@ -11,9 +11,14 @@ export interface UseActionReturn<TResult> {
 
 /**
  * Framework-agnostic action hook. Submits FormData to an API endpoint via fetch.
- * Revalidates by replacing the current URL (triggers loaders in both React Router and Expo Router).
+ * Results are stored in `data` — the component decides what to render.
+ * Server-initiated redirects are followed automatically.
+ * Optional `onSuccess` fires after a 2xx non-redirect response (use to refetch data).
  */
-export function useAction<TResult>(apiUrl: string): UseActionReturn<TResult> {
+export function useAction<TResult>(
+  apiUrl: string,
+  options?: { onSuccess?: () => void },
+): UseActionReturn<TResult> {
   const [data, setData] = useState<TResult>()
   const [state, setState] = useState<ActionState>("idle")
 
@@ -34,7 +39,7 @@ export function useAction<TResult>(apiUrl: string): UseActionReturn<TResult> {
 
         if (res.redirected) {
           setData(undefined)
-          window.location.replace(window.location.pathname)
+          window.location.replace(res.url)
           return
         }
 
@@ -47,15 +52,16 @@ export function useAction<TResult>(apiUrl: string): UseActionReturn<TResult> {
           }
         }
 
-        // Revalidate: replace current URL to re-run loaders
-        window.location.replace(window.location.pathname)
+        if (res.ok) {
+          options?.onSuccess?.()
+        }
       } catch (e) {
         setData({ error: e instanceof Error ? e.message : "Network error" } as TResult)
       } finally {
         setState("idle")
       }
     },
-    [apiUrl],
+    [apiUrl, options],
   )
 
   const Form: FC<FormHTMLAttributes<HTMLFormElement>> = useCallback(

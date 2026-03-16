@@ -1,19 +1,12 @@
 import { useLoaderData } from "expo-router"
 import type { LoaderFunction } from "expo-server"
 import type { AppDefinition } from "~/lib/apps"
+import { devHomeFallback } from "../../server/dev-fallbacks"
 import { Header } from "~/components/Header/Header"
 import { AppGrid } from "~/components/AppGrid/AppGrid"
 import { NoAccess } from "~/components/NoAccess/NoAccess"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
-import { css, html } from "react-strict-dom"
-
-const styles = css.create({
-  page: {
-    maxWidth: 1200,
-    margin: "0 auto",
-    padding: "32px 24px",
-  },
-})
+import { PageShell } from "@duro-app/ui"
 
 interface HomeLoaderData {
   user: string
@@ -23,24 +16,17 @@ interface HomeLoaderData {
 }
 
 export const loader: LoaderFunction<HomeLoaderData> = async (request) => {
-  try {
-    const { requireAuth } = await import("~/lib/auth.server")
-    const { getVisibleApps } = await import("~/lib/apps.server")
-    const { config } = await import("~/lib/config.server")
+  const { requireAuth } = require("~/lib/auth.server")
+  if (typeof requireAuth !== "function") return devHomeFallback
 
-    const auth = await requireAuth(request as unknown as Request)
-    const visibleApps = getVisibleApps(auth.groups)
-
-    return {
-      user: auth.user ?? "",
-      isAdmin: auth.groups.includes(config.adminGroupName),
-      visibleApps,
-      categoryOrder: config.categoryOrder,
-    }
-  } catch (e) {
-    if (e instanceof Response) throw e
-    // Dev mode fallback
-    return { user: "dev", isAdmin: true, visibleApps: [], categoryOrder: [] }
+  const { config } = require("~/lib/config.server")
+  const { getVisibleApps } = require("~/lib/apps.server")
+  const auth = await requireAuth(request as unknown as Request)
+  return {
+    user: auth.user ?? "",
+    isAdmin: auth.groups.includes(config.adminGroupName),
+    visibleApps: getVisibleApps(auth.groups),
+    categoryOrder: config.categoryOrder,
   }
 }
 
@@ -49,18 +35,17 @@ export default function HomePage() {
 
   const hasAccess = visibleApps.length > 0
 
+  if (!hasAccess) {
+    return (
+      <CenteredCardPage>
+        <NoAccess user={user} />
+      </CenteredCardPage>
+    )
+  }
+
   return (
-    <>
-      <Header user={user} isAdmin={isAdmin} showMenu={hasAccess} />
-      {hasAccess ? (
-        <html.main style={styles.page}>
-          <AppGrid apps={visibleApps} categoryOrder={categoryOrder} />
-        </html.main>
-      ) : (
-        <CenteredCardPage>
-          <NoAccess user={user} />
-        </CenteredCardPage>
-      )}
-    </>
+    <PageShell maxWidth="lg" header={<Header user={user} isAdmin={isAdmin} />}>
+      <AppGrid apps={visibleApps} categoryOrder={categoryOrder} />
+    </PageShell>
   )
 }

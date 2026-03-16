@@ -6,7 +6,7 @@ interface DevOverrides {
   certInstalled: boolean
 }
 
-const DevToolbarContext = createContext<DevOverrides | null>(null)
+export const DevToolbarContext = createContext<DevOverrides | null>(null)
 
 export function useDevOverrides(): DevOverrides | null {
   return useContext(DevToolbarContext)

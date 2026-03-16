@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 
 vi.mock("expo-router", () => ({
-  Link: ({ children, href, ...props }: any) => (
+  Link: ({ children, href, style: _style, ...props }: any) => (
     <a href={href} {...props}>
       {children}
     </a>

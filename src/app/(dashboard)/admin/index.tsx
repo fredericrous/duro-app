@@ -1,12 +1,9 @@
 import { useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
-import { useLoaderData } from "expo-router"
-import type { LoaderFunction } from "expo-server"
-import { Effect } from "effect"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import type { Invite } from "~/lib/services/InviteRepo.server"
-import { useAction } from "~/hooks/useAction"
 import type { AdminInvitesResult } from "~/lib/mutations/admin-invites"
-import { Alert, Button, Checkbox, Cluster, Field, Input, ScrollArea, Text } from "@duro-app/ui"
+import { Alert, Button, Checkbox, Cluster, Field, Fieldset, Input, PageShell, ScrollArea, Text } from "@duro-app/ui"
 import { Header } from "~/components/Header/Header"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
@@ -19,7 +16,7 @@ interface Group {
   displayName: string
 }
 
-interface AdminInvitesLoaderData {
+interface AdminInvitesData {
   user: string
   isAdmin: boolean
   groups: Group[]
@@ -27,76 +24,53 @@ interface AdminInvitesLoaderData {
   failedInvites: Invite[]
 }
 
-export const loader: LoaderFunction<AdminInvitesLoaderData> = async (request) => {
-  try {
-    const { requireAuth } = await import("~/lib/auth.server")
-    const { config } = await import("~/lib/config.server")
-    const { runEffect } = await import("~/lib/runtime.server")
-    const { UserManager } = await import("~/lib/services/UserManager.server")
-    const { InviteRepo } = await import("~/lib/services/InviteRepo.server")
-
-    const auth = await requireAuth(request as unknown as Request)
-
-    const [groups, pendingInvites, failedInvites] = await Promise.all([
-      runEffect(
-        Effect.gen(function* () {
-          const users = yield* UserManager
-          return yield* users.getGroups
-        }),
-      ),
-      runEffect(
-        Effect.gen(function* () {
-          const repo = yield* InviteRepo
-          return yield* repo.findPending()
-        }),
-      ),
-      runEffect(
-        Effect.gen(function* () {
-          const repo = yield* InviteRepo
-          return yield* repo.findFailed()
-        }),
-      ),
-    ])
-
-    return {
-      user: auth.user ?? "",
-      isAdmin: auth.groups.includes(config.adminGroupName),
-      groups: groups as Group[],
-      pendingInvites: pendingInvites as Invite[],
-      failedInvites: failedInvites as Invite[],
-    }
-  } catch (e) {
-    if (e instanceof Response) throw e
-    // Dev mode fallback — dynamic imports don't resolve in Metro dev loader bundles
-    return {
-      user: "dev",
-      isAdmin: true,
-      groups: [],
-      pendingInvites: [],
-      failedInvites: [],
-    }
-  }
+async function submitInviteAction(formData: FormData): Promise<AdminInvitesResult> {
+  const res = await fetch("/admin/invites", { method: "POST", body: formData })
+  return res.json()
 }
 
 export default function AdminInvitesPage() {
   const { t } = useTranslation()
-  const { user, isAdmin, groups, pendingInvites, failedInvites } = useLoaderData<typeof loader>()
-  const inviteAction = useAction<AdminInvitesResult>("/admin/invites")
+  const queryClient = useQueryClient()
   const formRef = useRef<HTMLFormElement>(null)
-  const isSubmitting = inviteAction.state !== "idle"
 
+  const { data: pageData, isLoading } = useQuery<AdminInvitesData>({
+    queryKey: ["admin-invites"],
+    queryFn: () => fetch("/admin/invites").then((r) => r.json()),
+  })
+
+  const mutation = useMutation({
+    mutationFn: submitInviteAction,
+    onSuccess: (data) => {
+      if ("success" in data && data.success) {
+        formRef.current?.reset()
+      }
+      queryClient.invalidateQueries({ queryKey: ["admin-invites"] })
+    },
+  })
+
+  // Auto-dismiss success message after 5s
   useEffect(() => {
-    if (inviteAction.data && "success" in inviteAction.data && inviteAction.data.success) {
-      formRef.current?.reset()
+    if (mutation.data && "success" in mutation.data) {
+      const id = setTimeout(() => mutation.reset(), 5000)
+      return () => clearTimeout(id)
     }
-  }, [inviteAction.data])
+  }, [mutation.data])
 
-  const actionData = inviteAction.data
+  if (isLoading || !pageData) {
+    return (
+      <PageShell maxWidth="lg" header={<Header user="" isAdmin={false} />}>
+        <Text as="p" color="muted">Loading...</Text>
+      </PageShell>
+    )
+  }
+
+  const { user, isAdmin, groups, pendingInvites, failedInvites } = pageData
+  const actionData = mutation.data
   const hasRevocationWarning = actionData && "warning" in actionData && "groups" in actionData
 
   return (
-    <>
-      <Header user={user} isAdmin={isAdmin} />
+    <PageShell maxWidth="lg" header={<Header user={user} isAdmin={isAdmin} />}>
       <CardSection title={t("admin.invites.sendTitle")}>
         {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
         {actionData && "success" in actionData && actionData.success && (
@@ -105,7 +79,12 @@ export default function AdminInvitesPage() {
         {hasRevocationWarning && (
           <Alert variant="warning">
             <Text as="p">{actionData.warning}</Text>
-            <inviteAction.Form>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                mutation.mutate(new FormData(e.currentTarget))
+              }}
+            >
               <input type="hidden" name="email" value={actionData.email} />
               <input type="hidden" name="confirmed" value="true" />
               <input type="hidden" name="revocationId" value={actionData.revocationId} />
@@ -115,7 +94,7 @@ export default function AdminInvitesPage() {
               <Button type="submit" variant="primary">
                 {t("admin.invites.proceedAnyway")}
               </Button>
-            </inviteAction.Form>
+            </form>
           </Alert>
         )}
 
@@ -123,33 +102,35 @@ export default function AdminInvitesPage() {
           ref={formRef}
           onSubmit={(e) => {
             e.preventDefault()
-            inviteAction.submit(new FormData(e.currentTarget) as unknown as Record<string, string>)
+            mutation.mutate(new FormData(e.currentTarget))
           }}
         >
-          <Field.Root>
-            <Field.Label>{t("admin.invites.emailLabel")}</Field.Label>
-            <Input name="email" type="email" required placeholder={t("admin.invites.emailPlaceholder")} />
-          </Field.Root>
+          <Fieldset.Root disabled={mutation.isPending} gap="md">
+            <Field.Root>
+              <Field.Label>{t("admin.invites.emailLabel")}</Field.Label>
+              <Input name="email" type="email" required placeholder={t("admin.invites.emailPlaceholder")} />
+            </Field.Root>
 
-          <Field.Root>
-            <Field.Label>{t("admin.invites.groupsLabel")}</Field.Label>
-            <Cluster gap="ms">
-              {groups.map((g) => (
-                <Checkbox key={g.id} name="groups" value={`${g.id}|${g.displayName}`}>
-                  {g.displayName}
-                </Checkbox>
-              ))}
-            </Cluster>
-          </Field.Root>
+            <Field.Root>
+              <Field.Label>{t("admin.invites.groupsLabel")}</Field.Label>
+              <Cluster gap="ms">
+                {groups.map((g) => (
+                  <Checkbox key={g.id} name="groups" value={`${g.id}|${g.displayName}`}>
+                    {g.displayName}
+                  </Checkbox>
+                ))}
+              </Cluster>
+            </Field.Root>
 
-          <Field.Root>
-            <Field.Label>{t("admin.invites.languageLabel")}</Field.Label>
-            <LanguageSelect />
-          </Field.Root>
+            <Field.Root>
+              <Field.Label>{t("admin.invites.languageLabel")}</Field.Label>
+              <LanguageSelect />
+            </Field.Root>
 
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? t("admin.invites.submitting") : t("admin.invites.submit")}
-          </Button>
+            <Button type="submit" variant="primary" disabled={mutation.isPending}>
+              {mutation.isPending ? t("admin.invites.submitting") : t("admin.invites.submit")}
+            </Button>
+          </Fieldset.Root>
         </form>
       </CardSection>
 
@@ -216,6 +197,6 @@ export default function AdminInvitesPage() {
           </ScrollArea.Root>
         )}
       </CardSection>
-    </>
+    </PageShell>
   )
 }

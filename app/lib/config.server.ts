@@ -1,6 +1,8 @@
+const isDevServer = process.env.NODE_ENV === "development" && process.env.VITEST !== "true"
+
 export const config = {
-  appName: process.env.APP_NAME ?? "Daddyshome",
-  allowedOriginSuffix: process.env.ALLOWED_ORIGIN_SUFFIX ?? "daddyshome.fr",
+  appName: process.env.APP_NAME ?? (isDevServer ? "Duro" : "Daddyshome"),
+  allowedOriginSuffix: process.env.ALLOWED_ORIGIN_SUFFIX ?? (isDevServer ? "localhost" : "daddyshome.fr"),
   homeUrl: process.env.HOME_URL ?? "https://home.daddyshome.fr",
   inviteBaseUrl: process.env.INVITE_BASE_URL ?? "https://join.daddyshome.fr",
   adminGroupName: process.env.ADMIN_GROUP_NAME ?? "lldap_admin",
@@ -11,3 +13,13 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
 } as const
+
+/** Check if a request Origin header matches the allowed suffix. */
+export function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return true
+  try {
+    return new URL(origin).hostname.endsWith(config.allowedOriginSuffix)
+  } catch {
+    return false
+  }
+}

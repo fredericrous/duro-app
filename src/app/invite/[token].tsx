@@ -3,6 +3,7 @@ import { Trans, useTranslation } from "react-i18next"
 import { useLoaderData } from "expo-router"
 import type { LoaderFunction } from "expo-server"
 import { Effect } from "effect"
+import { devInviteFallback } from "../../server/dev-fallbacks"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { InvitePasswordReveal } from "~/components/InvitePasswordReveal/InvitePasswordReveal"
@@ -15,91 +16,50 @@ type InviteLoaderData =
   | { valid: true; email: string; groupNames: string[]; p12Password: string | null; appName: string; healthUrl: string }
 
 export const loader: LoaderFunction<InviteLoaderData> = async (request, params) => {
+  const { config } = require("~/lib/config.server")
+  if (typeof config !== "object") return devInviteFallback
+
+  const { hashToken } = require("~/lib/crypto.server")
+  const { runEffect } = require("~/lib/runtime.server")
+  const { InviteRepo } = require("~/lib/services/InviteRepo.server")
+  const { CertManager } = require("~/lib/services/CertManager.server")
+  const token = params.token as string | undefined
+  if (!token) {
+    return { valid: false, error: "Missing invite token", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+  }
+
   try {
-    const { config } = await import("~/lib/config.server")
-    const { hashToken } = await import("~/lib/crypto.server")
-    const { runEffect } = await import("~/lib/runtime.server")
-    const { InviteRepo } = await import("~/lib/services/InviteRepo.server")
-    const { CertManager } = await import("~/lib/services/CertManager.server")
+    const tokenHash = hashToken(token)
+    const { invite, p12Password } = await runEffect(
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const cert = yield* CertManager
+        const invite = yield* repo.findByTokenHash(tokenHash)
+        const p12Password = invite ? yield* cert.getP12Password(invite.id) : null
+        return { invite, p12Password }
+      }),
+    )
 
-    const token = params.token as string | undefined
-    if (!token) {
-      return {
-        valid: false,
-        error: "Missing invite token",
-        appName: config.appName,
-        healthUrl: `${config.homeUrl}/health`,
-      }
-    }
+    if (!invite)
+      return { valid: false as const, error: "Invalid invite link", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+    if (invite.usedAt)
+      return { valid: false as const, error: "already_used", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+    if (new Date(invite.expiresAt) < new Date())
+      return { valid: false as const, error: "expired", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+    if (invite.attempts >= 5)
+      return { valid: false as const, error: "Too many attempts.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
 
-    try {
-      const tokenHash = hashToken(token)
-      const { invite, p12Password } = await runEffect(
-        Effect.gen(function* () {
-          const repo = yield* InviteRepo
-          const cert = yield* CertManager
-          const invite = yield* repo.findByTokenHash(tokenHash)
-          const p12Password = invite ? yield* cert.getP12Password(invite.id) : null
-          return { invite, p12Password }
-        }),
-      )
-
-      if (!invite)
-        return {
-          valid: false as const,
-          error: "Invalid invite link",
-          appName: config.appName,
-          healthUrl: `${config.homeUrl}/health`,
-        }
-      if (invite.usedAt)
-        return {
-          valid: false as const,
-          error: "already_used",
-          appName: config.appName,
-          healthUrl: `${config.homeUrl}/health`,
-        }
-      if (new Date(invite.expiresAt) < new Date())
-        return {
-          valid: false as const,
-          error: "expired",
-          appName: config.appName,
-          healthUrl: `${config.homeUrl}/health`,
-        }
-      if (invite.attempts >= 5)
-        return {
-          valid: false as const,
-          error: "Too many attempts.",
-          appName: config.appName,
-          healthUrl: `${config.homeUrl}/health`,
-        }
-
-      return {
-        valid: true as const,
-        email: invite.email,
-        groupNames: JSON.parse(invite.groupNames) as string[],
-        p12Password,
-        appName: config.appName,
-        healthUrl: `${config.homeUrl}/health`,
-      }
-    } catch (e) {
-      if (e instanceof Response) throw e
-      return {
-        valid: false as const,
-        error: "Something went wrong",
-        appName: config.appName,
-        healthUrl: `${config.homeUrl}/health`,
-      }
-    }
-  } catch {
-    // Dev mode fallback — dynamic imports don't resolve in Metro dev loader bundles
     return {
-      valid: true,
-      email: "dev@localhost",
-      groupNames: ["family"],
-      p12Password: "dev-p12-password",
-      appName: "Duro",
-      healthUrl: "/health",
+      valid: true as const,
+      email: invite.email,
+      groupNames: JSON.parse(invite.groupNames) as string[],
+      p12Password,
+      appName: config.appName,
+      healthUrl: `${config.homeUrl}/health`,
     }
+  } catch (e) {
+    if (e instanceof Response) throw e
+    return { valid: false as const, error: "Something went wrong", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
   }
 }
 
