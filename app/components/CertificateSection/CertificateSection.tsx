@@ -4,18 +4,7 @@ import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 import type { SettingsResult } from "~/lib/mutations/settings"
 import { useAction } from "~/hooks/useAction"
 import { PasswordReveal } from "~/components/PasswordReveal/PasswordReveal"
-import { Alert, Button, Heading, Inline, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
-import { css, html } from "react-strict-dom"
-
-const styles = css.create({
-  certSection: {
-    marginTop: 32,
-    paddingTop: 32,
-    borderTopWidth: 1,
-    borderTopStyle: "solid",
-    borderTopColor: "#e5e5e5",
-  },
-})
+import { Alert, Button, Inline, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
 
 const API_URL = "/settings"
 
@@ -128,9 +117,7 @@ export function CertificateSection({
   }
 
   return (
-    <html.div style={styles.certSection}>
       <Stack gap="md">
-        <Heading level={2}>{t("settings.cert.heading")}</Heading>
         <Text as="p" color="muted">
           {t("settings.cert.description")}
         </Text>
@@ -206,6 +193,5 @@ export function CertificateSection({
           )
         )}
       </Stack>
-    </html.div>
   )
 }

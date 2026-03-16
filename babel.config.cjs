@@ -16,12 +16,11 @@ module.exports = function (api) {
   const platform = api.caller(getPlatform)
   const dev = api.caller(getIsDev)
 
-
   return {
     plugins: [["babel-plugin-react-compiler"]],
     presets: [
       "babel-preset-expo",
-      [reactStrictPreset, { debug: dev, dev, platform }],
+      [reactStrictPreset, { debug: true, dev, platform }],
     ],
   }
 }

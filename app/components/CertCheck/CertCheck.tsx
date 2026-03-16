@@ -1,6 +1,9 @@
 import { useLocalSearchParams } from "expo-router"
 import { useTranslation } from "react-i18next"
 import { Alert, Button, LinkButton, Stack, Text } from "@duro-app/ui"
+import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { radii, spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { typeScale, typography } from "@duro-app/tokens/tokens/typography.css"
 import { css, html } from "react-strict-dom"
 
 const styles = css.create({
@@ -8,20 +11,20 @@ const styles = css.create({
     visibility: "hidden",
   },
   btnRetry: {
-    padding: 8,
-    paddingLeft: 12,
-    paddingRight: 12,
-    fontSize: 14,
-    fontWeight: 500,
+    padding: spacing.sm,
+    paddingLeft: spacing.ms,
+    paddingRight: spacing.ms,
+    fontSize: typeScale.fontSize3,
+    fontWeight: typography.fontWeightMedium,
     backgroundColor: {
-      default: "rgba(251, 191, 36, 0.15)",
+      default: colors.warningBg,
       ":hover": "rgba(251, 191, 36, 0.25)",
     },
-    color: "#fbbf24",
+    color: colors.warning,
     borderWidth: 1,
     borderStyle: "solid",
-    borderColor: "rgba(251, 191, 36, 0.3)",
-    borderRadius: 6,
+    borderColor: colors.warningBorder,
+    borderRadius: radii.sm,
     cursor: "pointer",
     width: "100%",
   },

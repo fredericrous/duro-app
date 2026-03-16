@@ -14,7 +14,7 @@ const styles = css.create({
     justifyContent: "center",
     width: 48,
     height: 48,
-    color: "var(--color-accent)",
+    color: "#6aaffc", // tokens.colors.accent — can't use css.defineVars ref in Metro
   },
 })
 

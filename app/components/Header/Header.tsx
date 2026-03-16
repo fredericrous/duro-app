@@ -1,22 +1,22 @@
 import { Link } from "expo-router"
 import { useTranslation } from "react-i18next"
 import { Menu } from "@duro-app/ui"
+import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { typeScale } from "@duro-app/tokens/tokens/typography.css"
 import { css, html } from "react-strict-dom"
 
 const styles = css.create({
-  header: {
+  row: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    maxWidth: 1200,
-    margin: "0 auto",
-    padding: "24px 24px 0",
   },
-  title: {
-    fontSize: "1.75rem",
+  logo: {
+    fontSize: typeScale.fontSize9,
     fontWeight: 700,
+    letterSpacing: typeScale.letterSpacingTight,
     textDecoration: "none",
-    color: "var(--color-text)",
+    color: colors.text,
   },
 })
 
@@ -30,9 +30,9 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
   const { t } = useTranslation()
 
   return (
-    <html.header style={styles.header}>
-      <Link href="/" style={styles.title as any}>
-        {t("common.appTitle")}
+    <html.div style={styles.row}>
+      <Link href="/" style={{ textDecoration: "none" }}>
+        <html.span style={styles.logo}>{t("common.appTitle")}</html.span>
       </Link>
       {showMenu && (
         <Menu.Root>
@@ -44,6 +44,6 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
           </Menu.Popup>
         </Menu.Root>
       )}
-    </html.header>
+    </html.div>
   )
 }

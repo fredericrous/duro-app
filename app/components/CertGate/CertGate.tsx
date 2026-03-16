@@ -71,7 +71,7 @@ export function CertGate({
               required
               minLength={12}
               placeholder={t("createAccount.confirm.placeholder")}
-              autoComplete="new-password"
+              autoComplete="off"
             />
           </Field.Root>
 

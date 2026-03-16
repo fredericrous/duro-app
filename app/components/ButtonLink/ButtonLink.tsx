@@ -1,33 +1,36 @@
 import { Link } from "expo-router"
 import type { ComponentProps } from "react"
+import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { radii } from "@duro-app/tokens/tokens/spacing.css"
+import { typeScale, typography } from "@duro-app/tokens/tokens/typography.css"
 import { css } from "react-strict-dom"
 
 const styles = css.create({
   btn: {
     display: "inline-block",
     padding: "12px 32px",
-    borderRadius: 4,
-    fontSize: "0.875rem",
-    fontWeight: "500",
+    borderRadius: radii.sm,
+    fontSize: typeScale.fontSize3,
+    fontWeight: typography.fontWeightMedium,
     cursor: "pointer",
     borderWidth: 0,
     textDecoration: "none",
   },
   primary: {
-    backgroundColor: "#6366f1",
-    color: "#fff",
+    backgroundColor: colors.accent,
+    color: colors.accentContrast,
   },
   ghost: {
     padding: "8px 20px",
     backgroundColor: "transparent",
-    color: "#999",
+    color: colors.textMuted,
     borderWidth: 1,
     borderStyle: "solid",
-    borderColor: "#333",
+    borderColor: colors.border,
   },
   small: {
     padding: "6px 12px",
-    fontSize: "0.75rem",
+    fontSize: typeScale.fontSize1,
   },
 })
 
