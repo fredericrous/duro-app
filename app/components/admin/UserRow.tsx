@@ -52,7 +52,12 @@ export function UserRow({
         <Table.Cell>
           {!isSystem && (
             <Inline gap="sm">
-              <form onSubmit={(e) => { e.preventDefault(); certMutation.mutate(new FormData(e.currentTarget)) }}>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  certMutation.mutate(new FormData(e.currentTarget))
+                }}
+              >
                 <input type="hidden" name="intent" value="resendCert" />
                 <input type="hidden" name="username" value={user.id} />
                 <input type="hidden" name="email" value={user.email} />

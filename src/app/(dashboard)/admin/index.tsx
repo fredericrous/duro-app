@@ -57,7 +57,11 @@ export default function AdminInvitesPage() {
   }, [mutation.data])
 
   if (isLoading || !pageData) {
-    return <Text as="p" color="muted">Loading...</Text>
+    return (
+      <Text as="p" color="muted">
+        Loading...
+      </Text>
+    )
   }
 
   const { groups, pendingInvites, failedInvites } = pageData

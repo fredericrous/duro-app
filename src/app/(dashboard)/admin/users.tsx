@@ -43,7 +43,11 @@ export default function AdminUsersPage() {
   })
 
   if (isLoading || !pageData) {
-    return <Text as="p" color="muted">Loading...</Text>
+    return (
+      <Text as="p" color="muted">
+        Loading...
+      </Text>
+    )
   }
 
   const { users, revocations, systemUserIds, certsByUser } = pageData
@@ -107,7 +111,9 @@ export default function AdminUsersPage() {
       </CardSection>
       <ActionBar
         selectedItemCount={revokeTarget ? 1 : 0}
-        selectedLabel={() => t("admin.users.actions.revokeLabel", { user: revokeTarget?.displayName ?? revokeTarget?.id })}
+        selectedLabel={() =>
+          t("admin.users.actions.revokeLabel", { user: revokeTarget?.displayName ?? revokeTarget?.id })
+        }
         onClearSelection={() => setRevokeTarget(null)}
       >
         <Input
@@ -117,12 +123,7 @@ export default function AdminUsersPage() {
           onChange={(e) => setRevokeReason((e.target as HTMLInputElement).value)}
           placeholder={t("admin.users.actions.reasonPlaceholder")}
         />
-        <Button
-          variant="danger"
-          size="small"
-          disabled={revokeMutation.isPending}
-          onClick={handleConfirmRevoke}
-        >
+        <Button variant="danger" size="small" disabled={revokeMutation.isPending} onClick={handleConfirmRevoke}>
           {revokeMutation.isPending ? t("admin.users.actions.revoking") : t("admin.users.actions.confirmRevoke")}
         </Button>
       </ActionBar>
