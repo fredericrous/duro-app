@@ -16,12 +16,17 @@ type InviteLoaderData =
   | { valid: true; email: string; groupNames: string[]; p12Password: string | null; appName: string; healthUrl: string }
 
 export const loader: LoaderFunction<InviteLoaderData> = async (request, params) => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { config } = require("~/lib/config.server")
   if (typeof config !== "object") return devInviteFallback
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { hashToken } = require("~/lib/crypto.server")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { runEffect } = require("~/lib/runtime.server")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { InviteRepo } = require("~/lib/services/InviteRepo.server")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { CertManager } = require("~/lib/services/CertManager.server")
   const token = params.token as string | undefined
   if (!token) {

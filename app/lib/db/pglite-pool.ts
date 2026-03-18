@@ -50,6 +50,7 @@ class WorkerBackend implements PgLiteBackend {
 
   constructor() {
     // Dynamic require to avoid Metro bundling worker_threads
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { Worker } = require("node:worker_threads") as typeof import("node:worker_threads")
     const workerPath = join(process.cwd(), "app", "lib", "db", "pglite-worker.mjs")
     this.worker = new Worker(workerPath)

@@ -16,10 +16,13 @@ interface HomeLoaderData {
 }
 
 export const loader: LoaderFunction<HomeLoaderData> = async (request) => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { requireAuth } = require("~/lib/auth.server")
   if (typeof requireAuth !== "function") return devHomeFallback
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { config } = require("~/lib/config.server")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { getVisibleApps } = require("~/lib/apps.server")
   const auth = await requireAuth(request as unknown as Request)
   return {

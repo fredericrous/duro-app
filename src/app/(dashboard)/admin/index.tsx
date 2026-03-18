@@ -54,6 +54,7 @@ export default function AdminInvitesPage() {
       const id = setTimeout(() => mutation.reset(), 5000)
       return () => clearTimeout(id)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mutation.data])
 
   if (isLoading || !pageData) {

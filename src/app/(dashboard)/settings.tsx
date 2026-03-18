@@ -24,14 +24,21 @@ interface SettingsLoaderData {
 }
 
 export const loader: LoaderFunction<SettingsLoaderData> = async (request) => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { requireAuth } = require("~/lib/auth.server")
   if (typeof requireAuth !== "function") return devSettingsFallback
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { runEffect } = require("~/lib/runtime.server")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { config } = require("~/lib/config.server")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { resolveLocale } = require("~/lib/i18n.server")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { PreferencesRepo } = require("~/lib/services/PreferencesRepo.server")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { CertManager } = require("~/lib/services/CertManager.server")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { CertificateRepo } = require("~/lib/services/CertificateRepo.server")
   const auth = await requireAuth(request as unknown as Request)
   const { locale, lastCertRenewal, p12Password, certificates } = await runEffect(

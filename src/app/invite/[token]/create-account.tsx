@@ -15,12 +15,17 @@ type CreateAccountLoaderData =
   | { valid: true; email: string; appName: string; healthUrl: string }
 
 export const loader: LoaderFunction<CreateAccountLoaderData> = async (request, params) => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { config } = require("~/lib/config.server")
   if (typeof config !== "object") return devCreateAccountFallback
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { hashToken } = require("~/lib/crypto.server")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { runEffect } = require("~/lib/runtime.server")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { InviteRepo } = require("~/lib/services/InviteRepo.server")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { CertManager } = require("~/lib/services/CertManager.server")
   const token = params.token as string | undefined
   if (!token) {
