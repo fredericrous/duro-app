@@ -50,7 +50,7 @@ export const EmailServiceLive = Layer.scoped(
     // Load internal CA cert for SMTP TLS verification
     let ca: string | undefined
     try {
-      ca = readFileSync("/certs/internal-ca.pem", "utf-8")
+      ca = readFileSync("/certs/ca.crt", "utf-8")
     } catch {
       // CA cert not available (dev environment)
     }

@@ -30,7 +30,7 @@ securityContext:
 # Shared env vars
 env:
   NODE_TLS_REJECT_UNAUTHORIZED: "0"
-  SMTP_HOST: "stalwart.stalwart.svc.cluster.local."
+  SMTP_HOST: "stalwart-mail-external.stalwart.svc.cluster.local."
   SMTP_PORT: "587"
   SMTP_USER: "admin"
   SMTP_FROM: "noreply@daddyshome.fr"

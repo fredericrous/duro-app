@@ -130,6 +130,9 @@ spec:
         - name: internal-ca
           secret:
             secretName: {{ .Values.internalCA.secretName }}
+            items:
+              - key: {{ .Values.internalCA.key | default "ca.crt" }}
+                path: ca.crt
             optional: true
         {{- end }}
 {{- end }}
