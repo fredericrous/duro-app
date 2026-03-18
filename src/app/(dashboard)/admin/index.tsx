@@ -3,8 +3,7 @@ import { useTranslation } from "react-i18next"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import type { Invite } from "~/lib/services/InviteRepo.server"
 import type { AdminInvitesResult } from "~/lib/mutations/admin-invites"
-import { Alert, Button, Checkbox, Cluster, Field, Fieldset, Input, PageShell, ScrollArea, Text } from "@duro-app/ui"
-import { Header } from "~/components/Header/Header"
+import { Alert, Button, Checkbox, Cluster, Field, Fieldset, Input, ScrollArea, Stack, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 import { PendingInviteRow } from "~/components/admin/PendingInviteRow"
@@ -58,19 +57,15 @@ export default function AdminInvitesPage() {
   }, [mutation.data])
 
   if (isLoading || !pageData) {
-    return (
-      <PageShell maxWidth="lg" header={<Header user="" isAdmin={false} />}>
-        <Text as="p" color="muted">Loading...</Text>
-      </PageShell>
-    )
+    return <Text as="p" color="muted">Loading...</Text>
   }
 
-  const { user, isAdmin, groups, pendingInvites, failedInvites } = pageData
+  const { groups, pendingInvites, failedInvites } = pageData
   const actionData = mutation.data
   const hasRevocationWarning = actionData && "warning" in actionData && "groups" in actionData
 
   return (
-    <PageShell maxWidth="lg" header={<Header user={user} isAdmin={isAdmin} />}>
+    <Stack gap="md">
       <CardSection title={t("admin.invites.sendTitle")}>
         {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
         {actionData && "success" in actionData && actionData.success && (
@@ -197,6 +192,6 @@ export default function AdminInvitesPage() {
           </ScrollArea.Root>
         )}
       </CardSection>
-    </PageShell>
+    </Stack>
   )
 }

@@ -5,7 +5,7 @@ export function useAdminUsersMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (formData: FormData) =>
-      fetch("/admin/users", { method: "POST", body: formData }).then((r) => r.json() as Promise<AdminUsersResult>),
+      fetch("/admin/users-data", { method: "POST", body: formData }).then((r) => r.json() as Promise<AdminUsersResult>),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
   })
 }

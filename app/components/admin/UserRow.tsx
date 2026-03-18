@@ -5,27 +5,31 @@ import { certStatus } from "~/lib/cert-status"
 import { useAdminUsersMutation } from "./useAdminUsersMutation"
 import { AdminCertRow } from "./AdminCertRow"
 import { RevokeAllButton } from "./RevokeAllButton"
-import { Badge, Button, Inline, Input, Stack, Table } from "@duro-app/ui"
+import { Badge, Button, Inline, Stack, Table } from "@duro-app/ui"
+import { css, html } from "react-strict-dom"
+
+const styles = css.create({
+  fullRow: {
+    gridColumn: "1 / -1",
+  },
+})
 
 export function UserRow({
   user,
   isSystem,
   certs,
+  onRevoke,
 }: {
   user: { id: string; displayName: string; email: string; creationDate: string }
   isSystem: boolean
   certs: UserCertificate[]
+  onRevoke?: (user: { id: string; email: string; displayName: string }) => void
 }) {
   const { t } = useTranslation()
-  const [showRevoke, setShowRevoke] = useState(false)
   const [showCerts, setShowCerts] = useState(false)
   const certMutation = useAdminUsersMutation()
-  const revokeMutation = useAdminUsersMutation()
   const revokeAllMutation = useAdminUsersMutation()
   const isSendingCert = certMutation.isPending
-  const isRevoking = revokeMutation.isPending
-  const revokeSucceeded = revokeMutation.data && "success" in revokeMutation.data
-  const isRevokeVisible = showRevoke && !revokeSucceeded
   const activeCerts = certs.filter((c) => certStatus(c) === "active")
 
   return (
@@ -52,7 +56,7 @@ export function UserRow({
                 <input type="hidden" name="intent" value="resendCert" />
                 <input type="hidden" name="username" value={user.id} />
                 <input type="hidden" name="email" value={user.email} />
-                <Button type="submit" variant="secondary" size="small" disabled={isSendingCert || isRevoking}>
+                <Button type="submit" variant="secondary" size="small" disabled={isSendingCert}>
                   {isSendingCert ? t("admin.users.actions.sendingCert") : t("admin.users.actions.sendCert")}
                 </Button>
               </form>
@@ -65,38 +69,17 @@ export function UserRow({
                 type="button"
                 variant="danger"
                 size="small"
-                disabled={isRevoking}
-                onClick={() => setShowRevoke(!showRevoke)}
+                onClick={() => onRevoke?.({ id: user.id, email: user.email, displayName: user.displayName })}
               >
-                {t("admin.users.actions.revoke")}
+                {t("admin.users.certs.revokeAll")}
               </Button>
             </Inline>
           )}
         </Table.Cell>
       </Table.Row>
-      {isRevokeVisible && (
-        <Table.Row>
-          <td colSpan={5}>
-            <form onSubmit={(e) => { e.preventDefault(); revokeMutation.mutate(new FormData(e.currentTarget)) }}>
-              <Inline gap="sm" align="center">
-                <input type="hidden" name="intent" value="revokeUser" />
-                <input type="hidden" name="username" value={user.id} />
-                <input type="hidden" name="email" value={user.email} />
-                <Input name="reason" type="text" placeholder={t("admin.users.actions.reasonPlaceholder")} />
-                <Button type="submit" variant="danger" disabled={isRevoking}>
-                  {isRevoking ? t("admin.users.actions.revoking") : t("admin.users.actions.confirmRevoke")}
-                </Button>
-                <Button type="button" variant="secondary" onClick={() => setShowRevoke(false)}>
-                  {t("common.cancel")}
-                </Button>
-              </Inline>
-            </form>
-          </td>
-        </Table.Row>
-      )}
       {showCerts && (
         <Table.Row>
-          <td colSpan={5}>
+          <html.div style={styles.fullRow}>
             <Table.Root columns={5}>
               <Table.Header>
                 <Table.Row>
@@ -118,7 +101,7 @@ export function UserRow({
                 <RevokeAllButton username={user.id} mutation={revokeAllMutation} />
               </Stack>
             )}
-          </td>
+          </html.div>
         </Table.Row>
       )}
     </>

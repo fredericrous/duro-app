@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useQuery } from "@tanstack/react-query"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
@@ -5,8 +6,8 @@ import type { Revocation } from "~/lib/services/InviteRepo.server"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { UserRow } from "~/components/admin/UserRow"
 import { RevokedUserRow } from "~/components/admin/RevokedUserRow"
-import { PageShell, ScrollArea, Table, Text } from "@duro-app/ui"
-import { Header } from "~/components/Header/Header"
+import { useAdminUsersMutation } from "~/components/admin/useAdminUsersMutation"
+import { ActionBar, Button, Input, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
 
 interface User {
   id: string
@@ -24,26 +25,53 @@ interface AdminUsersData {
   certsByUser: Record<string, UserCertificate[]>
 }
 
+interface RevokeTarget {
+  id: string
+  email: string
+  displayName: string
+}
+
 export default function AdminUsersPage() {
   const { t } = useTranslation()
+  const [revokeTarget, setRevokeTarget] = useState<RevokeTarget | null>(null)
+  const [revokeReason, setRevokeReason] = useState("")
+  const revokeMutation = useAdminUsersMutation()
 
   const { data: pageData, isLoading } = useQuery<AdminUsersData>({
     queryKey: ["admin-users"],
-    queryFn: () => fetch("/admin/users").then((r) => r.json()),
+    queryFn: () => fetch("/admin/users-data").then((r) => r.json()),
   })
 
   if (isLoading || !pageData) {
-    return (
-      <PageShell maxWidth="lg" header={<Header user="" isAdmin={false} />}>
-        <Text as="p" color="muted">Loading...</Text>
-      </PageShell>
-    )
+    return <Text as="p" color="muted">Loading...</Text>
   }
 
-  const { user, isAdmin, users, revocations, systemUserIds, certsByUser } = pageData
+  const { users, revocations, systemUserIds, certsByUser } = pageData
+
+  const handleRevoke = (user: RevokeTarget) => {
+    setRevokeTarget(user)
+    setRevokeReason("")
+    revokeMutation.reset()
+  }
+
+  const handleConfirmRevoke = () => {
+    if (!revokeTarget) return
+    const formData = new FormData()
+    formData.set("intent", "revokeUser")
+    formData.set("username", revokeTarget.id)
+    formData.set("email", revokeTarget.email)
+    formData.set("reason", revokeReason)
+    revokeMutation.mutate(formData, {
+      onSuccess: (data) => {
+        if (data && "success" in data) {
+          setRevokeTarget(null)
+        }
+      },
+    })
+  }
 
   return (
-    <PageShell maxWidth="lg" header={<Header user={user} isAdmin={isAdmin} />}>
+    <Stack gap="md">
       <CardSection title={`${t("admin.users.title")} (${users.length})`}>
         <ScrollArea.Root>
           <ScrollArea.Viewport>
@@ -65,6 +93,7 @@ export default function AdminUsersPage() {
                       user={u}
                       isSystem={systemUserIds.includes(u.id)}
                       certs={certsByUser[u.id] ?? []}
+                      onRevoke={handleRevoke}
                     />
                   ))}
                 </Table.Body>
@@ -76,6 +105,27 @@ export default function AdminUsersPage() {
           </ScrollArea.Scrollbar>
         </ScrollArea.Root>
       </CardSection>
+      <ActionBar
+        selectedItemCount={revokeTarget ? 1 : 0}
+        selectedLabel={() => t("admin.users.actions.revokeLabel", { user: revokeTarget?.displayName ?? revokeTarget?.id })}
+        onClearSelection={() => setRevokeTarget(null)}
+      >
+        <Input
+          name="reason"
+          type="text"
+          value={revokeReason}
+          onChange={(e) => setRevokeReason((e.target as HTMLInputElement).value)}
+          placeholder={t("admin.users.actions.reasonPlaceholder")}
+        />
+        <Button
+          variant="danger"
+          size="small"
+          disabled={revokeMutation.isPending}
+          onClick={handleConfirmRevoke}
+        >
+          {revokeMutation.isPending ? t("admin.users.actions.revoking") : t("admin.users.actions.confirmRevoke")}
+        </Button>
+      </ActionBar>
 
       {revocations.length > 0 && (
         <CardSection title={`${t("admin.users.revokedTitle")} (${revocations.length})`}>
@@ -107,6 +157,6 @@ export default function AdminUsersPage() {
           </ScrollArea.Root>
         </CardSection>
       )}
-    </PageShell>
+    </Stack>
   )
 }
