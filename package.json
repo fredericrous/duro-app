@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "NODE_ENV=development expo start --web",
     "build": "expo export --platform web",
-    "start": "expo serve",
+    "start": "expo serve --port 3000",
     "lint": "eslint app/ src/",
     "format": "prettier --write app/ src/",
     "format:check": "prettier --check app/ src/",
