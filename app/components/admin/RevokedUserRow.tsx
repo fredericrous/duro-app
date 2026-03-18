@@ -15,7 +15,12 @@ export function RevokedUserRow({ revocation }: { revocation: Revocation }) {
       <Table.Cell>{new Date(revocation.revokedAt).toLocaleDateString()}</Table.Cell>
       <Table.Cell>{revocation.revokedBy}</Table.Cell>
       <Table.Cell>
-        <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(new FormData(e.currentTarget)) }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            mutation.mutate(new FormData(e.currentTarget))
+          }}
+        >
           <input type="hidden" name="intent" value="reinviteRevoked" />
           <input type="hidden" name="revocationId" value={revocation.id} />
           <Button type="submit" variant="secondary" size="small" disabled={mutation.isPending}>

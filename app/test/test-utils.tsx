@@ -13,11 +13,7 @@ export function TestDevProvider({
   children: ReactNode
   overrides?: DevOverrides
 }) {
-  return (
-    <DevToolbarContext.Provider value={overrides}>
-      {children}
-    </DevToolbarContext.Provider>
-  )
+  return <DevToolbarContext.Provider value={overrides}>{children}</DevToolbarContext.Provider>
 }
 
 export function renderWithDev(
@@ -25,9 +21,7 @@ export function renderWithDev(
   { overrides, ...options }: RenderOptions & { overrides?: DevOverrides } = {},
 ) {
   return render(ui, {
-    wrapper: ({ children }) => (
-      <TestDevProvider overrides={overrides}>{children}</TestDevProvider>
-    ),
+    wrapper: ({ children }) => <TestDevProvider overrides={overrides}>{children}</TestDevProvider>,
     ...options,
   })
 }

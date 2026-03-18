@@ -117,81 +117,81 @@ export function CertificateSection({
   }
 
   return (
-      <Stack gap="md">
-        <Text as="p" color="muted">
-          {t("settings.cert.description")}
+    <Stack gap="md">
+      <Text as="p" color="muted">
+        {t("settings.cert.description")}
+      </Text>
+
+      {certData && "certError" in certData && <Alert variant="error">{certData.certError}</Alert>}
+
+      {justSent && <Alert variant="success">{t("settings.cert.success")}</Alert>}
+
+      {certData && "certRevoked" in certData && <Alert variant="success">{t("settings.cert.list.revoked")}</Alert>}
+
+      {effectivePassword && <PasswordReveal p12Password={effectivePassword} />}
+
+      {certificates.length > 0 && (
+        <ScrollArea.Root>
+          <ScrollArea.Viewport>
+            <ScrollArea.Content>
+              <Table.Root columns={4}>
+                <Table.Header>
+                  <Table.Row>
+                    <Table.HeaderCell>{t("settings.cert.list.serial")}</Table.HeaderCell>
+                    <Table.HeaderCell>{t("settings.cert.list.issued")}</Table.HeaderCell>
+                    <Table.HeaderCell>{t("settings.cert.list.expires")}</Table.HeaderCell>
+                    <Table.HeaderCell>{t("common.actions")}</Table.HeaderCell>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {certificates.map((cert) => (
+                    <CertRow key={cert.id} cert={cert} />
+                  ))}
+                </Table.Body>
+              </Table.Root>
+            </ScrollArea.Content>
+          </ScrollArea.Viewport>
+          <ScrollArea.Scrollbar orientation="horizontal">
+            <ScrollArea.Thumb orientation="horizontal" />
+          </ScrollArea.Scrollbar>
+        </ScrollArea.Root>
+      )}
+
+      {certificates.length === 0 && !effectivePassword && (
+        <Text as="p" color="muted" variant="bodySm">
+          {t("settings.cert.list.empty")}
         </Text>
+      )}
 
-        {certData && "certError" in certData && <Alert variant="error">{certData.certError}</Alert>}
-
-        {justSent && <Alert variant="success">{t("settings.cert.success")}</Alert>}
-
-        {certData && "certRevoked" in certData && <Alert variant="success">{t("settings.cert.list.revoked")}</Alert>}
-
-        {effectivePassword && <PasswordReveal p12Password={effectivePassword} />}
-
-        {certificates.length > 0 && (
-          <ScrollArea.Root>
-            <ScrollArea.Viewport>
-              <ScrollArea.Content>
-                <Table.Root columns={4}>
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.HeaderCell>{t("settings.cert.list.serial")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("settings.cert.list.issued")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("settings.cert.list.expires")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("common.actions")}</Table.HeaderCell>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {certificates.map((cert) => (
-                      <CertRow key={cert.id} cert={cert} />
-                    ))}
-                  </Table.Body>
-                </Table.Root>
-              </ScrollArea.Content>
-            </ScrollArea.Viewport>
-            <ScrollArea.Scrollbar orientation="horizontal">
-              <ScrollArea.Thumb orientation="horizontal" />
-            </ScrollArea.Scrollbar>
-          </ScrollArea.Root>
-        )}
-
-        {certificates.length === 0 && !effectivePassword && (
-          <Text as="p" color="muted" variant="bodySm">
-            {t("settings.cert.list.empty")}
+      {cooldownRemaining && !effectivePassword ? (
+        <Stack gap="sm">
+          <Button disabled>{t("settings.cert.newCert")}</Button>
+          <Text as="p" variant="bodySm" color="muted">
+            {t("settings.cert.nextAvailable", { time: nextAvailableText })}
           </Text>
-        )}
-
-        {cooldownRemaining && !effectivePassword ? (
-          <Stack gap="sm">
-            <Button disabled>{t("settings.cert.newCert")}</Button>
-            <Text as="p" variant="bodySm" color="muted">
-              {t("settings.cert.nextAvailable", { time: nextAvailableText })}
-            </Text>
-          </Stack>
-        ) : confirming ? (
-          <Stack gap="sm">
-            <Text as="p">{t("settings.cert.confirm", { email })}</Text>
-            <Inline gap="sm">
-              <certAction.Form>
-                <input type="hidden" name="intent" value="issueCert" />
-                <Button type="submit" variant="primary" disabled={isSubmitting}>
-                  {isSubmitting ? t("settings.cert.issuing") : t("settings.cert.confirmButton")}
-                </Button>
-              </certAction.Form>
-              <Button variant="secondary" onClick={() => setConfirming(false)}>
-                {t("common.cancel")}
+        </Stack>
+      ) : confirming ? (
+        <Stack gap="sm">
+          <Text as="p">{t("settings.cert.confirm", { email })}</Text>
+          <Inline gap="sm">
+            <certAction.Form>
+              <input type="hidden" name="intent" value="issueCert" />
+              <Button type="submit" variant="primary" disabled={isSubmitting}>
+                {isSubmitting ? t("settings.cert.issuing") : t("settings.cert.confirmButton")}
               </Button>
-            </Inline>
-          </Stack>
-        ) : (
-          !effectivePassword && (
-            <Button variant="primary" onClick={() => setConfirming(true)}>
-              {t("settings.cert.newCert")}
+            </certAction.Form>
+            <Button variant="secondary" onClick={() => setConfirming(false)}>
+              {t("common.cancel")}
             </Button>
-          )
-        )}
-      </Stack>
+          </Inline>
+        </Stack>
+      ) : (
+        !effectivePassword && (
+          <Button variant="primary" onClick={() => setConfirming(true)}>
+            {t("settings.cert.newCert")}
+          </Button>
+        )
+      )}
+    </Stack>
   )
 }

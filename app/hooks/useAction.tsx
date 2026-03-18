@@ -15,10 +15,7 @@ export interface UseActionReturn<TResult> {
  * Server-initiated redirects are followed automatically.
  * Optional `onSuccess` fires after a 2xx non-redirect response (use to refetch data).
  */
-export function useAction<TResult>(
-  apiUrl: string,
-  options?: { onSuccess?: () => void },
-): UseActionReturn<TResult> {
+export function useAction<TResult>(apiUrl: string, options?: { onSuccess?: () => void }): UseActionReturn<TResult> {
   const [data, setData] = useState<TResult>()
   const [state, setState] = useState<ActionState>("idle")
 

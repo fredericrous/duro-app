@@ -33,7 +33,12 @@ export function AdminCertRow({ cert }: { cert: UserCertificate }) {
         )}
         {effectiveStatus === "active" && confirming && (
           <Inline gap="sm">
-            <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(new FormData(e.currentTarget)) }}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                mutation.mutate(new FormData(e.currentTarget))
+              }}
+            >
               <input type="hidden" name="intent" value="revokeCert" />
               <input type="hidden" name="serialNumber" value={cert.serialNumber} />
               <Button type="submit" variant="danger" size="small" disabled={mutation.isPending}>
@@ -46,7 +51,12 @@ export function AdminCertRow({ cert }: { cert: UserCertificate }) {
           </Inline>
         )}
         {effectiveStatus === "failed" && (
-          <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(new FormData(e.currentTarget)) }}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              mutation.mutate(new FormData(e.currentTarget))
+            }}
+          >
             <input type="hidden" name="intent" value="revokeCert" />
             <input type="hidden" name="serialNumber" value={cert.serialNumber} />
             <Button type="submit" variant="danger" size="small" disabled={mutation.isPending}>

@@ -24,7 +24,12 @@ export const loader: LoaderFunction<CreateAccountLoaderData> = async (request, p
   const { CertManager } = require("~/lib/services/CertManager.server")
   const token = params.token as string | undefined
   if (!token) {
-    return { valid: false, error: "Missing invite token", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+    return {
+      valid: false,
+      error: "Missing invite token",
+      appName: config.appName,
+      healthUrl: `${config.homeUrl}/health`,
+    }
   }
 
   try {
@@ -42,18 +47,44 @@ export const loader: LoaderFunction<CreateAccountLoaderData> = async (request, p
     )
 
     if (!invite)
-      return { valid: false as const, error: "Invalid invite link", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+      return {
+        valid: false as const,
+        error: "Invalid invite link",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
     if (invite.usedAt)
-      return { valid: false as const, error: "already_used", appName: config.appName, healthUrl: `${config.homeUrl}/health`, homeUrl: config.homeUrl }
+      return {
+        valid: false as const,
+        error: "already_used",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+        homeUrl: config.homeUrl,
+      }
     if (new Date(invite.expiresAt) < new Date())
-      return { valid: false as const, error: "This invite has expired.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+      return {
+        valid: false as const,
+        error: "This invite has expired.",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
     if (invite.attempts >= 5)
-      return { valid: false as const, error: "Too many attempts.", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+      return {
+        valid: false as const,
+        error: "Too many attempts.",
+        appName: config.appName,
+        healthUrl: `${config.homeUrl}/health`,
+      }
 
     return { valid: true as const, email: invite.email, appName: config.appName, healthUrl: `${config.homeUrl}/health` }
   } catch (e) {
     if (e instanceof Response) throw e
-    return { valid: false as const, error: "Something went wrong", appName: config.appName, healthUrl: `${config.homeUrl}/health` }
+    return {
+      valid: false as const,
+      error: "Something went wrong",
+      appName: config.appName,
+      healthUrl: `${config.homeUrl}/health`,
+    }
   }
 }
 

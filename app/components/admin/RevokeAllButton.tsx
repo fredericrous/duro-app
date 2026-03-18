@@ -20,7 +20,12 @@ export function RevokeAllButton({
   if (confirming) {
     return (
       <Inline gap="sm">
-        <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(new FormData(e.currentTarget)) }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            mutation.mutate(new FormData(e.currentTarget))
+          }}
+        >
           <input type="hidden" name="intent" value="revokeAllCerts" />
           <input type="hidden" name="username" value={username} />
           <Button type="submit" variant="danger" size="small" disabled={mutation.isPending}>
