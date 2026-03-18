@@ -84,7 +84,7 @@ spec:
               command:
                 - wget
                 - -qO-
-                - http://localhost:{{ .Values.web.port }}/health
+                - http://127.0.0.1:{{ .Values.web.port }}/health
             initialDelaySeconds: 10
             periodSeconds: 30
             timeoutSeconds: 5
@@ -93,7 +93,7 @@ spec:
               command:
                 - wget
                 - -qO-
-                - http://localhost:{{ .Values.web.port }}/health
+                - http://127.0.0.1:{{ .Values.web.port }}/health
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
