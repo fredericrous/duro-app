@@ -1,6 +1,6 @@
 import { getSession } from "~/lib/session.server"
 
-const PUBLIC_PREFIXES = ["/health", "/auth/", "/invite/"]
+const PUBLIC_PREFIXES = ["/health", "/auth/", "/invite/", "/api/bootstrap-invite"]
 const isDev = process.env.NODE_ENV === "development"
 
 export default async function middleware(request: Request) {
