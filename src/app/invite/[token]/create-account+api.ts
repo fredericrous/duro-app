@@ -1,8 +1,11 @@
-import { runEffect } from "~/lib/runtime.server"
-import { isOriginAllowed } from "~/lib/config.server"
-import { handleCreateAccount, parseCreateAccountMutation } from "~/lib/mutations/create-account"
-
 export async function POST(request: Request, params: Record<string, string>) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { isOriginAllowed } = require("~/lib/config.server")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { runEffect } = require("~/lib/runtime.server")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { handleCreateAccount, parseCreateAccountMutation } = require("~/lib/mutations/create-account")
+
   const token = params.token
   if (!token) {
     return Response.json({ error: "Missing invite token" }, { status: 400 })

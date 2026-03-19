@@ -1,6 +1,6 @@
-import { isOriginAllowed } from "~/lib/config.server"
-
 export async function POST(request: Request) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { isOriginAllowed } = require("~/lib/config.server")
   if (!isOriginAllowed(request.headers.get("Origin"))) {
     return Response.json({ error: "Invalid request origin" }, { status: 403 })
   }
