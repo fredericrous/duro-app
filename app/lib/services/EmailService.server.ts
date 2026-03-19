@@ -58,7 +58,7 @@ export const EmailServiceLive = Layer.scoped(
     const transportOptions: SMTPTransport.Options = {
       host,
       port,
-      secure: false,
+      secure: port === 465,
       auth: { user, pass },
       tls: ca ? { ca, rejectUnauthorized: true } : undefined,
     }

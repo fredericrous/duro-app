@@ -31,7 +31,7 @@ securityContext:
 env:
   NODE_TLS_REJECT_UNAUTHORIZED: "0"
   SMTP_HOST: "stalwart-mail-external.stalwart.svc.cluster.local."
-  SMTP_PORT: "587"
+  SMTP_PORT: "465"
   SMTP_USER: "admin"
   SMTP_FROM: "noreply@daddyshome.fr"
   INVITE_BASE_URL: "https://join.daddyshome.fr"
