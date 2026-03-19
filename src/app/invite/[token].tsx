@@ -147,7 +147,9 @@ export default function InvitePage() {
           )}
         </Stack>
 
-        <InvitePasswordReveal p12Password={loaderData.p12Password} />
+        {effectiveCertStatus !== "installed" && (
+          <InvitePasswordReveal p12Password={loaderData.p12Password} />
+        )}
         <CertCheck status={effectiveCertStatus} onRecheck={recheck} />
       </Stack>
     </CenteredCardPage>
