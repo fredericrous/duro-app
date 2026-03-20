@@ -1,15 +1,4 @@
-// Inline isOriginAllowed to avoid Metro __d module registry collision.
-// See create-account+api.ts for full explanation.
-const ALLOWED_SUFFIX = process.env.ALLOWED_ORIGIN_SUFFIX ?? "daddyshome.fr"
-
-function isOriginAllowed(origin: string | null): boolean {
-  if (!origin) return true
-  try {
-    return new URL(origin).hostname.endsWith(ALLOWED_SUFFIX)
-  } catch {
-    return false
-  }
-}
+import { isOriginAllowed } from "~/lib/config.server"
 
 export async function POST(request: Request) {
   if (!isOriginAllowed(request.headers.get("Origin"))) {

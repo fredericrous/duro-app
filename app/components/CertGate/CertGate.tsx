@@ -15,7 +15,7 @@ export function CertGate({
   const { t } = useTranslation()
   const { token } = useLocalSearchParams<{ token: string }>()
   const certInstalled = use(certPromise)
-  const action = useAction<{ error?: string }>(`/invite/${token}/create-account`)
+  const action = useAction<{ error?: string }>(`/api/invite/${token}/create-account`)
   const isSubmitting = action.state === "submitting"
   const error = action.data?.error ?? actionData?.error
 
