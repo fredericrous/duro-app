@@ -127,7 +127,8 @@
     },
     "confirm": {
       "label": "Confirm Password",
-      "placeholder": "Confirm your password"
+      "placeholder": "Confirm your password",
+      "mismatch": "Passwords do not match"
     },
     "submit": "Create Account",
     "submitting": "Creating Account...",
