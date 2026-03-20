@@ -73,10 +73,7 @@ export function CertGate({
           <Fieldset.Root disabled={isSubmitting} gap="md">
             <Field.Root name="username">
               <Field.Label>{t("createAccount.username.label")}</Field.Label>
-              <Input
-                placeholder={t("createAccount.username.placeholder")}
-                autoComplete="username"
-              />
+              <Input placeholder={t("createAccount.username.placeholder")} autoComplete="username" />
               <Field.Description>{t("createAccount.username.hint")}</Field.Description>
               <Field.Error />
             </Field.Root>
@@ -94,20 +91,11 @@ export function CertGate({
 
             <Field.Root name="confirmPassword">
               <Field.Label>{t("createAccount.confirm.label")}</Field.Label>
-              <Input
-                type="password"
-                placeholder={t("createAccount.confirm.placeholder")}
-                autoComplete="off"
-              />
+              <Input type="password" placeholder={t("createAccount.confirm.placeholder")} autoComplete="off" />
               <Field.Error />
             </Field.Root>
 
-            <Button
-              type="submit"
-              variant="primary"
-              fullWidth
-              disabled={isSubmitting || !formState.isValid}
-            >
+            <Button type="submit" variant="primary" fullWidth disabled={isSubmitting || !formState.isValid}>
               {isSubmitting ? t("createAccount.submitting") : t("createAccount.submit")}
             </Button>
           </Fieldset.Root>
