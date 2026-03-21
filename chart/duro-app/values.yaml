@@ -50,7 +50,7 @@ envFrom: []
 
 # Web-specific config
 web:
-  port: 8081
+  port: 3000
   otelServiceName: "duro"
   env:
     LLDAP_URL: "http://lldap.lldap.svc.cluster.local.:17170"

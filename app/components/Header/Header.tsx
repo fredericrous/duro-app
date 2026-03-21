@@ -1,4 +1,4 @@
-import { Link } from "expo-router"
+import { Link } from "react-router"
 import { useTranslation } from "react-i18next"
 import { Menu } from "@duro-app/ui"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
@@ -31,7 +31,7 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
 
   return (
     <html.div style={styles.row}>
-      <Link href="/" style={{ textDecoration: "none" }}>
+      <Link to="/" style={{ textDecoration: "none" }}>
         <html.span style={styles.logo}>{t("common.appTitle")}</html.span>
       </Link>
       {showMenu && (
