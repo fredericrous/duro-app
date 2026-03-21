@@ -1,0 +1,177 @@
+import { redirect, useNavigation } from "react-router"
+import { useTranslation } from "react-i18next"
+import type { Route } from "./+types/reinvite"
+import { runEffect } from "~/lib/runtime.server"
+import { InviteRepo } from "~/lib/services/InviteRepo.server"
+import { CertManager } from "~/lib/services/CertManager.server"
+import { config } from "~/lib/config.server"
+import { queueInvite } from "~/lib/workflows/invite.server"
+import { hashToken } from "~/lib/crypto.server"
+import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
+import { Effect } from "effect"
+import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
+import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
+import { Alert, Button, Heading, StatusIcon, Text } from "@duro-app/ui"
+import { css, html } from "react-strict-dom"
+
+const styles = css.create({
+  infoText: {
+    color: "var(--color-text-muted)",
+    fontSize: 14,
+    lineHeight: 1.6,
+    marginBottom: 24,
+  },
+})
+
+export function meta({ data }: Route.MetaArgs) {
+  return [{ title: data?.appName ? `Request New Invite - ${data.appName}` : "Request New Invite" }]
+}
+
+export async function loader({ request, params }: Route.LoaderArgs) {
+  const token = params.token
+  if (!token) {
+    return { canReinvite: false as const, error: "Missing token", appName: config.appName }
+  }
+
+  try {
+    const tokenHash = hashToken(token)
+
+    const { invite, p12Password } = await runEffect(
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const cert = yield* CertManager
+        const invite = yield* repo.findByTokenHash(tokenHash)
+        const p12Password = invite ? yield* cert.getP12Password(invite.id) : null
+        return { invite, p12Password }
+      }),
+    )
+
+    if (!invite) {
+      return { canReinvite: false as const, error: "Invalid link", appName: config.appName }
+    }
+
+    const currentLocale = resolveLocale(request)
+    if (invite.locale && invite.locale !== currentLocale) {
+      throw redirect(request.url, {
+        headers: { "Set-Cookie": localeCookieHeader(invite.locale) },
+      })
+    }
+
+    if (invite.usedBy && invite.usedBy !== "__revoked__") {
+      return {
+        canReinvite: false as const,
+        error:
+          "This invite has already been used to create an account. If you need help, contact the person who invited you.",
+        appName: config.appName,
+      }
+    }
+
+    const isExpired = new Date(invite.expiresAt) < new Date()
+    const passwordConsumed = p12Password === null
+
+    if (!isExpired && !passwordConsumed) {
+      return {
+        canReinvite: false as const,
+        error: "Your invite is still valid. Check your email for the original invitation link.",
+        appName: config.appName,
+      }
+    }
+
+    return {
+      canReinvite: true as const,
+      email: invite.email,
+      appName: config.appName,
+    }
+  } catch (e) {
+    if (e instanceof Response) throw e
+    console.error("[reinvite] loader error:", e)
+    return { canReinvite: false as const, error: "Something went wrong", appName: config.appName }
+  }
+}
+
+export async function action({ params }: Route.ActionArgs) {
+  const token = params.token
+  if (!token) {
+    return { success: false as const, error: "Missing token" }
+  }
+
+  try {
+    const tokenHash = hashToken(token)
+
+    const result = await runEffect(
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const cert = yield* CertManager
+
+        const invite = yield* repo.findByTokenHash(tokenHash)
+        if (!invite) {
+          return { success: false as const, error: "Invalid link" }
+        }
+
+        if (invite.usedBy && invite.usedBy !== "__revoked__") {
+          return { success: false as const, error: "Account already created" }
+        }
+
+        yield* repo.revoke(invite.id).pipe(Effect.catchAll(() => Effect.void))
+        yield* cert.deleteP12Secret(invite.id)
+
+        const groups = JSON.parse(invite.groups) as number[]
+        const groupNames = JSON.parse(invite.groupNames) as string[]
+
+        yield* queueInvite({
+          email: invite.email,
+          groups,
+          groupNames,
+          invitedBy: invite.invitedBy,
+          locale: invite.locale,
+        })
+
+        return { success: true as const, email: invite.email }
+      }),
+    )
+
+    return result
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to send new invite"
+    return { success: false as const, error: message }
+  }
+}
+
+export default function ReinvitePage({ loaderData, actionData }: Route.ComponentProps) {
+  const { t } = useTranslation()
+  const navigation = useNavigation()
+  const isSubmitting = navigation.state === "submitting"
+
+  if (actionData && "success" in actionData && actionData.success) {
+    return (
+      <CenteredCardPage>
+        <StatusIcon name="check-done" variant="success" />
+        <Heading level={1}>{t("reinvite.success.title")}</Heading>
+        <Text as="p" color="muted">
+          {t("reinvite.success.message", { email: actionData.email })}
+        </Text>
+      </CenteredCardPage>
+    )
+  }
+
+  if (!loaderData.canReinvite) {
+    return <ErrorCard title={t("reinvite.error.title")} message={loaderData.error} />
+  }
+
+  return (
+    <CenteredCardPage>
+      <Heading level={1}>{t("reinvite.heading")}</Heading>
+      <Text as="p" color="muted">
+        {t("reinvite.message", { email: loaderData.email })}
+      </Text>
+
+      {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
+
+      <form method="post">
+        <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
+          {isSubmitting ? t("reinvite.submitting") : t("reinvite.submit")}
+        </Button>
+      </form>
+    </CenteredCardPage>
+  )
+}

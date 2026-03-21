@@ -1,9 +1,8 @@
 import { use, useMemo } from "react"
 import { useTranslation } from "react-i18next"
-import { useLocalSearchParams } from "expo-router"
+import { useFetcher, useParams } from "react-router"
 import { Schema } from "effect"
 import { Alert, Button, Field, Fieldset, Form, Heading, Input, LinkButton, Text } from "@duro-app/ui"
-import { useAction } from "~/hooks/useAction"
 
 export function CertGate({
   certPromise,
@@ -13,11 +12,11 @@ export function CertGate({
   actionData: { error?: string } | undefined
 }) {
   const { t } = useTranslation()
-  const { token } = useLocalSearchParams<{ token: string }>()
+  const { token } = useParams()
+  const fetcher = useFetcher<{ error?: string }>()
   const certInstalled = use(certPromise)
-  const action = useAction<{ error?: string }>(`/api/invite/${token}/create-account`)
-  const isSubmitting = action.state === "submitting"
-  const error = action.data?.error ?? actionData?.error
+  const isSubmitting = fetcher.state === "submitting"
+  const error = fetcher.data?.error ?? actionData?.error
 
   const CreateAccountSchema = useMemo(
     () =>
@@ -67,7 +66,12 @@ export function CertGate({
       <Form
         schema={CreateAccountSchema}
         defaultValues={{ username: "", password: "", confirmPassword: "" }}
-        onSubmit={(data) => action.submit(data)}
+        onSubmit={(data) =>
+          fetcher.submit(data, {
+            method: "post",
+            action: `/invite/${token}/create-account`,
+          })
+        }
       >
         {({ formState }) => (
           <Fieldset.Root disabled={isSubmitting} gap="md">

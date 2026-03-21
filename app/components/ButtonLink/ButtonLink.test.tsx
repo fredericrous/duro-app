@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 
-vi.mock("expo-router", () => ({
-  Link: ({ children, href, style: _style, ...props }: any) => (
-    <a href={href} {...props}>
+vi.mock("react-router", () => ({
+  Link: ({ children, to, style: _style, ...props }: any) => (
+    <a href={to} {...props}>
       {children}
     </a>
   ),
@@ -13,7 +13,7 @@ import { ButtonLink } from "./ButtonLink"
 
 describe("ButtonLink", () => {
   it("renders a link with primary variant by default", () => {
-    render(<ButtonLink href={"/dashboard" as any}>Go Home</ButtonLink>)
+    render(<ButtonLink to="/dashboard">Go Home</ButtonLink>)
     const link = screen.getByRole("link", { name: "Go Home" })
     expect(link).toBeInTheDocument()
     expect(link).toHaveAttribute("href", "/dashboard")
@@ -21,7 +21,7 @@ describe("ButtonLink", () => {
 
   it("renders ghost variant when specified", () => {
     render(
-      <ButtonLink href={"/back" as any} variant="ghost">
+      <ButtonLink to="/back" variant="ghost">
         Back
       </ButtonLink>,
     )
@@ -31,7 +31,7 @@ describe("ButtonLink", () => {
 
   it("applies small size", () => {
     render(
-      <ButtonLink href={"/small" as any} size="small">
+      <ButtonLink to="/small" size="small">
         Small Link
       </ButtonLink>,
     )

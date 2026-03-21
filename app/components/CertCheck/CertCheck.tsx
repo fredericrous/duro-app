@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from "expo-router"
+import { useParams } from "react-router"
 import { useTranslation } from "react-i18next"
 import { Alert, Button, LinkButton, Stack, Text } from "@duro-app/ui"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
@@ -42,7 +42,7 @@ export function CertCheck({
   onRecheck: () => void
 }) {
   const { t } = useTranslation()
-  const { token } = useLocalSearchParams<{ token: string }>()
+  const { token } = useParams()
   const installed = status === "installed"
 
   return (

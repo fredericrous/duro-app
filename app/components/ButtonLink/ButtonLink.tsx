@@ -1,4 +1,4 @@
-import { Link } from "expo-router"
+import { Link } from "react-router"
 import type { ComponentProps } from "react"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { radii } from "@duro-app/tokens/tokens/spacing.css"
@@ -42,12 +42,12 @@ type ButtonLinkProps = ComponentProps<typeof Link> & {
 export function ButtonLink({ variant = "primary", size = "default", style, ...props }: ButtonLinkProps) {
   return (
     <Link
-      style={[
-        styles.btn as any,
-        variant === "primary" ? (styles.primary as any) : (styles.ghost as any),
-        size === "small" ? (styles.small as any) : undefined,
-        style,
-      ]}
+      style={{
+        ...(styles.btn as any),
+        ...(variant === "primary" ? (styles.primary as any) : (styles.ghost as any)),
+        ...(size === "small" ? (styles.small as any) : {}),
+        ...(typeof style === "object" && style !== null ? style : {}),
+      }}
       {...props}
     />
   )
