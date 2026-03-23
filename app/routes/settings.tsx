@@ -75,32 +75,34 @@ export default function SettingsPage({ loaderData }: Route.ComponentProps) {
       maxWidth="sm"
       header={<Header user={dashboardData?.user ?? ""} isAdmin={dashboardData?.isAdmin ?? false} />}
     >
-      <CardSection title={t("settings.languageLabel")}>
-        {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
+      <Stack gap="lg">
+        <CardSection title={t("settings.languageLabel")}>
+          {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
 
-        <fetcher.Form method="post">
-          <input type="hidden" name="intent" value="saveLocale" />
-          <Stack gap="lg">
-            <Field.Root>
-              <LanguageSelect defaultValue={loaderData.locale} />
-              <Field.Description>{t("settings.languageHint")}</Field.Description>
-            </Field.Root>
+          <fetcher.Form method="post">
+            <input type="hidden" name="intent" value="saveLocale" />
+            <Stack gap="lg">
+              <Field.Root>
+                <LanguageSelect defaultValue={loaderData.locale} />
+                <Field.Description>{t("settings.languageHint")}</Field.Description>
+              </Field.Root>
 
-            <Button type="submit" variant="primary">
-              {t("common.save")}
-            </Button>
-          </Stack>
-        </fetcher.Form>
-      </CardSection>
+              <Button type="submit" variant="primary">
+                {t("common.save")}
+              </Button>
+            </Stack>
+          </fetcher.Form>
+        </CardSection>
 
-      <CardSection title={t("settings.cert.heading")}>
-        <CertificateSection
-          email={loaderData.email}
-          p12Password={loaderData.p12Password}
-          lastCertRenewalAt={loaderData.lastCertRenewalAt}
-          certificates={loaderData.certificates}
-        />
-      </CardSection>
+        <CardSection title={t("settings.cert.heading")}>
+          <CertificateSection
+            email={loaderData.email}
+            p12Password={loaderData.p12Password}
+            lastCertRenewalAt={loaderData.lastCertRenewalAt}
+            certificates={loaderData.certificates}
+          />
+        </CardSection>
+      </Stack>
     </PageShell>
   )
 }

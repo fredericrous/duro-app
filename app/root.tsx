@@ -9,8 +9,7 @@ import {
   useRouteLoaderData,
 } from "react-router"
 import { useTranslation } from "react-i18next"
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { ThemeProvider } from "@duro-app/ui"
+import { ActionBarProvider, ThemeProvider } from "@duro-app/ui"
 import { DevToolbar } from "~/components/DevToolbar/DevToolbar"
 import type { Route } from "./+types/root"
 import { resolveLocale } from "~/lib/i18n.server"
@@ -18,7 +17,6 @@ import "@duro-app/ui/dist/index.css"
 import "./styles/global.css"
 import "./styles/strict.css"
 
-const queryClient = new QueryClient()
 const isDev = process.env.NODE_ENV === "development"
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -44,11 +42,11 @@ export function Layout({ children }: { children: ReactNode }) {
         <Links />
       </head>
       <body>
-        <QueryClientProvider client={queryClient}>
-          <ThemeProvider theme="dark">
+        <ThemeProvider theme="dark">
+          <ActionBarProvider>
             <MaybeDevToolbar>{children}</MaybeDevToolbar>
-          </ThemeProvider>
-        </QueryClientProvider>
+          </ActionBarProvider>
+        </ThemeProvider>
         <ScrollRestoration />
         <Scripts />
       </body>

@@ -17,7 +17,4 @@ export default [
   route("reinvite/:token", "routes/reinvite.tsx"),
   route("welcome", "routes/welcome.tsx"),
   route("api/bootstrap-invite", "routes/api.bootstrap-invite.ts"),
-  route("admin/me", "routes/api.admin-me.ts"),
-  route("admin/invites", "routes/api.admin-invites.ts"),
-  route("admin/users-data", "routes/api.admin-users-data.ts"),
 ] satisfies RouteConfig

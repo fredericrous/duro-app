@@ -134,7 +134,7 @@ export function CertificateSection({
         <ScrollArea.Root>
           <ScrollArea.Viewport>
             <ScrollArea.Content>
-              <Table.Root columns={4}>
+              <Table.Root>
                 <Table.Header>
                   <Table.Row>
                     <Table.HeaderCell>{t("settings.cert.list.serial")}</Table.HeaderCell>
