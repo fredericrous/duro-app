@@ -213,6 +213,7 @@
         "by": "By",
         "actions": "Actions"
       },
+      "selectAll": "Select all users",
       "actions": {
         "sendCert": "Send Cert",
         "sendingCert": "Sending...",
@@ -222,7 +223,8 @@
         "reasonPlaceholder": "Reason (optional)",
         "reinvite": "Re-invite",
         "processing": "Processing...",
-        "viewCerts": "Certificates"
+        "viewCerts": "Certificates",
+        "revokeLabel": "Revoke {{user}}"
       },
       "certs": {
         "serial": "Serial",
@@ -238,7 +240,11 @@
         "revokeAll": "Revoke All",
         "revokeAllConfirm": "Revoke all certificates for this user?",
         "empty": "No certificates",
-        "count": "{{count}} cert(s)"
+        "count": "{{count}} cert(s)",
+        "usersSelected": "{{count}} user(s) selected",
+        "selected": "{{count}} certificate(s) selected",
+        "revokeAllForUsers": "Revoke all certs for {{count}} user(s)",
+        "revokeSelected": "Revoke {{count}} certificate(s)"
       }
     }
   },

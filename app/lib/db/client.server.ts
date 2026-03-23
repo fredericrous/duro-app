@@ -124,6 +124,8 @@ const seedDevData = Effect.gen(function* () {
   const users = [
     { id: "dev", email: "dev@localhost", serial: "aa:bb:cc:dd:00:00:00:01" },
     { id: "alice", email: "alice@example.com", serial: "aa:bb:cc:dd:00:00:00:02" },
+    { id: "alice", email: "alice@example.com", serial: "aa:bb:cc:dd:00:00:00:04" },
+    { id: "alice", email: "alice@example.com", serial: "aa:bb:cc:dd:00:00:00:05" },
     { id: "bob", email: "bob@example.com", serial: "aa:bb:cc:dd:00:00:00:03" },
   ]
 
@@ -133,7 +135,7 @@ const seedDevData = Effect.gen(function* () {
       VALUES (${crypto.randomUUID()}, ${crypto.randomUUID()}, ${u.id}, ${u.id}, ${u.email}, ${u.serial}, ${now}, ${expires})
     `
   }
-  yield* Effect.log("dev seed complete: 3 users with certificates")
+  yield* Effect.log("dev seed complete: 3 users with certificates (alice has 3)")
 }).pipe(Effect.as(true as const))
 
 export const DbDevLive = Layer.effect(MigrationsRan, seedDevData).pipe(Layer.provideMerge(PgLiteClientLayer))

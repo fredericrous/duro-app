@@ -1,0 +1,2 @@
+overrides:
+  '@duro-app/ui': link:../duro-design-system/packages/ui

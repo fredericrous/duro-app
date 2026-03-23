@@ -2,10 +2,11 @@
  * Adapter that wraps PGlite in a pg.Pool-compatible interface
  * for use with @effect/sql-pg's layerFromPool.
  *
- * vitest: loads PGlite directly (no Metro).
- * Metro dev: runs PGlite in a worker thread to avoid Metro breaking Emscripten's require().
+ * vitest: loads PGlite directly (no worker).
+ * dev: runs PGlite in a worker thread to isolate Emscripten.
  */
 import type { PGlite } from "@electric-sql/pglite"
+import { Worker } from "node:worker_threads"
 import { EventEmitter } from "node:events"
 import { join } from "node:path"
 
@@ -39,7 +40,7 @@ class DirectBackend implements PgLiteBackend {
 }
 
 // ---------------------------------------------------------------------------
-// Worker thread backend (Metro dev — fast, shared memory)
+// Worker thread backend (dev — fast, shared memory)
 // ---------------------------------------------------------------------------
 
 class WorkerBackend implements PgLiteBackend {
@@ -49,9 +50,6 @@ class WorkerBackend implements PgLiteBackend {
   ready: Promise<void>
 
   constructor() {
-    // Dynamic require to avoid Metro bundling worker_threads
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Worker } = require("node:worker_threads") as typeof import("node:worker_threads")
     const workerPath = join(process.cwd(), "app", "lib", "db", "pglite-worker.mjs")
     this.worker = new Worker(workerPath)
 
@@ -171,7 +169,7 @@ class PglitePool extends EventEmitter {
 }
 
 // ---------------------------------------------------------------------------
-// Factory — shared singleton across Metro bundles
+// Factory — shared singleton
 // ---------------------------------------------------------------------------
 
 const GLOBAL_KEY = "__pglite_backend__"
@@ -187,10 +185,10 @@ export async function createPglitePool() {
     await pglite.waitReady
     backend = new DirectBackend(pglite)
   } else if ((globalThis as any)[GLOBAL_KEY]) {
-    // Metro — reuse existing worker across bundles
+    // reuse existing worker
     backend = (globalThis as any)[GLOBAL_KEY]
   } else {
-    // Metro — spawn worker thread
+    // spawn worker thread
     const wb = new WorkerBackend()
     await wb.ready
     ;(globalThis as any)[GLOBAL_KEY] = wb

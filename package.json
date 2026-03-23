@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@duro-app/tokens": "^0.15.2",
-    "@duro-app/ui": "^0.16.0",
+    "@duro-app/ui": "link:../duro-design-system/packages/ui",
     "@effect/experimental": "^0.58.0",
     "@effect/opentelemetry": "^0.61.0",
     "@effect/platform": "^0.94.5",
@@ -35,7 +35,7 @@
     "@react-email/render": "^2.0.4",
     "@react-router/node": "^7.1.0",
     "@react-router/serve": "^7.1.0",
-    "@tanstack/react-query": "^5.90.21",
+    "@tanstack/react-table": "^8.21.3",
     "accept-language-parser": "^1.5.0",
     "effect": "^3.20.0",
     "i18next": "^25.8.11",

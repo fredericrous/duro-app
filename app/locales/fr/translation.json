@@ -213,6 +213,7 @@
         "by": "Par",
         "actions": "Actions"
       },
+      "selectAll": "Tout selectionner",
       "actions": {
         "sendCert": "Envoyer cert",
         "sendingCert": "Envoi...",
@@ -222,7 +223,8 @@
         "reasonPlaceholder": "Raison (optionnel)",
         "reinvite": "Reinviter",
         "processing": "Traitement...",
-        "viewCerts": "Certificats"
+        "viewCerts": "Certificats",
+        "revokeLabel": "Revoquer {{user}}"
       },
       "certs": {
         "serial": "N° de serie",
@@ -238,7 +240,11 @@
         "revokeAll": "Tout revoquer",
         "revokeAllConfirm": "Revoquer tous les certificats de cet utilisateur ?",
         "empty": "Aucun certificat",
-        "count": "{{count}} certificat(s)"
+        "count": "{{count}} certificat(s)",
+        "usersSelected": "{{count}} utilisateur(s) selectionne(s)",
+        "selected": "{{count}} certificat(s) selectionne(s)",
+        "revokeAllForUsers": "Revoquer les certs de {{count}} utilisateur(s)",
+        "revokeSelected": "Revoquer {{count}} certificat(s)"
       }
     }
   },

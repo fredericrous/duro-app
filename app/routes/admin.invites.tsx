@@ -1,71 +1,111 @@
 import { useEffect, useRef } from "react"
+import { useFetcher, useRevalidator } from "react-router"
 import { useTranslation } from "react-i18next"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import type { Invite } from "~/lib/services/InviteRepo.server"
-import type { AdminInvitesResult } from "~/lib/mutations/admin-invites"
-import { Alert, Button, Checkbox, Cluster, Field, Fieldset, Input, ScrollArea, Stack, Text } from "@duro-app/ui"
+import type { Route } from "./+types/admin.invites"
+import { Effect } from "effect"
+import { runEffect } from "~/lib/runtime.server"
+import { config } from "~/lib/config.server"
+import { UserManager } from "~/lib/services/UserManager.server"
+import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
+import { handleAdminInvitesMutation, parseAdminInvitesMutation } from "~/lib/mutations/admin-invites"
+import {
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  Cluster,
+  Field,
+  Fieldset,
+  Inline,
+  Input,
+  ScrollArea,
+  Stack,
+  Table,
+  Text,
+} from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
-import { PendingInviteRow } from "~/components/admin/PendingInviteRow"
-import { FailedInviteRow } from "~/components/admin/FailedInviteRow"
-import { Table } from "@duro-app/ui"
 
-interface Group {
-  id: number
-  displayName: string
+export async function loader() {
+  const [groups, pendingInvites, failedInvites] = await Promise.all([
+    runEffect(
+      Effect.gen(function* () {
+        const users = yield* UserManager
+        return yield* users.getGroups
+      }),
+    ),
+    runEffect(
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        return yield* repo.findPending()
+      }),
+    ),
+    runEffect(
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        return yield* repo.findFailed()
+      }),
+    ),
+  ])
+
+  return { groups, pendingInvites, failedInvites }
 }
 
-interface AdminInvitesData {
-  user: string
-  isAdmin: boolean
-  groups: Group[]
-  pendingInvites: Invite[]
-  failedInvites: Invite[]
+export async function action({ request }: Route.ActionArgs) {
+  const origin = request.headers.get("Origin")
+  if (origin && !origin.endsWith(config.allowedOriginSuffix)) {
+    throw new Response("Invalid origin", { status: 403 })
+  }
+
+  const formData = await request.formData()
+  const parsed = parseAdminInvitesMutation(formData as any)
+  if ("error" in parsed) return parsed
+
+  return await runEffect(handleAdminInvitesMutation(parsed))
 }
 
-async function submitInviteAction(formData: FormData): Promise<AdminInvitesResult> {
-  const res = await fetch("/admin/invites", { method: "POST", body: formData })
-  return res.json()
-}
-
-export default function AdminInvitesPage() {
+function StepBadges({ invite }: { invite: Invite }) {
   const { t } = useTranslation()
-  const queryClient = useQueryClient()
+  if (invite.failedAt) return <Badge variant="error">{t("admin.invites.badge.failed")}</Badge>
+  if (invite.emailSent) return <Badge variant="success">{t("admin.invites.badge.sent")}</Badge>
+  if (invite.certIssued) return <Badge variant="success">{t("admin.invites.badge.certIssued")}</Badge>
+  return <Badge variant="warning">{t("admin.invites.badge.processing")}</Badge>
+}
+
+export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation()
+  const { groups, pendingInvites, failedInvites } = loaderData
+  const fetcher = useFetcher<typeof action>()
   const formRef = useRef<HTMLFormElement>(null)
+  const isSubmitting = fetcher.state !== "idle"
+  const revalidator = useRevalidator()
+  const revalidatorRef = useRef(revalidator)
 
-  const { data: pageData, isLoading } = useQuery<AdminInvitesData>({
-    queryKey: ["admin-invites"],
-    queryFn: () => fetch("/admin/invites").then((r) => r.json()),
-  })
-
-  const mutation = useMutation({
-    mutationFn: submitInviteAction,
-    onSuccess: (data) => {
-      if ("success" in data && data.success) {
-        formRef.current?.reset()
-      }
-      queryClient.invalidateQueries({ queryKey: ["admin-invites"] })
-    },
+  useEffect(() => {
+    revalidatorRef.current = revalidator
   })
 
   useEffect(() => {
-    if (mutation.data && "success" in mutation.data) {
-      const id = setTimeout(() => mutation.reset(), 5000)
-      return () => clearTimeout(id)
+    if (fetcher.data && "success" in fetcher.data && fetcher.data.success) {
+      formRef.current?.reset()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mutation.data])
+  }, [fetcher.data])
 
-  if (isLoading || !pageData) {
-    return (
-      <Text as="p" color="muted">
-        Loading...
-      </Text>
-    )
-  }
+  // Auto-refresh while invites are still processing
+  useEffect(() => {
+    const hasIncomplete = pendingInvites.some((i) => !i.emailSent)
+    if (!hasIncomplete) return
 
-  const { groups, pendingInvites, failedInvites } = pageData
-  const actionData = mutation.data
+    const interval = setInterval(() => {
+      if (revalidatorRef.current.state === "idle") {
+        revalidatorRef.current.revalidate()
+      }
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [pendingInvites])
+
+  const actionData = fetcher.data
   const hasRevocationWarning = actionData && "warning" in actionData && "groups" in actionData
 
   return (
@@ -78,33 +118,22 @@ export default function AdminInvitesPage() {
         {hasRevocationWarning && (
           <Alert variant="warning">
             <Text as="p">{actionData.warning}</Text>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                mutation.mutate(new FormData(e.currentTarget))
-              }}
-            >
+            <fetcher.Form method="post" style={{ marginTop: "0.5rem" }}>
               <input type="hidden" name="email" value={actionData.email} />
               <input type="hidden" name="confirmed" value="true" />
               <input type="hidden" name="revocationId" value={actionData.revocationId} />
-              {actionData.groups.map((g: string) => (
+              {(actionData.groups as string[]).map((g) => (
                 <input key={g} type="hidden" name="groups" value={g} />
               ))}
               <Button type="submit" variant="primary">
                 {t("admin.invites.proceedAnyway")}
               </Button>
-            </form>
+            </fetcher.Form>
           </Alert>
         )}
 
-        <form
-          ref={formRef}
-          onSubmit={(e) => {
-            e.preventDefault()
-            mutation.mutate(new FormData(e.currentTarget))
-          }}
-        >
-          <Fieldset.Root disabled={mutation.isPending} gap="md">
+        <fetcher.Form method="post" ref={formRef}>
+          <Fieldset.Root disabled={isSubmitting} gap="md">
             <Field.Root>
               <Field.Label>{t("admin.invites.emailLabel")}</Field.Label>
               <Input name="email" type="email" required placeholder={t("admin.invites.emailPlaceholder")} />
@@ -126,11 +155,11 @@ export default function AdminInvitesPage() {
               <LanguageSelect />
             </Field.Root>
 
-            <Button type="submit" variant="primary" disabled={mutation.isPending}>
-              {mutation.isPending ? t("admin.invites.submitting") : t("admin.invites.submit")}
+            <Button type="submit" variant="primary" disabled={isSubmitting}>
+              {isSubmitting ? t("admin.invites.submitting") : t("admin.invites.submit")}
             </Button>
           </Fieldset.Root>
-        </form>
+        </fetcher.Form>
       </CardSection>
 
       {failedInvites.length > 0 && (
@@ -138,7 +167,7 @@ export default function AdminInvitesPage() {
           <ScrollArea.Root>
             <ScrollArea.Viewport>
               <ScrollArea.Content>
-                <Table.Root columns={4}>
+                <Table.Root>
                   <Table.Header>
                     <Table.Row>
                       <Table.HeaderCell>{t("admin.invites.cols.email")}</Table.HeaderCell>
@@ -171,7 +200,7 @@ export default function AdminInvitesPage() {
           <ScrollArea.Root>
             <ScrollArea.Viewport>
               <ScrollArea.Content>
-                <Table.Root columns={6}>
+                <Table.Root>
                   <Table.Header>
                     <Table.Row>
                       <Table.HeaderCell>{t("admin.invites.cols.email")}</Table.HeaderCell>
@@ -197,5 +226,81 @@ export default function AdminInvitesPage() {
         )}
       </CardSection>
     </Stack>
+  )
+}
+
+function PendingInviteRow({ invite }: { invite: Invite }) {
+  const { t } = useTranslation()
+  const revokeFetcher = useFetcher()
+  const resendFetcher = useFetcher()
+  const isRevoking = revokeFetcher.state !== "idle"
+  const isResending = resendFetcher.state !== "idle"
+
+  return (
+    <Table.Row>
+      <Table.Cell>{invite.email}</Table.Cell>
+      <Table.Cell>{JSON.parse(invite.groupNames).join(", ")}</Table.Cell>
+      <Table.Cell>
+        <StepBadges invite={invite} />
+      </Table.Cell>
+      <Table.Cell>{invite.invitedBy}</Table.Cell>
+      <Table.Cell>{new Date(invite.expiresAt).toLocaleDateString()}</Table.Cell>
+      <Table.Cell>
+        <Inline gap="sm">
+          <resendFetcher.Form method="post">
+            <input type="hidden" name="intent" value="resend" />
+            <input type="hidden" name="inviteId" value={invite.id} />
+            <Button type="submit" variant="secondary" size="small" disabled={isResending || isRevoking}>
+              {isResending ? t("admin.invites.action.resending") : t("admin.invites.action.resend")}
+            </Button>
+          </resendFetcher.Form>
+          <revokeFetcher.Form method="post">
+            <input type="hidden" name="intent" value="revoke" />
+            <input type="hidden" name="inviteId" value={invite.id} />
+            <Button type="submit" variant="danger" size="small" disabled={isRevoking || isResending}>
+              {isRevoking ? t("admin.invites.action.revoking") : t("admin.invites.action.revoke")}
+            </Button>
+          </revokeFetcher.Form>
+        </Inline>
+      </Table.Cell>
+    </Table.Row>
+  )
+}
+
+function FailedInviteRow({ invite }: { invite: Invite }) {
+  const { t } = useTranslation()
+  const retryFetcher = useFetcher()
+  const revokeFetcher = useFetcher()
+  const isRetrying = retryFetcher.state !== "idle"
+  const isRevoking = revokeFetcher.state !== "idle"
+
+  return (
+    <Table.Row>
+      <Table.Cell>{invite.email}</Table.Cell>
+      <Table.Cell>
+        <Text color="muted" variant="bodySm">
+          {invite.lastError ?? "Unknown error"}
+        </Text>
+      </Table.Cell>
+      <Table.Cell>{invite.failedAt ? new Date(invite.failedAt).toLocaleString() : "\u2014"}</Table.Cell>
+      <Table.Cell>
+        <Inline gap="sm">
+          <retryFetcher.Form method="post">
+            <input type="hidden" name="intent" value="retry" />
+            <input type="hidden" name="inviteId" value={invite.id} />
+            <Button type="submit" variant="secondary" size="small" disabled={isRetrying || isRevoking}>
+              {isRetrying ? t("admin.invites.action.retrying") : t("admin.invites.action.retry")}
+            </Button>
+          </retryFetcher.Form>
+          <revokeFetcher.Form method="post">
+            <input type="hidden" name="intent" value="revoke" />
+            <input type="hidden" name="inviteId" value={invite.id} />
+            <Button type="submit" variant="danger" size="small" disabled={isRevoking || isRetrying}>
+              {isRevoking ? t("admin.invites.action.revoking") : t("admin.invites.action.revoke")}
+            </Button>
+          </revokeFetcher.Form>
+        </Inline>
+      </Table.Cell>
+    </Table.Row>
   )
 }
