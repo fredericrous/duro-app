@@ -13,13 +13,9 @@ export async function action({ request }: Route.ActionArgs) {
     const auth = await requireApiAuth(request)
     requireScope(auth, "invitations:create")
 
-    const { applicationId, roleId, entitlementId, invitedPrincipalId, message } =
-      await request.json()
+    const { applicationId, roleId, entitlementId, invitedPrincipalId, message } = await request.json()
     if (!applicationId || !invitedPrincipalId) {
-      return Response.json(
-        { error: "Missing required fields: applicationId, invitedPrincipalId" },
-        { status: 400 },
-      )
+      return Response.json({ error: "Missing required fields: applicationId, invitedPrincipalId" }, { status: 400 })
     }
 
     const invitation = await runEffect(

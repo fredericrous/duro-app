@@ -12,8 +12,7 @@ export async function action({ request }: Route.ActionArgs) {
     const auth = await requireApiAuth(request)
     requireScope(auth, "requests:create")
 
-    const { applicationId, roleId, entitlementId, justification, requestedDurationHours } =
-      await request.json()
+    const { applicationId, roleId, entitlementId, justification, requestedDurationHours } = await request.json()
     if (!applicationId) {
       return Response.json({ error: "Missing required field: applicationId" }, { status: 400 })
     }

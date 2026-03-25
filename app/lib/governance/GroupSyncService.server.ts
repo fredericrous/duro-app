@@ -14,10 +14,7 @@ const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string
 export class GroupSyncService extends Context.Tag("GroupSyncService")<
   GroupSyncService,
   {
-    readonly syncGroups: (
-      principalId: string,
-      oidcGroups: string[],
-    ) => Effect.Effect<void, GroupSyncError>
+    readonly syncGroups: (principalId: string, oidcGroups: string[]) => Effect.Effect<void, GroupSyncError>
   }
 >() {}
 

@@ -69,9 +69,7 @@ export const AuditServiceLive = Layer.effect(
                 AND (${targetType} IS NULL OR target_type = ${targetType})
                 AND (${targetId} IS NULL OR target_id = ${targetId})
               ORDER BY created_at DESC
-              LIMIT ${limit} OFFSET ${offset}`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeAuditEvent(r))),
-          ),
+              LIMIT ${limit} OFFSET ${offset}`.pipe(Effect.map((rows) => rows.map((r) => decodeAuditEvent(r)))),
           "Failed to query audit events",
         )
       },
@@ -87,6 +85,5 @@ export const AuditServiceDev = Layer.succeed(AuditService, {
       targetId: event.targetId,
     }).pipe(Effect.asVoid),
 
-  query: (_filters) =>
-    Effect.log("[AuditService/dev] query").pipe(Effect.as([] as AuditEvent[])),
+  query: (_filters) => Effect.log("[AuditService/dev] query").pipe(Effect.as([] as AuditEvent[])),
 })

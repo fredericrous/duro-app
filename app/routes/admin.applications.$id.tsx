@@ -8,12 +8,7 @@ import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { RbacRepo } from "~/lib/governance/RbacRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import type { Role, Entitlement, Resource, Grant } from "~/lib/governance/types"
-import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-  createColumnHelper,
-} from "@tanstack/react-table"
+import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { Badge, Button, Dialog, Field, Heading, Input, ScrollArea, Stack, Tabs, Table, Text } from "@duro-app/ui"
@@ -213,10 +208,18 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
         <Heading level={2}>{application.displayName}</Heading>
         <Text color="muted">
           {application.slug} &middot;{" "}
-          <Badge variant={application.accessMode === "open" ? "success" : application.accessMode === "request" ? "warning" : "default"}>
+          <Badge
+            variant={
+              application.accessMode === "open"
+                ? "success"
+                : application.accessMode === "request"
+                  ? "warning"
+                  : "default"
+            }
+          >
             {application.accessMode}
-          </Badge>
-          {" "}&middot;{" "}
+          </Badge>{" "}
+          &middot;{" "}
           <Badge variant={application.enabled ? "success" : "default"}>
             {application.enabled ? "Enabled" : "Disabled"}
           </Badge>
@@ -399,9 +402,7 @@ function DataTable<T>({ table }: { table: ReturnType<typeof useReactTable<T>> })
                 <Table.Row key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <Table.HeaderCell key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                     </Table.HeaderCell>
                   ))}
                 </Table.Row>
@@ -411,9 +412,7 @@ function DataTable<T>({ table }: { table: ReturnType<typeof useReactTable<T>> })
               {table.getRowModel().rows.map((row) => (
                 <Table.Row key={row.id}>
                   {row.getVisibleCells().map((cell) => (
-                    <Table.Cell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </Table.Cell>
+                    <Table.Cell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</Table.Cell>
                   ))}
                 </Table.Row>
               ))}

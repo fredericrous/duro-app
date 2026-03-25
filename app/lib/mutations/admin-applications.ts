@@ -13,9 +13,7 @@ export type AdminApplicationsMutation =
   | { intent: "createRole"; applicationId: string; slug: string; displayName: string; description?: string }
   | { intent: "createEntitlement"; applicationId: string; slug: string; displayName: string; description?: string }
 
-export type AdminApplicationsResult =
-  | { success: true; message: string }
-  | { error: string }
+export type AdminApplicationsResult = { success: true; message: string } | { error: string }
 
 // ---------------------------------------------------------------------------
 // Dispatcher
@@ -90,9 +88,7 @@ export function handleAdminApplicationsMutation(mutation: AdminApplicationsMutat
 // FormData parser
 // ---------------------------------------------------------------------------
 
-export function parseAdminApplicationsMutation(
-  formData: FormData,
-): AdminApplicationsMutation | { error: string } {
+export function parseAdminApplicationsMutation(formData: FormData): AdminApplicationsMutation | { error: string } {
   const intent = formData.get("intent") as string
 
   switch (intent) {

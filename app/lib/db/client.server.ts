@@ -261,7 +261,9 @@ const seedGovernanceData = (sql: SqlClient.SqlClient) =>
     const keyHash = crypto.createHash("sha256").update(devApiKey).digest("hex")
     yield* sql`INSERT INTO api_keys (id, principal_id, key_hash, name, scopes) VALUES ('apikey-dev', ${devId}, ${keyHash}, 'Dev Test Key', ${JSON.stringify(["*"])})`
 
-    yield* Effect.log("governance seed complete: 4 apps, 6 roles, 8 entitlements, 4 grants, 1 policy, 1 pending request")
+    yield* Effect.log(
+      "governance seed complete: 4 apps, 6 roles, 8 entitlements, 4 grants, 1 policy, 1 pending request",
+    )
   })
 
 export const DbDevLive = Layer.effect(MigrationsRan, seedDevData).pipe(Layer.provideMerge(PgLiteClientLayer))

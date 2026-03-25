@@ -45,9 +45,7 @@ export async function checkAuthDecision(input: AuthDecisionInput): Promise<AuthD
       }),
     )
   } catch (err) {
-    await runEffect(
-      Effect.logWarning("authz engine failed, treating as deny", { error: String(err) }),
-    )
+    await runEffect(Effect.logWarning("authz engine failed, treating as deny", { error: String(err) }))
     govDecision = { allow: false, matchedGrantIds: [], reasons: ["engine error"] }
   }
 

@@ -42,12 +42,7 @@ export function ActionCell({
           {t("admin.users.actions.viewCerts")}
         </Button>
       )}
-      <Button
-        type="button"
-        variant="danger"
-        size="small"
-        onClick={() => onRevoke({ id, email, displayName })}
-      >
+      <Button type="button" variant="danger" size="small" onClick={() => onRevoke({ id, email, displayName })}>
         {activeCertCount > 0 ? t("admin.users.certs.revokeAll") : t("admin.users.actions.revoke")}
       </Button>
     </ButtonGroup>

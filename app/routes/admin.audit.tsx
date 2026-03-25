@@ -131,7 +131,9 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
               <Combobox.Input placeholder="Filter by event type..." />
               <Combobox.Popup>
                 {uniqueEventTypes.map((et) => (
-                  <Combobox.Item key={et} value={et}>{et}</Combobox.Item>
+                  <Combobox.Item key={et} value={et}>
+                    {et}
+                  </Combobox.Item>
                 ))}
                 <Combobox.Empty>No results</Combobox.Empty>
               </Combobox.Popup>
@@ -151,10 +153,7 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
                           {header.isPlaceholder ? null : (
                             <>
                               {header.column.getCanSort() ? (
-                                <html.span
-                                  style={styles.sortHeader}
-                                  onClick={header.column.getToggleSortingHandler()}
-                                >
+                                <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
                                   {flexRender(header.column.columnDef.header, header.getContext())}
                                   <Table.SortIndicator column={header.column} />
                                 </html.span>
@@ -189,17 +188,11 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
 
         <html.div style={styles.pagination}>
           <Inline gap="sm">
-            <button
-              disabled={page === 0}
-              onClick={() => goToPage(page - 1)}
-            >
+            <button disabled={page === 0} onClick={() => goToPage(page - 1)}>
               Previous
             </button>
             <Text color="muted">Page {page + 1}</Text>
-            <button
-              disabled={events.length < pageSize}
-              onClick={() => goToPage(page + 1)}
-            >
+            <button disabled={events.length < pageSize} onClick={() => goToPage(page + 1)}>
               Next
             </button>
           </Inline>

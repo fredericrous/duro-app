@@ -48,4 +48,8 @@ export const AppLayer = Layer.mergeAll(
   ApiKeyRepoLive,
   isDevServer ? ProvisioningServiceDev : ProvisioningServiceLive,
   GroupSyncServiceLive,
-).pipe(Layer.provideMerge(isDevServer ? DbDevLive : DbLive), Layer.provide(OtelLayer), Layer.provide(FetchHttpClient.layer))
+).pipe(
+  Layer.provideMerge(isDevServer ? DbDevLive : DbLive),
+  Layer.provide(OtelLayer),
+  Layer.provide(FetchHttpClient.layer),
+)

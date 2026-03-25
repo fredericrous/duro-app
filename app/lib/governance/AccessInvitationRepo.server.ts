@@ -25,19 +25,10 @@ export class AccessInvitationRepo extends Context.Tag("AccessInvitationRepo")<
       message?: string
       expiresAt?: string
     }) => Effect.Effect<AccessInvitation, AccessInvitationRepoError>
-    readonly findById: (
-      id: string,
-    ) => Effect.Effect<AccessInvitation | null, AccessInvitationRepoError>
-    readonly listForPrincipal: (
-      principalId: string,
-    ) => Effect.Effect<AccessInvitation[], AccessInvitationRepoError>
-    readonly listForApp: (
-      applicationId: string,
-    ) => Effect.Effect<AccessInvitation[], AccessInvitationRepoError>
-    readonly accept: (
-      id: string,
-      grantId: string,
-    ) => Effect.Effect<void, AccessInvitationRepoError>
+    readonly findById: (id: string) => Effect.Effect<AccessInvitation | null, AccessInvitationRepoError>
+    readonly listForPrincipal: (principalId: string) => Effect.Effect<AccessInvitation[], AccessInvitationRepoError>
+    readonly listForApp: (applicationId: string) => Effect.Effect<AccessInvitation[], AccessInvitationRepoError>
+    readonly accept: (id: string, grantId: string) => Effect.Effect<void, AccessInvitationRepoError>
     readonly decline: (id: string) => Effect.Effect<void, AccessInvitationRepoError>
     readonly expire: (id: string) => Effect.Effect<void, AccessInvitationRepoError>
   }
@@ -54,18 +45,14 @@ export const AccessInvitationRepoLive = Layer.effect(
         withErr(
           sql`INSERT INTO access_invitations (application_id, role_id, entitlement_id, resource_id, invited_principal_id, invited_by, message, expires_at)
               VALUES (${input.applicationId}, ${input.roleId ?? null}, ${input.entitlementId ?? null}, ${input.resourceId ?? null}, ${input.invitedPrincipalId}, ${input.invitedBy}, ${input.message ?? null}, ${input.expiresAt ?? null})
-              RETURNING *`.pipe(
-            Effect.map((rows) => decodeAccessInvitation(rows[0]) as AccessInvitation),
-          ),
+              RETURNING *`.pipe(Effect.map((rows) => decodeAccessInvitation(rows[0]) as AccessInvitation)),
           "Failed to create access invitation",
         ),
 
       findById: (id) =>
         withErr(
           sql`SELECT * FROM access_invitations WHERE id = ${id}`.pipe(
-            Effect.map((rows) =>
-              rows.length > 0 ? (decodeAccessInvitation(rows[0]) as AccessInvitation) : null,
-            ),
+            Effect.map((rows) => (rows.length > 0 ? (decodeAccessInvitation(rows[0]) as AccessInvitation) : null)),
           ),
           "Failed to find access invitation",
         ),

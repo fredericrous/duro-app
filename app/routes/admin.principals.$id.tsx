@@ -4,12 +4,7 @@ import { runEffect } from "~/lib/runtime.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import type { Principal, Grant } from "~/lib/governance/types"
-import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-  createColumnHelper,
-} from "@tanstack/react-table"
+import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { Badge, Heading, ScrollArea, Stack, Text, Table } from "@duro-app/ui"
@@ -105,11 +100,8 @@ export default function AdminPrincipalDetailPage({ loaderData }: Route.Component
       <html.div>
         <Heading level={2}>{principal.displayName}</Heading>
         <Text color="muted">
-          <Badge variant={principal.principalType === "user" ? "default" : "info"}>
-            {principal.principalType}
-          </Badge>
-          {" "}&middot; {principal.email ?? "No email"}
-          {" "}&middot;{" "}
+          <Badge variant={principal.principalType === "user" ? "default" : "info"}>{principal.principalType}</Badge>{" "}
+          &middot; {principal.email ?? "No email"} &middot;{" "}
           <Badge variant={principal.enabled ? "success" : "default"}>
             {principal.enabled ? "Enabled" : "Disabled"}
           </Badge>
@@ -117,11 +109,7 @@ export default function AdminPrincipalDetailPage({ loaderData }: Route.Component
       </html.div>
 
       <CardSection title={`Active Grants (${grants.length})`}>
-        {grants.length === 0 ? (
-          <Text color="muted">No active grants.</Text>
-        ) : (
-          <DataTable table={grantsTable} />
-        )}
+        {grants.length === 0 ? <Text color="muted">No active grants.</Text> : <DataTable table={grantsTable} />}
       </CardSection>
 
       <CardSection title={`Groups (${groups.length})`}>
@@ -146,9 +134,7 @@ function DataTable<T>({ table }: { table: ReturnType<typeof useReactTable<T>> })
                 <Table.Row key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <Table.HeaderCell key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                     </Table.HeaderCell>
                   ))}
                 </Table.Row>
@@ -158,9 +144,7 @@ function DataTable<T>({ table }: { table: ReturnType<typeof useReactTable<T>> })
               {table.getRowModel().rows.map((row) => (
                 <Table.Row key={row.id}>
                   {row.getVisibleCells().map((cell) => (
-                    <Table.Cell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </Table.Cell>
+                    <Table.Cell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</Table.Cell>
                   ))}
                 </Table.Row>
               ))}

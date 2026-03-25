@@ -151,10 +151,7 @@ export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
                           {header.isPlaceholder ? null : (
                             <>
                               {header.column.getCanSort() ? (
-                                <html.span
-                                  style={styles.sortHeader}
-                                  onClick={header.column.getToggleSortingHandler()}
-                                >
+                                <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
                                   {flexRender(header.column.columnDef.header, header.getContext())}
                                   <Table.SortIndicator column={header.column} />
                                 </html.span>

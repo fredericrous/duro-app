@@ -35,13 +35,8 @@ const deny = (reason: string): AccessDecision => ({
   reasons: [reason],
 })
 
-const withErr = <A>(
-  effect: Effect.Effect<A, SqlError.SqlError>,
-  message: string,
-): Effect.Effect<A, AuthzError> =>
-  effect.pipe(
-    Effect.mapError((cause) => new AuthzError({ message, cause })),
-  )
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string): Effect.Effect<A, AuthzError> =>
+  effect.pipe(Effect.mapError((cause) => new AuthzError({ message, cause })))
 
 // ---------------------------------------------------------------------------
 // Implementation
@@ -131,9 +126,7 @@ const checkAccessImpl = (sql: SqlClient.SqlClient, check: AccessCheck) =>
           )
           const ancestorGrantIds = new Set(ancestorGrants.map((r: any) => r.grantId))
           // Include app-wide grants + ancestor grants
-          finalMatches = matched.filter(
-            (r: any) => r.resourceId === null || ancestorGrantIds.has(r.grantId),
-          )
+          finalMatches = matched.filter((r: any) => r.resourceId === null || ancestorGrantIds.has(r.grantId))
         }
       }
     }
@@ -158,9 +151,7 @@ const checkAccessImpl = (sql: SqlClient.SqlClient, check: AccessCheck) =>
     return {
       allow: false,
       matchedGrantIds: [],
-      reasons: [
-        `No matching grants for action '${check.action}' on application '${check.application}'`,
-      ],
+      reasons: [`No matching grants for action '${check.action}' on application '${check.application}'`],
       diagnostics: {
         principalId,
         groupIds,
@@ -177,10 +168,7 @@ const checkAccessImpl = (sql: SqlClient.SqlClient, check: AccessCheck) =>
 const checkBulkImpl = (sql: SqlClient.SqlClient, checks: readonly AccessCheck[]) =>
   Effect.gen(function* () {
     // Deduplicate subjects and pre-resolve principal + groups once per unique subject
-    const subjectCache = new Map<
-      string,
-      { principalId: string; groupIds: string[]; allIds: string[] } | null
-    >()
+    const subjectCache = new Map<string, { principalId: string; groupIds: string[]; allIds: string[] } | null>()
 
     const uniqueSubjects = [...new Set(checks.map((c) => c.subject))]
 

@@ -15,10 +15,7 @@ export async function action({ request }: Route.ActionArgs) {
 
     const { subject, application, action, resourceId } = await request.json()
     if (!subject || !application || !action) {
-      return Response.json(
-        { error: "Missing required fields: subject, application, action" },
-        { status: 400 },
-      )
+      return Response.json({ error: "Missing required fields: subject, application, action" }, { status: 400 })
     }
 
     const decision = await runEffect(

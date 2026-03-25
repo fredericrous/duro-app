@@ -35,9 +35,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         const groupSync = yield* GroupSyncService
         const principal = yield* principalRepo.ensureUser(user.sub, user.name, user.email)
         yield* groupSync.syncGroups(principal.id, user.groups)
-      }).pipe(
-        Effect.catchAll((e) => Effect.logWarning("auth callback: governance sync failed", { error: String(e) })),
-      ),
+      }).pipe(Effect.catchAll((e) => Effect.logWarning("auth callback: governance sync failed", { error: String(e) }))),
     )
   }
 

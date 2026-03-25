@@ -8,12 +8,9 @@ import { PrincipalRepoLive } from "./PrincipalRepo.server"
 import { ApplicationRepoLive } from "./ApplicationRepo.server"
 import { RbacRepoLive } from "./RbacRepo.server"
 
-const TestLayer = Layer.mergeAll(
-  GrantRepoLive,
-  PrincipalRepoLive,
-  ApplicationRepoLive,
-  RbacRepoLive,
-).pipe(Layer.provideMerge(makeTestDbLayer()))
+const TestLayer = Layer.mergeAll(GrantRepoLive, PrincipalRepoLive, ApplicationRepoLive, RbacRepoLive).pipe(
+  Layer.provideMerge(makeTestDbLayer()),
+)
 
 // ---------------------------------------------------------------------------
 // Helper: seed principals, app, role, entitlement

@@ -121,14 +121,10 @@ const processJobInternal = (sql: SqlClient.SqlClient, job: Record<string, any>) 
       )
     }
     const system = systems[0] as Record<string, any>
-    const config =
-      typeof system.config === "string" ? JSON.parse(system.config) : (system.config ?? {})
+    const config = typeof system.config === "string" ? JSON.parse(system.config) : (system.config ?? {})
 
     // 3. Load grant details for the request body
-    const grants = yield* withErr(
-      sql`SELECT * FROM grants WHERE id = ${job.grantId}`,
-      "Failed to load grant",
-    )
+    const grants = yield* withErr(sql`SELECT * FROM grants WHERE id = ${job.grantId}`, "Failed to load grant")
     const grant = (grants[0] ?? {}) as Record<string, any>
 
     const body = {
@@ -146,9 +142,7 @@ const processJobInternal = (sql: SqlClient.SqlClient, job: Record<string, any>) 
     const result = yield* Effect.match(
       connectorType === "http"
         ? executeHttpConnector(config, job.operation, body)
-        : Effect.fail(
-            new ProvisioningError({ message: `Unsupported connector type: ${connectorType}` }),
-          ),
+        : Effect.fail(new ProvisioningError({ message: `Unsupported connector type: ${connectorType}` })),
       {
         onFailure: (err) => ({ ok: false as const, error: err }),
         onSuccess: () => ({ ok: true as const, error: null }),
@@ -166,10 +160,7 @@ const processJobInternal = (sql: SqlClient.SqlClient, job: Record<string, any>) 
         "Failed to mark job as completed",
       )
     } else {
-      const errorMsg =
-        result.error instanceof ProvisioningError
-          ? result.error.message
-          : String(result.error)
+      const errorMsg = result.error instanceof ProvisioningError ? result.error.message : String(result.error)
       yield* withErr(
         sql`
           UPDATE provisioning_jobs
@@ -220,14 +211,9 @@ export const ProvisioningServiceLive = Layer.effect(
 
       processJob: (jobId) =>
         Effect.gen(function* () {
-          const jobs = yield* withErr(
-            sql`SELECT * FROM provisioning_jobs WHERE id = ${jobId}`,
-            "Failed to fetch job",
-          )
+          const jobs = yield* withErr(sql`SELECT * FROM provisioning_jobs WHERE id = ${jobId}`, "Failed to fetch job")
           if (jobs.length === 0) {
-            return yield* Effect.fail(
-              new ProvisioningError({ message: `Job ${jobId} not found` }),
-            )
+            return yield* Effect.fail(new ProvisioningError({ message: `Job ${jobId} not found` }))
           }
           yield* processJobInternal(sql, jobs[0] as Record<string, any>)
         }),
@@ -241,20 +227,12 @@ export const ProvisioningServiceLive = Layer.effect(
 
 export const ProvisioningServiceDev = Layer.succeed(ProvisioningService, {
   onGrantActivated: (grantId) =>
-    Effect.log(`[ProvisioningService/dev] onGrantActivated grantId=${grantId}`).pipe(
-      Effect.asVoid,
-    ),
+    Effect.log(`[ProvisioningService/dev] onGrantActivated grantId=${grantId}`).pipe(Effect.asVoid),
 
   onGrantRevoked: (grantId) =>
-    Effect.log(`[ProvisioningService/dev] onGrantRevoked grantId=${grantId}`).pipe(
-      Effect.asVoid,
-    ),
+    Effect.log(`[ProvisioningService/dev] onGrantRevoked grantId=${grantId}`).pipe(Effect.asVoid),
 
-  processNextPending: () =>
-    Effect.log("[ProvisioningService/dev] processNextPending (no-op)").pipe(Effect.asVoid),
+  processNextPending: () => Effect.log("[ProvisioningService/dev] processNextPending (no-op)").pipe(Effect.asVoid),
 
-  processJob: (jobId) =>
-    Effect.log(`[ProvisioningService/dev] processJob jobId=${jobId} (no-op)`).pipe(
-      Effect.asVoid,
-    ),
+  processJob: (jobId) => Effect.log(`[ProvisioningService/dev] processJob jobId=${jobId} (no-op)`).pipe(Effect.asVoid),
 })

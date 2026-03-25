@@ -56,11 +56,7 @@ export const submitAccessRequest = (input: SubmitRequestInput) =>
     const request = yield* requestRepo.create(input)
 
     // 2. Find approval policy
-    const policy = yield* requestRepo.findApprovalPolicy(
-      input.applicationId,
-      input.roleId,
-      input.entitlementId,
-    )
+    const policy = yield* requestRepo.findApprovalPolicy(input.applicationId, input.roleId, input.entitlementId)
 
     if (!policy || policy.mode === "none") {
       // Auto-approve in a transaction
@@ -101,15 +97,11 @@ export const submitAccessRequest = (input: SubmitRequestInput) =>
     const approverIds: string[] = []
     for (const rule of rules) {
       if (rule.approverType === "app_owner") {
-        const apps =
-          yield* sql`SELECT owner_id FROM applications WHERE id = ${input.applicationId}`
+        const apps = yield* sql`SELECT owner_id FROM applications WHERE id = ${input.applicationId}`
         if (apps.length > 0 && (apps[0] as any).ownerId) {
           approverIds.push((apps[0] as any).ownerId as string)
         }
-      } else if (
-        rule.approverType === "principal" &&
-        rule.approverPrincipalId
-      ) {
+      } else if (rule.approverType === "principal" && rule.approverPrincipalId) {
         approverIds.push(rule.approverPrincipalId)
       }
     }
@@ -158,12 +150,7 @@ export const decideApproval = (input: DecideInput) =>
     yield* sqlClient.withTransaction(
       Effect.gen(function* () {
         // 1. Record the individual decision
-        yield* requestRepo.recordDecision(
-          input.requestId,
-          input.approverId,
-          input.decision,
-          input.comment,
-        )
+        yield* requestRepo.recordDecision(input.requestId, input.approverId, input.decision, input.comment)
 
         // 2. Load request + approvals + policy
         const request = yield* requestRepo.findById(input.requestId)

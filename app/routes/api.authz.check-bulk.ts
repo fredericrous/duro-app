@@ -20,10 +20,7 @@ export async function action({ request }: Route.ActionArgs) {
 
     for (const check of checks) {
       if (!check.subject || !check.application || !check.action) {
-        return Response.json(
-          { error: "Each check must include subject, application, and action" },
-          { status: 400 },
-        )
+        return Response.json({ error: "Each check must include subject, application, and action" }, { status: 400 })
       }
     }
 

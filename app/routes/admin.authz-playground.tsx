@@ -75,18 +75,13 @@ export default function AdminAuthzPlaygroundPage({ loaderData }: Route.Component
   const [selectedApp, setSelectedApp] = useState("")
 
   const isChecking = fetcher.state !== "idle"
-  const result = fetcher.data as
-    | { decision: AccessDecision }
-    | { error: string }
-    | undefined
+  const result = fetcher.data as { decision: AccessDecision } | { error: string } | undefined
 
   return (
     <Stack gap="md">
       <html.div>
         <Heading level={2}>Authorization Playground</Heading>
-        <Text color="muted">
-          Test access checks against the authorization engine in real-time.
-        </Text>
+        <Text color="muted">Test access checks against the authorization engine in real-time.</Text>
       </html.div>
 
       <Panel.Root bordered>
@@ -96,10 +91,7 @@ export default function AdminAuthzPlaygroundPage({ loaderData }: Route.Component
             <Stack gap="md">
               <html.div>
                 <Text>Principal</Text>
-                <Combobox.Root
-                  value={selectedSubject}
-                  onValueChange={(v) => setSelectedSubject(v ?? "")}
-                >
+                <Combobox.Root value={selectedSubject} onValueChange={(v) => setSelectedSubject(v ?? "")}>
                   <Combobox.Input placeholder="Select a principal..." />
                   <Combobox.Popup>
                     {principals
@@ -117,10 +109,7 @@ export default function AdminAuthzPlaygroundPage({ loaderData }: Route.Component
 
               <html.div>
                 <Text>Application</Text>
-                <Combobox.Root
-                  value={selectedApp}
-                  onValueChange={(v) => setSelectedApp(v ?? "")}
-                >
+                <Combobox.Root value={selectedApp} onValueChange={(v) => setSelectedApp(v ?? "")}>
                   <Combobox.Input placeholder="Select an application..." />
                   <Combobox.Popup>
                     {applications.map((app) => (
@@ -136,18 +125,11 @@ export default function AdminAuthzPlaygroundPage({ loaderData }: Route.Component
 
               <Field.Root>
                 <Field.Label>Action (entitlement slug)</Field.Label>
-                <Input
-                  name="action"
-                  placeholder="e.g. read, write, admin"
-                  required
-                />
+                <Input name="action" placeholder="e.g. read, write, admin" required />
               </Field.Root>
               <Field.Root>
                 <Field.Label>Resource ID</Field.Label>
-                <Input
-                  name="resourceId"
-                  placeholder="Optional resource ID"
-                />
+                <Input name="resourceId" placeholder="Optional resource ID" />
               </Field.Root>
               <Button type="submit" variant="primary" disabled={isChecking}>
                 {isChecking ? "Checking..." : "Check Access"}
@@ -196,20 +178,17 @@ export default function AdminAuthzPlaygroundPage({ loaderData }: Route.Component
                       </html.li>
                       <html.li>
                         <Text>
-                          Group IDs: {result.decision.diagnostics.groupIds.length > 0
+                          Group IDs:{" "}
+                          {result.decision.diagnostics.groupIds.length > 0
                             ? result.decision.diagnostics.groupIds.join(", ")
                             : "none"}
                         </Text>
                       </html.li>
                       <html.li>
-                        <Text>
-                          Candidate grants: {result.decision.diagnostics.candidateGrantCount}
-                        </Text>
+                        <Text>Candidate grants: {result.decision.diagnostics.candidateGrantCount}</Text>
                       </html.li>
                       <html.li>
-                        <Text>
-                          Evaluation time: {result.decision.diagnostics.evaluationMs}ms
-                        </Text>
+                        <Text>Evaluation time: {result.decision.diagnostics.evaluationMs}ms</Text>
                       </html.li>
                     </html.ul>
                   </>

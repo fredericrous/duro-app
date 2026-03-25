@@ -110,9 +110,7 @@ export const PrincipalRepoLive = Layer.effect(
         withErr(
           sql`SELECT p.* FROM principals p
               JOIN group_memberships gm ON gm.group_id = p.id
-              WHERE gm.member_id = ${principalId}`.pipe(
-            Effect.map((rows) => rows.map((r) => decodePrincipal(r))),
-          ),
+              WHERE gm.member_id = ${principalId}`.pipe(Effect.map((rows) => rows.map((r) => decodePrincipal(r)))),
           "Failed to list groups for principal",
         ),
 
@@ -120,9 +118,7 @@ export const PrincipalRepoLive = Layer.effect(
         withErr(
           sql`SELECT p.* FROM principals p
               JOIN group_memberships gm ON gm.member_id = p.id
-              WHERE gm.group_id = ${groupId}`.pipe(
-            Effect.map((rows) => rows.map((r) => decodePrincipal(r))),
-          ),
+              WHERE gm.group_id = ${groupId}`.pipe(Effect.map((rows) => rows.map((r) => decodePrincipal(r)))),
           "Failed to list group members",
         ),
 

@@ -1,13 +1,5 @@
 import type { ReactNode } from "react"
-import {
-  Links,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-  isRouteErrorResponse,
-  useRouteLoaderData,
-} from "react-router"
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
 import { ActionBarProvider, ThemeProvider } from "@duro-app/ui"
 import { DevToolbar } from "~/components/DevToolbar/DevToolbar"

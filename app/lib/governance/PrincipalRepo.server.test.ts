@@ -21,7 +21,7 @@ describe("PrincipalRepo", () => {
         expect(principal.enabled).toBe(true)
         expect(principal.createdAt).toBeDefined()
         expect(principal.updatedAt).toBeDefined()
-      })
+      }),
     )
 
     it.effect("ensureUser is idempotent — same externalId returns same id with updated fields", () =>
@@ -33,7 +33,7 @@ describe("PrincipalRepo", () => {
         expect(second.id).toBe(first.id)
         expect(second.displayName).toBe("Robert")
         expect(second.email).toBe("robert@example.com")
-      })
+      }),
     )
 
     it.effect("findByExternalId returns null for non-existent user", () =>
@@ -42,7 +42,7 @@ describe("PrincipalRepo", () => {
         const result = yield* repo.findByExternalId("does-not-exist")
 
         expect(result).toBeNull()
-      })
+      }),
     )
 
     it.effect("findByExternalId returns the correct principal after ensureUser", () =>
@@ -55,7 +55,7 @@ describe("PrincipalRepo", () => {
         expect(found!.id).toBe(created.id)
         expect(found!.displayName).toBe("Charlie")
         expect(found!.email).toBe("charlie@example.com")
-      })
+      }),
     )
 
     it.effect("createGroup creates a group principal", () =>
@@ -68,7 +68,7 @@ describe("PrincipalRepo", () => {
         expect(group.externalId).toBe("group-ext-1")
         expect(group.id).toBeDefined()
         expect(group.enabled).toBe(true)
-      })
+      }),
     )
 
     it.effect("addMembership + listGroupsFor — returns the group for a member", () =>
@@ -83,7 +83,7 @@ describe("PrincipalRepo", () => {
         expect(groups).toHaveLength(1)
         expect(groups[0].id).toBe(group.id)
         expect(groups[0].displayName).toBe("Engineers")
-      })
+      }),
     )
 
     it.effect("addMembership + listMembers — returns the user in the group", () =>
@@ -98,7 +98,7 @@ describe("PrincipalRepo", () => {
         expect(members).toHaveLength(1)
         expect(members[0].id).toBe(user.id)
         expect(members[0].displayName).toBe("Eve")
-      })
+      }),
     )
 
     it.effect("removeMembership — after removing, listGroupsFor returns empty", () =>
@@ -112,7 +112,7 @@ describe("PrincipalRepo", () => {
         const groups = yield* repo.listGroupsFor(user.id)
 
         expect(groups).toHaveLength(0)
-      })
+      }),
     )
 
     it.effect("disable — after disabling, findById returns principal with enabled = false", () =>
@@ -127,7 +127,7 @@ describe("PrincipalRepo", () => {
 
         expect(found).not.toBeNull()
         expect(found!.enabled).toBe(false)
-      })
+      }),
     )
 
     it.effect("list — returns all created principals", () =>
@@ -143,7 +143,7 @@ describe("PrincipalRepo", () => {
         expect(ids).toContain(user1.id)
         expect(ids).toContain(user2.id)
         expect(ids).toContain(group.id)
-      })
+      }),
     )
   })
 })

@@ -45,9 +45,7 @@ export const ApiKeyRepoLive = Layer.effect(
         return withErr(
           sql`INSERT INTO api_keys (id, principal_id, key_hash, name, scopes)
               VALUES (gen_random_uuid(), ${principalId}, ${keyHash}, ${name}, ${scopesJson})
-              RETURNING id`.pipe(
-            Effect.map((rows) => ({ id: (rows[0] as any).id as string, rawKey })),
-          ),
+              RETURNING id`.pipe(Effect.map((rows) => ({ id: (rows[0] as any).id as string, rawKey }))),
           "Failed to create API key",
         )
       },

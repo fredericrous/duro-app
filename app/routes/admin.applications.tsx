@@ -84,11 +84,7 @@ const columns = [
   columnHelper.accessor("enabled", {
     header: "Enabled",
     enableSorting: true,
-    cell: ({ getValue }) => (
-      <Badge variant={getValue() ? "success" : "default"}>
-        {getValue() ? "Yes" : "No"}
-      </Badge>
-    ),
+    cell: ({ getValue }) => <Badge variant={getValue() ? "success" : "default"}>{getValue() ? "Yes" : "No"}</Badge>,
   }),
   columnHelper.accessor("ownerId", {
     header: "Owner",
@@ -140,10 +136,7 @@ export default function AdminApplicationsPage({ loaderData }: Route.ComponentPro
                           {header.isPlaceholder ? null : (
                             <>
                               {header.column.getCanSort() ? (
-                                <html.span
-                                  style={styles.sortHeader}
-                                  onClick={header.column.getToggleSortingHandler()}
-                                >
+                                <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
                                   {flexRender(header.column.columnDef.header, header.getContext())}
                                   <Table.SortIndicator column={header.column} />
                                 </html.span>
@@ -220,9 +213,15 @@ export default function AdminApplicationsPage({ loaderData }: Route.ComponentPro
                       <Select.Icon />
                     </Select.Trigger>
                     <Select.Popup>
-                      <Select.Item value="open"><Select.ItemText>Open</Select.ItemText></Select.Item>
-                      <Select.Item value="request"><Select.ItemText>Request</Select.ItemText></Select.Item>
-                      <Select.Item value="invite_only"><Select.ItemText>Invite Only</Select.ItemText></Select.Item>
+                      <Select.Item value="open">
+                        <Select.ItemText>Open</Select.ItemText>
+                      </Select.Item>
+                      <Select.Item value="request">
+                        <Select.ItemText>Request</Select.ItemText>
+                      </Select.Item>
+                      <Select.Item value="invite_only">
+                        <Select.ItemText>Invite Only</Select.ItemText>
+                      </Select.Item>
                     </Select.Popup>
                   </Select.Root>
                 </Field.Root>

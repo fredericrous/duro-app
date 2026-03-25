@@ -8,9 +8,7 @@ import { AuditService } from "~/lib/governance/AuditService.server"
 
 export type AdminGrantsMutation = { intent: "revoke"; grantId: string; revokedBy: string }
 
-export type AdminGrantsResult =
-  | { success: true; message: string }
-  | { error: string }
+export type AdminGrantsResult = { success: true; message: string } | { error: string }
 
 // ---------------------------------------------------------------------------
 // Dispatcher

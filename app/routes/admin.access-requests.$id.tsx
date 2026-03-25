@@ -10,17 +10,7 @@ import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import type { AccessRequest, RequestApproval, Principal } from "~/lib/governance/types"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import {
-  Badge,
-  Button,
-  ButtonGroup,
-  Field,
-  Heading,
-  Panel,
-  Stack,
-  Text,
-  Textarea,
-} from "@duro-app/ui"
+import { Badge, Button, ButtonGroup, Field, Heading, Panel, Stack, Text, Textarea } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -105,8 +95,8 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
       <html.div>
         <Heading level={2}>Access Request</Heading>
         <Text color="muted">
-          <Badge variant={statusVariant}>{accessRequest.status}</Badge>
-          {" "}&middot; Created {new Date(accessRequest.createdAt).toLocaleString()}
+          <Badge variant={statusVariant}>{accessRequest.status}</Badge> &middot; Created{" "}
+          {new Date(accessRequest.createdAt).toLocaleString()}
         </Text>
       </html.div>
 
@@ -161,20 +151,15 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
             {approvals.map((approval) => (
               <html.div key={approval.id} style={styles.approvalRow}>
                 <Text>
-                  {approval.approverId}
-                  {" "}&middot;{" "}
+                  {approval.approverId} &middot;{" "}
                   {approval.decision ? (
-                    <Badge variant={approval.decision === "approved" ? "success" : "error"}>
-                      {approval.decision}
-                    </Badge>
+                    <Badge variant={approval.decision === "approved" ? "success" : "error"}>{approval.decision}</Badge>
                   ) : (
                     <Badge variant="warning">pending</Badge>
                   )}
                 </Text>
                 {approval.comment && <Text color="muted">{approval.comment}</Text>}
-                {approval.decidedAt && (
-                  <Text color="muted">{new Date(approval.decidedAt).toLocaleString()}</Text>
-                )}
+                {approval.decidedAt && <Text color="muted">{new Date(approval.decidedAt).toLocaleString()}</Text>}
               </html.div>
             ))}
           </Stack>

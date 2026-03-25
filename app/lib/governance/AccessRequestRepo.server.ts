@@ -32,12 +32,8 @@ export class AccessRequestRepo extends Context.Tag("AccessRequestRepo")<
       requestedDurationHours?: number
     }) => Effect.Effect<AccessRequest, AccessRequestRepoError>
     readonly findById: (id: string) => Effect.Effect<AccessRequest | null, AccessRequestRepoError>
-    readonly listPending: (
-      applicationId?: string,
-    ) => Effect.Effect<AccessRequest[], AccessRequestRepoError>
-    readonly listForRequester: (
-      requesterId: string,
-    ) => Effect.Effect<AccessRequest[], AccessRequestRepoError>
+    readonly listPending: (applicationId?: string) => Effect.Effect<AccessRequest[], AccessRequestRepoError>
+    readonly listForRequester: (requesterId: string) => Effect.Effect<AccessRequest[], AccessRequestRepoError>
     readonly listAll: (filters?: {
       status?: string
       applicationId?: string
@@ -50,21 +46,13 @@ export class AccessRequestRepo extends Context.Tag("AccessRequestRepo")<
       decision: string,
       comment?: string,
     ) => Effect.Effect<void, AccessRequestRepoError>
-    readonly getApprovals: (
-      requestId: string,
-    ) => Effect.Effect<RequestApproval[], AccessRequestRepoError>
+    readonly getApprovals: (requestId: string) => Effect.Effect<RequestApproval[], AccessRequestRepoError>
     readonly createApprovalRecords: (
       requestId: string,
       approverIds: string[],
     ) => Effect.Effect<void, AccessRequestRepoError>
-    readonly updateStatus: (
-      requestId: string,
-      status: string,
-    ) => Effect.Effect<void, AccessRequestRepoError>
-    readonly linkGrant: (
-      requestId: string,
-      grantId: string,
-    ) => Effect.Effect<void, AccessRequestRepoError>
+    readonly updateStatus: (requestId: string, status: string) => Effect.Effect<void, AccessRequestRepoError>
+    readonly linkGrant: (requestId: string, grantId: string) => Effect.Effect<void, AccessRequestRepoError>
     readonly findApprovalPolicy: (
       applicationId: string,
       roleId?: string,
@@ -91,9 +79,7 @@ export const AccessRequestRepoLive = Layer.effect(
       findById: (id) =>
         withErr(
           sql`SELECT * FROM access_requests WHERE id = ${id}`.pipe(
-            Effect.map((rows) =>
-              rows.length > 0 ? (decodeAccessRequest(rows[0]) as AccessRequest) : null,
-            ),
+            Effect.map((rows) => (rows.length > 0 ? (decodeAccessRequest(rows[0]) as AccessRequest) : null)),
           ),
           "Failed to find access request",
         ),
@@ -136,9 +122,7 @@ export const AccessRequestRepoLive = Layer.effect(
         withErr(
           sql`UPDATE request_approvals
               SET decision = ${decision}, comment = ${comment ?? null}, decided_at = NOW()
-              WHERE request_id = ${requestId} AND approver_id = ${approverId}`.pipe(
-            Effect.asVoid,
-          ),
+              WHERE request_id = ${requestId} AND approver_id = ${approverId}`.pipe(Effect.asVoid),
           "Failed to record decision",
         ),
 
@@ -152,8 +136,10 @@ export const AccessRequestRepoLive = Layer.effect(
 
       createApprovalRecords: (requestId, approverIds) =>
         withErr(
-          Effect.forEach(approverIds, (approverId) =>
-            sql`INSERT INTO request_approvals (request_id, approver_id) VALUES (${requestId}, ${approverId})`,
+          Effect.forEach(
+            approverIds,
+            (approverId) =>
+              sql`INSERT INTO request_approvals (request_id, approver_id) VALUES (${requestId}, ${approverId})`,
           ).pipe(Effect.asVoid),
           "Failed to create approval records",
         ),
@@ -169,9 +155,7 @@ export const AccessRequestRepoLive = Layer.effect(
 
       linkGrant: (requestId, grantId) =>
         withErr(
-          sql`UPDATE access_requests SET grant_id = ${grantId} WHERE id = ${requestId}`.pipe(
-            Effect.asVoid,
-          ),
+          sql`UPDATE access_requests SET grant_id = ${grantId} WHERE id = ${requestId}`.pipe(Effect.asVoid),
           "Failed to link grant to access request",
         ),
 
@@ -186,9 +170,7 @@ export const AccessRequestRepoLive = Layer.effect(
                 )
               ORDER BY CASE scope_type WHEN 'entitlement' THEN 1 WHEN 'role' THEN 2 ELSE 3 END
               LIMIT 1`.pipe(
-            Effect.map((rows) =>
-              rows.length > 0 ? (decodeApprovalPolicy(rows[0]) as ApprovalPolicy) : null,
-            ),
+            Effect.map((rows) => (rows.length > 0 ? (decodeApprovalPolicy(rows[0]) as ApprovalPolicy) : null)),
           ),
           "Failed to find approval policy",
         ),

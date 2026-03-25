@@ -67,9 +67,7 @@ export const GrantRepoLive = Layer.effect(
 
       revoke: (id, revokedBy) =>
         withErr(
-          sql`UPDATE grants SET revoked_at = NOW(), revoked_by = ${revokedBy} WHERE id = ${id}`.pipe(
-            Effect.asVoid,
-          ),
+          sql`UPDATE grants SET revoked_at = NOW(), revoked_by = ${revokedBy} WHERE id = ${id}`.pipe(Effect.asVoid),
           "Failed to revoke grant",
         ),
 
@@ -110,9 +108,7 @@ export const GrantRepoLive = Layer.effect(
           sql`SELECT * FROM grants
               WHERE revoked_at IS NULL
                 AND expires_at IS NOT NULL
-                AND expires_at <= NOW()`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeGrant(r) as Grant)),
-          ),
+                AND expires_at <= NOW()`.pipe(Effect.map((rows) => rows.map((r) => decodeGrant(r) as Grant))),
           "Failed to find expired grants",
         ),
     }

@@ -45,13 +45,7 @@ const columns = [
     cell: ({ getValue }) => {
       const type = getValue()
       const variant =
-        type === "user"
-          ? "default"
-          : type === "group"
-            ? "info"
-            : type === "service_account"
-              ? "warning"
-              : "default"
+        type === "user" ? "default" : type === "group" ? "info" : type === "service_account" ? "warning" : "default"
       return <Badge variant={variant}>{type}</Badge>
     },
   }),
@@ -64,11 +58,7 @@ const columns = [
   columnHelper.accessor("enabled", {
     header: "Enabled",
     enableSorting: true,
-    cell: ({ getValue }) => (
-      <Badge variant={getValue() ? "success" : "default"}>
-        {getValue() ? "Yes" : "No"}
-      </Badge>
-    ),
+    cell: ({ getValue }) => <Badge variant={getValue() ? "success" : "default"}>{getValue() ? "Yes" : "No"}</Badge>,
   }),
 ]
 
@@ -90,10 +80,7 @@ export default function AdminPrincipalsPage({ loaderData }: Route.ComponentProps
     getPaginationRowModel: getPaginationRowModel(),
   })
 
-  const uniqueTypes = useMemo(
-    () => [...new Set(principals.map((p) => p.principalType))].sort(),
-    [principals],
-  )
+  const uniqueTypes = useMemo(() => [...new Set(principals.map((p) => p.principalType))].sort(), [principals])
 
   const setFilter = (columnId: string, value: string | null) => {
     table.getColumn(columnId)?.setFilterValue(value || undefined)
@@ -125,7 +112,9 @@ export default function AdminPrincipalsPage({ loaderData }: Route.ComponentProps
               <Combobox.Input placeholder="Filter by type..." />
               <Combobox.Popup>
                 {uniqueTypes.map((t) => (
-                  <Combobox.Item key={t} value={t}>{t}</Combobox.Item>
+                  <Combobox.Item key={t} value={t}>
+                    {t}
+                  </Combobox.Item>
                 ))}
                 <Combobox.Empty>No results</Combobox.Empty>
               </Combobox.Popup>
@@ -144,10 +133,7 @@ export default function AdminPrincipalsPage({ loaderData }: Route.ComponentProps
                           {header.isPlaceholder ? null : (
                             <>
                               {header.column.getCanSort() ? (
-                                <html.span
-                                  style={styles.sortHeader}
-                                  onClick={header.column.getToggleSortingHandler()}
-                                >
+                                <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
                                   {flexRender(header.column.columnDef.header, header.getContext())}
                                   <Table.SortIndicator column={header.column} />
                                 </html.span>

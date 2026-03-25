@@ -11,9 +11,7 @@ export type AdminAccessRequestsMutation =
   | { intent: "reject"; requestId: string; approverId: string; comment?: string }
   | { intent: "cancel"; requestId: string }
 
-export type AdminAccessRequestsResult =
-  | { success: true; message: string }
-  | { error: string }
+export type AdminAccessRequestsResult = { success: true; message: string } | { error: string }
 
 // ---------------------------------------------------------------------------
 // Dispatcher
@@ -65,9 +63,7 @@ export function handleAdminAccessRequestsMutation(mutation: AdminAccessRequestsM
 // FormData parser
 // ---------------------------------------------------------------------------
 
-export function parseAdminAccessRequestsMutation(
-  formData: FormData,
-): AdminAccessRequestsMutation | { error: string } {
+export function parseAdminAccessRequestsMutation(formData: FormData): AdminAccessRequestsMutation | { error: string } {
   const intent = formData.get("intent") as string
 
   switch (intent) {

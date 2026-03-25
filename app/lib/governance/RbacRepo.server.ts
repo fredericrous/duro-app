@@ -3,14 +3,7 @@ import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import * as crypto from "node:crypto"
 import { MigrationsRan } from "~/lib/db/client.server"
-import {
-  decodeRole,
-  decodeEntitlement,
-  decodeResource,
-  type Role,
-  type Entitlement,
-  type Resource,
-} from "./types"
+import { decodeRole, decodeEntitlement, decodeResource, type Role, type Entitlement, type Resource } from "./types"
 
 // ---------------------------------------------------------------------------
 // Error
@@ -52,14 +45,8 @@ export class RbacRepo extends Context.Tag("RbacRepo")<
     readonly deleteEntitlement: (id: string) => Effect.Effect<void, RbacRepoError>
 
     // Role-entitlement mappings
-    readonly attachEntitlement: (
-      roleId: string,
-      entitlementId: string,
-    ) => Effect.Effect<void, RbacRepoError>
-    readonly detachEntitlement: (
-      roleId: string,
-      entitlementId: string,
-    ) => Effect.Effect<void, RbacRepoError>
+    readonly attachEntitlement: (roleId: string, entitlementId: string) => Effect.Effect<void, RbacRepoError>
+    readonly detachEntitlement: (roleId: string, entitlementId: string) => Effect.Effect<void, RbacRepoError>
     readonly listRoleEntitlements: (roleId: string) => Effect.Effect<Entitlement[], RbacRepoError>
 
     // Resources
@@ -124,11 +111,7 @@ export const RbacRepoLive = Layer.effect(
           "Failed to find role",
         ),
 
-      deleteRole: (id) =>
-        withErr(
-          sql`DELETE FROM roles WHERE id = ${id}`.pipe(Effect.asVoid),
-          "Failed to delete role",
-        ),
+      deleteRole: (id) => withErr(sql`DELETE FROM roles WHERE id = ${id}`.pipe(Effect.asVoid), "Failed to delete role"),
 
       // ---- Entitlements ----
 
@@ -161,10 +144,7 @@ export const RbacRepoLive = Layer.effect(
         ),
 
       deleteEntitlement: (id) =>
-        withErr(
-          sql`DELETE FROM entitlements WHERE id = ${id}`.pipe(Effect.asVoid),
-          "Failed to delete entitlement",
-        ),
+        withErr(sql`DELETE FROM entitlements WHERE id = ${id}`.pipe(Effect.asVoid), "Failed to delete entitlement"),
 
       // ---- Role-entitlement mappings ----
 
