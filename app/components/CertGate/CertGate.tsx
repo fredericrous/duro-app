@@ -73,7 +73,7 @@ export function CertGate({
           })
         }
       >
-        {({ formState }) => (
+        {() => (
           <Fieldset.Root disabled={isSubmitting} gap="md">
             <Field.Root name="username">
               <Field.Label>{t("createAccount.username.label")}</Field.Label>
@@ -99,7 +99,7 @@ export function CertGate({
               <Field.Error />
             </Field.Root>
 
-            <Button type="submit" variant="primary" fullWidth disabled={isSubmitting || !formState.isValid}>
+            <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
               {isSubmitting ? t("createAccount.submitting") : t("createAccount.submit")}
             </Button>
           </Fieldset.Root>
