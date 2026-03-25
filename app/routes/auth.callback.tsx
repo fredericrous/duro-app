@@ -2,6 +2,9 @@ import { redirect } from "react-router"
 import type { Route } from "./+types/auth.callback"
 import { runEffect } from "~/lib/runtime.server"
 import { OidcClient } from "~/lib/services/OidcClient.server"
+import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
+import { GroupSyncService } from "~/lib/governance/GroupSyncService.server"
+import { authMode } from "~/lib/governance-mode.server"
 import { getPkceData, createSessionCookie, clearPkceCookie } from "~/lib/session.server"
 import { Effect } from "effect"
 
@@ -23,6 +26,20 @@ export async function loader({ request }: Route.LoaderArgs) {
       return yield* oidc.exchangeCode(callbackUrl, pkce.codeVerifier, pkce.state)
     }),
   )
+
+  // Upsert principal + sync OIDC groups to governance model
+  if (authMode !== "legacy") {
+    await runEffect(
+      Effect.gen(function* () {
+        const principalRepo = yield* PrincipalRepo
+        const groupSync = yield* GroupSyncService
+        const principal = yield* principalRepo.ensureUser(user.sub, user.name, user.email)
+        yield* groupSync.syncGroups(principal.id, user.groups)
+      }).pipe(
+        Effect.catchAll((e) => Effect.logWarning("auth callback: governance sync failed", { error: String(e) })),
+      ),
+    )
+  }
 
   const sessionCookie = await createSessionCookie({
     sub: user.sub,

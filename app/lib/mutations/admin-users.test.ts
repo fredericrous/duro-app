@@ -177,6 +177,42 @@ describe("parseAdminUsersMutation", () => {
     const result = parseAdminUsersMutation(fd)
     expect(result).toEqual({ error: "Unknown action" })
   })
+
+  it("parses revokeCertsBatch", () => {
+    const fd = new FormData()
+    fd.append("intent", "revokeCertsBatch")
+    fd.append("serialNumbers", "sn-1")
+    fd.append("serialNumbers", "sn-2")
+
+    const result = parseAdminUsersMutation(fd)
+    expect(result).toEqual({ intent: "revokeCertsBatch", serialNumbers: ["sn-1", "sn-2"] })
+  })
+
+  it("returns error for empty revokeCertsBatch", () => {
+    const fd = new FormData()
+    fd.append("intent", "revokeCertsBatch")
+
+    const result = parseAdminUsersMutation(fd)
+    expect(result).toEqual({ error: "Missing serial numbers" })
+  })
+
+  it("parses revokeAllCertsBatch", () => {
+    const fd = new FormData()
+    fd.append("intent", "revokeAllCertsBatch")
+    fd.append("usernames", "alice")
+    fd.append("usernames", "bob")
+
+    const result = parseAdminUsersMutation(fd)
+    expect(result).toEqual({ intent: "revokeAllCertsBatch", usernames: ["alice", "bob"] })
+  })
+
+  it("returns error for empty revokeAllCertsBatch", () => {
+    const fd = new FormData()
+    fd.append("intent", "revokeAllCertsBatch")
+
+    const result = parseAdminUsersMutation(fd)
+    expect(result).toEqual({ error: "Missing usernames" })
+  })
 })
 
 // --- Dispatcher tests ---
@@ -242,5 +278,134 @@ describe("handleAdminUsersMutation", () => {
     const mutation: AdminUsersMutation = { intent: "reinviteRevoked", revocationId: "doesnt-exist" }
     const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(TestLayer)))
     expect(result).toEqual({ error: "Revocation not found" })
+  })
+
+  it("revokeCertsBatch revokes multiple certs", async () => {
+    const certs = new Map<string, UserCertificate>()
+    certs.set("sn-1", {
+      id: "1",
+      inviteId: null,
+      userId: null,
+      username: "alice",
+      email: "alice@example.com",
+      serialNumber: "sn-1",
+      issuedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      revokedAt: null,
+      revokeState: null,
+      revokeError: null,
+    })
+    certs.set("sn-2", {
+      id: "2",
+      inviteId: null,
+      userId: null,
+      username: "alice",
+      email: "alice@example.com",
+      serialNumber: "sn-2",
+      issuedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      revokedAt: null,
+      revokeState: null,
+      revokeError: null,
+    })
+
+    const layer = Layer.mergeAll(
+      mockCertManager,
+      mockCertRepo(certs),
+      mockInviteRepo,
+      mockUserManager,
+      mockEmailService,
+      mockPreferencesRepo,
+    )
+
+    const mutation: AdminUsersMutation = { intent: "revokeCertsBatch", serialNumbers: ["sn-1", "sn-2"] }
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(layer)))
+    expect(result).toEqual({ certsRevoked: true, count: 2 })
+  })
+
+  it("revokeCertsBatch skips already-revoked certs", async () => {
+    const certs = new Map<string, UserCertificate>()
+    certs.set("sn-1", {
+      id: "1",
+      inviteId: null,
+      userId: null,
+      username: "alice",
+      email: "alice@example.com",
+      serialNumber: "sn-1",
+      issuedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      revokedAt: null,
+      revokeState: null,
+      revokeError: null,
+    })
+    certs.set("sn-2", {
+      id: "2",
+      inviteId: null,
+      userId: null,
+      username: "alice",
+      email: "alice@example.com",
+      serialNumber: "sn-2",
+      issuedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      revokedAt: new Date().toISOString(),
+      revokeState: "completed",
+      revokeError: null,
+    })
+
+    const layer = Layer.mergeAll(
+      mockCertManager,
+      mockCertRepo(certs),
+      mockInviteRepo,
+      mockUserManager,
+      mockEmailService,
+      mockPreferencesRepo,
+    )
+
+    const mutation: AdminUsersMutation = { intent: "revokeCertsBatch", serialNumbers: ["sn-1", "sn-2"] }
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(layer)))
+    expect(result).toEqual({ certsRevoked: true, count: 1 })
+  })
+
+  it("revokeAllCertsBatch revokes certs for multiple users", async () => {
+    const certs = new Map<string, UserCertificate>()
+    certs.set("sn-1", {
+      id: "1",
+      inviteId: null,
+      userId: null,
+      username: "alice",
+      email: "alice@example.com",
+      serialNumber: "sn-1",
+      issuedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      revokedAt: null,
+      revokeState: null,
+      revokeError: null,
+    })
+    certs.set("sn-2", {
+      id: "2",
+      inviteId: null,
+      userId: null,
+      username: "bob",
+      email: "bob@example.com",
+      serialNumber: "sn-2",
+      issuedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      revokedAt: null,
+      revokeState: null,
+      revokeError: null,
+    })
+
+    const layer = Layer.mergeAll(
+      mockCertManager,
+      mockCertRepo(certs),
+      mockInviteRepo,
+      mockUserManager,
+      mockEmailService,
+      mockPreferencesRepo,
+    )
+
+    const mutation: AdminUsersMutation = { intent: "revokeAllCertsBatch", usernames: ["alice", "bob"] }
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(layer)))
+    expect(result).toEqual({ certsRevoked: true, count: 2 })
   })
 })

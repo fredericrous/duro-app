@@ -14,6 +14,8 @@ export type AdminUsersMutation =
   | { intent: "revokeCert"; serialNumber: string }
   | { intent: "revokeAllCerts"; username: string }
   | { intent: "reinviteRevoked"; revocationId: string }
+  | { intent: "revokeCertsBatch"; serialNumbers: string[] }
+  | { intent: "revokeAllCertsBatch"; usernames: string[] }
 
 export type AdminUsersResult =
   | { success: true; message: string; reinviteEmail?: string }
@@ -81,6 +83,43 @@ export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
           reinviteEmail: revocation.email,
         }
       }
+
+      case "revokeCertsBatch": {
+        const cert = yield* CertManager
+        const certRepo = yield* CertificateRepo
+        let count = 0
+        for (const serial of mutation.serialNumbers) {
+          const affected = yield* certRepo.markRevokePending(serial)
+          if (affected === 0) continue
+          yield* cert.revokeCert(serial).pipe(
+            Effect.tap(() => certRepo.markRevokeCompleted(serial)),
+            Effect.tapError((e) =>
+              certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void)),
+            ),
+          )
+          count++
+        }
+        return { certsRevoked: true as const, count }
+      }
+
+      case "revokeAllCertsBatch": {
+        const cert = yield* CertManager
+        const certRepo = yield* CertificateRepo
+        let total = 0
+        for (const username of mutation.usernames) {
+          const serials = yield* certRepo.revokeAllForUser(username)
+          for (const serial of serials) {
+            yield* cert.revokeCert(serial).pipe(
+              Effect.tap(() => certRepo.markRevokeCompleted(serial)),
+              Effect.catchAll((e) =>
+                certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void)),
+              ),
+            )
+          }
+          total += serials.length
+        }
+        return { certsRevoked: true as const, count: total }
+      }
     }
   }).pipe(
     Effect.catchAll((e) => {
@@ -129,6 +168,16 @@ export function parseAdminUsersMutation(formData: FormData): AdminUsersMutation 
       const revocationId = formData.get("revocationId") as string
       if (!revocationId) return { error: "Missing revocation ID" }
       return { intent, revocationId }
+    }
+    case "revokeCertsBatch": {
+      const serialNumbers = formData.getAll("serialNumbers") as string[]
+      if (serialNumbers.length === 0) return { error: "Missing serial numbers" }
+      return { intent, serialNumbers }
+    }
+    case "revokeAllCertsBatch": {
+      const usernames = formData.getAll("usernames") as string[]
+      if (usernames.length === 0) return { error: "Missing usernames" }
+      return { intent, usernames }
     }
     default:
       return { error: "Unknown action" }

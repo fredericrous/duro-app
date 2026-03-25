@@ -1,23 +1,9 @@
 import { ManagedRuntime, type Effect } from "effect"
 import { AppLayer } from "./services/AppLayer.server"
-import type { UserManager } from "./services/UserManager.server"
-import type { CertManager } from "./services/CertManager.server"
-import type { EmailService } from "./services/EmailService.server"
-import type { InviteRepo } from "./services/InviteRepo.server"
-import type { PreferencesRepo } from "./services/PreferencesRepo.server"
-import type { OidcClient } from "./services/OidcClient.server"
-import type { CertificateRepo } from "./services/CertificateRepo.server"
-
-type AppServices =
-  | UserManager
-  | CertManager
-  | EmailService
-  | InviteRepo
-  | PreferencesRepo
-  | OidcClient
-  | CertificateRepo
 
 const appRuntime = ManagedRuntime.make(AppLayer)
+
+type AppServices = ManagedRuntime.ManagedRuntime.Context<typeof appRuntime>
 
 /**
  * Run an Effect with the app's service layer. Call this ONLY at route handler

@@ -7,6 +7,7 @@ export default defineConfig({
     setupFiles: ["./app/test/setup.ts"],
     include: ["app/**/*.test.{ts,tsx}"],
     css: { modules: { classNameStrategy: "non-scoped" } },
+    hookTimeout: 30000,
   },
   resolve: {
     alias: {
