@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import { useFetcher, useNavigate } from "react-router"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.applications"
@@ -17,7 +17,6 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { Badge, Button, Dialog, Field, Input, Select, ScrollArea, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 

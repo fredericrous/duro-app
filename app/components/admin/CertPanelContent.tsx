@@ -25,7 +25,7 @@ export function CertPanelContent({
   certPanelCerts,
   selectedCerts,
   toggleCert,
-  onClose,
+  _onClose,
 }: {
   t: (key: string, opts?: Record<string, unknown>) => string
   certPanelUser: { displayName: string } | undefined

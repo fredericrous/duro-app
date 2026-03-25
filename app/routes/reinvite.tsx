@@ -12,16 +12,6 @@ import { Effect } from "effect"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { Alert, Button, Heading, StatusIcon, Text } from "@duro-app/ui"
-import { css, html } from "react-strict-dom"
-
-const styles = css.create({
-  infoText: {
-    color: "var(--color-text-muted)",
-    fontSize: 14,
-    lineHeight: 1.6,
-    marginBottom: 24,
-  },
-})
 
 export function meta({ data }: Route.MetaArgs) {
   return [{ title: data?.appName ? `Request New Invite - ${data.appName}` : "Request New Invite" }]

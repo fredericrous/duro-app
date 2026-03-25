@@ -224,7 +224,6 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
   )
 
   // Column defs are rebuilt when translation changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const columns = useMemo(() => buildColumns(t), [t])
 
   const [sorting, setSorting] = useState<SortingState>([])

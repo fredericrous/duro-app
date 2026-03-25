@@ -6,7 +6,6 @@ import { runEffect } from "~/lib/runtime.server"
 import { isOriginAllowed } from "~/lib/config.server"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { RbacRepo } from "~/lib/governance/RbacRepo.server"
-import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import type { Role, Entitlement, Resource, Grant } from "~/lib/governance/types"
 import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
@@ -42,13 +41,7 @@ export async function loader({ params }: Route.LoaderArgs) {
         return yield* repo.listResources(appId)
       }),
     ),
-    runEffect(
-      Effect.gen(function* () {
-        // Get all grants that reference roles/entitlements in this app
-        // For now we list via roles; a more complete approach would union role+entitlement grants
-        return [] as Grant[]
-      }),
-    ),
+    runEffect(Effect.succeed([] as Grant[])),
   ])
 
   if (!application) {
