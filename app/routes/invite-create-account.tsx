@@ -5,7 +5,7 @@ import type { Route } from "./+types/invite-create-account"
 import { runEffect } from "~/lib/runtime.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
-import { config } from "~/lib/config.server"
+import { config, isOriginAllowed } from "~/lib/config.server"
 import { hashToken } from "~/lib/crypto.server"
 import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
 import { acceptInvite } from "~/lib/workflows/invite.server"
@@ -115,7 +115,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   const origin = request.headers.get("Origin")
-  if (origin && !origin.endsWith(config.allowedOriginSuffix)) {
+  if (!isOriginAllowed(origin)) {
     return { error: "Invalid request origin" }
   }
 
@@ -145,7 +145,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         yield* acceptInvite(token, { username, password })
       }),
     )
-    throw redirect(`${config.homeUrl}/welcome`)
+    return { success: true as const, username, homeUrl: config.homeUrl }
   } catch (e) {
     if (e instanceof Response) throw e
     const message = e instanceof Error ? e.message : "Failed to create account"
@@ -170,6 +170,20 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
     () => (devOverrides?.certInstalled ? Promise.resolve(true) : realCertPromise),
     [devOverrides?.certInstalled, realCertPromise],
   )
+
+  if (actionData && "success" in actionData && actionData.success) {
+    return (
+      <CenteredCardPage>
+        <Heading level={1}>{t("createAccount.success.title")}</Heading>
+        <Alert variant="success">
+          <Text as="p">{t("createAccount.success.message")}</Text>
+        </Alert>
+        <LinkButton href={actionData.homeUrl} variant="primary" fullWidth>
+          {t("createAccount.success.goHome")}
+        </LinkButton>
+      </CenteredCardPage>
+    )
+  }
 
   if (!loaderData.valid) {
     if (loaderData.error === "already_used") {
