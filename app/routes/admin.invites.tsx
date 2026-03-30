@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { startTransition, useEffect, useRef, useState } from "react"
 import { useFetcher, useRevalidator } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/admin.invites"
@@ -91,7 +91,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
   useEffect(() => {
     if (fetcher.data && "success" in fetcher.data && fetcher.data.success) {
       formRef.current?.reset()
-      setEmails([])
+      startTransition(() => setEmails([]))
     }
   }, [fetcher.data])
 
