@@ -87,6 +87,7 @@ const filterBarStyles = css.create({
 })
 
 export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
+  "use no memo"
   const { t } = useTranslation()
   const { users, revocations, systemUserIds, certsByUser } = loaderData
   const [revokeTarget, setRevokeTarget] = useState<RevokeTarget | null>(null)
