@@ -10,7 +10,22 @@ import type { Role, Entitlement, Resource, Grant } from "~/lib/governance/types"
 import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { Alert, Badge, Button, Checkbox, Dialog, Field, Heading, Input, ScrollArea, Select, Stack, Tabs, Table, Text } from "@duro-app/ui"
+import {
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  Dialog,
+  Field,
+  Heading,
+  Input,
+  ScrollArea,
+  Select,
+  Stack,
+  Tabs,
+  Table,
+  Text,
+} from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 export async function loader({ params }: Route.LoaderArgs) {

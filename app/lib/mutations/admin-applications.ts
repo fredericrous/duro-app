@@ -9,7 +9,15 @@ import { AppSyncService } from "~/lib/governance/AppSyncService.server"
 
 export type AdminApplicationsMutation =
   | { intent: "syncFromCluster" }
-  | { intent: "update"; id: string; displayName?: string; description?: string; accessMode?: string; enabled?: boolean; ownerId?: string }
+  | {
+      intent: "update"
+      id: string
+      displayName?: string
+      description?: string
+      accessMode?: string
+      enabled?: boolean
+      ownerId?: string
+    }
   | { intent: "delete"; id: string }
   | { intent: "createRole"; applicationId: string; slug: string; displayName: string; description?: string }
   | { intent: "createEntitlement"; applicationId: string; slug: string; displayName: string; description?: string }
