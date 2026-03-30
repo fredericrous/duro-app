@@ -232,6 +232,7 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: userData,
     columns,
