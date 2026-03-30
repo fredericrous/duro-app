@@ -209,17 +209,74 @@ export const LldapClientLive = Layer.effect(
       setUserPassword: (userId: string, password: string) =>
         Effect.gen(function* () {
           const token = yield* getToken
-          yield* http
+
+          // Load @serenity-kit/opaque (WASM-based OPAQUE client, opaque-ke 4.0).
+          // Uses LLDAP's /base64 endpoints which accept base64url-encoded raw bytes.
+          const opaque = yield* Effect.tryPromise({
+            try: async () => {
+              const mod = await import("@serenity-kit/opaque")
+              await mod.ready
+              return mod
+            },
+            catch: (e) => new LldapError({ message: "Failed to load OPAQUE module", cause: e }),
+          })
+
+          // Step 1: OPAQUE registration start (client-side crypto)
+          const { clientRegistrationState, registrationRequest } = yield* Effect.try({
+            try: () => opaque.client.startRegistration({ password }),
+            catch: (e) => new LldapError({ message: "OPAQUE startRegistration failed", cause: e }),
+          })
+
+          // Step 2: POST /auth/opaque/register/start/base64
+          const serverResponse = yield* http
             .execute(
-              HttpClientRequest.post(`${url}/api/user/${encodeURIComponent(userId)}/password`).pipe(
+              HttpClientRequest.post(`${url}/auth/opaque/register/start/base64`).pipe(
                 HttpClientRequest.setHeaders({ "Content-Type": "application/json" }),
                 HttpClientRequest.bearerToken(token),
-                HttpClientRequest.bodyUnsafeJson({ password }),
+                HttpClientRequest.bodyUnsafeJson({
+                  username: userId,
+                  registration_start_request: registrationRequest,
+                }),
+              ),
+            )
+            .pipe(
+              Effect.flatMap((r) => {
+                if (r.status >= 200 && r.status < 300) return r.json
+                return r.text.pipe(
+                  Effect.catchAll(() => Effect.succeed("")),
+                  Effect.flatMap((body) => Effect.fail(`${r.status} - ${body.slice(0, 500)}`)),
+                )
+              }),
+              Effect.mapError((e) => new LldapError({ message: "OPAQUE register/start failed", cause: e })),
+              Effect.scoped,
+            ) as Effect.Effect<{ server_data: string; registration_response: string }, LldapError>
+
+          // Step 3: OPAQUE registration finish (client-side crypto)
+          const { registrationRecord } = yield* Effect.try({
+            try: () =>
+              opaque.client.finishRegistration({
+                password,
+                clientRegistrationState,
+                registrationResponse: serverResponse.registration_response,
+              }),
+            catch: (e) => new LldapError({ message: "OPAQUE finishRegistration failed", cause: e }),
+          })
+
+          // Step 4: POST /auth/opaque/register/finish/base64
+          yield* http
+            .execute(
+              HttpClientRequest.post(`${url}/auth/opaque/register/finish/base64`).pipe(
+                HttpClientRequest.setHeaders({ "Content-Type": "application/json" }),
+                HttpClientRequest.bearerToken(token),
+                HttpClientRequest.bodyUnsafeJson({
+                  server_data: serverResponse.server_data,
+                  registration_upload: registrationRecord,
+                }),
               ),
             )
             .pipe(
               Effect.flatMap(HttpClientResponse.filterStatusOk),
-              Effect.mapError((e) => new LldapError({ message: "Failed to set user password", cause: e })),
+              Effect.mapError((e) => new LldapError({ message: "OPAQUE register/finish failed", cause: e })),
               Effect.scoped,
             )
         }),
