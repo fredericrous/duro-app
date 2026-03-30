@@ -104,8 +104,8 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
         lastName: "",
       })
       .pipe(
-        Effect.mapError((e) => {
-          const msg = e instanceof Error ? e.message : String(e && typeof e === "object" && "message" in e ? e.message : e)
+        Effect.mapError((e: any) => {
+          const msg = String(e?.message ?? e)
           if (msg.includes("UNIQUE") || msg.includes("unique") || msg.includes("already exists") || msg.includes("duplicate")) {
             return new Error(`A user with this email or username already exists`)
           }

@@ -240,13 +240,8 @@ export const LldapClientLive = Layer.effect(
               ),
             )
             .pipe(
-              Effect.flatMap((r) => {
-                if (r.status >= 200 && r.status < 300) return r.json
-                return r.text.pipe(
-                  Effect.catchAll(() => Effect.succeed("")),
-                  Effect.flatMap((body) => Effect.fail(`${r.status} - ${body.slice(0, 500)}`)),
-                )
-              }),
+              Effect.flatMap(HttpClientResponse.filterStatusOk),
+              Effect.flatMap((r) => r.json),
               Effect.mapError((e) => new LldapError({ message: "OPAQUE register/start failed", cause: e })),
               Effect.scoped,
             ) as Effect.Effect<{ server_data: string; registration_response: string }, LldapError>
