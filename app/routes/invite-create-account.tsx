@@ -146,9 +146,17 @@ export async function action({ request, params }: Route.ActionArgs) {
       }),
     )
     return { success: true as const, username, homeUrl: config.homeUrl }
-  } catch (e) {
+  } catch (e: any) {
     if (e instanceof Response) throw e
-    const message = e instanceof Error ? e.message : "Failed to create account"
+    // FiberFailure wraps the real cause — extract the inner message
+    const cause = e?.cause ?? e
+    const message =
+      typeof cause === "object" && cause !== null && "message" in cause
+        ? String(cause.message)
+        : e instanceof Error
+          ? e.message
+          : "Failed to create account"
+    console.error("[create-account] action error:", message)
     return { error: message }
   }
 }

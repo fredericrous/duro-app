@@ -78,6 +78,15 @@ export async function action({ request }: Route.ActionArgs) {
           return yield* Effect.fail(new Error(`Admin group '${config.adminGroupName}' not found in LLDAP`))
         }
 
+        // Check if a user with this email already exists in LLDAP
+        const existingUsers = yield* userMgr.getUsers
+        const emailTaken = existingUsers.find((u) => u.email.toLowerCase() === email.toLowerCase())
+        if (emailTaken) {
+          return yield* Effect.fail(
+            new Error(`A user with email '${email}' already exists (username: ${emailTaken.displayName})`),
+          )
+        }
+
         const pending = yield* inviteRepo.findPending()
         const existing = pending.find((i) => i.email === email)
         if (existing) {

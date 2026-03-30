@@ -95,13 +95,23 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
     })
 
     // Create user with compensating rollback on failure
-    yield* users.createUser({
-      id: input.username,
-      email: invite.email,
-      displayName: input.username,
-      firstName: input.username,
-      lastName: "",
-    })
+    yield* users
+      .createUser({
+        id: input.username,
+        email: invite.email,
+        displayName: input.username,
+        firstName: input.username,
+        lastName: "",
+      })
+      .pipe(
+        Effect.mapError((e) => {
+          const msg = e instanceof Error ? e.message : String(e && typeof e === "object" && "message" in e ? e.message : e)
+          if (msg.includes("UNIQUE") || msg.includes("unique") || msg.includes("already exists") || msg.includes("duplicate")) {
+            return new Error(`A user with this email or username already exists`)
+          }
+          return new Error(`Failed to create user: ${msg}`)
+        }),
+      )
 
     // Set password + add to groups, rollback user on failure
     yield* Effect.gen(function* () {
