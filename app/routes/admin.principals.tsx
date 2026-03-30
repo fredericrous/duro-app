@@ -152,7 +152,7 @@ export default function AdminPrincipalsPage({ loaderData }: Route.ComponentProps
                     <html.div
                       key={row.id}
                       onClick={() => navigate(`/admin/principals/${row.original.id}`)}
-                      style={styles.clickableRow}
+                      style={[styles.clickableRow, styles.displayContents]}
                     >
                       <Table.Row>
                         {row.getVisibleCells().map((cell) => (
@@ -191,5 +191,8 @@ const styles = css.create({
   },
   clickableRow: {
     cursor: "pointer",
+  },
+  displayContents: {
+    display: "contents",
   },
 })

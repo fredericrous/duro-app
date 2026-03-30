@@ -1,10 +1,10 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useFetcher, useRevalidator } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/admin.invites"
 import { Effect } from "effect"
 import { runEffect } from "~/lib/runtime.server"
-import { config } from "~/lib/config.server"
+import { config, isOriginAllowed } from "~/lib/config.server"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
 import { handleAdminInvitesMutation, parseAdminInvitesMutation } from "~/lib/mutations/admin-invites"
@@ -17,10 +17,11 @@ import {
   Field,
   Fieldset,
   Inline,
-  Input,
   ScrollArea,
   Stack,
   Table,
+  Tag,
+  TagGroup,
   Text,
 } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
@@ -53,7 +54,7 @@ export async function loader() {
 
 export async function action({ request }: Route.ActionArgs) {
   const origin = request.headers.get("Origin")
-  if (origin && !origin.endsWith(config.allowedOriginSuffix)) {
+  if (!isOriginAllowed(origin)) {
     throw new Response("Invalid origin", { status: 403 })
   }
 
@@ -73,11 +74,13 @@ function StepBadges({ invite }: { invite: Invite }) {
 }
 
 export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
+  "use no memo"
   const { t } = useTranslation()
   const { groups, pendingInvites, failedInvites } = loaderData
   const fetcher = useFetcher<typeof action>()
   const formRef = useRef<HTMLFormElement>(null)
   const isSubmitting = fetcher.state !== "idle"
+  const [emails, setEmails] = useState<string[]>([])
   const revalidator = useRevalidator()
   const revalidatorRef = useRef(revalidator)
 
@@ -88,6 +91,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
   useEffect(() => {
     if (fetcher.data && "success" in fetcher.data && fetcher.data.success) {
       formRef.current?.reset()
+      setEmails([])
     }
   }, [fetcher.data])
 
@@ -106,7 +110,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
   }, [pendingInvites])
 
   const actionData = fetcher.data
-  const hasRevocationWarning = actionData && "warning" in actionData && "groups" in actionData
+  const hasRevocationWarning = actionData && "warning" in actionData && "emails" in actionData
 
   return (
     <Stack gap="md">
@@ -119,7 +123,9 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
           <Alert variant="warning">
             <Text as="p">{actionData.warning}</Text>
             <fetcher.Form method="post" style={{ marginTop: "0.5rem" }}>
-              <input type="hidden" name="email" value={actionData.email} />
+              {(actionData.emails as string[]).map((e) => (
+                <input key={e} type="hidden" name="emails" value={e} />
+              ))}
               <input type="hidden" name="confirmed" value="true" />
               <input type="hidden" name="revocationId" value={actionData.revocationId} />
               {(actionData.groups as string[]).map((g) => (
@@ -134,12 +140,27 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
 
         <fetcher.Form method="post" ref={formRef}>
           <Fieldset.Root disabled={isSubmitting} gap="md">
-            <Field.Root>
+            <Field.Root required>
               <Field.Label>{t("admin.invites.emailLabel")}</Field.Label>
-              <Input name="email" type="email" required placeholder={t("admin.invites.emailPlaceholder")} />
+              <TagGroup.Root
+                name="emails"
+                value={emails}
+                onValueChange={setEmails}
+                onValidate={(v) => (v.includes("@") ? true : t("admin.invites.emailInvalid"))}
+              >
+                <TagGroup.List aria-label={t("admin.invites.emailLabel")}>
+                  {emails.map((email) => (
+                    <Tag key={email} value={email}>
+                      {email}
+                    </Tag>
+                  ))}
+                </TagGroup.List>
+                <TagGroup.Input placeholder={t("admin.invites.emailPlaceholder")} />
+              </TagGroup.Root>
+              <Field.Description>{t("admin.invites.emailHint")}</Field.Description>
             </Field.Root>
 
-            <Field.Root>
+            <Field.Root required>
               <Field.Label>{t("admin.invites.groupsLabel")}</Field.Label>
               <Cluster gap="ms">
                 {groups.map((g) => (

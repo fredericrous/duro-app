@@ -24,6 +24,8 @@ import { AuditServiceLive, AuditServiceDev } from "~/lib/governance/AuditService
 import { ApiKeyRepoLive } from "~/lib/governance/ApiKeyRepo.server"
 import { ProvisioningServiceLive, ProvisioningServiceDev } from "~/lib/governance/ProvisioningService.server"
 import { GroupSyncServiceLive } from "~/lib/governance/GroupSyncService.server"
+import { OperatorClientLive, OperatorClientDev } from "./OperatorClient.server"
+import { AppSyncServiceLive } from "~/lib/governance/AppSyncService.server"
 
 const isDevServer = process.env.NODE_ENV === "development" && process.env.VITEST !== "true"
 
@@ -48,6 +50,8 @@ export const AppLayer = Layer.mergeAll(
   ApiKeyRepoLive,
   isDevServer ? ProvisioningServiceDev : ProvisioningServiceLive,
   GroupSyncServiceLive,
+  isDevServer ? OperatorClientDev : OperatorClientLive,
+  AppSyncServiceLive,
 ).pipe(
   Layer.provideMerge(isDevServer ? DbDevLive : DbLive),
   Layer.provide(OtelLayer),

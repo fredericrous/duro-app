@@ -165,8 +165,10 @@
     },
     "invites": {
       "sendTitle": "Envoyer une invitation",
-      "emailLabel": "E-mail",
-      "emailPlaceholder": "utilisateur@exemple.com",
+      "emailLabel": "E-mails",
+      "emailPlaceholder": "Ajouter un e-mail...",
+      "emailHint": "Appuyez sur Entree ou virgule pour ajouter",
+      "emailInvalid": "E-mail invalide",
       "groupsLabel": "Groupes",
       "languageLabel": "Langue de l'invitation",
       "submit": "Envoyer l'invitation",

@@ -22,6 +22,7 @@ function MaybeDevToolbar({ children }: { children: ReactNode }) {
 }
 
 export function Layout({ children }: { children: ReactNode }) {
+  "use no memo"
   const data = useRouteLoaderData<typeof loader>("root")
   const locale = data?.locale ?? "en"
 

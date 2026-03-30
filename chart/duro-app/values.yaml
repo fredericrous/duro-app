@@ -55,6 +55,7 @@ web:
   env:
     LLDAP_URL: "http://lldap.lldap.svc.cluster.local.:17170"
     LLDAP_ADMIN_USER: "admin"
+    OPERATOR_API_URL: "http://duro-operator.duro.svc.cluster.local:9090"
   resources:
     requests:
       memory: "96Mi"

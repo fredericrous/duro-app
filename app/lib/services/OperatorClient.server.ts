@@ -50,17 +50,26 @@ export const OperatorClientLive = Layer.effect(
   Effect.gen(function* () {
     const httpClient = yield* HttpClient.HttpClient
 
-    const api = makeJsonApi(httpClient, config.operatorApiUrl, {}, (cause) => new OperatorClientError({ message: "Failed to call operator API", cause }))
+    const api = makeJsonApi(
+      httpClient,
+      config.operatorApiUrl,
+      {},
+      (cause) => new OperatorClientError({ message: "Failed to call operator API", cause }),
+    )
 
     return {
       listApps: () =>
-        api.get("/api/v1/apps").pipe(
-          Effect.flatMap((raw) =>
-            decodeClusterApps(raw).pipe(
-              Effect.mapError((cause) => new OperatorClientError({ message: "Failed to decode operator response", cause })),
+        api
+          .get("/api/v1/apps")
+          .pipe(
+            Effect.flatMap((raw) =>
+              decodeClusterApps(raw).pipe(
+                Effect.mapError(
+                  (cause) => new OperatorClientError({ message: "Failed to decode operator response", cause }),
+                ),
+              ),
             ),
           ),
-        ),
     }
   }),
 )

@@ -1,14 +1,15 @@
 import { Effect } from "effect"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { RbacRepo } from "~/lib/governance/RbacRepo.server"
+import { AppSyncService } from "~/lib/governance/AppSyncService.server"
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export type AdminApplicationsMutation =
-  | { intent: "create"; slug: string; displayName: string; description?: string; accessMode?: string }
-  | { intent: "update"; id: string; displayName?: string; description?: string; accessMode?: string; enabled?: boolean }
+  | { intent: "syncFromCluster" }
+  | { intent: "update"; id: string; displayName?: string; description?: string; accessMode?: string; enabled?: boolean; ownerId?: string }
   | { intent: "delete"; id: string }
   | { intent: "createRole"; applicationId: string; slug: string; displayName: string; description?: string }
   | { intent: "createEntitlement"; applicationId: string; slug: string; displayName: string; description?: string }
@@ -22,15 +23,13 @@ export type AdminApplicationsResult = { success: true; message: string } | { err
 export function handleAdminApplicationsMutation(mutation: AdminApplicationsMutation) {
   return Effect.gen(function* () {
     switch (mutation.intent) {
-      case "create": {
-        const repo = yield* ApplicationRepo
-        const app = yield* repo.create({
-          slug: mutation.slug,
-          displayName: mutation.displayName,
-          description: mutation.description,
-          accessMode: mutation.accessMode,
-        })
-        return { success: true as const, message: `Application "${app.displayName}" created` }
+      case "syncFromCluster": {
+        const syncService = yield* AppSyncService
+        const result = yield* syncService.syncFromCluster()
+        return {
+          success: true as const,
+          message: `Synced ${result.total} apps: ${result.created} created, ${result.updated} updated, ${result.disabled} disabled`,
+        }
       }
 
       case "update": {
@@ -40,6 +39,7 @@ export function handleAdminApplicationsMutation(mutation: AdminApplicationsMutat
         if (mutation.description !== undefined) fields.description = mutation.description
         if (mutation.accessMode !== undefined) fields.accessMode = mutation.accessMode
         if (mutation.enabled !== undefined) fields.enabled = mutation.enabled
+        if (mutation.ownerId !== undefined) fields.ownerId = mutation.ownerId
         yield* repo.update(mutation.id, fields)
         return { success: true as const, message: "Application updated" }
       }
@@ -92,13 +92,8 @@ export function parseAdminApplicationsMutation(formData: FormData): AdminApplica
   const intent = formData.get("intent") as string
 
   switch (intent) {
-    case "create": {
-      const slug = formData.get("slug") as string
-      const displayName = formData.get("displayName") as string
-      if (!slug || !displayName) return { error: "Missing slug or displayName" }
-      const description = (formData.get("description") as string) || undefined
-      const accessMode = (formData.get("accessMode") as string) || undefined
-      return { intent, slug, displayName, description, accessMode }
+    case "syncFromCluster": {
+      return { intent }
     }
 
     case "update": {
@@ -109,7 +104,8 @@ export function parseAdminApplicationsMutation(formData: FormData): AdminApplica
       const accessMode = (formData.get("accessMode") as string) || undefined
       const enabledRaw = formData.get("enabled") as string | null
       const enabled = enabledRaw !== null ? enabledRaw === "true" : undefined
-      return { intent, id, displayName, description, accessMode, enabled }
+      const ownerId = (formData.get("ownerId") as string) || undefined
+      return { intent, id, displayName, description, accessMode, enabled, ownerId }
     }
 
     case "delete": {

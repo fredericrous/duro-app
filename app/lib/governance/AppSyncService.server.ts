@@ -40,14 +40,14 @@ export const AppSyncServiceLive = Layer.succeed(AppSyncService, {
       const appRepo = yield* ApplicationRepo
 
       // 1. Fetch apps from the operator
-      const clusterApps = yield* operator.listApps().pipe(
-        Effect.mapError((e: OperatorClientError) => new AppSyncError({ message: e.message, cause: e.cause })),
-      )
+      const clusterApps = yield* operator
+        .listApps()
+        .pipe(Effect.mapError((e: OperatorClientError) => new AppSyncError({ message: e.message, cause: e.cause })))
 
       // 2. Fetch existing governance apps
-      const existingApps = yield* appRepo.list().pipe(
-        Effect.mapError((e: ApplicationRepoError) => new AppSyncError({ message: e.message, cause: e.cause })),
-      )
+      const existingApps = yield* appRepo
+        .list()
+        .pipe(Effect.mapError((e: ApplicationRepoError) => new AppSyncError({ message: e.message, cause: e.cause })))
 
       // 3. Build lookup by slug
       const existingBySlug = new Map(existingApps.map((a) => [a.slug, a]))

@@ -12,6 +12,7 @@ export const config = {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean),
+  operatorApiUrl: process.env.OPERATOR_API_URL ?? "",
 } as const
 
 /** Check if a request Origin header matches the allowed suffix. */

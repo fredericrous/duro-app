@@ -10,7 +10,7 @@ import type { Role, Entitlement, Resource, Grant } from "~/lib/governance/types"
 import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { Badge, Button, Dialog, Field, Heading, Input, ScrollArea, Stack, Tabs, Table, Text } from "@duro-app/ui"
+import { Alert, Badge, Button, Checkbox, Dialog, Field, Heading, Input, ScrollArea, Select, Stack, Tabs, Table, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -96,6 +96,24 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { success: true }
   }
 
+  if (intent === "updateSettings") {
+    const accessMode = formData.get("accessMode") as string | null
+    const enabledRaw = formData.get("enabled") as string | null
+    const ownerId = (formData.get("ownerId") as string) || undefined
+
+    await runEffect(
+      Effect.gen(function* () {
+        const repo = yield* ApplicationRepo
+        const fields: Record<string, unknown> = {}
+        if (accessMode) fields.accessMode = accessMode
+        fields.enabled = enabledRaw === "true"
+        if (ownerId !== undefined) fields.ownerId = ownerId
+        yield* repo.update(appId, fields)
+      }),
+    )
+    return { success: true, message: "Settings updated" }
+  }
+
   if (intent === "createResource") {
     const resourceType = formData.get("resourceType") as string
     const displayName = formData.get("displayName") as string
@@ -170,7 +188,8 @@ const resourceColumns = [
 export default function AdminApplicationDetailPage({ loaderData }: Route.ComponentProps) {
   const { application, roles, entitlements, resources, grants } = loaderData
   const fetcher = useFetcher()
-  const [activeTab, setActiveTab] = useState("roles")
+  const [activeTab, setActiveTab] = useState("settings")
+  const settingsFetcher = useFetcher<typeof action>()
   const [roleDialogOpen, setRoleDialogOpen] = useState(false)
   const [entitlementDialogOpen, setEntitlementDialogOpen] = useState(false)
   const [resourceDialogOpen, setResourceDialogOpen] = useState(false)
@@ -222,6 +241,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
 
       <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
         <Tabs.List>
+          <Tabs.Tab value="settings">Settings</Tabs.Tab>
           <Tabs.Tab value="roles">Roles ({roles.length})</Tabs.Tab>
           <Tabs.Tab value="entitlements">Entitlements ({entitlements.length})</Tabs.Tab>
           <Tabs.Tab value="resources">Resources ({resources.length})</Tabs.Tab>
@@ -229,6 +249,71 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
         </Tabs.List>
 
         <html.div style={styles.tabContent}>
+          {activeTab === "settings" && (
+            <CardSection title="Application Settings">
+              {settingsFetcher.data && "message" in settingsFetcher.data && (
+                <Alert variant="success">{settingsFetcher.data.message}</Alert>
+              )}
+              <settingsFetcher.Form method="post">
+                <input type="hidden" name="intent" value="updateSettings" />
+                <Stack gap="md">
+                  <Field.Root>
+                    <Field.Label>Slug</Field.Label>
+                    <Input value={application.slug} disabled />
+                    <Field.Description>Synced from Kubernetes — read only</Field.Description>
+                  </Field.Root>
+                  <Field.Root>
+                    <Field.Label>Display Name</Field.Label>
+                    <Input value={application.displayName} disabled />
+                    <Field.Description>Synced from Kubernetes — read only</Field.Description>
+                  </Field.Root>
+                  <Field.Root>
+                    <Field.Label>Access Mode</Field.Label>
+                    <Select.Root name="accessMode" defaultValue={application.accessMode}>
+                      <Select.Trigger aria-label="Access Mode">
+                        <Select.Value placeholder="Select access mode" />
+                        <Select.Icon />
+                      </Select.Trigger>
+                      <Select.Popup>
+                        <Select.Item value="open">
+                          <Select.ItemText>Open</Select.ItemText>
+                        </Select.Item>
+                        <Select.Item value="request">
+                          <Select.ItemText>Request</Select.ItemText>
+                        </Select.Item>
+                        <Select.Item value="invite_only">
+                          <Select.ItemText>Invite Only</Select.ItemText>
+                        </Select.Item>
+                      </Select.Popup>
+                    </Select.Root>
+                  </Field.Root>
+                  <Field.Root>
+                    <Field.Label>Enabled</Field.Label>
+                    <input type="hidden" name="enabled" value={application.enabled ? "true" : "false"} />
+                    <Checkbox
+                      name="enabled"
+                      value="true"
+                      defaultChecked={application.enabled}
+                      onChange={(e: any) => {
+                        const hidden = e.target.form?.querySelector('input[name="enabled"][type="hidden"]')
+                        if (hidden) hidden.value = e.target.checked ? "true" : "false"
+                      }}
+                    >
+                      Application is enabled
+                    </Checkbox>
+                  </Field.Root>
+                  <Field.Root>
+                    <Field.Label>Owner</Field.Label>
+                    <Input name="ownerId" defaultValue={application.ownerId ?? ""} placeholder="Principal ID" />
+                  </Field.Root>
+                  <Button type="submit" variant="primary" disabled={settingsFetcher.state !== "idle"}>
+                    {settingsFetcher.state !== "idle" ? "Saving..." : "Save Settings"}
+                  </Button>
+                </Stack>
+              </settingsFetcher.Form>
+            </CardSection>
+          )}
+
           {activeTab === "roles" && (
             <CardSection
               title="Roles"

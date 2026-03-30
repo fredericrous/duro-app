@@ -5,7 +5,7 @@ import type { Route } from "./+types/invite"
 import { runEffect } from "~/lib/runtime.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
-import { config } from "~/lib/config.server"
+import { config, isOriginAllowed } from "~/lib/config.server"
 import { hashToken } from "~/lib/crypto.server"
 import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
 import { Effect } from "effect"
@@ -114,7 +114,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   const origin = request.headers.get("Origin")
-  if (origin && !origin.endsWith(config.allowedOriginSuffix)) {
+  if (!isOriginAllowed(origin)) {
     return { error: "Invalid request origin" }
   }
 

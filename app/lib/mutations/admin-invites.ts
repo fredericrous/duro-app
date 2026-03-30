@@ -12,7 +12,7 @@ export type AdminInvitesMutation =
   | { intent: "resend"; inviteId: string }
   | {
       intent: "send"
-      email: string
+      emails: string[]
       groups: string[]
       locale: string
       confirmed: boolean
@@ -25,7 +25,7 @@ export type AdminInvitesResult =
   | {
       warning: string
       revocationId: string
-      email: string
+      emails: string[]
       groups: string[]
     }
 
@@ -61,14 +61,14 @@ export function handleAdminInvitesMutation(mutation: AdminInvitesMutation) {
       case "send": {
         const repo = yield* InviteRepo
 
-        // Check for previous revocation
-        if (!mutation.confirmed) {
-          const revocation = yield* repo.findRevocationByEmail(mutation.email)
+        // Check for previous revocations (only for single email)
+        if (!mutation.confirmed && mutation.emails.length === 1) {
+          const revocation = yield* repo.findRevocationByEmail(mutation.emails[0])
           if (revocation) {
             return {
               warning: `This email was previously revoked by ${revocation.revokedBy}${revocation.reason ? ` (reason: ${revocation.reason})` : ""}. Proceed anyway?`,
               revocationId: revocation.id,
-              email: mutation.email,
+              emails: mutation.emails,
               groups: mutation.groups,
             } as AdminInvitesResult
           }
@@ -88,14 +88,46 @@ export function handleAdminInvitesMutation(mutation: AdminInvitesMutation) {
           return name
         })
 
-        const result = yield* queueInvite({
-          email: mutation.email,
-          groups: groupIds,
-          groupNames,
-          invitedBy: "admin",
-          locale: mutation.locale,
-        })
-        return result as AdminInvitesResult
+        const errors: string[] = []
+        let sent = 0
+
+        for (const email of mutation.emails) {
+          yield* queueInvite({
+            email,
+            groups: groupIds,
+            groupNames,
+            invitedBy: "admin",
+            locale: mutation.locale,
+          }).pipe(
+            Effect.tap(() => {
+              sent++
+              return Effect.void
+            }),
+            Effect.catchAll((e) => {
+              const msg =
+                e instanceof Error
+                  ? e.message
+                  : typeof e === "object" && e !== null && "message" in e
+                    ? String((e as any).message)
+                    : "Unknown error"
+              errors.push(`${email}: ${msg}`)
+              return Effect.void
+            }),
+          )
+        }
+
+        if (sent === 0) {
+          return { error: errors.join("\n") } as AdminInvitesResult
+        }
+
+        const message =
+          errors.length > 0
+            ? `Sent ${sent} of ${mutation.emails.length} invites. Errors:\n${errors.join("\n")}`
+            : sent === 1
+              ? `Invite sent to ${mutation.emails[0]}`
+              : `${sent} invites sent`
+
+        return { success: true as const, message }
       }
     }
   }).pipe(
@@ -109,6 +141,17 @@ export function handleAdminInvitesMutation(mutation: AdminInvitesMutation) {
       return Effect.succeed({ error: message } as AdminInvitesResult)
     }),
   )
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function parseEmails(raw: string): string[] {
+  return raw
+    .split(/[\n,;]+/)
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e.length > 0 && e.includes("@"))
 }
 
 // ---------------------------------------------------------------------------
@@ -129,19 +172,24 @@ export function parseAdminInvitesMutation(formData: FormData): AdminInvitesMutat
     return { intent, inviteId }
   }
 
-  // Default: send new invite
-  const email = formData.get("email") as string
+  // Default: send new invite(s)
+  const allEmails = formData.getAll("emails") as string[]
   const groups = formData.getAll("groups") as string[]
   const locale = (formData.get("locale") as string) || "en"
   const confirmed = formData.get("confirmed") === "true"
   const revocationId = (formData.get("revocationId") as string) || undefined
 
-  if (!email || !email.includes("@")) {
-    return { error: "Valid email is required" }
+  // Support both hidden inputs (one per email) and legacy single-string format
+  const emails =
+    allEmails.length === 1
+      ? parseEmails(allEmails[0])
+      : allEmails.map((e) => e.trim().toLowerCase()).filter((e) => e.includes("@"))
+  if (emails.length === 0) {
+    return { error: "At least one valid email is required" }
   }
   if (groups.length === 0) {
     return { error: "Select at least one group" }
   }
 
-  return { intent: "send", email, groups, locale, confirmed, revocationId }
+  return { intent: "send", emails, groups, locale, confirmed, revocationId }
 }

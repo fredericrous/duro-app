@@ -131,7 +131,7 @@ export default function AdminAccessRequestsPage({ loaderData }: Route.ComponentP
                     <html.div
                       key={row.id}
                       onClick={() => navigate(`/admin/access-requests/${row.original.id}`)}
-                      style={styles.clickableRow}
+                      style={[styles.clickableRow, styles.displayContents]}
                     >
                       <Table.Row>
                         {row.getVisibleCells().map((cell) => (
@@ -167,5 +167,8 @@ const styles = css.create({
   },
   clickableRow: {
     cursor: "pointer",
+  },
+  displayContents: {
+    display: "contents",
   },
 })

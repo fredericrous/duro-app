@@ -106,7 +106,12 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
       .pipe(
         Effect.mapError((e: any) => {
           const msg = String(e?.message ?? e)
-          if (msg.includes("UNIQUE") || msg.includes("unique") || msg.includes("already exists") || msg.includes("duplicate")) {
+          if (
+            msg.includes("UNIQUE") ||
+            msg.includes("unique") ||
+            msg.includes("already exists") ||
+            msg.includes("duplicate")
+          ) {
             return new Error(`A user with this email or username already exists`)
           }
           return new Error(`Failed to create user: ${msg}`)

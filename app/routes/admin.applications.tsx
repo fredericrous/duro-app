@@ -5,6 +5,7 @@ import type { Route } from "./+types/admin.applications"
 import { runEffect } from "~/lib/runtime.server"
 import { isOriginAllowed } from "~/lib/config.server"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
+import { parseAdminApplicationsMutation, handleAdminApplicationsMutation } from "~/lib/mutations/admin-applications"
 import type { Application } from "~/lib/governance/types"
 import {
   useReactTable,
@@ -17,7 +18,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Badge, Button, Dialog, Field, Input, Select, ScrollArea, Stack, Table } from "@duro-app/ui"
+import { Alert, Badge, Button, ScrollArea, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 export async function loader() {
@@ -36,28 +37,10 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const formData = await request.formData()
-  const intent = formData.get("intent") as string
+  const parsed = parseAdminApplicationsMutation(formData as any)
+  if ("error" in parsed) return parsed
 
-  if (intent === "createApplication") {
-    const slug = formData.get("slug") as string
-    const displayName = formData.get("displayName") as string
-    const description = (formData.get("description") as string) || undefined
-    const accessMode = (formData.get("accessMode") as string) || undefined
-
-    if (!slug || !displayName) {
-      return { error: "Slug and display name are required" }
-    }
-
-    await runEffect(
-      Effect.gen(function* () {
-        const repo = yield* ApplicationRepo
-        return yield* repo.create({ slug, displayName, description, accessMode })
-      }),
-    )
-    return { success: true }
-  }
-
-  return { error: "Unknown intent" }
+  return await runEffect(handleAdminApplicationsMutation(parsed))
 }
 
 const columnHelper = createColumnHelper<Application>()
@@ -92,10 +75,10 @@ const columns = [
 ]
 
 export default function AdminApplicationsPage({ loaderData }: Route.ComponentProps) {
+  "use no memo"
   const { applications } = loaderData
   const navigate = useNavigate()
-  const fetcher = useFetcher()
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const fetcher = useFetcher<typeof action>()
   const [sorting, setSorting] = useState<SortingState>([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
 
@@ -111,18 +94,27 @@ export default function AdminApplicationsPage({ loaderData }: Route.ComponentPro
     getPaginationRowModel: getPaginationRowModel(),
   })
 
-  const isCreating = fetcher.state !== "idle"
+  const isSyncing = fetcher.state !== "idle"
+  const actionData = fetcher.data
 
   return (
     <Stack gap="md">
       <CardSection
         title={`Applications (${applications.length})`}
         action={
-          <Button variant="primary" size="small" onClick={() => setDialogOpen(true)}>
-            Create Application
-          </Button>
+          <fetcher.Form method="post">
+            <input type="hidden" name="intent" value="syncFromCluster" />
+            <Button type="submit" variant="primary" size="small" disabled={isSyncing}>
+              {isSyncing ? "Syncing..." : "Sync from cluster"}
+            </Button>
+          </fetcher.Form>
         }
       >
+        {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
+        {actionData && "success" in actionData && actionData.success && (
+          <Alert variant="success">{actionData.message}</Alert>
+        )}
+
         <ScrollArea.Root>
           <ScrollArea.Viewport>
             <ScrollArea.Content>
@@ -154,7 +146,7 @@ export default function AdminApplicationsPage({ loaderData }: Route.ComponentPro
                     <html.div
                       key={row.id}
                       onClick={() => navigate(`/admin/applications/${row.original.id}`)}
-                      style={styles.clickableRow}
+                      style={[styles.clickableRow, styles.displayContents]}
                     >
                       <Table.Row>
                         {row.getVisibleCells().map((cell) => (
@@ -175,63 +167,6 @@ export default function AdminApplicationsPage({ loaderData }: Route.ComponentPro
         </ScrollArea.Root>
         <Table.Pagination table={table} />
       </CardSection>
-
-      <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
-        <Dialog.Portal>
-          <Dialog.Header>
-            <Dialog.Title>Create Application</Dialog.Title>
-            <Dialog.Close />
-          </Dialog.Header>
-          <Dialog.Body>
-            <fetcher.Form
-              method="post"
-              onSubmit={() => {
-                // Close dialog after submission begins
-                setTimeout(() => setDialogOpen(false), 0)
-              }}
-            >
-              <input type="hidden" name="intent" value="createApplication" />
-              <Stack gap="md">
-                <Field.Root>
-                  <Field.Label>Slug</Field.Label>
-                  <Input name="slug" placeholder="my-app" required />
-                </Field.Root>
-                <Field.Root>
-                  <Field.Label>Display Name</Field.Label>
-                  <Input name="displayName" placeholder="My Application" required />
-                </Field.Root>
-                <Field.Root>
-                  <Field.Label>Description</Field.Label>
-                  <Input name="description" placeholder="Optional description" />
-                </Field.Root>
-                <Field.Root>
-                  <Field.Label>Access Mode</Field.Label>
-                  <Select.Root name="accessMode" defaultValue="invite_only">
-                    <Select.Trigger aria-label="Access Mode">
-                      <Select.Value placeholder="Select access mode" />
-                      <Select.Icon />
-                    </Select.Trigger>
-                    <Select.Popup>
-                      <Select.Item value="open">
-                        <Select.ItemText>Open</Select.ItemText>
-                      </Select.Item>
-                      <Select.Item value="request">
-                        <Select.ItemText>Request</Select.ItemText>
-                      </Select.Item>
-                      <Select.Item value="invite_only">
-                        <Select.ItemText>Invite Only</Select.ItemText>
-                      </Select.Item>
-                    </Select.Popup>
-                  </Select.Root>
-                </Field.Root>
-                <Button type="submit" variant="primary" disabled={isCreating}>
-                  {isCreating ? "Creating..." : "Create"}
-                </Button>
-              </Stack>
-            </fetcher.Form>
-          </Dialog.Body>
-        </Dialog.Portal>
-      </Dialog.Root>
     </Stack>
   )
 }
@@ -247,5 +182,8 @@ const styles = css.create({
   },
   clickableRow: {
     cursor: "pointer",
+  },
+  displayContents: {
+    display: "contents",
   },
 })

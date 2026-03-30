@@ -165,8 +165,10 @@
     },
     "invites": {
       "sendTitle": "Send Invite",
-      "emailLabel": "Email",
-      "emailPlaceholder": "user@example.com",
+      "emailLabel": "Emails",
+      "emailPlaceholder": "Add email...",
+      "emailHint": "Press Enter or comma to add each email",
+      "emailInvalid": "Invalid email",
       "groupsLabel": "Groups",
       "languageLabel": "Invite language",
       "submit": "Send Invite",
