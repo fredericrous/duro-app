@@ -222,8 +222,14 @@ export const LldapClientLive = Layer.effect(
           })
 
           // Step 1: OPAQUE registration start (client-side crypto)
+          // Argon2 params must match LLDAP's Argon2::default() from the argon2 0.5 crate:
+          // memory=19456 KiB, iterations=2, parallelism=1
           const { clientRegistrationState, registrationRequest } = yield* Effect.try({
-            try: () => opaque.client.startRegistration({ password }),
+            try: () =>
+              opaque.client.startRegistration({
+                password,
+                keyStretching: { "argon2id-custom": { memory: 19456, iterations: 2, parallelism: 1 } },
+              }),
             catch: (e) => new LldapError({ message: "OPAQUE startRegistration failed", cause: e }),
           })
 
@@ -253,6 +259,7 @@ export const LldapClientLive = Layer.effect(
                 password,
                 clientRegistrationState,
                 registrationResponse: serverResponse.registration_response,
+                keyStretching: { "argon2id-custom": { memory: 19456, iterations: 2, parallelism: 1 } },
               }),
             catch: (e) => new LldapError({ message: "OPAQUE finishRegistration failed", cause: e }),
           })
