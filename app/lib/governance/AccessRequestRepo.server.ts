@@ -88,7 +88,7 @@ export const AccessRequestRepoLive = Layer.effect(
         withErr(
           sql`SELECT * FROM access_requests
               WHERE status = 'pending'
-                AND (${applicationId ?? null} IS NULL OR application_id = ${applicationId ?? null})
+                AND (${applicationId ?? null}::text IS NULL OR application_id = ${applicationId ?? null})
               ORDER BY created_at ASC`.pipe(
             Effect.map((rows) => rows.map((r) => decodeAccessRequest(r) as AccessRequest)),
           ),
@@ -108,8 +108,8 @@ export const AccessRequestRepoLive = Layer.effect(
       listAll: (filters) =>
         withErr(
           sql`SELECT * FROM access_requests
-              WHERE (${filters?.status ?? null} IS NULL OR status = ${filters?.status ?? null})
-                AND (${filters?.applicationId ?? null} IS NULL OR application_id = ${filters?.applicationId ?? null})
+              WHERE (${filters?.status ?? null}::text IS NULL OR status = ${filters?.status ?? null})
+                AND (${filters?.applicationId ?? null}::text IS NULL OR application_id = ${filters?.applicationId ?? null})
               ORDER BY created_at DESC
               LIMIT ${filters?.limit ?? 100}
               OFFSET ${filters?.offset ?? 0}`.pipe(
@@ -164,8 +164,8 @@ export const AccessRequestRepoLive = Layer.effect(
           sql`SELECT * FROM approval_policies
               WHERE application_id = ${applicationId}
                 AND (
-                  (scope_type = 'entitlement' AND scope_id = ${entitlementId ?? null})
-                  OR (scope_type = 'role' AND scope_id = ${roleId ?? null})
+                  (scope_type = 'entitlement' AND scope_id = ${entitlementId ?? null}::text)
+                  OR (scope_type = 'role' AND scope_id = ${roleId ?? null}::text)
                   OR (scope_type = 'application' AND scope_id IS NULL)
                 )
               ORDER BY CASE scope_type WHEN 'entitlement' THEN 1 WHEN 'role' THEN 2 ELSE 3 END
