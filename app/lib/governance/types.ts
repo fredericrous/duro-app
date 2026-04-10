@@ -87,6 +87,7 @@ export const ApplicationRow = Schema.Struct({
   enabled: Coerced.Boolean,
   createdAt: Coerced.DateString,
   updatedAt: Coerced.DateString,
+  lastSyncedAt: Coerced.NullableDateString,
 })
 export type Application = typeof ApplicationRow.Type
 
