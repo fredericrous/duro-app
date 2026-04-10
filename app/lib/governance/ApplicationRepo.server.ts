@@ -27,6 +27,7 @@ export class ApplicationRepo extends Context.Tag("ApplicationRepo")<
       description?: string
       accessMode?: string
       ownerId?: string
+      lastSyncedAt?: string
     }) => Effect.Effect<Application, ApplicationRepoError>
     readonly findById: (id: string) => Effect.Effect<Application | null, ApplicationRepoError>
     readonly findBySlug: (slug: string) => Effect.Effect<Application | null, ApplicationRepoError>
@@ -39,6 +40,7 @@ export class ApplicationRepo extends Context.Tag("ApplicationRepo")<
         accessMode: string
         enabled: boolean
         ownerId: string
+        lastSyncedAt: string
       }>,
     ) => Effect.Effect<void, ApplicationRepoError>
   }
@@ -68,10 +70,11 @@ export const ApplicationRepoLive = Layer.effect(
           const accessMode = input.accessMode ?? "invite_only"
           const description = input.description ?? null
           const ownerId = input.ownerId ?? null
+          const lastSyncedAt = input.lastSyncedAt ?? null
 
           const rows = yield* withErr(
-            sql`INSERT INTO applications (id, slug, display_name, description, access_mode, owner_id)
-                VALUES (${id}, ${input.slug}, ${input.displayName}, ${description}, ${accessMode}, ${ownerId})
+            sql`INSERT INTO applications (id, slug, display_name, description, access_mode, owner_id, last_synced_at)
+                VALUES (${id}, ${input.slug}, ${input.displayName}, ${description}, ${accessMode}, ${ownerId}, ${lastSyncedAt})
                 RETURNING *`,
             "Failed to create application",
           )
@@ -110,12 +113,14 @@ export const ApplicationRepoLive = Layer.effect(
           const accessMode = fields.accessMode !== undefined ? fields.accessMode : null
           const enabled = fields.enabled !== undefined ? fields.enabled : null
           const ownerId = fields.ownerId !== undefined ? fields.ownerId : null
+          const lastSyncedAt = fields.lastSyncedAt !== undefined ? fields.lastSyncedAt : null
 
           const hasDisplayName = fields.displayName !== undefined
           const hasDescription = fields.description !== undefined
           const hasAccessMode = fields.accessMode !== undefined
           const hasEnabled = fields.enabled !== undefined
           const hasOwnerId = fields.ownerId !== undefined
+          const hasLastSyncedAt = fields.lastSyncedAt !== undefined
 
           yield* withErr(
             sql`UPDATE applications SET
@@ -124,6 +129,7 @@ export const ApplicationRepoLive = Layer.effect(
               access_mode = CASE WHEN ${hasAccessMode} THEN ${accessMode} ELSE access_mode END,
               enabled = CASE WHEN ${hasEnabled} THEN ${enabled} ELSE enabled END,
               owner_id = CASE WHEN ${hasOwnerId} THEN ${ownerId} ELSE owner_id END,
+              last_synced_at = CASE WHEN ${hasLastSyncedAt} THEN ${lastSyncedAt} ELSE last_synced_at END,
               updated_at = NOW()
               WHERE id = ${id}`.pipe(Effect.asVoid),
             "Failed to update application",

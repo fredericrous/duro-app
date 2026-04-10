@@ -38,6 +38,7 @@ export class GrantRepo extends Context.Tag("GrantRepo")<
       principalId: string,
       applicationId: string,
     ) => Effect.Effect<Grant[], GrantRepoError>
+    readonly findActiveForApp: (applicationId: string) => Effect.Effect<Grant[], GrantRepoError>
     readonly findExpired: () => Effect.Effect<Grant[], GrantRepoError>
   }
 >() {}
@@ -101,6 +102,18 @@ export const GrantRepoLive = Layer.effect(
                   OR entitlement_id IN (SELECT id FROM entitlements WHERE application_id = ${applicationId})
                 )`.pipe(Effect.map((rows) => rows.map((r) => decodeGrant(r) as Grant))),
           "Failed to find active grants for principal and app",
+        ),
+
+      findActiveForApp: (applicationId) =>
+        withErr(
+          sql`SELECT * FROM grants
+              WHERE revoked_at IS NULL
+                AND (expires_at IS NULL OR expires_at > NOW())
+                AND (
+                  role_id IN (SELECT id FROM roles WHERE application_id = ${applicationId})
+                  OR entitlement_id IN (SELECT id FROM entitlements WHERE application_id = ${applicationId})
+                )`.pipe(Effect.map((rows) => rows.map((r) => decodeGrant(r) as Grant))),
+          "Failed to find active grants for app",
         ),
 
       findExpired: () =>
