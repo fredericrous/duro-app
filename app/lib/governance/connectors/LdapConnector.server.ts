@@ -1,10 +1,10 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, Schedule } from "effect"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { RbacRepo } from "~/lib/governance/RbacRepo.server"
 import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
 import { ConnectorMappingRepo } from "~/lib/governance/ConnectorMappingRepo.server"
-import { LldapClient } from "~/lib/services/LldapClient.server"
+import { LldapClient, type LldapError } from "~/lib/services/LldapClient.server"
 
 // ---------------------------------------------------------------------------
 // Error
@@ -29,6 +29,19 @@ export class LdapConnector extends Context.Tag("LdapConnector")<
 >() {}
 
 // ---------------------------------------------------------------------------
+// Retry schedule — exponential backoff, max 3 attempts, for transient LLDAP
+// network failures. Applied selectively to LDAP network calls (not to DB
+// lookups — those already live inside a request-scoped sql client).
+// ---------------------------------------------------------------------------
+
+const ldapRetrySchedule = Schedule.exponential("200 millis").pipe(Schedule.intersect(Schedule.recurs(3)))
+
+const wrapLldapError =
+  (context: string) =>
+  (cause: LldapError): LdapConnectorError =>
+    new LdapConnectorError({ message: `LLDAP ${context}: ${cause.message}`, cause })
+
+// ---------------------------------------------------------------------------
 // Live layer — captures all dependencies at build time
 // ---------------------------------------------------------------------------
 
@@ -41,6 +54,40 @@ export const LdapConnectorLive = Layer.effect(
     const connectedSystems = yield* ConnectedSystemRepo
     const connectorMappings = yield* ConnectorMappingRepo
     const lldap = yield* LldapClient
+
+    // --- Retry-wrapped LLDAP operations ---------------------------------
+
+    const ensureGroupRetried = (name: string) =>
+      lldap.ensureGroup(name).pipe(
+        Effect.retry(ldapRetrySchedule),
+        Effect.mapError(wrapLldapError(`ensureGroup ${name}`)),
+      )
+
+    const addUserToGroupRetried = (userId: string, groupId: number) =>
+      lldap.addUserToGroup(userId, groupId).pipe(
+        Effect.retry(ldapRetrySchedule),
+        Effect.mapError(wrapLldapError(`addUserToGroup ${userId}→${groupId}`)),
+      )
+
+    const removeUserFromGroupRetried = (userId: string, groupId: number) =>
+      lldap.removeUserFromGroup(userId, groupId).pipe(
+        Effect.retry(ldapRetrySchedule),
+        Effect.mapError(wrapLldapError(`removeUserFromGroup ${userId}→${groupId}`)),
+      )
+
+    /**
+     * Read-only group lookup. Unlike `ensureGroup`, this does NOT create the
+     * group if missing — used on the deprovision path where creating a group
+     * just to remove someone from it would be wrong (leaves ghost groups).
+     */
+    const findGroupByName = (name: string) =>
+      lldap.getGroups.pipe(
+        Effect.retry(ldapRetrySchedule),
+        Effect.mapError(wrapLldapError(`getGroups (looking for ${name})`)),
+        Effect.map((groups) => groups.find((g) => g.displayName === name) ?? null),
+      )
+
+    // --- DB resolution (no retry — sql calls don't need it) -------------
 
     const resolveContext = (grantId: string) =>
       Effect.gen(function* () {
@@ -115,8 +162,13 @@ export const LdapConnectorLive = Layer.effect(
           const ctx = yield* resolveContext(grantId)
 
           if (ctx.principal.principalType !== "user") {
-            yield* Effect.logWarning(
-              `[LdapConnector] provision skipped: non-user principal ${ctx.principal.id} (type=${ctx.principal.principalType})`,
+            yield* Effect.logWarning("LdapConnector provision skipped: non-user principal").pipe(
+              Effect.annotateLogs({
+                component: "LdapConnector",
+                grantId,
+                principalId: ctx.principal.id,
+                principalType: ctx.principal.principalType,
+              }),
             )
             return
           }
@@ -127,29 +179,17 @@ export const LdapConnectorLive = Layer.effect(
             })
           }
 
-          const groupId = yield* lldap
-            .ensureGroup(ctx.externalRoleIdentifier)
-            .pipe(
-              Effect.mapError(
-                (e) =>
-                  new LdapConnectorError({
-                    message: `Failed to ensure LLDAP group ${ctx.externalRoleIdentifier}`,
-                    cause: e,
-                  }),
-              ),
-            )
+          const groupId = yield* ensureGroupRetried(ctx.externalRoleIdentifier)
+          yield* addUserToGroupRetried(ctx.principal.externalId, groupId)
 
-          yield* lldap
-            .addUserToGroup(ctx.principal.externalId, groupId)
-            .pipe(
-              Effect.mapError(
-                (e) =>
-                  new LdapConnectorError({
-                    message: `Failed to add ${ctx.principal.externalId} to ${ctx.externalRoleIdentifier}`,
-                    cause: e,
-                  }),
-              ),
-            )
+          yield* Effect.log("LdapConnector provision succeeded").pipe(
+            Effect.annotateLogs({
+              component: "LdapConnector",
+              grantId,
+              principalExternalId: ctx.principal.externalId,
+              externalRoleIdentifier: ctx.externalRoleIdentifier,
+            }),
+          )
         }),
 
       deprovisionGrant: (grantId: string) =>
@@ -157,7 +197,14 @@ export const LdapConnectorLive = Layer.effect(
           const ctx = yield* resolveContext(grantId)
 
           if (ctx.principal.principalType !== "user") {
-            yield* Effect.logWarning(`[LdapConnector] deprovision skipped: non-user principal ${ctx.principal.id}`)
+            yield* Effect.logWarning("LdapConnector deprovision skipped: non-user principal").pipe(
+              Effect.annotateLogs({
+                component: "LdapConnector",
+                grantId,
+                principalId: ctx.principal.id,
+                principalType: ctx.principal.principalType,
+              }),
+            )
             return
           }
 
@@ -167,6 +214,8 @@ export const LdapConnectorLive = Layer.effect(
             })
           }
 
+          // Over-revoke safety (invariant 4): skip removal if the user still
+          // has another active grant that maps to the same external group.
           const hasOther = yield* grantRepo
             .hasOtherActiveMappingTo({
               excludeGrantId: ctx.grant.id,
@@ -181,35 +230,42 @@ export const LdapConnectorLive = Layer.effect(
             )
 
           if (hasOther) {
-            yield* Effect.log(
-              `[LdapConnector] deprovision no-op: another active grant maps ${ctx.principal.externalId} to ${ctx.externalRoleIdentifier}`,
+            yield* Effect.log("LdapConnector deprovision no-op: other active grant maps to same group").pipe(
+              Effect.annotateLogs({
+                component: "LdapConnector",
+                grantId,
+                principalExternalId: ctx.principal.externalId,
+                externalRoleIdentifier: ctx.externalRoleIdentifier,
+              }),
             )
             return
           }
 
-          const groupId = yield* lldap
-            .ensureGroup(ctx.externalRoleIdentifier)
-            .pipe(
-              Effect.mapError(
-                (e) =>
-                  new LdapConnectorError({
-                    message: `Failed to ensure LLDAP group ${ctx.externalRoleIdentifier}`,
-                    cause: e,
-                  }),
-              ),
+          // Look up the group in LLDAP — do NOT create it just to remove
+          // someone. If the group is missing (drift, manual deletion), the
+          // user can't be in it, so the removal is a no-op.
+          const group = yield* findGroupByName(ctx.externalRoleIdentifier)
+          if (!group) {
+            yield* Effect.logWarning("LdapConnector deprovision no-op: group missing in LLDAP").pipe(
+              Effect.annotateLogs({
+                component: "LdapConnector",
+                grantId,
+                externalRoleIdentifier: ctx.externalRoleIdentifier,
+              }),
             )
+            return
+          }
 
-          yield* lldap
-            .removeUserFromGroup(ctx.principal.externalId, groupId)
-            .pipe(
-              Effect.mapError(
-                (e) =>
-                  new LdapConnectorError({
-                    message: `Failed to remove ${ctx.principal.externalId} from ${ctx.externalRoleIdentifier}`,
-                    cause: e,
-                  }),
-              ),
-            )
+          yield* removeUserFromGroupRetried(ctx.principal.externalId, group.id)
+
+          yield* Effect.log("LdapConnector deprovision succeeded").pipe(
+            Effect.annotateLogs({
+              component: "LdapConnector",
+              grantId,
+              principalExternalId: ctx.principal.externalId,
+              externalRoleIdentifier: ctx.externalRoleIdentifier,
+            }),
+          )
         }),
     }
   }),
@@ -221,7 +277,13 @@ export const LdapConnectorLive = Layer.effect(
 
 export const LdapConnectorDev = Layer.succeed(LdapConnector, {
   provisionGrant: (grantId: string) =>
-    Effect.log(`[LdapConnector/dev] provisionGrant grantId=${grantId} (no-op)`).pipe(Effect.asVoid),
+    Effect.log("[LdapConnector/dev] provisionGrant (no-op)").pipe(
+      Effect.annotateLogs({ grantId }),
+      Effect.asVoid,
+    ),
   deprovisionGrant: (grantId: string) =>
-    Effect.log(`[LdapConnector/dev] deprovisionGrant grantId=${grantId} (no-op)`).pipe(Effect.asVoid),
+    Effect.log("[LdapConnector/dev] deprovisionGrant (no-op)").pipe(
+      Effect.annotateLogs({ grantId }),
+      Effect.asVoid,
+    ),
 })

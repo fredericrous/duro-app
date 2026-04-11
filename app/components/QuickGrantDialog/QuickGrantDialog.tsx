@@ -125,7 +125,7 @@ export function QuickGrantDialog({
 
                 <Field.Root>
                   <Field.Label>Role</Field.Label>
-                  <Select.Root name="roleId" onValueChange={(v: any) => setSelectedRoleId(v)}>
+                  <Select.Root name="roleId" onValueChange={setSelectedRoleId}>
                     <Select.Trigger aria-label="Role">
                       <Select.Value placeholder="Pick a role" />
                       <Select.Icon />

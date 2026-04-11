@@ -33,20 +33,24 @@ import { AppSyncServiceLive } from "~/lib/governance/AppSyncService.server"
 
 const isDevServer = process.env.NODE_ENV === "development" && process.env.VITEST !== "true"
 
-// LdapConnectorLive depends on several governance repos + LldapClient. Build a
-// dedicated wired layer for it so the Service Tag interface stays clean and
-// consumers only need `LdapConnector` itself.
+// Shared governance repos — extracted as a single Layer value so both
+// AppLayer's top-level merge and LdapConnectorWired's sub-provide resolve to
+// the SAME memoized build. Referencing the same Layer value in both places
+// (not a freshly-constructed mergeAll each time) is what unlocks Effect's
+// per-build memoization, so these repos are instantiated exactly once.
+const GovernanceRepos = Layer.mergeAll(
+  PrincipalRepoLive,
+  RbacRepoLive,
+  GrantRepoLive,
+  ConnectedSystemRepoLive,
+  ConnectorMappingRepoLive,
+)
+
+// LdapConnectorLive depends on the governance repos + LldapClient. Because
+// GovernanceRepos is referenced by value here AND in the outer mergeAll, the
+// memoized build is shared.
 const LdapConnectorWired = LdapConnectorLive.pipe(
-  Layer.provide(
-    Layer.mergeAll(
-      PrincipalRepoLive,
-      RbacRepoLive,
-      GrantRepoLive,
-      ConnectedSystemRepoLive,
-      ConnectorMappingRepoLive,
-      LldapClientLive,
-    ),
-  ),
+  Layer.provide(Layer.mergeAll(GovernanceRepos, LldapClientLive)),
 )
 
 export const AppLayer = Layer.mergeAll(
@@ -59,12 +63,8 @@ export const AppLayer = Layer.mergeAll(
   PreferencesRepoLive,
   CertificateRepoLive,
   // Governance services
-  PrincipalRepoLive,
   ApplicationRepoLive,
-  RbacRepoLive,
-  GrantRepoLive,
-  ConnectedSystemRepoLive,
-  ConnectorMappingRepoLive,
+  GovernanceRepos,
   isDevServer ? LdapConnectorDev : LdapConnectorWired,
   AuthzEngineLive,
   AccessRequestRepoLive,
