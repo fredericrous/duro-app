@@ -74,6 +74,9 @@ export class LldapClient extends Context.Tag("LldapClient")<
     readonly createUser: (input: CreateUserInput) => Effect.Effect<void, LldapError>
     readonly setUserPassword: (userId: string, password: string) => Effect.Effect<void, LldapError>
     readonly addUserToGroup: (userId: string, groupId: number) => Effect.Effect<void, LldapError>
+    readonly removeUserFromGroup: (userId: string, groupId: number) => Effect.Effect<void, LldapError>
+    readonly createGroup: (displayName: string) => Effect.Effect<LldapGroup, LldapError>
+    readonly ensureGroup: (displayName: string) => Effect.Effect<number, LldapError>
     readonly deleteUser: (userId: string) => Effect.Effect<void, LldapError>
   }
 >() {}
@@ -294,6 +297,67 @@ export const LldapClientLive = Layer.effect(
           `,
           { userId, groupId },
         ).pipe(Effect.asVoid),
+
+      removeUserFromGroup: (userId: string, groupId: number) =>
+        graphql(
+          `
+            mutation RemoveUserFromGroup($userId: String!, $groupId: Int!) {
+              removeUserFromGroup(userId: $userId, groupId: $groupId) {
+                ok
+              }
+            }
+          `,
+          { userId, groupId },
+        ).pipe(Effect.asVoid),
+
+      createGroup: (displayName: string) =>
+        Effect.gen(function* () {
+          const raw = yield* graphql(
+            `
+              mutation CreateGroup($name: String!) {
+                createGroup(name: $name) {
+                  id
+                  displayName
+                }
+              }
+            `,
+            { name: displayName },
+          )
+          const data = raw as { createGroup?: { id: number; displayName: string } } | null
+          if (!data?.createGroup) {
+            return yield* new LldapError({ message: `No createGroup payload for ${displayName}` })
+          }
+          return data.createGroup
+        }),
+
+      ensureGroup: (displayName: string) =>
+        Effect.gen(function* () {
+          // 1. Lookup existing
+          const raw = yield* graphql(`{ groups { id displayName } }`)
+          const parsed = yield* decodeGroupsData(raw).pipe(
+            Effect.mapError((e) => new LldapError({ message: "Invalid groups response", cause: e })),
+          )
+          const match = parsed.groups.find((g) => g.displayName === displayName)
+          if (match) return match.id
+
+          // 2. Create
+          const created = yield* graphql(
+            `
+              mutation CreateGroup($name: String!) {
+                createGroup(name: $name) {
+                  id
+                  displayName
+                }
+              }
+            `,
+            { name: displayName },
+          )
+          const payload = created as { createGroup?: { id: number; displayName: string } } | null
+          if (!payload?.createGroup) {
+            return yield* new LldapError({ message: `No createGroup payload for ${displayName}` })
+          }
+          return payload.createGroup.id
+        }),
 
       deleteUser: (userId: string) =>
         graphql(

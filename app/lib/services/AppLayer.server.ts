@@ -17,6 +17,10 @@ import { PrincipalRepoLive } from "~/lib/governance/PrincipalRepo.server"
 import { ApplicationRepoLive } from "~/lib/governance/ApplicationRepo.server"
 import { RbacRepoLive } from "~/lib/governance/RbacRepo.server"
 import { GrantRepoLive } from "~/lib/governance/GrantRepo.server"
+import { ConnectedSystemRepoLive } from "~/lib/governance/ConnectedSystemRepo.server"
+import { ConnectorMappingRepoLive } from "~/lib/governance/ConnectorMappingRepo.server"
+import { LdapConnectorLive, LdapConnectorDev } from "~/lib/governance/connectors/LdapConnector.server"
+import { LldapClientLive } from "~/lib/services/LldapClient.server"
 import { AuthzEngineLive } from "~/lib/governance/AuthzEngine.server"
 import { AccessRequestRepoLive } from "~/lib/governance/AccessRequestRepo.server"
 import { AccessInvitationRepoLive } from "~/lib/governance/AccessInvitationRepo.server"
@@ -28,6 +32,22 @@ import { OperatorClientLive, OperatorClientDev } from "./OperatorClient.server"
 import { AppSyncServiceLive } from "~/lib/governance/AppSyncService.server"
 
 const isDevServer = process.env.NODE_ENV === "development" && process.env.VITEST !== "true"
+
+// LdapConnectorLive depends on several governance repos + LldapClient. Build a
+// dedicated wired layer for it so the Service Tag interface stays clean and
+// consumers only need `LdapConnector` itself.
+const LdapConnectorWired = LdapConnectorLive.pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      PrincipalRepoLive,
+      RbacRepoLive,
+      GrantRepoLive,
+      ConnectedSystemRepoLive,
+      ConnectorMappingRepoLive,
+      LldapClientLive,
+    ),
+  ),
+)
 
 export const AppLayer = Layer.mergeAll(
   // Existing services
@@ -43,6 +63,9 @@ export const AppLayer = Layer.mergeAll(
   ApplicationRepoLive,
   RbacRepoLive,
   GrantRepoLive,
+  ConnectedSystemRepoLive,
+  ConnectorMappingRepoLive,
+  isDevServer ? LdapConnectorDev : LdapConnectorWired,
   AuthzEngineLive,
   AccessRequestRepoLive,
   AccessInvitationRepoLive,

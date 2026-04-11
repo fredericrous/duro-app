@@ -11,6 +11,9 @@ import { ApplicationRepoLive } from "~/lib/governance/ApplicationRepo.server"
 import { RbacRepoLive } from "~/lib/governance/RbacRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { ProvisioningService } from "~/lib/governance/ProvisioningService.server"
+import { LdapConnector } from "~/lib/governance/connectors/LdapConnector.server"
+import { ConnectedSystemRepoLive } from "~/lib/governance/ConnectedSystemRepo.server"
+import { ConnectorMappingRepoLive } from "~/lib/governance/ConnectorMappingRepo.server"
 
 // ---------------------------------------------------------------------------
 // Section 1: Unit tests for evaluatePolicy (pure function)
@@ -62,10 +65,15 @@ const MockAudit = Layer.succeed(AuditService, {
 } as any)
 
 const MockProvisioning = Layer.succeed(ProvisioningService, {
-  onGrantActivated: () => Effect.void,
-  onGrantRevoked: () => Effect.void,
+  onGrantActivated: () => Effect.succeed([] as string[]),
+  onGrantRevoked: () => Effect.succeed([] as string[]),
   processNextPending: () => Effect.void,
   processJob: () => Effect.void,
+} as any)
+
+const MockLdapConnector = Layer.succeed(LdapConnector, {
+  provisionGrant: () => Effect.void,
+  deprovisionGrant: () => Effect.void,
 } as any)
 
 const TestLayer = Layer.mergeAll(
@@ -74,8 +82,11 @@ const TestLayer = Layer.mergeAll(
   PrincipalRepoLive,
   ApplicationRepoLive,
   RbacRepoLive,
+  ConnectedSystemRepoLive,
+  ConnectorMappingRepoLive,
   MockAudit,
   MockProvisioning,
+  MockLdapConnector,
 ).pipe(Layer.provideMerge(makeTestDbLayer()))
 
 // ---------------------------------------------------------------------------

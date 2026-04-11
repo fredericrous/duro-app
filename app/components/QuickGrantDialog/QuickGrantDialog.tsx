@@ -1,7 +1,8 @@
 import { useFetcher } from "react-router"
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Button,
+  Callout,
   Combobox,
   Dialog,
   EmptyState,
@@ -18,6 +19,8 @@ interface QuickGrantDialogProps {
   onOpenChange: (open: boolean) => void
   roles: ReadonlyArray<Role>
   principals: ReadonlyArray<Principal>
+  applicationSlug: string
+  ldapProvisioned: boolean
   onGoToRoles: () => void
 }
 
@@ -26,18 +29,31 @@ export function QuickGrantDialog({
   onOpenChange,
   roles,
   principals,
+  applicationSlug,
+  ldapProvisioned,
   onGoToRoles,
 }: QuickGrantDialogProps) {
   const fetcher = useFetcher()
   const isSubmitting = fetcher.state !== "idle"
+  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null)
+
+  // For LDAP-provisioned apps, only user principals can receive grants that
+  // actually do something. Group principals stay DB-only until phase 2.
+  const visiblePrincipals = useMemo(
+    () => (ldapProvisioned ? principals.filter((p) => p.principalType === "user") : principals),
+    [principals, ldapProvisioned],
+  )
 
   const principalLabels = useMemo<Record<string, string>>(() => {
     const out: Record<string, string> = {}
-    for (const p of principals) {
+    for (const p of visiblePrincipals) {
       out[p.id] = `${p.displayName} (${p.principalType})${p.email ? ` — ${p.email}` : ""}`
     }
     return out
-  }, [principals])
+  }, [visiblePrincipals])
+
+  const selectedRole = selectedRoleId ? roles.find((r) => r.id === selectedRoleId) : null
+  const showImmichAdminWarning = applicationSlug === "immich" && selectedRole?.slug === "admin"
 
   // Close dialog after a successful submission
   useEffect(() => {
@@ -47,7 +63,7 @@ export function QuickGrantDialog({
   }, [fetcher.state, fetcher.data, onOpenChange])
 
   const noRoles = roles.length === 0
-  const noPrincipals = principals.length === 0
+  const noPrincipals = visiblePrincipals.length === 0
   const blocked = noRoles || noPrincipals
 
   return (
@@ -75,18 +91,29 @@ export function QuickGrantDialog({
             />
           )}
           {!noRoles && noPrincipals && (
-            <EmptyState message="No users or groups found. Sync your identity provider or create a principal first." />
+            <EmptyState
+              message={
+                ldapProvisioned
+                  ? "No user principals available. Group-backed grants for provisioned apps arrive in phase 2."
+                  : "No users or groups found. Sync your identity provider or create a principal first."
+              }
+            />
           )}
           {!blocked && (
             <fetcher.Form method="post">
               <input type="hidden" name="intent" value="createGrant" />
               <Stack gap="md">
+                {ldapProvisioned && (
+                  <Text color="muted">
+                    Group grants for provisioned apps arrive in phase 2 — only user principals are offered here.
+                  </Text>
+                )}
                 <Field.Root>
                   <Field.Label>Principal</Field.Label>
                   <Combobox.Root name="principalId" initialLabels={principalLabels}>
-                    <Combobox.Input placeholder="Search users or groups…" />
+                    <Combobox.Input placeholder="Search users…" />
                     <Combobox.Popup>
-                      {principals.map((p) => (
+                      {visiblePrincipals.map((p) => (
                         <Combobox.Item key={p.id} value={p.id}>
                           {principalLabels[p.id]}
                         </Combobox.Item>
@@ -98,7 +125,7 @@ export function QuickGrantDialog({
 
                 <Field.Root>
                   <Field.Label>Role</Field.Label>
-                  <Select.Root name="roleId">
+                  <Select.Root name="roleId" onValueChange={(v: any) => setSelectedRoleId(v)}>
                     <Select.Trigger aria-label="Role">
                       <Select.Value placeholder="Pick a role" />
                       <Select.Icon />
@@ -127,6 +154,15 @@ export function QuickGrantDialog({
                     Local date. The grant expires at midnight UTC on the chosen day.
                   </Field.Description>
                 </Field.Root>
+
+                {showImmichAdminWarning && (
+                  <Callout variant="warning">
+                    <Text>
+                      Immich admin bit must be flipped manually in Immich until phase 2. This grant will add the user
+                      to the Immich LLDAP group (so they can log in) but won't promote them to admin.
+                    </Text>
+                  </Callout>
+                )}
 
                 {fetcher.data && "error" in fetcher.data && (
                   <Text color="error">{String(fetcher.data.error)}</Text>

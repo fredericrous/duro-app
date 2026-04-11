@@ -11,8 +11,10 @@ import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { RbacRepo } from "~/lib/governance/RbacRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
+import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
 import { AppSyncService } from "~/lib/governance/AppSyncService.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
+import { activateGrant } from "~/lib/workflows/grant-activation.server"
 import type { Role, Entitlement, Resource, Grant, Principal } from "~/lib/governance/types"
 import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
@@ -58,6 +60,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       const rbac = yield* RbacRepo
       const grantRepo = yield* GrantRepo
       const principalRepo = yield* PrincipalRepo
+      const connectedSystems = yield* ConnectedSystemRepo
 
       const application = yield* appRepo.findById(appId)
       if (!application) return null
@@ -67,8 +70,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       const resources = yield* rbac.listResources(appId)
       const grants = yield* grantRepo.findActiveForApp(appId)
       const principals = yield* principalRepo.list()
+      const ldapSystem = yield* connectedSystems.findByApplicationAndType(appId, "ldap")
+      const ldapProvisioned = ldapSystem !== null && ldapSystem.status === "active"
 
-      return { application, roles, entitlements, resources, grants, principals }
+      return { application, roles, entitlements, resources, grants, principals, ldapProvisioned }
     }),
   )
 
@@ -235,7 +240,7 @@ export async function action({ request, params }: Route.ActionArgs) {
           const sql = yield* SqlClient.SqlClient
           const grantRepo = yield* GrantRepo
           const audit = yield* AuditService
-          yield* sql.withTransaction(
+          const grantId = yield* sql.withTransaction(
             Effect.gen(function* () {
               const grant = yield* grantRepo.grantRole({
                 principalId,
@@ -252,8 +257,13 @@ export async function action({ request, params }: Route.ActionArgs) {
                 applicationId: appId,
                 metadata: { roleId, principalId, reason, expiresAt },
               })
+              return grant.id
             }),
           )
+          // After the grant + audit are committed, enqueue and fork
+          // provisioning. Runs outside the transaction so the LDAP connector
+          // doesn't hold the DB open during network calls.
+          yield* activateGrant(grantId)
         }),
       )
       return { success: true, message: "Grant created" }
@@ -347,7 +357,7 @@ const grantColumns = [
 // ---------------------------------------------------------------------------
 
 export default function AdminApplicationDetailPage({ loaderData }: Route.ComponentProps) {
-  const { application, roles, entitlements, resources, grants, principals } = loaderData
+  const { application, roles, entitlements, resources, grants, principals, ldapProvisioned } = loaderData
   const fetcher = useFetcher()
   const [activeTab, setActiveTab] = useState("overview")
   const settingsFetcher = useFetcher<typeof action>()
@@ -616,6 +626,8 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
         onOpenChange={setQuickGrantOpen}
         roles={roles as Role[]}
         principals={principals as Principal[]}
+        applicationSlug={application.slug}
+        ldapProvisioned={ldapProvisioned}
         onGoToRoles={() => setActiveTab("roles")}
       />
 

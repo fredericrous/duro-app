@@ -5,8 +5,10 @@ import type { Route } from "./+types/admin.grants"
 import { runEffect } from "~/lib/runtime.server"
 import { isOriginAllowed } from "~/lib/config.server"
 import { getAuth } from "~/lib/auth.server"
+import { checkAuthDecision } from "~/lib/auth-decision.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
+import { deactivateGrant } from "~/lib/workflows/grant-activation.server"
 import type { Grant } from "~/lib/governance/types"
 import {
   useReactTable,
@@ -62,13 +64,29 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "revoke") {
     const grantId = formData.get("grantId") as string
+
+    // Resolve the session username to a principal id (FK constraint on
+    // grants.revoked_by → principals.id). Same pattern as createGrant.
     const auth = await getAuth(request)
-    const revokedBy = auth.user ?? "system"
+    const decision = await checkAuthDecision({ auth, application: "duro", action: "admin" })
+    if (!decision.allow || !auth.user) {
+      throw new Response("Forbidden", { status: 403 })
+    }
+    const principal = await runEffect(
+      Effect.gen(function* () {
+        const repo = yield* PrincipalRepo
+        return yield* repo.findByExternalId(auth.user!)
+      }),
+    )
+    if (!principal) {
+      throw new Response("Principal not found for current session", { status: 403 })
+    }
 
     await runEffect(
       Effect.gen(function* () {
         const repo = yield* GrantRepo
-        return yield* repo.revoke(grantId, revokedBy)
+        yield* repo.revoke(grantId, principal.id)
+        yield* deactivateGrant(grantId)
       }),
     )
     return { success: true }

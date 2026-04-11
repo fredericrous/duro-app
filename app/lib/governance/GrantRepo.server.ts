@@ -39,6 +39,17 @@ export class GrantRepo extends Context.Tag("GrantRepo")<
       applicationId: string,
     ) => Effect.Effect<Grant[], GrantRepoError>
     readonly findActiveForApp: (applicationId: string) => Effect.Effect<Grant[], GrantRepoError>
+    /**
+     * Safety check for LDAP deprovisioning: is there ANY other active, non-expired
+     * grant for the same principal whose role maps to the same external group on
+     * the same connected system?
+     */
+    readonly hasOtherActiveMappingTo: (params: {
+      excludeGrantId: string
+      principalId: string
+      connectedSystemId: string
+      externalRoleIdentifier: string
+    }) => Effect.Effect<boolean, GrantRepoError>
     readonly findExpired: () => Effect.Effect<Grant[], GrantRepoError>
   }
 >() {}
@@ -114,6 +125,20 @@ export const GrantRepoLive = Layer.effect(
                   OR entitlement_id IN (SELECT id FROM entitlements WHERE application_id = ${applicationId})
                 )`.pipe(Effect.map((rows) => rows.map((r) => decodeGrant(r) as Grant))),
           "Failed to find active grants for app",
+        ),
+
+      hasOtherActiveMappingTo: (params) =>
+        withErr(
+          sql`SELECT 1 FROM grants g
+              JOIN connector_mappings m ON m.local_role_id = g.role_id
+              WHERE g.principal_id = ${params.principalId}
+                AND m.connected_system_id = ${params.connectedSystemId}
+                AND m.external_role_identifier = ${params.externalRoleIdentifier}
+                AND g.id != ${params.excludeGrantId}
+                AND g.revoked_at IS NULL
+                AND (g.expires_at IS NULL OR g.expires_at > NOW())
+              LIMIT 1`.pipe(Effect.map((rows) => rows.length > 0)),
+          "Failed to check for other active mappings",
         ),
 
       findExpired: () =>

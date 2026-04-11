@@ -3,7 +3,7 @@ import * as SqlClient from "@effect/sql/SqlClient"
 import { AccessRequestRepo } from "~/lib/governance/AccessRequestRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
-import { ProvisioningService } from "~/lib/governance/ProvisioningService.server"
+import { activateGrant } from "./grant-activation.server"
 import { type ApprovalPolicyRule } from "~/lib/governance/types"
 
 // ---------------------------------------------------------------------------
@@ -142,10 +142,9 @@ export const decideApproval = (input: DecideInput) =>
     const requestRepo = yield* AccessRequestRepo
     const grantRepo = yield* GrantRepo
     const audit = yield* AuditService
-    const provisioning = yield* ProvisioningService
     const sqlClient = yield* SqlClient.SqlClient
 
-    let grantCreated = false
+    let newGrantId: string | null = null
 
     yield* sqlClient.withTransaction(
       Effect.gen(function* () {
@@ -191,7 +190,7 @@ export const decideApproval = (input: DecideInput) =>
             targetId: input.requestId,
             applicationId: request.applicationId,
           })
-          grantCreated = true
+          newGrantId = grant.id
         } else if (result === "rejected") {
           yield* requestRepo.updateStatus(input.requestId, "rejected")
           yield* audit.emit({
@@ -206,8 +205,9 @@ export const decideApproval = (input: DecideInput) =>
       }),
     )
 
-    // Fire-and-forget provisioning outside the transaction
-    if (grantCreated) {
-      yield* provisioning.processNextPending().pipe(Effect.fork)
+    // Fire-and-forget provisioning outside the transaction. activateGrant
+    // enqueues the job(s) for the new grant AND forks the processing.
+    if (newGrantId) {
+      yield* activateGrant(newGrantId)
     }
   }).pipe(Effect.withSpan("decideApproval"))

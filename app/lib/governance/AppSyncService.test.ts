@@ -1,19 +1,24 @@
 // Set operator URL before module imports read config
 process.env.OPERATOR_API_URL = "http://operator.test:9090"
 
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest"
-import { Effect, Layer } from "effect"
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest"
+import { Context, Effect, Layer } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
+
+// PGlite migration + truncation takes ~2-3s per test under parallel load.
+// Default 5s timeout is too tight when many test files run concurrently.
+vi.setConfig({ testTimeout: 30000 })
 import { http, HttpResponse } from "msw"
 import { setupServer } from "msw/node"
 import { FetchHttpClient } from "@effect/platform"
 import { AppSyncService, AppSyncServiceLive } from "./AppSyncService.server"
 import { OperatorClient, OperatorClientLive, type ClusterApp } from "~/lib/services/OperatorClient.server"
 import { ApplicationRepo, ApplicationRepoLive } from "./ApplicationRepo.server"
-import { RbacRepo, RbacRepoLive } from "./RbacRepo.server"
+import { RbacRepo, RbacRepoLive, RbacRepoError } from "./RbacRepo.server"
+import { ConnectedSystemRepo, ConnectedSystemRepoLive } from "./ConnectedSystemRepo.server"
+import { ConnectorMappingRepo, ConnectorMappingRepoLive } from "./ConnectorMappingRepo.server"
 import { makeTestDbLayer } from "~/lib/db/client.server"
 import { STARTER_ENTITLEMENTS, STARTER_ROLES } from "./defaultRbac"
-import type { Application, Entitlement, Role } from "./types"
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -25,204 +30,62 @@ const clusterApps: ClusterApp[] = [
   { id: "grafana", name: "Grafana", url: "https://grafana.local", category: "monitoring", groups: ["admin"], priority: 30 },
 ]
 
-function makeApp(slug: string, displayName: string, enabled = true): Application {
-  return {
-    id: `app-${slug}`,
-    slug,
-    displayName,
-    description: null,
-    accessMode: "invite_only",
-    ownerId: null,
-    enabled,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    lastSyncedAt: null,
-  }
-}
-
 // ---------------------------------------------------------------------------
-// Mock ApplicationRepo (in-memory)
+// Layer composition — real DB via PGlite, only OperatorClient is stubbed.
 // ---------------------------------------------------------------------------
 
-function mockApplicationRepo(initial: Application[] = []) {
-  const apps = new Map(initial.map((a) => [a.id, { ...a }]))
-  let nextId = apps.size + 1
+type OperatorClientService = Context.Tag.Service<typeof OperatorClient>
 
-  return Layer.succeed(ApplicationRepo, {
-    create: (input: any) =>
-      Effect.sync(() => {
-        const id = `app-${nextId++}`
-        const app: Application = {
-          id,
-          slug: input.slug,
-          displayName: input.displayName,
-          description: input.description ?? null,
-          accessMode: input.accessMode ?? "invite_only",
-          ownerId: input.ownerId ?? null,
-          enabled: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          lastSyncedAt: input.lastSyncedAt ?? null,
-        }
-        apps.set(id, app)
-        return app
-      }),
-    findById: (id: string) => Effect.sync(() => apps.get(id) ?? null),
-    findBySlug: (slug: string) => Effect.sync(() => [...apps.values()].find((a) => a.slug === slug) ?? null),
-    list: () => Effect.sync(() => [...apps.values()]),
-    update: (id: string, fields: any) =>
-      Effect.sync(() => {
-        const app = apps.get(id)
-        if (!app) return
-        if (fields.displayName !== undefined) app.displayName = fields.displayName as string
-        if (fields.description !== undefined) app.description = fields.description as string
-        if (fields.accessMode !== undefined) app.accessMode = fields.accessMode as string
-        if (fields.enabled !== undefined) app.enabled = fields.enabled as boolean
-        if (fields.ownerId !== undefined) app.ownerId = fields.ownerId as string
-        if (fields.lastSyncedAt !== undefined) app.lastSyncedAt = fields.lastSyncedAt as string
-        app.updatedAt = new Date().toISOString()
-      }),
-    _apps: apps, // expose for assertions
-  } as any)
-}
+const stubOperatorClient = (apps: ClusterApp[]): OperatorClientService => ({
+  listApps: () => Effect.succeed(apps),
+})
 
-// ---------------------------------------------------------------------------
-// Mock RbacRepo (in-memory)
-// ---------------------------------------------------------------------------
-
-interface MockRbacState {
-  roles: Map<string, Role>
-  entitlements: Map<string, Entitlement>
-  attachments: Set<string>
-  failCreateRole: boolean
-}
-
-function mockRbacRepo(state: MockRbacState) {
-  let nextRoleId = 1
-  let nextEntId = 1
-  return Layer.succeed(RbacRepo, {
-    createRole: (appId: string, slug: string, displayName: string, description?: string) =>
-      Effect.suspend(() => {
-        if (state.failCreateRole) {
-          return Effect.fail({ _tag: "RbacRepoError", message: "forced", cause: null } as any)
-        }
-        const id = `role-${nextRoleId++}`
-        const role: Role = {
-          id,
-          applicationId: appId,
-          slug,
-          displayName,
-          description: description ?? null,
-          maxDurationHours: null,
-          createdAt: new Date().toISOString(),
-        }
-        state.roles.set(id, role)
-        return Effect.succeed(role)
-      }),
-    listRoles: (appId: string) =>
-      Effect.sync(() => [...state.roles.values()].filter((r) => r.applicationId === appId)),
-    findRoleById: (id: string) => Effect.sync(() => state.roles.get(id) ?? null),
-    deleteRole: (id: string) =>
-      Effect.sync(() => {
-        state.roles.delete(id)
-      }),
-    createEntitlement: (appId: string, slug: string, displayName: string, description?: string) =>
-      Effect.sync(() => {
-        const id = `ent-${nextEntId++}`
-        const ent: Entitlement = {
-          id,
-          applicationId: appId,
-          slug,
-          displayName,
-          description: description ?? null,
-          createdAt: new Date().toISOString(),
-        }
-        state.entitlements.set(id, ent)
-        return ent
-      }),
-    listEntitlements: (appId: string) =>
-      Effect.sync(() => [...state.entitlements.values()].filter((e) => e.applicationId === appId)),
-    findEntitlementById: (id: string) => Effect.sync(() => state.entitlements.get(id) ?? null),
-    deleteEntitlement: (id: string) =>
-      Effect.sync(() => {
-        state.entitlements.delete(id)
-      }),
-    attachEntitlement: (roleId: string, entitlementId: string) =>
-      Effect.sync(() => {
-        state.attachments.add(`${roleId}::${entitlementId}`)
-      }),
-    detachEntitlement: (roleId: string, entitlementId: string) =>
-      Effect.sync(() => {
-        state.attachments.delete(`${roleId}::${entitlementId}`)
-      }),
-    listRoleEntitlements: (roleId: string) =>
-      Effect.sync(() => {
-        const ids = [...state.attachments]
-          .filter((k) => k.startsWith(`${roleId}::`))
-          .map((k) => k.split("::")[1])
-        return ids.map((id) => state.entitlements.get(id)!).filter(Boolean)
-      }),
-    createResource: () => Effect.fail({ _tag: "RbacRepoError", message: "not used", cause: null } as any),
-    listResources: () => Effect.succeed([]),
-    getResourceAncestors: () => Effect.succeed([]),
-  } as any)
-}
-
-function makeMockRbacState(): MockRbacState {
-  return {
-    roles: new Map(),
-    entitlements: new Map(),
-    attachments: new Set(),
-    failCreateRole: false,
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Stub SqlClient — withTransaction is identity (no rollback in pure mock)
-// ---------------------------------------------------------------------------
-
-const stubSqlClient = Layer.succeed(SqlClient.SqlClient, {
-  withTransaction: (eff: any) => eff,
-} as any)
-
-// ---------------------------------------------------------------------------
-// Mock OperatorClient
-// ---------------------------------------------------------------------------
-
-function mockOperatorClient(apps: ClusterApp[]) {
-  return Layer.succeed(OperatorClient, {
-    listApps: () => Effect.succeed(apps),
-  })
-}
-
-// ---------------------------------------------------------------------------
-// Helper to run sync
-// ---------------------------------------------------------------------------
-
-function runSync(operatorApps: ClusterApp[], existingApps: Application[] = [], rbacState?: MockRbacState) {
-  const repoLayer = mockApplicationRepo(existingApps)
-  const rbacLayer = mockRbacRepo(rbacState ?? makeMockRbacState())
-  const layer = Layer.mergeAll(
-    mockOperatorClient(operatorApps),
-    repoLayer,
-    rbacLayer,
-    stubSqlClient,
+/**
+ * Build a full layer for a single test. PGlite is fresh per test (truncated
+ * in makeTestDbLayer), so tests don't share state.
+ */
+function layersFor(operatorApps: ClusterApp[]) {
+  return Layer.mergeAll(
+    Layer.succeed(OperatorClient, stubOperatorClient(operatorApps)),
     AppSyncServiceLive,
-  )
-
-  return Effect.gen(function* () {
-    const sync = yield* AppSyncService
-    return yield* sync.syncFromCluster()
-  }).pipe(Effect.provide(layer), Effect.runPromise)
+    ApplicationRepoLive,
+    RbacRepoLive,
+    ConnectedSystemRepoLive,
+    ConnectorMappingRepoLive,
+  ).pipe(Layer.provideMerge(makeTestDbLayer()))
 }
 
+/**
+ * Seed existing apps (mimicking what a previous sync / manual insert would
+ * have produced) before the sync runs. Takes the same Application-shape
+ * objects the old mock used. Called inside the Effect so SQL is available.
+ */
+const seedExistingApps = (apps: Array<{ slug: string; displayName: string; enabled?: boolean; accessMode?: string; ownerId?: string }>) =>
+  Effect.gen(function* () {
+    const repo = yield* ApplicationRepo
+    for (const a of apps) {
+      const created = yield* repo.create({
+        slug: a.slug,
+        displayName: a.displayName,
+        accessMode: a.accessMode ?? "invite_only",
+        ownerId: a.ownerId,
+      })
+      if (a.enabled === false) {
+        yield* repo.update(created.id, { enabled: false })
+      }
+    }
+  })
+
 // ---------------------------------------------------------------------------
-// Tests: Sync logic (pure Effect, no HTTP)
+// Tests: sync logic
 // ---------------------------------------------------------------------------
 
 describe("AppSyncService", () => {
   it("creates apps that don't exist in DB", async () => {
-    const result = await runSync(clusterApps)
+    const result = await Effect.gen(function* () {
+      const sync = yield* AppSyncService
+      return yield* sync.syncFromCluster()
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
 
     expect(result.created).toBe(3)
     expect(result.updated).toBe(0)
@@ -231,53 +94,63 @@ describe("AppSyncService", () => {
   })
 
   it("does not duplicate existing apps", async () => {
-    const existing = [makeApp("jellyfin", "Jellyfin")]
-
-    const result = await runSync(clusterApps, existing)
+    const result = await Effect.gen(function* () {
+      yield* seedExistingApps([{ slug: "jellyfin", displayName: "Jellyfin" }])
+      const sync = yield* AppSyncService
+      return yield* sync.syncFromCluster()
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
 
     expect(result.created).toBe(2) // gitea + grafana
     expect(result.updated).toBe(0) // jellyfin name matches
   })
 
   it("updates displayName when it differs", async () => {
-    const existing = [makeApp("jellyfin", "Old Name")]
-
-    const result = await runSync(clusterApps, existing)
+    const result = await Effect.gen(function* () {
+      yield* seedExistingApps([{ slug: "jellyfin", displayName: "Old Name" }])
+      const sync = yield* AppSyncService
+      return yield* sync.syncFromCluster()
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
 
     expect(result.updated).toBe(1)
     expect(result.created).toBe(2)
   })
 
   it("disables apps no longer in the cluster", async () => {
-    const existing = [
-      makeApp("jellyfin", "Jellyfin"),
-      makeApp("removed-app", "Removed App", true),
-    ]
-
-    const result = await runSync(clusterApps, existing)
+    const result = await Effect.gen(function* () {
+      yield* seedExistingApps([
+        { slug: "jellyfin", displayName: "Jellyfin" },
+        { slug: "removed-app", displayName: "Removed App" },
+      ])
+      const sync = yield* AppSyncService
+      return yield* sync.syncFromCluster()
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
 
     expect(result.disabled).toBe(1)
     expect(result.created).toBe(2) // gitea + grafana
   })
 
   it("does not disable already-disabled apps", async () => {
-    const existing = [
-      makeApp("jellyfin", "Jellyfin"),
-      makeApp("removed-app", "Removed App", false), // already disabled
-    ]
+    const result = await Effect.gen(function* () {
+      yield* seedExistingApps([
+        { slug: "jellyfin", displayName: "Jellyfin" },
+        { slug: "removed-app", displayName: "Removed App", enabled: false },
+      ])
+      const sync = yield* AppSyncService
+      return yield* sync.syncFromCluster()
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
 
-    const result = await runSync(clusterApps, existing)
-
-    expect(result.disabled).toBe(0) // already disabled, skip
+    expect(result.disabled).toBe(0)
   })
 
   it("handles empty cluster (disables all)", async () => {
-    const existing = [
-      makeApp("jellyfin", "Jellyfin"),
-      makeApp("gitea", "Gitea"),
-    ]
-
-    const result = await runSync([], existing)
+    const result = await Effect.gen(function* () {
+      yield* seedExistingApps([
+        { slug: "jellyfin", displayName: "Jellyfin" },
+        { slug: "gitea", displayName: "Gitea" },
+      ])
+      const sync = yield* AppSyncService
+      return yield* sync.syncFromCluster()
+    }).pipe(Effect.provide(layersFor([])), Effect.runPromise)
 
     expect(result.created).toBe(0)
     expect(result.disabled).toBe(2)
@@ -285,137 +158,203 @@ describe("AppSyncService", () => {
   })
 
   it("handles empty DB (creates all)", async () => {
-    const result = await runSync(clusterApps, [])
+    const result = await Effect.gen(function* () {
+      const sync = yield* AppSyncService
+      return yield* sync.syncFromCluster()
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
 
     expect(result.created).toBe(3)
     expect(result.disabled).toBe(0)
   })
 
   it("preserves governance fields on sync", async () => {
-    const existing = [
-      {
-        ...makeApp("jellyfin", "Jellyfin"),
-        accessMode: "open",
-        ownerId: "admin-user",
-      },
-    ]
-
-    const repoLayer = mockApplicationRepo(existing)
-    const rbacLayer = mockRbacRepo(makeMockRbacState())
-    const layer = Layer.mergeAll(
-      mockOperatorClient(clusterApps),
-      repoLayer,
-      rbacLayer,
-      stubSqlClient,
-      AppSyncServiceLive,
-    )
-
-    await Effect.gen(function* () {
+    const jf = await Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      // Seed an admin principal so the owner_id FK resolves.
+      yield* sql`INSERT INTO principals (id, principal_type, external_id, display_name, email)
+                 VALUES ('admin-user', 'user', 'admin-user', 'Admin', 'admin@localhost')`
+      yield* seedExistingApps([
+        { slug: "jellyfin", displayName: "Jellyfin", accessMode: "open", ownerId: "admin-user" },
+      ])
       const sync = yield* AppSyncService
       yield* sync.syncFromCluster()
-
       const repo = yield* ApplicationRepo
-      const apps = yield* repo.list()
-      const jf = apps.find((a) => a.slug === "jellyfin")!
-      expect(jf.accessMode).toBe("open") // preserved
-      expect(jf.ownerId).toBe("admin-user") // preserved
-    }).pipe(Effect.provide(layer), Effect.runPromise)
+      return yield* repo.findBySlug("jellyfin")
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
+
+    expect(jf).not.toBeNull()
+    expect(jf!.accessMode).toBe("open")
+    expect(jf!.ownerId).toBe("admin-user")
   })
 
   it("seeds starter roles and entitlements when an app is first synced", async () => {
-    const rbacState = makeMockRbacState()
-    await runSync(clusterApps, [], rbacState)
+    const { app, roles, ents } = await Effect.gen(function* () {
+      const sync = yield* AppSyncService
+      yield* sync.syncFromCluster()
+      const appRepo = yield* ApplicationRepo
+      const rbac = yield* RbacRepo
+      const app = yield* appRepo.findBySlug("jellyfin")
+      if (!app) throw new Error("app missing")
+      const roles = yield* rbac.listRoles(app.id)
+      const ents = yield* rbac.listEntitlements(app.id)
+      return { app, roles, ents }
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
 
-    // 3 apps × 3 entitlements each = 9
-    expect(rbacState.entitlements.size).toBe(STARTER_ENTITLEMENTS.length * clusterApps.length)
-    // 3 apps × 3 roles each = 9
-    expect(rbacState.roles.size).toBe(STARTER_ROLES.length * clusterApps.length)
-    // 3 apps × (1 + 2 + 3) attachments per role set = 18
-    const expectedAttachments = clusterApps.length * STARTER_ROLES.reduce((n, r) => n + r.entitlements.length, 0)
-    expect(rbacState.attachments.size).toBe(expectedAttachments)
-
-    // Verify slugs are correct on at least one app
-    const oneAppEnts = [...rbacState.entitlements.values()].filter((e) => e.applicationId === "app-1")
-    expect(new Set(oneAppEnts.map((e) => e.slug))).toEqual(new Set(["read", "write", "manage"]))
-    const oneAppRoles = [...rbacState.roles.values()].filter((r) => r.applicationId === "app-1")
-    expect(new Set(oneAppRoles.map((r) => r.slug))).toEqual(new Set(["viewer", "editor", "admin"]))
+    expect(new Set(roles.map((r) => r.slug))).toEqual(new Set(STARTER_ROLES.map((r) => r.slug)))
+    expect(new Set(ents.map((e) => e.slug))).toEqual(new Set(STARTER_ENTITLEMENTS.map((e) => e.slug)))
+    expect(app.lastSyncedAt).not.toBeNull()
   })
 
   it("does not re-seed starter rbac when app already exists", async () => {
-    const existing = [makeApp("jellyfin", "Jellyfin")]
-    const rbacState = makeMockRbacState()
-
-    await runSync(clusterApps, existing, rbacState)
-
-    // Only the 2 newly-created apps (gitea, grafana) should be seeded.
-    expect(rbacState.roles.size).toBe(STARTER_ROLES.length * 2)
-    expect(rbacState.entitlements.size).toBe(STARTER_ENTITLEMENTS.length * 2)
-  })
-
-  it("writes lastSyncedAt on every sync", async () => {
-    const beforeTs = new Date().toISOString()
-    const existing = [makeApp("jellyfin", "Jellyfin")]
-    const repoLayer = mockApplicationRepo(existing)
-    const rbacLayer = mockRbacRepo(makeMockRbacState())
-    const layer = Layer.mergeAll(
-      mockOperatorClient(clusterApps),
-      repoLayer,
-      rbacLayer,
-      stubSqlClient,
-      AppSyncServiceLive,
-    )
-
-    await Effect.gen(function* () {
+    const rolesAfter = await Effect.gen(function* () {
+      yield* seedExistingApps([{ slug: "jellyfin", displayName: "Jellyfin" }])
       const sync = yield* AppSyncService
       yield* sync.syncFromCluster()
+      const appRepo = yield* ApplicationRepo
+      const rbac = yield* RbacRepo
+      const jellyfin = yield* appRepo.findBySlug("jellyfin")
+      return yield* rbac.listRoles(jellyfin!.id)
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
 
-      const repo = yield* ApplicationRepo
-      const apps = yield* repo.list()
-      for (const a of apps.filter((x) => clusterApps.some((c) => c.id === x.slug))) {
+    // Pre-existing jellyfin was seeded without starter roles — sync doesn't
+    // retrofit them, so it still has zero roles.
+    expect(rolesAfter.length).toBe(0)
+  })
+
+  it("writes lastSyncedAt on every sync for both new and existing apps", async () => {
+    const beforeTs = new Date().toISOString()
+
+    const all = await Effect.gen(function* () {
+      yield* seedExistingApps([{ slug: "jellyfin", displayName: "Jellyfin" }])
+      const sync = yield* AppSyncService
+      yield* sync.syncFromCluster()
+      const appRepo = yield* ApplicationRepo
+      return yield* appRepo.list()
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
+
+    for (const a of all) {
+      if (clusterApps.some((c) => c.id === a.slug)) {
         expect(a.lastSyncedAt).not.toBeNull()
         expect(a.lastSyncedAt! >= beforeTs).toBe(true)
       }
-    }).pipe(Effect.provide(layer), Effect.runPromise)
+    }
   })
+
+  it(
+    "backfills LDAP connected system and connector mappings for known slugs",
+    async () => {
+      const nextcloudCluster: ClusterApp[] = [
+        { id: "nextcloud", name: "Nextcloud", url: "x", category: "cloud", groups: ["family"], priority: 50 },
+      ]
+
+      const result = await Effect.gen(function* () {
+        const sync = yield* AppSyncService
+        yield* sync.syncFromCluster()
+        const appRepo = yield* ApplicationRepo
+        const rbac = yield* RbacRepo
+        const systems = yield* ConnectedSystemRepo
+        const mappings = yield* ConnectorMappingRepo
+
+        const app = yield* appRepo.findBySlug("nextcloud")
+        const system = yield* systems.findByApplicationAndType(app!.id, "ldap")
+        const roles = yield* rbac.listRoles(app!.id)
+
+        const mappingsFor = new Map<string, string>()
+        for (const r of roles) {
+          const m = yield* mappings.findByConnectedSystemAndRole(system!.id, r.id)
+          if (m) mappingsFor.set(r.slug, m.externalRoleIdentifier)
+        }
+
+        return { system, mappingsFor }
+      }).pipe(Effect.provide(layersFor(nextcloudCluster)), Effect.runPromise)
+
+      expect(result.system).not.toBeNull()
+      expect(result.system!.connectorType).toBe("ldap")
+      expect(result.mappingsFor.get("viewer")).toBe("nextcloud-user")
+      expect(result.mappingsFor.get("editor")).toBe("nextcloud-user")
+      expect(result.mappingsFor.get("admin")).toBe("nextcloud-admin")
+    },
+  )
+
+  it("does NOT create an LDAP connected system for apps outside the allow-list", async () => {
+    const system = await Effect.gen(function* () {
+      const sync = yield* AppSyncService
+      yield* sync.syncFromCluster()
+      const appRepo = yield* ApplicationRepo
+      const systems = yield* ConnectedSystemRepo
+      const app = yield* appRepo.findBySlug("jellyfin")
+      return yield* systems.findByApplicationAndType(app!.id, "ldap")
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
+
+    expect(system).toBeNull()
+  })
+
+  it(
+    "is idempotent — re-syncing a known-slug app does not duplicate connected systems or mappings",
+    async () => {
+      const nextcloudCluster: ClusterApp[] = [
+        { id: "nextcloud", name: "Nextcloud", url: "x", category: "cloud", groups: ["family"], priority: 50 },
+      ]
+
+      const counts = await Effect.gen(function* () {
+        const sync = yield* AppSyncService
+        yield* sync.syncFromCluster() // first sync
+        yield* sync.syncFromCluster() // second sync — must not duplicate
+        const appRepo = yield* ApplicationRepo
+        const systems = yield* ConnectedSystemRepo
+        const mappings = yield* ConnectorMappingRepo
+        const app = yield* appRepo.findBySlug("nextcloud")
+        const systemList = yield* systems.listByApplication(app!.id)
+        const system = systemList[0]
+        const mappingList = yield* mappings.listByConnectedSystem(system!.id)
+        return { systems: systemList.length, mappings: mappingList.length }
+      }).pipe(Effect.provide(layersFor(nextcloudCluster)), Effect.runPromise)
+
+      expect(counts.systems).toBe(1)
+      // 3 starter roles × 1 mapping each
+      expect(counts.mappings).toBe(STARTER_ROLES.length)
+    },
+  )
 })
 
 // ---------------------------------------------------------------------------
-// Tests: Transactional rollback (real DB via PGlite)
+// Tests: transactional rollback — uses a Layer override to inject a failing
+// RbacRepo variant into the same real-DB layer.
 // ---------------------------------------------------------------------------
 
-describe("AppSyncService — transactional seeding (real DB)", () => {
-  // Override RbacRepo with one that fails on createEntitlement (first RBAC step).
-  // If the transaction works, the application row inserted by appRepo.create
-  // must be rolled back when this failure propagates.
-  const FailingRbacRepo = Layer.succeed(RbacRepo, {
-    createEntitlement: () =>
-      Effect.fail({ _tag: "RbacRepoError", message: "forced", cause: null } as any),
-    createRole: () => Effect.fail({ _tag: "RbacRepoError", message: "forced", cause: null } as any),
-    attachEntitlement: () => Effect.succeed(undefined),
-    listRoles: () => Effect.succeed([]),
-    findRoleById: () => Effect.succeed(null),
-    deleteRole: () => Effect.succeed(undefined),
-    listEntitlements: () => Effect.succeed([]),
-    findEntitlementById: () => Effect.succeed(null),
-    deleteEntitlement: () => Effect.succeed(undefined),
-    detachEntitlement: () => Effect.succeed(undefined),
-    listRoleEntitlements: () => Effect.succeed([]),
-    createResource: () => Effect.fail({ _tag: "RbacRepoError", message: "n/a", cause: null } as any),
-    listResources: () => Effect.succeed([]),
-    getResourceAncestors: () => Effect.succeed([]),
-  } as any)
+type RbacRepoService = Context.Tag.Service<typeof RbacRepo>
 
+const forcedError = new RbacRepoError({ message: "forced" })
+
+/** A RbacRepo that fails on createEntitlement (first step of seedDefaultRbac). */
+const FailingRbacRepo: RbacRepoService = {
+  createEntitlement: () => Effect.fail(forcedError),
+  createRole: () => Effect.fail(forcedError),
+  attachEntitlement: () => Effect.void,
+  detachEntitlement: () => Effect.void,
+  listRoles: () => Effect.succeed([]),
+  findRoleById: () => Effect.succeed(null),
+  deleteRole: () => Effect.void,
+  listEntitlements: () => Effect.succeed([]),
+  findEntitlementById: () => Effect.succeed(null),
+  deleteEntitlement: () => Effect.void,
+  listRoleEntitlements: () => Effect.succeed([]),
+  createResource: () => Effect.fail(forcedError),
+  listResources: () => Effect.succeed([]),
+  getResourceAncestors: () => Effect.succeed([]),
+}
+
+describe("AppSyncService — transactional seeding (real DB)", () => {
   it("rolls back app creation when starter rbac seed fails", { timeout: 30000 }, async () => {
-    const dbLayer = makeTestDbLayer()
     const layers = Layer.mergeAll(
-      mockOperatorClient([clusterApps[0]]),
+      Layer.succeed(OperatorClient, stubOperatorClient([clusterApps[0]])),
       AppSyncServiceLive,
       ApplicationRepoLive,
-      FailingRbacRepo,
-    ).pipe(Layer.provideMerge(dbLayer))
+      Layer.succeed(RbacRepo, FailingRbacRepo),
+      ConnectedSystemRepoLive,
+      ConnectorMappingRepoLive,
+    ).pipe(Layer.provideMerge(makeTestDbLayer()))
 
-    // Single Effect so the dbLayer is built once and shared across the
-    // failed sync and the post-state assertion.
     const { syncResult, apps } = await Effect.gen(function* () {
       const sync = yield* AppSyncService
       const syncResult = yield* Effect.either(sync.syncFromCluster())
@@ -428,41 +367,35 @@ describe("AppSyncService — transactional seeding (real DB)", () => {
     expect(apps.find((a) => a.slug === "jellyfin")).toBeUndefined()
   })
 
-  it("commits app + starter rbac together when seed succeeds", { timeout: 30000 }, async () => {
-    const dbLayer = makeTestDbLayer()
-    const layers = Layer.mergeAll(
-      mockOperatorClient([clusterApps[0]]),
-      AppSyncServiceLive,
-      ApplicationRepoLive,
-      RbacRepoLive,
-    ).pipe(Layer.provideMerge(dbLayer))
+  it("commits app + starter rbac + LDAP backfill together when seed succeeds", { timeout: 30000 }, async () => {
+    const nextcloudCluster: ClusterApp[] = [
+      { id: "nextcloud", name: "Nextcloud", url: "x", category: "cloud", groups: ["family"], priority: 50 },
+    ]
 
-    // Single Effect so the dbLayer is built once and the same PGlite instance
-    // is used for both the sync and the assertions.
-    const { app, roles, ents } = await Effect.gen(function* () {
+    const { app, roles, ents, system } = await Effect.gen(function* () {
       const sync = yield* AppSyncService
       yield* sync.syncFromCluster()
-
       const appRepo = yield* ApplicationRepo
       const rbac = yield* RbacRepo
-      const a = yield* appRepo.findBySlug("jellyfin")
-      if (!a) throw new Error("app missing")
-      const roles = yield* rbac.listRoles(a.id)
-      const ents = yield* rbac.listEntitlements(a.id)
-      return { app: a, roles, ents }
-    }).pipe(Effect.provide(layers), Effect.runPromise)
+      const systems = yield* ConnectedSystemRepo
+      const app = yield* appRepo.findBySlug("nextcloud")
+      if (!app) throw new Error("app missing")
+      const roles = yield* rbac.listRoles(app.id)
+      const ents = yield* rbac.listEntitlements(app.id)
+      const system = yield* systems.findByApplicationAndType(app.id, "ldap")
+      return { app, roles, ents, system }
+    }).pipe(Effect.provide(layersFor(nextcloudCluster)), Effect.runPromise)
 
     expect(app.lastSyncedAt).not.toBeNull()
     expect(new Set(roles.map((r) => r.slug))).toEqual(new Set(["viewer", "editor", "admin"]))
     expect(new Set(ents.map((e) => e.slug))).toEqual(new Set(["read", "write", "manage"]))
+    expect(system).not.toBeNull()
   })
 })
 
 // ---------------------------------------------------------------------------
-// Tests: OperatorClientLive via MSW (HTTP integration)
+// Tests: OperatorClientLive via MSW (HTTP integration — unchanged)
 // ---------------------------------------------------------------------------
-
-const OPERATOR_URL = "http://operator.test:9090"
 
 const server = setupServer()
 
@@ -483,10 +416,7 @@ describe("OperatorClientLive with MSW", () => {
     const result = await Effect.gen(function* () {
       const client = yield* OperatorClient
       return yield* client.listApps()
-    }).pipe(
-      Effect.provide(layer),
-      Effect.runPromise,
-    )
+    }).pipe(Effect.provide(layer), Effect.runPromise)
 
     expect(result).toHaveLength(3)
     expect(result[0].id).toBe("jellyfin")
@@ -503,11 +433,7 @@ describe("OperatorClientLive with MSW", () => {
     const result = await Effect.gen(function* () {
       const client = yield* OperatorClient
       return yield* client.listApps()
-    }).pipe(
-      Effect.provide(layer),
-      Effect.either,
-      Effect.runPromise,
-    )
+    }).pipe(Effect.provide(layer), Effect.either, Effect.runPromise)
 
     expect(result._tag).toBe("Left")
   })

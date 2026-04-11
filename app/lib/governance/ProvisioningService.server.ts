@@ -2,6 +2,7 @@ import { Context, Effect, Data, Layer } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { MigrationsRan } from "~/lib/db/client.server"
+import { LdapConnector } from "./connectors/LdapConnector.server"
 
 // ---------------------------------------------------------------------------
 // Error
@@ -22,10 +23,12 @@ const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string
 export class ProvisioningService extends Context.Tag("ProvisioningService")<
   ProvisioningService,
   {
-    readonly onGrantActivated: (grantId: string) => Effect.Effect<void, ProvisioningError>
-    readonly onGrantRevoked: (grantId: string) => Effect.Effect<void, ProvisioningError>
-    readonly processNextPending: () => Effect.Effect<void, ProvisioningError>
-    readonly processJob: (jobId: string) => Effect.Effect<void, ProvisioningError>
+    /** Enqueues one provisioning_jobs row per matching ConnectedSystem. Returns the enqueued job IDs. */
+    readonly onGrantActivated: (grantId: string) => Effect.Effect<string[], ProvisioningError>
+    /** Symmetric; enqueues deprovision jobs. Returns the enqueued job IDs. */
+    readonly onGrantRevoked: (grantId: string) => Effect.Effect<string[], ProvisioningError>
+    readonly processNextPending: () => Effect.Effect<void, ProvisioningError, LdapConnector>
+    readonly processJob: (jobId: string) => Effect.Effect<void, ProvisioningError, LdapConnector>
   }
 >() {}
 
@@ -33,11 +36,11 @@ export class ProvisioningService extends Context.Tag("ProvisioningService")<
 // Internals
 // ---------------------------------------------------------------------------
 
-/** Find the active connected_system for the grant's application (if any). */
-const findConnectedSystem = (sql: SqlClient.SqlClient, grantId: string) =>
+/** Find ALL active connected_systems for the grant's application. */
+const findConnectedSystems = (sql: SqlClient.SqlClient, grantId: string) =>
   withErr(
     sql`
-      SELECT cs.id
+      SELECT DISTINCT cs.id
       FROM connected_systems cs
       JOIN applications a ON a.id = cs.application_id
       JOIN grants g ON (
@@ -46,12 +49,11 @@ const findConnectedSystem = (sql: SqlClient.SqlClient, grantId: string) =>
       )
       WHERE g.id = ${grantId}
         AND cs.status = 'active'
-      LIMIT 1
     `,
-    "Failed to look up connected system for grant",
+    "Failed to look up connected systems for grant",
   )
 
-/** Insert a provisioning job. */
+/** Insert a provisioning job and return its id. */
 const insertJob = (
   sql: SqlClient.SqlClient,
   connectedSystemId: string,
@@ -62,7 +64,8 @@ const insertJob = (
     sql`
       INSERT INTO provisioning_jobs (connected_system_id, grant_id, operation)
       VALUES (${connectedSystemId}, ${grantId}, ${operation})
-    `.pipe(Effect.asVoid),
+      RETURNING id
+    `.pipe(Effect.map((rows) => (rows[0] as { id: string }).id)),
     `Failed to insert provisioning job (${operation})`,
   )
 
@@ -100,6 +103,11 @@ const processJobInternal = (sql: SqlClient.SqlClient, job: Record<string, any>) 
   Effect.gen(function* () {
     const jobId = job.id as string
 
+    // Idempotency: already-terminal jobs are no-ops
+    if (job.status === "completed" || job.status === "failed") {
+      return
+    }
+
     // 1. Mark running
     yield* withErr(
       sql`
@@ -123,7 +131,7 @@ const processJobInternal = (sql: SqlClient.SqlClient, job: Record<string, any>) 
     const system = systems[0] as Record<string, any>
     const config = typeof system.config === "string" ? JSON.parse(system.config) : (system.config ?? {})
 
-    // 3. Load grant details for the request body
+    // 3. Load grant details for the HTTP connector body (only used by http path)
     const grants = yield* withErr(sql`SELECT * FROM grants WHERE id = ${job.grantId}`, "Failed to load grant")
     const grant = (grants[0] ?? {}) as Record<string, any>
 
@@ -139,15 +147,33 @@ const processJobInternal = (sql: SqlClient.SqlClient, job: Record<string, any>) 
     // 4. Dispatch based on connector_type
     const connectorType = (system.connectorType ?? "http") as string
 
-    const result = yield* Effect.match(
-      connectorType === "http"
-        ? executeHttpConnector(config, job.operation, body)
-        : Effect.fail(new ProvisioningError({ message: `Unsupported connector type: ${connectorType}` })),
-      {
-        onFailure: (err) => ({ ok: false as const, error: err }),
-        onSuccess: () => ({ ok: true as const, error: null }),
-      },
-    )
+    const dispatchEffect: Effect.Effect<void, ProvisioningError, LdapConnector> = (() => {
+      if (connectorType === "http") {
+        return executeHttpConnector(config, job.operation, body)
+      }
+      if (connectorType === "ldap") {
+        return Effect.gen(function* () {
+          const ldap = yield* LdapConnector
+          if (job.operation === "provision") {
+            yield* ldap
+              .provisionGrant(job.grantId)
+              .pipe(Effect.mapError((e) => new ProvisioningError({ message: e.message, cause: e })))
+          } else {
+            yield* ldap
+              .deprovisionGrant(job.grantId)
+              .pipe(Effect.mapError((e) => new ProvisioningError({ message: e.message, cause: e })))
+          }
+        })
+      }
+      return Effect.fail(
+        new ProvisioningError({ message: `Connector type not implemented: ${connectorType}` }),
+      )
+    })()
+
+    const result = yield* Effect.match(dispatchEffect, {
+      onFailure: (err) => ({ ok: false as const, error: err }),
+      onSuccess: () => ({ ok: true as const, error: null }),
+    })
 
     // 5. Update final status
     if (result.ok) {
@@ -182,17 +208,21 @@ export const ProvisioningServiceLive = Layer.effect(
     yield* MigrationsRan
     const sql = yield* SqlClient.SqlClient
 
-    const maybeEnqueue = (grantId: string, operation: "provision" | "deprovision") =>
+    const enqueueForAllSystems = (grantId: string, operation: "provision" | "deprovision") =>
       Effect.gen(function* () {
-        const rows = yield* findConnectedSystem(sql, grantId)
-        if (rows.length === 0) return // no connected system — no-op
-        yield* insertJob(sql, (rows[0] as any).id as string, grantId, operation)
+        const rows = yield* findConnectedSystems(sql, grantId)
+        const jobIds: string[] = []
+        for (const row of rows) {
+          const id = yield* insertJob(sql, (row as any).id as string, grantId, operation)
+          jobIds.push(id)
+        }
+        return jobIds
       })
 
     return {
-      onGrantActivated: (grantId) => maybeEnqueue(grantId, "provision"),
+      onGrantActivated: (grantId) => enqueueForAllSystems(grantId, "provision"),
 
-      onGrantRevoked: (grantId) => maybeEnqueue(grantId, "deprovision"),
+      onGrantRevoked: (grantId) => enqueueForAllSystems(grantId, "deprovision"),
 
       processNextPending: () =>
         Effect.gen(function* () {
@@ -227,10 +257,10 @@ export const ProvisioningServiceLive = Layer.effect(
 
 export const ProvisioningServiceDev = Layer.succeed(ProvisioningService, {
   onGrantActivated: (grantId) =>
-    Effect.log(`[ProvisioningService/dev] onGrantActivated grantId=${grantId}`).pipe(Effect.asVoid),
+    Effect.log(`[ProvisioningService/dev] onGrantActivated grantId=${grantId}`).pipe(Effect.as([] as string[])),
 
   onGrantRevoked: (grantId) =>
-    Effect.log(`[ProvisioningService/dev] onGrantRevoked grantId=${grantId}`).pipe(Effect.asVoid),
+    Effect.log(`[ProvisioningService/dev] onGrantRevoked grantId=${grantId}`).pipe(Effect.as([] as string[])),
 
   processNextPending: () => Effect.log("[ProvisioningService/dev] processNextPending (no-op)").pipe(Effect.asVoid),
 
