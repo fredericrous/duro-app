@@ -61,6 +61,14 @@ const PLUGIN_PROVISIONING_TEMPLATES: ReadonlyArray<PluginProvisioningTemplate> =
     config: { viewerGroup: "immich-user", editorGroup: "immich-user", adminGroup: "immich-user" },
     mappings: { viewer: "immich-user", editor: "immich-user", admin: "immich-user" },
   },
+  // Immich: admin bit promotion via admin API
+  {
+    slug: "immich",
+    pluginSlug: "immich-admin-bit",
+    pluginVersion: "1.0.0",
+    config: { immichUrl: "https://photos.daddyshome.fr" },
+    mappings: { admin: "immich-admin" },
+  },
 ]
 
 export const PLUGIN_PROVISIONING_SLUGS: ReadonlySet<string> = new Set(

@@ -4,6 +4,7 @@ import { isReversible, PLUGIN_CAPABILITIES } from "./contracts"
 import { ManifestInvalid, PluginNotFound } from "./errors"
 import { lldapGroupMembershipPlugin } from "./builtins/lldap-group-membership"
 import { giteaTeamsPlugin } from "./builtins/gitea-teams"
+import { immichAdminBitPlugin } from "./builtins/immich-admin-bit"
 
 // ---------------------------------------------------------------------------
 // Service tag
@@ -79,7 +80,7 @@ export const PluginRegistryLive = Layer.sync(PluginRegistry, () => {
   const plugins: ReadonlyArray<Plugin> = [
     lldapGroupMembershipPlugin,
     giteaTeamsPlugin,
-    // Future: immichAdminBitPlugin, ...
+    immichAdminBitPlugin,
   ]
 
   const existingSlugs = new Set<string>()

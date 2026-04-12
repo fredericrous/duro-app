@@ -1,8 +1,7 @@
 import { useFetcher } from "react-router"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo } from "react"
 import {
   Button,
-  Callout,
   Combobox,
   Dialog,
   EmptyState,
@@ -35,7 +34,6 @@ export function QuickGrantDialog({
 }: QuickGrantDialogProps) {
   const fetcher = useFetcher()
   const isSubmitting = fetcher.state !== "idle"
-  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null)
 
   // For LDAP-provisioned apps, only user principals can receive grants that
   // actually do something. Group principals stay DB-only until phase 2.
@@ -51,9 +49,6 @@ export function QuickGrantDialog({
     }
     return out
   }, [visiblePrincipals])
-
-  const selectedRole = selectedRoleId ? roles.find((r) => r.id === selectedRoleId) : null
-  const showImmichAdminWarning = applicationSlug === "immich" && selectedRole?.slug === "admin"
 
   // Close dialog after a successful submission
   useEffect(() => {
@@ -125,7 +120,7 @@ export function QuickGrantDialog({
 
                 <Field.Root>
                   <Field.Label>Role</Field.Label>
-                  <Select.Root name="roleId" onValueChange={setSelectedRoleId}>
+                  <Select.Root name="roleId">
                     <Select.Trigger aria-label="Role">
                       <Select.Value placeholder="Pick a role" />
                       <Select.Icon />
@@ -154,15 +149,6 @@ export function QuickGrantDialog({
                     Local date. The grant expires at midnight UTC on the chosen day.
                   </Field.Description>
                 </Field.Root>
-
-                {showImmichAdminWarning && (
-                  <Callout variant="warning">
-                    <Text>
-                      Immich admin bit must be flipped manually in Immich until phase 2. This grant will add the user
-                      to the Immich LLDAP group (so they can log in) but won't promote them to admin.
-                    </Text>
-                  </Callout>
-                )}
 
                 {fetcher.data && "error" in fetcher.data && (
                   <Text color="error">{String(fetcher.data.error)}</Text>

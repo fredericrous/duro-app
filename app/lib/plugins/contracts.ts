@@ -125,11 +125,22 @@ export interface ScopedLldapClient {
   readonly findGroupByName: (groupName: string) => Effect.Effect<{ id: number; displayName: string } | null, ScopeViolation>
 }
 
+export interface HttpCallOpts {
+  /** Vault secret logical name for auth token injection. */
+  readonly secret?: string
+  /**
+   * Auth header format. Defaults to "Authorization: token {value}" (Gitea).
+   * Set to a header name (e.g. "x-api-key") for non-standard auth, or
+   * "Bearer" for standard OAuth bearer.
+   */
+  readonly authHeader?: string
+}
+
 export interface ScopedHttpClient {
-  readonly get: (url: string, opts?: { secret?: string }) => Effect.Effect<unknown, PluginError>
-  readonly post: (url: string, body: unknown, opts?: { secret?: string }) => Effect.Effect<unknown, PluginError>
-  readonly put: (url: string, body: unknown, opts?: { secret?: string }) => Effect.Effect<unknown, PluginError>
-  readonly del: (url: string, opts?: { secret?: string }) => Effect.Effect<void, PluginError>
+  readonly get: (url: string, opts?: HttpCallOpts) => Effect.Effect<unknown, PluginError>
+  readonly post: (url: string, body: unknown, opts?: HttpCallOpts) => Effect.Effect<unknown, PluginError>
+  readonly put: (url: string, body: unknown, opts?: HttpCallOpts) => Effect.Effect<unknown, PluginError>
+  readonly del: (url: string, opts?: HttpCallOpts) => Effect.Effect<void, PluginError>
 }
 
 export interface ScopedVaultClient {

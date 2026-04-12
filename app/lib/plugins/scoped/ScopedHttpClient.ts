@@ -53,18 +53,27 @@ export function makeScopedHttpClient(
     return null
   }
 
-  const doFetch = (url: string, init: RequestInit, secretName?: string) =>
+  const doFetch = (url: string, init: RequestInit, secretName?: string, authHeader?: string) =>
     Effect.gen(function* () {
       const violation = assertUrlAllowed(url)
       if (violation) return yield* violation
 
-      // Inject Vault-backed bearer token when `secret` is provided
+      // Inject Vault-backed auth token when `secret` is provided.
+      // authHeader controls the format:
+      //   undefined → "Authorization: token {value}" (Gitea default)
+      //   "Bearer"  → "Authorization: Bearer {value}"
+      //   "x-api-key" → "x-api-key: {value}" (Immich, custom headers)
       const headers = new Headers(init.headers as HeadersInit | undefined)
       if (secretName) {
         const token = yield* vault.readSecret(secretName).pipe(
           Effect.mapError((e) => new PluginError({ message: `Failed to resolve secret '${secretName}': ${e.message}`, cause: e })),
         )
-        headers.set("Authorization", `token ${token}`)
+        const scheme = authHeader ?? "token"
+        if (scheme.toLowerCase() === "bearer" || scheme.toLowerCase() === "token") {
+          headers.set("Authorization", `${scheme} ${token}`)
+        } else {
+          headers.set(scheme, token)
+        }
       }
 
       const res = yield* Effect.tryPromise({
@@ -88,9 +97,9 @@ export function makeScopedHttpClient(
     eff.pipe(Effect.mapError((e) => (e instanceof PluginError ? e : new PluginError({ message: e.message, cause: e }))))
 
   return {
-    get: (url, opts) => mapErr(doFetch(url, { method: "GET" }, opts?.secret)),
-    post: (url, body, opts) => mapErr(doFetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, opts?.secret)),
-    put: (url, body, opts) => mapErr(doFetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, opts?.secret)),
-    del: (url, opts) => mapErr(doFetch(url, { method: "DELETE" }, opts?.secret)).pipe(Effect.asVoid),
+    get: (url, opts) => mapErr(doFetch(url, { method: "GET" }, opts?.secret, opts?.authHeader)),
+    post: (url, body, opts) => mapErr(doFetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, opts?.secret, opts?.authHeader)),
+    put: (url, body, opts) => mapErr(doFetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, opts?.secret, opts?.authHeader)),
+    del: (url, opts) => mapErr(doFetch(url, { method: "DELETE" }, opts?.secret, opts?.authHeader)).pipe(Effect.asVoid),
   }
 }
