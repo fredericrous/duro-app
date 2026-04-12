@@ -20,6 +20,7 @@ interface AppOverviewProps {
   roles: ReadonlyArray<Role>
   entitlements: ReadonlyArray<Entitlement>
   grants: ReadonlyArray<Grant>
+  pluginInfo: { pluginSlug: string; pluginVersion: string } | null
   onOpenQuickGrant: () => void
   onSwitchTab: (tab: string) => void
 }
@@ -42,6 +43,7 @@ export function AppOverview({
   roles,
   entitlements,
   grants,
+  pluginInfo,
   onOpenQuickGrant,
   onSwitchTab,
 }: AppOverviewProps) {
@@ -115,6 +117,13 @@ export function AppOverview({
 
             <Text color="muted">Description</Text>
             <Text>{application.description ?? "—"}</Text>
+
+            <Text color="muted">Provisioning</Text>
+            <Text>
+              {pluginInfo
+                ? `${pluginInfo.pluginSlug} v${pluginInfo.pluginVersion}`
+                : "None (grants are governance-only)"}
+            </Text>
           </html.div>
         </Panel.Body>
       </Panel.Root>

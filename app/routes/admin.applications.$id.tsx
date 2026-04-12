@@ -70,10 +70,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       const resources = yield* rbac.listResources(appId)
       const grants = yield* grantRepo.findActiveForApp(appId)
       const principals = yield* principalRepo.list()
-      const ldapSystem = yield* connectedSystems.findByApplicationAndType(appId, "ldap")
-      const ldapProvisioned = ldapSystem !== null && ldapSystem.status === "active"
+      const pluginSystem = yield* connectedSystems.findByApplicationAndType(appId, "plugin")
+      const ldapProvisioned = pluginSystem !== null && pluginSystem.status === "active"
 
-      return { application, roles, entitlements, resources, grants, principals, ldapProvisioned }
+      const pluginInfo = pluginSystem?.pluginSlug
+        ? { pluginSlug: pluginSystem.pluginSlug, pluginVersion: pluginSystem.pluginVersion ?? "?" }
+        : null
+
+      return { application, roles, entitlements, resources, grants, principals, ldapProvisioned, pluginInfo }
     }),
   )
 
@@ -357,7 +361,7 @@ const grantColumns = [
 // ---------------------------------------------------------------------------
 
 export default function AdminApplicationDetailPage({ loaderData }: Route.ComponentProps) {
-  const { application, roles, entitlements, resources, grants, principals, ldapProvisioned } = loaderData
+  const { application, roles, entitlements, resources, grants, principals, ldapProvisioned, pluginInfo } = loaderData
   const fetcher = useFetcher()
   const [activeTab, setActiveTab] = useState("overview")
   const settingsFetcher = useFetcher<typeof action>()
@@ -449,6 +453,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
               roles={roles as Role[]}
               entitlements={entitlements as Entitlement[]}
               grants={grants as Grant[]}
+              pluginInfo={pluginInfo}
               onOpenQuickGrant={() => setQuickGrantOpen(true)}
               onSwitchTab={setActiveTab}
             />

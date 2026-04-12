@@ -85,6 +85,7 @@ const navMap: Record<string, string> = {
   invitations: "/admin/invitations",
   "authz-playground": "/admin/authz-playground",
   audit: "/admin/audit",
+  plugins: "/admin/plugins",
   invites: "/admin",
   users: "/admin/users",
 }
@@ -160,6 +161,7 @@ export default function AdminLayout() {
         <SideNav.Item value="audit">{t("admin.nav.auditLog", "Audit Log")}</SideNav.Item>
       </SideNav.Group>
       <SideNav.Group label={t("admin.nav.system", "System")}>
+        <SideNav.Item value="plugins">{t("admin.nav.plugins", "Plugins")}</SideNav.Item>
         <SideNav.Item value="invites">{t("admin.nav.invites", "Invites")}</SideNav.Item>
         <SideNav.Item value="users">{t("admin.nav.users", "Users")}</SideNav.Item>
       </SideNav.Group>
