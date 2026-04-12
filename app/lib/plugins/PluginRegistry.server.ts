@@ -5,6 +5,7 @@ import { ManifestInvalid, PluginNotFound } from "./errors"
 import { lldapGroupMembershipPlugin } from "./builtins/lldap-group-membership"
 import { giteaTeamsPlugin } from "./builtins/gitea-teams"
 import { immichAdminBitPlugin } from "./builtins/immich-admin-bit"
+import { plexLibrariesPlugin } from "./builtins/plex-libraries"
 
 // ---------------------------------------------------------------------------
 // Service tag
@@ -81,6 +82,7 @@ export const PluginRegistryLive = Layer.sync(PluginRegistry, () => {
     lldapGroupMembershipPlugin,
     giteaTeamsPlugin,
     immichAdminBitPlugin,
+    plexLibrariesPlugin,
   ]
 
   const existingSlugs = new Set<string>()

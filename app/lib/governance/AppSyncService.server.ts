@@ -69,6 +69,14 @@ const PLUGIN_PROVISIONING_TEMPLATES: ReadonlyArray<PluginProvisioningTemplate> =
     config: { immichUrl: "https://photos.daddyshome.fr" },
     mappings: { admin: "immich-admin" },
   },
+  // Plex: direct API sharing (no LLDAP — Plex uses plex.tv accounts)
+  {
+    slug: "plex",
+    pluginSlug: "plex-libraries",
+    pluginVersion: "1.0.0",
+    config: { plexUrl: "https://plex.daddyshome.fr" },
+    mappings: { viewer: "plex-share", editor: "plex-share", admin: "plex-share" },
+  },
 ]
 
 export const PLUGIN_PROVISIONING_SLUGS: ReadonlySet<string> = new Set(
