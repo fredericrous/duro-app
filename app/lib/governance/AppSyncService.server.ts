@@ -23,6 +23,7 @@ interface PluginProvisioningTemplate {
 }
 
 const PLUGIN_PROVISIONING_TEMPLATES: ReadonlyArray<PluginProvisioningTemplate> = [
+  // Nextcloud: LLDAP groups for login gating
   {
     slug: "nextcloud",
     pluginSlug: "lldap-group-membership",
@@ -30,6 +31,7 @@ const PLUGIN_PROVISIONING_TEMPLATES: ReadonlyArray<PluginProvisioningTemplate> =
     config: { viewerGroup: "nextcloud-user", editorGroup: "nextcloud-user", adminGroup: "nextcloud-admin" },
     mappings: { viewer: "nextcloud-user", editor: "nextcloud-user", admin: "nextcloud-admin" },
   },
+  // Gitea: LLDAP groups for Authelia access-control gating
   {
     slug: "gitea",
     pluginSlug: "lldap-group-membership",
@@ -37,6 +39,21 @@ const PLUGIN_PROVISIONING_TEMPLATES: ReadonlyArray<PluginProvisioningTemplate> =
     config: { viewerGroup: "gitea-user", editorGroup: "gitea-user", adminGroup: "gitea-admin" },
     mappings: { viewer: "gitea-user", editor: "gitea-user", admin: "gitea-admin" },
   },
+  // Gitea: team membership for real viewer/editor/admin permission split
+  {
+    slug: "gitea",
+    pluginSlug: "gitea-teams",
+    pluginVersion: "1.0.0",
+    config: {
+      giteaUrl: "https://gitea.daddyshome.fr",
+      orgName: "homelab",
+      viewerTeamName: "viewers",
+      editorTeamName: "editors",
+      adminTeamName: "Owners",
+    },
+    mappings: { viewer: "viewers", editor: "editors", admin: "Owners" },
+  },
+  // Immich: LLDAP groups for login gating
   {
     slug: "immich",
     pluginSlug: "lldap-group-membership",
@@ -50,7 +67,7 @@ export const PLUGIN_PROVISIONING_SLUGS: ReadonlySet<string> = new Set(
   PLUGIN_PROVISIONING_TEMPLATES.map((t) => t.slug),
 )
 
-const findTemplate = (slug: string) => PLUGIN_PROVISIONING_TEMPLATES.find((t) => t.slug === slug)
+const findTemplates = (slug: string) => PLUGIN_PROVISIONING_TEMPLATES.filter((t) => t.slug === slug)
 
 // ---------------------------------------------------------------------------
 // Types
@@ -108,17 +125,25 @@ const wrapConnectorMappingErr = (msg: string) => (e: ConnectorMappingRepoError) 
  */
 const ensurePluginProvisioning = (appId: string, slug: string) =>
   Effect.gen(function* () {
-    const template = findTemplate(slug)
-    if (!template) return
+    const templates = findTemplates(slug)
+    if (templates.length === 0) return
+
+    for (const template of templates) {
+      yield* ensureSinglePlugin(appId, slug, template)
+    }
+  })
+
+const ensureSinglePlugin = (appId: string, slug: string, template: PluginProvisioningTemplate) =>
+  Effect.gen(function* () {
 
     const connectedSystems = yield* ConnectedSystemRepo
     const connectorMappings = yield* ConnectorMappingRepo
     const rbac = yield* RbacRepo
 
-    // 1. Find or create the ConnectedSystem row (now connector_type='plugin')
+    // 1. Find or create the ConnectedSystem row for this specific plugin
     let system = yield* connectedSystems
-      .findByApplicationAndType(appId, "plugin")
-      .pipe(Effect.mapError(wrapConnectedSystemErr(`Failed to look up plugin system for ${slug}`)))
+      .findByApplicationAndPlugin(appId, template.pluginSlug)
+      .pipe(Effect.mapError(wrapConnectedSystemErr(`Failed to look up plugin system ${template.pluginSlug} for ${slug}`)))
 
     if (!system) {
       system = yield* connectedSystems

@@ -28,6 +28,10 @@ export class ConnectedSystemRepo extends Context.Tag("ConnectedSystemRepo")<
       applicationId: string,
       connectorType: string,
     ) => Effect.Effect<ConnectedSystem | null, ConnectedSystemRepoError>
+    readonly findByApplicationAndPlugin: (
+      applicationId: string,
+      pluginSlug: string,
+    ) => Effect.Effect<ConnectedSystem | null, ConnectedSystemRepoError>
     readonly listByApplication: (applicationId: string) => Effect.Effect<ConnectedSystem[], ConnectedSystemRepoError>
   }
 >() {}
@@ -71,6 +75,17 @@ export const ConnectedSystemRepoLive = Layer.effect(
             Effect.map((rows) => (rows.length > 0 ? (decodeConnectedSystem(rows[0]) as ConnectedSystem) : null)),
           ),
           "Failed to find connected system by application and type",
+        ),
+
+      findByApplicationAndPlugin: (applicationId, pluginSlug) =>
+        withErr(
+          sql`SELECT * FROM connected_systems
+              WHERE application_id = ${applicationId}
+                AND plugin_slug = ${pluginSlug}
+              LIMIT 1`.pipe(
+            Effect.map((rows) => (rows.length > 0 ? (decodeConnectedSystem(rows[0]) as ConnectedSystem) : null)),
+          ),
+          "Failed to find connected system by application and plugin",
         ),
 
       listByApplication: (applicationId) =>

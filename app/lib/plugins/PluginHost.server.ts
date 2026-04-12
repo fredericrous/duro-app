@@ -78,16 +78,19 @@ export const PluginHostLive = Layer.effect(
         } satisfies GrantContext
       }).pipe(Effect.mapError((e) => (e instanceof PluginHostError ? e : new PluginHostError({ pluginSlug: "", message: `Failed to load grant context: ${e}`, cause: e }))))
 
-    const buildServices = (pluginSlug: string, manifest: PluginManifest, config: Record<string, unknown>): PluginServices => ({
+    const buildServices = (pluginSlug: string, manifest: PluginManifest, config: Record<string, unknown>): PluginServices => {
+      const scopedVault = makeScopedVaultClient(manifest)
+      return {
       lldap: makeScopedLldapClient(lldap, manifest, config),
-      http: makeScopedHttpClient(manifest),
-      vault: makeScopedVaultClient(manifest),
+      http: makeScopedHttpClient(manifest, scopedVault),
+      vault: scopedVault,
       audit: makeScopedAuditService(audit, manifest),
       log: (message, annotations) =>
         Effect.log(message).pipe(
           Effect.annotateLogs({ ...annotations, plugin: pluginSlug }),
         ),
-    })
+    }
+    }
 
     return {
       runProvision: (pluginSlug, grantId) =>

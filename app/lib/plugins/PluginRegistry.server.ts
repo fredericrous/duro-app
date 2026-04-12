@@ -3,6 +3,7 @@ import type { Plugin, PluginManifest, PluginCapability } from "./contracts"
 import { isReversible, PLUGIN_CAPABILITIES } from "./contracts"
 import { ManifestInvalid, PluginNotFound } from "./errors"
 import { lldapGroupMembershipPlugin } from "./builtins/lldap-group-membership"
+import { giteaTeamsPlugin } from "./builtins/gitea-teams"
 
 // ---------------------------------------------------------------------------
 // Service tag
@@ -77,7 +78,8 @@ function validatePlugin(plugin: Plugin): void {
 export const PluginRegistryLive = Layer.sync(PluginRegistry, () => {
   const plugins: ReadonlyArray<Plugin> = [
     lldapGroupMembershipPlugin,
-    // Future: giteaTeamsPlugin, immichAdminBitPlugin, ...
+    giteaTeamsPlugin,
+    // Future: immichAdminBitPlugin, ...
   ]
 
   const existingSlugs = new Set<string>()

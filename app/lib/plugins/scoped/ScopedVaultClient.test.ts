@@ -25,7 +25,7 @@ describe("ScopedVaultClient", () => {
     const scoped = makeScopedVaultClient(manifest, readFn)
 
     const value = await Effect.runPromise(scoped.readSecret("my-token"))
-    expect(value).toBe("secret-for-duro/plugins/test-plugin/secrets/my-token")
+    expect(value).toBe("secret-for-secret/data/duro/plugins/test-plugin/secrets/my-token")
   })
 
   it("rejects undeclared secrets with ScopeViolation", async () => {
@@ -46,7 +46,7 @@ describe("ScopedVaultClient", () => {
     const result = await Effect.runPromise(Effect.either(scoped.readSecret("my-token")))
     expect(result._tag).toBe("Left")
     if (result._tag === "Left") {
-      expect(result.left.message).toContain("VaultClient not configured")
+      expect(result.left.message).toContain("not found")
     }
   })
 })

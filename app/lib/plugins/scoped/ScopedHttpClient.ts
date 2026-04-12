@@ -1,5 +1,5 @@
 import { Effect } from "effect"
-import type { ScopedHttpClient, PluginManifest } from "../contracts"
+import type { ScopedHttpClient, ScopedVaultClient, PluginManifest } from "../contracts"
 import { PluginError, ScopeViolation } from "../errors"
 
 /**
@@ -18,6 +18,7 @@ import { PluginError, ScopeViolation } from "../errors"
  */
 export function makeScopedHttpClient(
   manifest: PluginManifest,
+  vault: ScopedVaultClient,
 ): ScopedHttpClient {
   const isDev = process.env.NODE_ENV === "development"
 
@@ -52,12 +53,22 @@ export function makeScopedHttpClient(
     return null
   }
 
-  const doFetch = (url: string, init: RequestInit) =>
+  const doFetch = (url: string, init: RequestInit, secretName?: string) =>
     Effect.gen(function* () {
       const violation = assertUrlAllowed(url)
       if (violation) return yield* violation
+
+      // Inject Vault-backed bearer token when `secret` is provided
+      const headers = new Headers(init.headers as HeadersInit | undefined)
+      if (secretName) {
+        const token = yield* vault.readSecret(secretName).pipe(
+          Effect.mapError((e) => new PluginError({ message: `Failed to resolve secret '${secretName}': ${e.message}`, cause: e })),
+        )
+        headers.set("Authorization", `token ${token}`)
+      }
+
       const res = yield* Effect.tryPromise({
-        try: () => fetch(url, { ...init, signal: AbortSignal.timeout(manifest.timeoutMs) }),
+        try: () => fetch(url, { ...init, headers, signal: AbortSignal.timeout(manifest.timeoutMs) }),
         catch: (e) => new PluginError({ message: `HTTP request failed: ${e instanceof Error ? e.message : String(e)}`, cause: e }),
       })
       if (!res.ok) {
@@ -77,9 +88,9 @@ export function makeScopedHttpClient(
     eff.pipe(Effect.mapError((e) => (e instanceof PluginError ? e : new PluginError({ message: e.message, cause: e }))))
 
   return {
-    get: (url, _opts) => mapErr(doFetch(url, { method: "GET" })),
-    post: (url, body, _opts) => mapErr(doFetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })),
-    put: (url, body, _opts) => mapErr(doFetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })),
-    del: (url, _opts) => mapErr(doFetch(url, { method: "DELETE" })).pipe(Effect.asVoid),
+    get: (url, opts) => mapErr(doFetch(url, { method: "GET" }, opts?.secret)),
+    post: (url, body, opts) => mapErr(doFetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, opts?.secret)),
+    put: (url, body, opts) => mapErr(doFetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, opts?.secret)),
+    del: (url, opts) => mapErr(doFetch(url, { method: "DELETE" }, opts?.secret)).pipe(Effect.asVoid),
   }
 }
