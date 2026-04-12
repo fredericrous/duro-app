@@ -1,8 +1,8 @@
 import { Cause, Context, Effect } from "effect"
 import { ProvisioningService, type ProvisioningError } from "~/lib/governance/ProvisioningService.server"
-import type { LdapConnector } from "~/lib/governance/connectors/LdapConnector.server"
+import type { PluginHost } from "~/lib/plugins/PluginHost.server"
 
-type ActivationDeps = ProvisioningService | LdapConnector
+type ActivationDeps = ProvisioningService | PluginHost
 
 /**
  * Fork a processing job as a background daemon fiber. Critical: use

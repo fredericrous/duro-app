@@ -8,35 +8,49 @@ import { ConnectorMappingRepo, type ConnectorMappingRepoError } from "./Connecto
 import { seedDefaultRbac } from "./defaultRbac"
 
 // ---------------------------------------------------------------------------
-// Known LDAP-provisioned apps. Hardcoded allow-list for phase 1.
-// Each entry maps the starter role slug → LLDAP group name.
+// Known plugin-provisioned apps. Hardcoded allow-list for phase 2A.
+// Each template seeds a ConnectedSystem (connector_type='plugin') + per-role
+// ConnectorMappings. The config shape matches the lldap-group-membership
+// plugin's configSchema.
 // ---------------------------------------------------------------------------
 
-interface LdapProvisioningTemplate {
+interface PluginProvisioningTemplate {
   readonly slug: string
-  readonly groupForRole: Record<string, string> // role slug → group name
+  readonly pluginSlug: string
+  readonly pluginVersion: string
+  readonly config: Record<string, unknown>
+  readonly mappings: Record<string, string>
 }
 
-const LDAP_PROVISIONING_TEMPLATES: ReadonlyArray<LdapProvisioningTemplate> = [
+const PLUGIN_PROVISIONING_TEMPLATES: ReadonlyArray<PluginProvisioningTemplate> = [
   {
     slug: "nextcloud",
-    groupForRole: { viewer: "nextcloud-user", editor: "nextcloud-user", admin: "nextcloud-admin" },
+    pluginSlug: "lldap-group-membership",
+    pluginVersion: "1.0.0",
+    config: { viewerGroup: "nextcloud-user", editorGroup: "nextcloud-user", adminGroup: "nextcloud-admin" },
+    mappings: { viewer: "nextcloud-user", editor: "nextcloud-user", admin: "nextcloud-admin" },
   },
   {
     slug: "gitea",
-    groupForRole: { viewer: "gitea-user", editor: "gitea-user", admin: "gitea-admin" },
+    pluginSlug: "lldap-group-membership",
+    pluginVersion: "1.0.0",
+    config: { viewerGroup: "gitea-user", editorGroup: "gitea-user", adminGroup: "gitea-admin" },
+    mappings: { viewer: "gitea-user", editor: "gitea-user", admin: "gitea-admin" },
   },
   {
     slug: "immich",
-    groupForRole: { viewer: "immich-user", editor: "immich-user", admin: "immich-user" },
+    pluginSlug: "lldap-group-membership",
+    pluginVersion: "1.0.0",
+    config: { viewerGroup: "immich-user", editorGroup: "immich-user", adminGroup: "immich-user" },
+    mappings: { viewer: "immich-user", editor: "immich-user", admin: "immich-user" },
   },
 ]
 
-export const LDAP_PROVISIONING_SLUGS: ReadonlySet<string> = new Set(
-  LDAP_PROVISIONING_TEMPLATES.map((t) => t.slug),
+export const PLUGIN_PROVISIONING_SLUGS: ReadonlySet<string> = new Set(
+  PLUGIN_PROVISIONING_TEMPLATES.map((t) => t.slug),
 )
 
-const findTemplate = (slug: string) => LDAP_PROVISIONING_TEMPLATES.find((t) => t.slug === slug)
+const findTemplate = (slug: string) => PLUGIN_PROVISIONING_TEMPLATES.find((t) => t.slug === slug)
 
 // ---------------------------------------------------------------------------
 // Types
@@ -88,11 +102,11 @@ const wrapConnectorMappingErr = (msg: string) => (e: ConnectorMappingRepoError) 
   new AppSyncError({ message: msg, cause: e })
 
 /**
- * Idempotent backfill of ConnectedSystem + ConnectorMappings for known LDAP-
+ * Idempotent backfill of ConnectedSystem + ConnectorMappings for known plugin-
  * provisioned apps. Runs on every sync, not just first create. Never calls
  * LLDAP (invariant 6) — groups are pre-created by the LLDAP bootstrap job.
  */
-const ensureLdapProvisioning = (appId: string, slug: string) =>
+const ensurePluginProvisioning = (appId: string, slug: string) =>
   Effect.gen(function* () {
     const template = findTemplate(slug)
     if (!template) return
@@ -101,20 +115,22 @@ const ensureLdapProvisioning = (appId: string, slug: string) =>
     const connectorMappings = yield* ConnectorMappingRepo
     const rbac = yield* RbacRepo
 
-    // 1. Find or create the ConnectedSystem row
+    // 1. Find or create the ConnectedSystem row (now connector_type='plugin')
     let system = yield* connectedSystems
-      .findByApplicationAndType(appId, "ldap")
-      .pipe(Effect.mapError(wrapConnectedSystemErr(`Failed to look up LDAP system for ${slug}`)))
+      .findByApplicationAndType(appId, "plugin")
+      .pipe(Effect.mapError(wrapConnectedSystemErr(`Failed to look up plugin system for ${slug}`)))
 
     if (!system) {
       system = yield* connectedSystems
         .create({
           applicationId: appId,
-          connectorType: "ldap",
-          config: { groupPrefix: slug },
+          connectorType: "plugin",
+          config: template.config,
           status: "active",
+          pluginSlug: template.pluginSlug,
+          pluginVersion: template.pluginVersion,
         })
-        .pipe(Effect.mapError(wrapConnectedSystemErr(`Failed to create LDAP system for ${slug}`)))
+        .pipe(Effect.mapError(wrapConnectedSystemErr(`Failed to create plugin system for ${slug}`)))
     }
 
     // 2. For each existing role matching a template entry, upsert a mapping
@@ -123,7 +139,7 @@ const ensureLdapProvisioning = (appId: string, slug: string) =>
       .pipe(Effect.mapError(wrapRbacRepoErr(`Failed to list roles for ${slug}`)))
 
     for (const role of roles) {
-      const externalRoleIdentifier = template.groupForRole[role.slug]
+      const externalRoleIdentifier = template.mappings[role.slug]
       if (!externalRoleIdentifier) continue
       yield* connectorMappings
         .ensureForRole({
@@ -181,7 +197,7 @@ export const AppSyncServiceLive = Layer.succeed(AppSyncService, {
                   Effect.mapError(wrapRbacRepoErr(`Failed to seed starter RBAC for ${app.id}`)),
                 )
 
-                yield* ensureLdapProvisioning(createdApp.id, app.id)
+                yield* ensurePluginProvisioning(createdApp.id, app.id)
               }),
             )
             .pipe(
@@ -204,7 +220,7 @@ export const AppSyncServiceLive = Layer.succeed(AppSyncService, {
 
           // Idempotent backfill on every sync for known-slug apps. Catches
           // apps that were synced before provisioning existed.
-          yield* ensureLdapProvisioning(existing.id, existing.slug)
+          yield* ensurePluginProvisioning(existing.id, existing.slug)
         }
       }
 

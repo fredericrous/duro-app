@@ -17,9 +17,11 @@ export class ConnectedSystemRepo extends Context.Tag("ConnectedSystemRepo")<
   {
     readonly create: (input: {
       applicationId: string
-      connectorType: "http" | "ldap" | "scim" | "webhook"
+      connectorType: "http" | "ldap" | "scim" | "webhook" | "plugin"
       config: Record<string, unknown>
       status?: "active" | "disabled" | "error"
+      pluginSlug?: string
+      pluginVersion?: string
     }) => Effect.Effect<ConnectedSystem, ConnectedSystemRepoError>
     readonly findById: (id: string) => Effect.Effect<ConnectedSystem | null, ConnectedSystemRepoError>
     readonly findByApplicationAndType: (
@@ -41,9 +43,11 @@ export const ConnectedSystemRepoLive = Layer.effect(
         Effect.gen(function* () {
           const status = input.status ?? "active"
           const configJson = JSON.stringify(input.config)
+          const pluginSlug = input.pluginSlug ?? null
+          const pluginVersion = input.pluginVersion ?? null
           const rows = yield* withErr(
-            sql`INSERT INTO connected_systems (application_id, connector_type, config, status)
-                VALUES (${input.applicationId}, ${input.connectorType}, ${configJson}::jsonb, ${status})
+            sql`INSERT INTO connected_systems (application_id, connector_type, config, status, plugin_slug, plugin_version)
+                VALUES (${input.applicationId}, ${input.connectorType}, ${configJson}::jsonb, ${status}, ${pluginSlug}, ${pluginVersion})
                 RETURNING *`,
             "Failed to create connected system",
           )

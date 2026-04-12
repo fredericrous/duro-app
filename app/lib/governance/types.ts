@@ -236,6 +236,8 @@ export const ConnectedSystemRow = Schema.Struct({
   connectorType: Schema.String,
   config: Schema.Unknown, // JSONB
   status: Schema.String,
+  pluginSlug: Coerced.NullableString,
+  pluginVersion: Coerced.NullableString,
   lastSyncAt: Coerced.NullableDateString,
   lastError: Coerced.NullableString,
   createdAt: Coerced.DateString,

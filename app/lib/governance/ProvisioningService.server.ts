@@ -2,7 +2,7 @@ import { Cause, Context, Data, Effect, Exit, Layer } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { MigrationsRan } from "~/lib/db/client.server"
-import { LdapConnector } from "./connectors/LdapConnector.server"
+import { PluginHost } from "~/lib/plugins/PluginHost.server"
 import { decodeProvisioningJob, type ProvisioningJob } from "./types"
 
 // ---------------------------------------------------------------------------
@@ -28,8 +28,8 @@ export class ProvisioningService extends Context.Tag("ProvisioningService")<
     readonly onGrantActivated: (grantId: string) => Effect.Effect<string[], ProvisioningError>
     /** Symmetric; enqueues deprovision jobs. Returns the enqueued job IDs. */
     readonly onGrantRevoked: (grantId: string) => Effect.Effect<string[], ProvisioningError>
-    readonly processNextPending: () => Effect.Effect<void, ProvisioningError, LdapConnector>
-    readonly processJob: (jobId: string) => Effect.Effect<void, ProvisioningError, LdapConnector>
+    readonly processNextPending: () => Effect.Effect<void, ProvisioningError, PluginHost>
+    readonly processJob: (jobId: string) => Effect.Effect<void, ProvisioningError, PluginHost>
   }
 >() {}
 
@@ -144,10 +144,10 @@ const processJobInternal = (sql: SqlClient.SqlClient, job: ProvisioningJob) =>
 
     yield* markRunning(sql, job.id)
 
-    // 2. Load connected system config
+    // 2. Load connected system
     const systems = yield* withErr(
-      sql<{ connectorType: string; config: unknown }>`
-        SELECT connector_type, config FROM connected_systems WHERE id = ${job.connectedSystemId}
+      sql<{ connectorType: string; config: unknown; pluginSlug: string | null }>`
+        SELECT connector_type, config, plugin_slug FROM connected_systems WHERE id = ${job.connectedSystemId}
       `,
       "Failed to load connected system",
     )
@@ -164,40 +164,44 @@ const processJobInternal = (sql: SqlClient.SqlClient, job: ProvisioningJob) =>
 
     const connectorType = system.connectorType ?? "http"
 
-    // 3. Load grant details (only used by the http connector body)
-    const grants = yield* withErr(
-      sql<{
-        principalId: string
-        roleId: string | null
-        entitlementId: string | null
-        resourceId: string | null
-      }>`SELECT principal_id, role_id, entitlement_id, resource_id FROM grants WHERE id = ${job.grantId}`,
-      "Failed to load grant",
-    )
-    const grant = grants[0]
-
-    // 4. Dispatch on connector_type
-    const dispatchEffect: Effect.Effect<void, ProvisioningError, LdapConnector> =
-      connectorType === "http"
-        ? executeHttpConnector(config, job.operation, {
-            grantId: job.grantId,
-            principalId: grant?.principalId ?? null,
-            roleId: grant?.roleId ?? null,
-            entitlementId: grant?.entitlementId ?? null,
-            resourceId: grant?.resourceId ?? null,
-            operation: job.operation,
+    // 3. Dispatch on connector_type
+    const dispatchEffect: Effect.Effect<void, ProvisioningError, PluginHost> =
+      connectorType === "plugin" && system.pluginSlug
+        ? Effect.gen(function* () {
+            const host = yield* PluginHost
+            const op =
+              job.operation === "provision"
+                ? host.runProvision(system.pluginSlug!, job.grantId)
+                : host.runDeprovision(system.pluginSlug!, job.grantId)
+            yield* op.pipe(
+              Effect.mapError((e) => new ProvisioningError({ message: e.message, cause: e })),
+            )
           })
-        : connectorType === "ldap"
-          ? Effect.gen(function* () {
-              const ldap = yield* LdapConnector
-              const op =
-                job.operation === "provision"
-                  ? ldap.provisionGrant(job.grantId)
-                  : ldap.deprovisionGrant(job.grantId)
-              yield* op.pipe(
-                Effect.mapError((e) => new ProvisioningError({ message: e.message, cause: e })),
-              )
-            })
+        : connectorType === "http"
+          ? (() => {
+              // Legacy HTTP connector — loads grant details for the request body
+              const loadAndPost = Effect.gen(function* () {
+                const grants = yield* withErr(
+                  sql<{
+                    principalId: string
+                    roleId: string | null
+                    entitlementId: string | null
+                    resourceId: string | null
+                  }>`SELECT principal_id, role_id, entitlement_id, resource_id FROM grants WHERE id = ${job.grantId}`,
+                  "Failed to load grant",
+                )
+                const grant = grants[0]
+                yield* executeHttpConnector(config, job.operation, {
+                  grantId: job.grantId,
+                  principalId: grant?.principalId ?? null,
+                  roleId: grant?.roleId ?? null,
+                  entitlementId: grant?.entitlementId ?? null,
+                  resourceId: grant?.resourceId ?? null,
+                  operation: job.operation,
+                })
+              })
+              return loadAndPost as Effect.Effect<void, ProvisioningError, never>
+            })()
           : Effect.fail(
               new ProvisioningError({ message: `Connector type not implemented: ${connectorType}` }),
             )

@@ -19,8 +19,6 @@ import { RbacRepoLive } from "~/lib/governance/RbacRepo.server"
 import { GrantRepoLive } from "~/lib/governance/GrantRepo.server"
 import { ConnectedSystemRepoLive } from "~/lib/governance/ConnectedSystemRepo.server"
 import { ConnectorMappingRepoLive } from "~/lib/governance/ConnectorMappingRepo.server"
-import { LdapConnectorLive, LdapConnectorDev } from "~/lib/governance/connectors/LdapConnector.server"
-import { LldapClientLive } from "~/lib/services/LldapClient.server"
 import { AuthzEngineLive } from "~/lib/governance/AuthzEngine.server"
 import { AccessRequestRepoLive } from "~/lib/governance/AccessRequestRepo.server"
 import { AccessInvitationRepoLive } from "~/lib/governance/AccessInvitationRepo.server"
@@ -31,13 +29,16 @@ import { GroupSyncServiceLive } from "~/lib/governance/GroupSyncService.server"
 import { OperatorClientLive, OperatorClientDev } from "./OperatorClient.server"
 import { AppSyncServiceLive } from "~/lib/governance/AppSyncService.server"
 
+// Plugin system
+import { PluginRegistryLive } from "~/lib/plugins/PluginRegistry.server"
+import { PluginHostLive } from "~/lib/plugins/PluginHost.server"
+import { LldapClientLive } from "~/lib/services/LldapClient.server"
+
 const isDevServer = process.env.NODE_ENV === "development" && process.env.VITEST !== "true"
 
-// Shared governance repos — extracted as a single Layer value so both
-// AppLayer's top-level merge and LdapConnectorWired's sub-provide resolve to
-// the SAME memoized build. Referencing the same Layer value in both places
-// (not a freshly-constructed mergeAll each time) is what unlocks Effect's
-// per-build memoization, so these repos are instantiated exactly once.
+// Shared governance repos — extracted as a single Layer value so both the
+// outer AppLayer merge and the PluginHostWired sub-provide resolve to the
+// SAME memoized build. Same-value references = one build in Effect's Layer.
 const GovernanceRepos = Layer.mergeAll(
   PrincipalRepoLive,
   RbacRepoLive,
@@ -46,11 +47,19 @@ const GovernanceRepos = Layer.mergeAll(
   ConnectorMappingRepoLive,
 )
 
-// LdapConnectorLive depends on the governance repos + LldapClient. Because
-// GovernanceRepos is referenced by value here AND in the outer mergeAll, the
-// memoized build is shared.
-const LdapConnectorWired = LdapConnectorLive.pipe(
-  Layer.provide(Layer.mergeAll(GovernanceRepos, LldapClientLive)),
+// PluginHostLive depends on governance repos, LldapClient, AuditService,
+// ApplicationRepo, and PluginRegistry. Build a dedicated wired layer so
+// its Service Tag stays dependency-free and callers only need PluginHost.
+const PluginHostWired = PluginHostLive.pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      GovernanceRepos,
+      ApplicationRepoLive,
+      PluginRegistryLive,
+      LldapClientLive,
+      isDevServer ? AuditServiceDev : AuditServiceLive,
+    ),
+  ),
 )
 
 export const AppLayer = Layer.mergeAll(
@@ -65,7 +74,6 @@ export const AppLayer = Layer.mergeAll(
   // Governance services
   ApplicationRepoLive,
   GovernanceRepos,
-  isDevServer ? LdapConnectorDev : LdapConnectorWired,
   AuthzEngineLive,
   AccessRequestRepoLive,
   AccessInvitationRepoLive,
@@ -75,6 +83,9 @@ export const AppLayer = Layer.mergeAll(
   GroupSyncServiceLive,
   isDevServer ? OperatorClientDev : OperatorClientLive,
   AppSyncServiceLive,
+  // Plugin system
+  PluginRegistryLive,
+  isDevServer ? PluginHostWired : PluginHostWired,
 ).pipe(
   Layer.provideMerge(isDevServer ? DbDevLive : DbLive),
   Layer.provide(OtelLayer),

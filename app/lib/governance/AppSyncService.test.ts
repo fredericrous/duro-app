@@ -256,7 +256,7 @@ describe("AppSyncService", () => {
         const mappings = yield* ConnectorMappingRepo
 
         const app = yield* appRepo.findBySlug("nextcloud")
-        const system = yield* systems.findByApplicationAndType(app!.id, "ldap")
+        const system = yield* systems.findByApplicationAndType(app!.id, "plugin")
         const roles = yield* rbac.listRoles(app!.id)
 
         const mappingsFor = new Map<string, string>()
@@ -269,7 +269,7 @@ describe("AppSyncService", () => {
       }).pipe(Effect.provide(layersFor(nextcloudCluster)), Effect.runPromise)
 
       expect(result.system).not.toBeNull()
-      expect(result.system!.connectorType).toBe("ldap")
+      expect(result.system!.connectorType).toBe("plugin")
       expect(result.mappingsFor.get("viewer")).toBe("nextcloud-user")
       expect(result.mappingsFor.get("editor")).toBe("nextcloud-user")
       expect(result.mappingsFor.get("admin")).toBe("nextcloud-admin")
@@ -283,7 +283,7 @@ describe("AppSyncService", () => {
       const appRepo = yield* ApplicationRepo
       const systems = yield* ConnectedSystemRepo
       const app = yield* appRepo.findBySlug("jellyfin")
-      return yield* systems.findByApplicationAndType(app!.id, "ldap")
+      return yield* systems.findByApplicationAndType(app!.id, "plugin")
     }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
 
     expect(system).toBeNull()
@@ -382,7 +382,7 @@ describe("AppSyncService — transactional seeding (real DB)", () => {
       if (!app) throw new Error("app missing")
       const roles = yield* rbac.listRoles(app.id)
       const ents = yield* rbac.listEntitlements(app.id)
-      const system = yield* systems.findByApplicationAndType(app.id, "ldap")
+      const system = yield* systems.findByApplicationAndType(app.id, "plugin")
       return { app, roles, ents, system }
     }).pipe(Effect.provide(layersFor(nextcloudCluster)), Effect.runPromise)
 
