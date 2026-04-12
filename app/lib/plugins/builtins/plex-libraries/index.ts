@@ -4,7 +4,11 @@ import { PluginError } from "../../errors"
 import { manifest, type PlexLibrariesConfig } from "./manifest"
 
 const PLEX_TV = "https://plex.tv"
-const AUTH = { secret: "plex-token" as const, authHeader: "X-Plex-Token" as const }
+const AUTH = {
+  secret: "plex-token" as const,
+  authHeader: "X-Plex-Token" as const,
+  headers: { Accept: "application/json" } as const,
+}
 
 interface PlexLibrarySection {
   key: string

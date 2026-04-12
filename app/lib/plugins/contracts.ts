@@ -134,6 +134,8 @@ export interface HttpCallOpts {
    * "Bearer" for standard OAuth bearer.
    */
   readonly authHeader?: string
+  /** Additional request headers merged into the request. */
+  readonly headers?: Readonly<Record<string, string>>
 }
 
 export interface ScopedHttpClient {

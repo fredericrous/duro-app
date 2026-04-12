@@ -171,8 +171,8 @@ const processJobInternal = (sql: SqlClient.SqlClient, job: ProvisioningJob) =>
             const host = yield* PluginHost
             const op =
               job.operation === "provision"
-                ? host.runProvision(system.pluginSlug!, job.grantId)
-                : host.runDeprovision(system.pluginSlug!, job.grantId)
+                ? host.runProvision(system.pluginSlug!, job.grantId, job.connectedSystemId)
+                : host.runDeprovision(system.pluginSlug!, job.grantId, job.connectedSystemId)
             yield* op.pipe(
               Effect.mapError((e) => new ProvisioningError({ message: e.message, cause: e })),
             )

@@ -23,8 +23,8 @@ import { AuditService } from "~/lib/governance/AuditService.server"
 export class PluginHost extends Context.Tag("PluginHost")<
   PluginHost,
   {
-    readonly runProvision: (pluginSlug: string, grantId: string) => Effect.Effect<void, PluginHostError>
-    readonly runDeprovision: (pluginSlug: string, grantId: string) => Effect.Effect<void, PluginHostError>
+    readonly runProvision: (pluginSlug: string, grantId: string, connectedSystemId: string) => Effect.Effect<void, PluginHostError>
+    readonly runDeprovision: (pluginSlug: string, grantId: string, connectedSystemId: string) => Effect.Effect<void, PluginHostError>
   }
 >() {}
 
@@ -45,7 +45,7 @@ export const PluginHostLive = Layer.effect(
     const lldap = yield* LldapClient
     const audit = yield* AuditService
 
-    const loadGrantContext = (grantId: string) =>
+    const loadGrantContext = (grantId: string, connectedSystemId: string) =>
       Effect.gen(function* () {
         const grant = yield* grantRepo.findById(grantId)
         if (!grant) return yield* new PluginHostError({ pluginSlug: "", grantId, message: `Grant ${grantId} not found` })
@@ -60,8 +60,10 @@ export const PluginHostLive = Layer.effect(
         const app = yield* appRepo.findById(role.applicationId)
         if (!app) return yield* new PluginHostError({ pluginSlug: "", grantId, message: `Application ${role.applicationId} not found` })
 
-        const system = yield* connectedSystems.findByApplicationAndType(role.applicationId, "plugin")
-        if (!system) return yield* new PluginHostError({ pluginSlug: "", grantId, message: `No plugin ConnectedSystem for application ${role.applicationId}` })
+        // Load the SPECIFIC connected system for this job, not just
+        // any plugin system on the app. Critical for multi-plugin apps.
+        const system = yield* connectedSystems.findById(connectedSystemId)
+        if (!system) return yield* new PluginHostError({ pluginSlug: "", grantId, message: `ConnectedSystem ${connectedSystemId} not found` })
 
         const config: Record<string, unknown> =
           typeof system.config === "string"
@@ -75,7 +77,8 @@ export const PluginHostLive = Layer.effect(
           applicationId: role.applicationId,
           applicationSlug: app.slug,
           config,
-        } satisfies GrantContext
+          connectedSystemId,
+        } satisfies GrantContext & { connectedSystemId: string }
       }).pipe(Effect.mapError((e) => (e instanceof PluginHostError ? e : new PluginHostError({ pluginSlug: "", message: `Failed to load grant context: ${e}`, cause: e }))))
 
     const buildServices = (pluginSlug: string, manifest: PluginManifest, config: Record<string, unknown>): PluginServices => {
@@ -93,12 +96,12 @@ export const PluginHostLive = Layer.effect(
     }
 
     return {
-      runProvision: (pluginSlug, grantId) =>
+      runProvision: (pluginSlug, grantId, connectedSystemId) =>
         Effect.gen(function* () {
           const plugin = yield* registry.get(pluginSlug).pipe(
             Effect.mapError((e) => new PluginHostError({ pluginSlug, grantId, message: `Plugin not found: ${pluginSlug}`, cause: e })),
           )
-          const ctx = yield* loadGrantContext(grantId)
+          const ctx = yield* loadGrantContext(grantId, connectedSystemId)
           const { manifest } = plugin
 
           // Validate config against schema
@@ -150,12 +153,12 @@ export const PluginHostLive = Layer.effect(
           )
         }),
 
-      runDeprovision: (pluginSlug, grantId) =>
+      runDeprovision: (pluginSlug, grantId, connectedSystemId) =>
         Effect.gen(function* () {
           const plugin = yield* registry.get(pluginSlug).pipe(
             Effect.mapError((e) => new PluginHostError({ pluginSlug, grantId, message: `Plugin not found: ${pluginSlug}`, cause: e })),
           )
-          const ctx = yield* loadGrantContext(grantId)
+          const ctx = yield* loadGrantContext(grantId, connectedSystemId)
           const { manifest } = plugin
 
           yield* Effect.try({
@@ -163,19 +166,11 @@ export const PluginHostLive = Layer.effect(
             catch: (e) => new PluginHostError({ pluginSlug, grantId, message: `Config validation failed: ${e}`, cause: e }),
           })
 
-          // Over-revoke safety check (invariant 1): before running the
-          // plugin's deprovision, check if ANY other active grant for the
-          // same principal maps to the same external identifier for this app.
-          // If so, skip — the user should remain in the target group.
-          const system = yield* connectedSystems
-            .findByApplicationAndType(ctx.applicationId, "plugin")
-            .pipe(Effect.mapError((e) => new PluginHostError({ pluginSlug, grantId, message: `Failed to load connected system`, cause: e })))
-
-          const mapping = system
-            ? yield* connectorMappings
-                .findByConnectedSystemAndRole(system.id, ctx.role.id)
-                .pipe(Effect.mapError((e) => new PluginHostError({ pluginSlug, grantId, message: `Failed to load mapping`, cause: e })))
-            : null
+          // Over-revoke safety check (invariant 1): use the SPECIFIC
+          // connected system for this job, not any system on the app.
+          const mapping = yield* connectorMappings
+            .findByConnectedSystemAndRole(connectedSystemId, ctx.role.id)
+            .pipe(Effect.mapError((e) => new PluginHostError({ pluginSlug, grantId, message: `Failed to load mapping`, cause: e })))
 
           if (mapping) {
             const hasOther = yield* grantRepo

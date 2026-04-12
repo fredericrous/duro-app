@@ -8,6 +8,7 @@ import { getAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
+import { AuditService } from "~/lib/governance/AuditService.server"
 import { deactivateGrant } from "~/lib/workflows/grant-activation.server"
 import type { Grant } from "~/lib/governance/types"
 import {
@@ -85,7 +86,14 @@ export async function action({ request }: Route.ActionArgs) {
     await runEffect(
       Effect.gen(function* () {
         const repo = yield* GrantRepo
+        const audit = yield* AuditService
         yield* repo.revoke(grantId, principal.id)
+        yield* audit.emit({
+          eventType: "grant.revoked",
+          actorId: principal.id,
+          targetType: "grant",
+          targetId: grantId,
+        }).pipe(Effect.catchAll(() => Effect.void))
         yield* deactivateGrant(grantId)
       }),
     )
