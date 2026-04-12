@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "react-router dev",
-    "build": "react-router build",
+    "build": "react-router build && node scripts/build-worker.mjs",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
     "lint": "eslint app/",
@@ -73,6 +73,7 @@
     "@types/react-dom": "~19.1.7",
     "@vitest/coverage-v8": "^4.1.0",
     "babel-plugin-react-compiler": "1.0.0",
+    "esbuild": "^0.28.0",
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.0.1",
