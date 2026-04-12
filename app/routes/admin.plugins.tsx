@@ -1,4 +1,5 @@
 import { Effect } from "effect"
+import { useNavigate } from "react-router"
 import { runEffect } from "~/lib/runtime.server"
 import { PluginRegistry } from "~/lib/plugins/PluginRegistry.server"
 import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
@@ -14,6 +15,7 @@ import {
   Text,
 } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { css, html } from "react-strict-dom"
 
 interface PluginRow {
   manifest: PluginManifest
@@ -26,35 +28,35 @@ export async function loader() {
       const registry = yield* PluginRegistry
       const systems = yield* ConnectedSystemRepo
       const manifests = yield* registry.list()
+      const counts = yield* systems.countByPluginSlug()
 
-      const rows: PluginRow[] = []
-      for (const m of manifests) {
-        const installs = yield* systems.listByApplication("").pipe(
-          Effect.catchAll(() => Effect.succeed([])),
-        )
-        const count = installs.filter(
-          (s) => s.connectorType === "plugin" && s.pluginSlug === m.slug,
-        ).length
+      const countMap = new Map(counts.map((c) => [c.pluginSlug, c.count]))
 
-        rows.push({ manifest: m, installCount: count })
-      }
-
-      return rows
+      return manifests.map((m): PluginRow => ({
+        manifest: m,
+        installCount: countMap.get(m.slug) ?? 0,
+      }))
     }),
   )
 
   return { plugins: data }
 }
 
+const styles = css.create({
+  clickableRow: { cursor: "pointer" },
+  displayContents: { display: "contents" },
+})
+
 export default function AdminPluginsPage({ loaderData }: { loaderData: Awaited<ReturnType<typeof loader>> }) {
   const { plugins } = loaderData
+  const navigate = useNavigate()
 
   return (
     <Stack gap="md">
       <Heading level={2}>Provisioning Plugins</Heading>
       <Text color="muted">
         Registered plugins that handle grant provisioning to external systems.
-        Each plugin declares its capabilities and permission strategy.
+        Click a plugin for details and recent activity.
       </Text>
 
       <CardSection title={`Plugins (${plugins.length})`}>
@@ -74,39 +76,45 @@ export default function AdminPluginsPage({ loaderData }: { loaderData: Awaited<R
                 </Table.Header>
                 <Table.Body>
                   {plugins.map((p: PluginRow) => (
-                    <Table.Row key={p.manifest.slug}>
-                      <Table.Cell>
-                        <Stack gap="xs">
-                          <Text>{p.manifest.displayName}</Text>
-                          <Text color="muted" variant="caption">
-                            {p.manifest.slug}
-                          </Text>
-                        </Stack>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge variant="default">{p.manifest.version}</Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge variant={p.manifest.imperative ? "warning" : "success"}>
-                          {p.manifest.imperative ? "Imperative" : "Declarative"}
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Inline gap="xs">
-                          {p.manifest.capabilities.map((cap: string) => (
-                            <Tag key={cap} size="sm">
-                              {cap}
-                            </Tag>
-                          ))}
-                        </Inline>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text>{p.installCount}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text>{p.manifest.timeoutMs / 1000}s</Text>
-                      </Table.Cell>
-                    </Table.Row>
+                    <html.div
+                      key={p.manifest.slug}
+                      onClick={() => navigate(`/admin/plugins/${p.manifest.slug}`)}
+                      style={[styles.clickableRow, styles.displayContents]}
+                    >
+                      <Table.Row>
+                        <Table.Cell>
+                          <Stack gap="xs">
+                            <Text>{p.manifest.displayName}</Text>
+                            <Text color="muted" variant="caption">
+                              {p.manifest.slug}
+                            </Text>
+                          </Stack>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Badge variant="default">{p.manifest.version}</Badge>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Badge variant={p.manifest.imperative ? "warning" : "success"}>
+                            {p.manifest.imperative ? "Imperative" : "Declarative"}
+                          </Badge>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Inline gap="xs">
+                            {p.manifest.capabilities.map((cap: string) => (
+                              <Tag key={cap} size="sm">
+                                {cap}
+                              </Tag>
+                            ))}
+                          </Inline>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text>{p.installCount}</Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text>{p.manifest.timeoutMs / 1000}s</Text>
+                        </Table.Cell>
+                      </Table.Row>
+                    </html.div>
                   ))}
                 </Table.Body>
               </Table.Root>
@@ -117,33 +125,6 @@ export default function AdminPluginsPage({ loaderData }: { loaderData: Awaited<R
           </ScrollArea.Scrollbar>
         </ScrollArea.Root>
       </CardSection>
-
-      {plugins.map((p: PluginRow) => (
-        <CardSection key={p.manifest.slug} title={`${p.manifest.displayName} — Permission Strategy`}>
-          <Stack gap="sm">
-            <Text color="muted">{p.manifest.description}</Text>
-            {Object.entries(p.manifest.permissionStrategy.byRoleSlug).map(([roleSlug, actions]: [string, readonly PluginAction[]]) => (
-              <Inline key={roleSlug} gap="sm" align="center">
-                <Badge variant="info">{roleSlug}</Badge>
-                <Text>{"\u2192"}</Text>
-                <Text>
-                  {actions.map((a: PluginAction) => `${a.op}(${"group" in a ? a.group : "url" in a ? a.url : ""})`).join(", ")}
-                </Text>
-              </Inline>
-            ))}
-            {p.manifest.vaultSecrets.length > 0 && (
-              <Text color="muted">
-                Vault secrets: {p.manifest.vaultSecrets.join(", ")}
-              </Text>
-            )}
-            {p.manifest.allowedDomains.length > 0 && (
-              <Text color="muted">
-                Allowed domains: {p.manifest.allowedDomains.join(", ")}
-              </Text>
-            )}
-          </Stack>
-        </CardSection>
-      ))}
     </Stack>
   )
 }

@@ -23,23 +23,33 @@ export async function loader({ request }: Route.LoaderArgs) {
   const eventType = url.searchParams.get("eventType") || undefined
   const actorId = url.searchParams.get("actorId") || undefined
   const applicationId = url.searchParams.get("applicationId") || undefined
+  const source = url.searchParams.get("source") || undefined
   const page = parseInt(url.searchParams.get("page") || "0", 10)
   const pageSize = 50
 
   const events = await runEffect(
     Effect.gen(function* () {
       const svc = yield* AuditService
-      return yield* svc.query({
+      const raw = yield* svc.query({
         eventType,
         actorId,
         applicationId,
-        limit: pageSize,
-        offset: page * pageSize,
+        limit: source ? pageSize * 5 : pageSize,
+        offset: source ? 0 : page * pageSize,
       })
+
+      if (!source) return raw
+
+      return raw
+        .filter((e) => {
+          const meta = (e.metadata ?? {}) as Record<string, unknown>
+          return meta.source === source
+        })
+        .slice(0, pageSize)
     }),
   )
 
-  return { events, page, pageSize }
+  return { events, page, pageSize, source }
 }
 
 const columnHelper = createColumnHelper<AuditEvent>()
