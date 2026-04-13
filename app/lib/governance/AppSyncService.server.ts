@@ -5,7 +5,7 @@ import { ApplicationRepo, type ApplicationRepoError } from "./ApplicationRepo.se
 import { RbacRepo, type RbacRepoError } from "./RbacRepo.server"
 import { ConnectedSystemRepo, type ConnectedSystemRepoError } from "./ConnectedSystemRepo.server"
 import { ConnectorMappingRepo, type ConnectorMappingRepoError } from "./ConnectorMappingRepo.server"
-import { seedDefaultRbac } from "./defaultRbac"
+import { seedDefaultRbac } from "./defaultRbac.server"
 
 // ---------------------------------------------------------------------------
 // Known plugin-provisioned apps. Hardcoded allow-list for phase 2A.
