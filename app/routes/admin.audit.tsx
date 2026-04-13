@@ -18,6 +18,26 @@ import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { Badge, Combobox, Inline, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
+function safeParseMetadata(metadata: unknown): Record<string, unknown> {
+  if (metadata === null || metadata === undefined) return {}
+  if (typeof metadata === "string") {
+    try {
+      return JSON.parse(metadata) as Record<string, unknown>
+    } catch {
+      return { _raw: metadata }
+    }
+  }
+  if (typeof metadata === "object" && !Array.isArray(metadata)) {
+    try {
+      JSON.stringify(metadata)
+      return metadata as Record<string, unknown>
+    } catch {
+      return { _error: "non-serializable metadata" }
+    }
+  }
+  return {}
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url)
   const eventType = url.searchParams.get("eventType") || undefined
@@ -27,29 +47,44 @@ export async function loader({ request }: Route.LoaderArgs) {
   const page = parseInt(url.searchParams.get("page") || "0", 10)
   const pageSize = 50
 
-  const events = await runEffect(
-    Effect.gen(function* () {
-      const svc = yield* AuditService
-      const raw = yield* svc.query({
-        eventType,
-        actorId,
-        applicationId,
-        limit: source ? pageSize * 5 : pageSize,
-        offset: source ? 0 : page * pageSize,
-      })
+  let events: AuditEvent[] = []
+  let error: string | undefined
 
-      if (!source) return raw
-
-      return raw
-        .filter((e) => {
-          const meta = (e.metadata ?? {}) as Record<string, unknown>
-          return meta.source === source
+  try {
+    events = await runEffect(
+      Effect.gen(function* () {
+        const svc = yield* AuditService
+        const raw = yield* svc.query({
+          eventType,
+          actorId,
+          applicationId,
+          limit: source ? pageSize * 5 : pageSize,
+          offset: source ? 0 : page * pageSize,
         })
-        .slice(0, pageSize)
-    }),
-  )
 
-  return { events, page, pageSize, source }
+        // Ensure metadata is always a plain serializable object so
+        // react-router's JSON serialization doesn't blow up on weird
+        // JSONB values (circular refs, cause objects, etc)
+        const sanitized = raw.map((e) => ({
+          ...e,
+          metadata: safeParseMetadata(e.metadata),
+        }))
+
+        if (!source) return sanitized
+
+        return sanitized
+          .filter((e) => {
+            const meta = (e.metadata ?? {}) as Record<string, unknown>
+            return meta.source === source
+          })
+          .slice(0, pageSize)
+      }),
+    )
+  } catch (e) {
+    error = e instanceof Error ? e.message : String(e)
+  }
+
+  return { events, page, pageSize, source, error }
 }
 
 const columnHelper = createColumnHelper<AuditEvent>()
@@ -92,7 +127,7 @@ const columns = [
 ]
 
 export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
-  const { events, page, pageSize } = loaderData
+  const { events, page, pageSize, error } = loaderData as Awaited<ReturnType<typeof loader>>
   const [searchParams, setSearchParams] = useSearchParams()
   const [sorting, setSorting] = useState<SortingState>([])
 
@@ -129,6 +164,9 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <Stack gap="md">
+      {error && (
+        <Text color="error">Failed to load audit events: {error}</Text>
+      )}
       <CardSection title="Audit Log">
         <html.div style={styles.filterBar}>
           <Inline gap="sm">
