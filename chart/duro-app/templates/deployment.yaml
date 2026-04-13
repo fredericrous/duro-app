@@ -81,6 +81,7 @@ spec:
             {{- if .Values.pluginSecrets.enabled }}
             - secretRef:
                 name: {{ include "duro-app.fullname" . }}-plugin-secrets
+                optional: true
             {{- end }}
           {{- end }}
           resources:
