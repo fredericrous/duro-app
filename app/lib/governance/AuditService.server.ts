@@ -63,11 +63,11 @@ export const AuditServiceLive = Layer.effect(
 
         return withErr(
           sql`SELECT * FROM audit_events
-              WHERE (${eventType} IS NULL OR event_type = ${eventType})
-                AND (${actorId} IS NULL OR actor_id = ${actorId})
-                AND (${applicationId} IS NULL OR application_id = ${applicationId})
-                AND (${targetType} IS NULL OR target_type = ${targetType})
-                AND (${targetId} IS NULL OR target_id = ${targetId})
+              WHERE (${eventType}::text IS NULL OR event_type = ${eventType}::text)
+                AND (${actorId}::text IS NULL OR actor_id = ${actorId}::text)
+                AND (${applicationId}::text IS NULL OR application_id = ${applicationId}::text)
+                AND (${targetType}::text IS NULL OR target_type = ${targetType}::text)
+                AND (${targetId}::text IS NULL OR target_id = ${targetId}::text)
               ORDER BY created_at DESC
               LIMIT ${limit} OFFSET ${offset}`.pipe(Effect.map((rows) => rows.map((r) => decodeAuditEvent(r)))),
           "Failed to query audit events",
