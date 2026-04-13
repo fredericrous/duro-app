@@ -92,9 +92,7 @@ export async function action({ request }: Route.ActionArgs) {
       Effect.gen(function* () {
         const repo = yield* GroupMappingRepo
         return yield* repo.create(
-          mappingType === "group"
-            ? { oidcGroupName, principalGroupId }
-            : { oidcGroupName, roleId, applicationId },
+          mappingType === "group" ? { oidcGroupName, principalGroupId } : { oidcGroupName, roleId, applicationId },
         )
       }),
     )
@@ -128,11 +126,7 @@ const columns = [
     id: "type",
     header: "Type",
     cell: ({ row }) =>
-      row.original.principalGroupId ? (
-        <Badge variant="info">Group</Badge>
-      ) : (
-        <Badge variant="default">Role</Badge>
-      ),
+      row.original.principalGroupId ? <Badge variant="info">Group</Badge> : <Badge variant="default">Role</Badge>,
   }),
   columnHelper.display({
     id: "target",

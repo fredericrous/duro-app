@@ -71,10 +71,7 @@ export const GroupMappingRepoLive = Layer.effect(
         ),
 
       remove: (id) =>
-        withErr(
-          sql`DELETE FROM group_mappings WHERE id = ${id}`.pipe(Effect.asVoid),
-          "Failed to delete group mapping",
-        ),
+        withErr(sql`DELETE FROM group_mappings WHERE id = ${id}`.pipe(Effect.asVoid), "Failed to delete group mapping"),
     }
   }),
 )
