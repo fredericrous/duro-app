@@ -83,6 +83,7 @@ const navMap: Record<string, string> = {
   grants: "/admin/grants",
   "access-requests": "/admin/access-requests",
   invitations: "/admin/invitations",
+  "group-mappings": "/admin/group-mappings",
   "authz-playground": "/admin/authz-playground",
   audit: "/admin/audit",
   plugins: "/admin/plugins",
@@ -151,6 +152,7 @@ export default function AdminLayout() {
         <SideNav.Item value="applications">{t("admin.nav.applications", "Applications")}</SideNav.Item>
         <SideNav.Item value="principals">{t("admin.nav.principals", "Principals")}</SideNav.Item>
         <SideNav.Item value="grants">{t("admin.nav.grants", "Grants")}</SideNav.Item>
+        <SideNav.Item value="group-mappings">{t("admin.nav.groupMappings", "Group Mappings")}</SideNav.Item>
       </SideNav.Group>
       <SideNav.Group label={t("admin.nav.workflows", "Workflows")}>
         <SideNav.Item value="access-requests">{t("admin.nav.accessRequests", "Access Requests")}</SideNav.Item>

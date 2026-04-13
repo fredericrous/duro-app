@@ -26,6 +26,7 @@ import { AuditServiceLive, AuditServiceDev } from "~/lib/governance/AuditService
 import { ApiKeyRepoLive } from "~/lib/governance/ApiKeyRepo.server"
 import { ProvisioningServiceLive, ProvisioningServiceDev } from "~/lib/governance/ProvisioningService.server"
 import { GroupSyncServiceLive } from "~/lib/governance/GroupSyncService.server"
+import { GroupMappingRepoLive } from "~/lib/governance/GroupMappingRepo.server"
 import { OperatorClientLive, OperatorClientDev } from "./OperatorClient.server"
 import { AppSyncServiceLive } from "~/lib/governance/AppSyncService.server"
 
@@ -81,6 +82,7 @@ export const AppLayer = Layer.mergeAll(
   ApiKeyRepoLive,
   isDevServer ? ProvisioningServiceDev : ProvisioningServiceLive,
   GroupSyncServiceLive,
+  GroupMappingRepoLive,
   isDevServer ? OperatorClientDev : OperatorClientLive,
   AppSyncServiceLive,
   // Plugin system
