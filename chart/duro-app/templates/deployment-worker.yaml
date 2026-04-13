@@ -75,9 +75,15 @@ spec:
             {{- end }}
             - name: OTEL_SERVICE_NAME
               value: {{ .Values.worker.otelServiceName | quote }}
-          {{- with .Values.envFrom }}
+          {{- if or .Values.envFrom .Values.pluginSecrets.enabled }}
           envFrom:
+            {{- with .Values.envFrom }}
             {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- if .Values.pluginSecrets.enabled }}
+            - secretRef:
+                name: {{ include "duro-app.fullname" . }}-plugin-secrets
+            {{- end }}
           {{- end }}
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}

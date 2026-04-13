@@ -48,6 +48,22 @@ env:
 
 envFrom: []
 
+# Plugin secrets — templates an ExternalSecret for plugin credentials
+# with configurable Vault paths. The created K8s Secret is auto-injected
+# into envFrom for both web and worker deployments.
+pluginSecrets:
+  enabled: false
+  secretStoreRef:
+    name: ""
+    kind: SecretStore
+  refreshInterval: 1h
+  # Map of env var name → Vault source
+  # Example:
+  #   PLUGIN_GITEA_TEAMS_SECRET_TOKEN:
+  #     key: secret/data/gitea/admin-api-token
+  #     property: token
+  secrets: {}
+
 # Web-specific config
 web:
   port: 3000
