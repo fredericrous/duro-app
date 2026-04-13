@@ -22,16 +22,23 @@ const baseManifest: PluginManifest = {
 const config = { viewerGroup: "app-user", adminGroup: "app-admin" }
 
 function makeFakeLldap() {
-  const groups = new Map<string, number>([["app-user", 1], ["app-admin", 2]])
+  const groups = new Map<string, number>([
+    ["app-user", 1],
+    ["app-admin", 2],
+  ])
   const memberships = new Set<string>()
   let nextId = 10
 
   return {
     getGroups: Effect.sync(() => [...groups.entries()].map(([displayName, id]) => ({ id, displayName }))),
     addUserToGroup: (userId: string, groupId: number) =>
-      Effect.sync(() => { memberships.add(`${userId}::${groupId}`) }),
+      Effect.sync(() => {
+        memberships.add(`${userId}::${groupId}`)
+      }),
     removeUserFromGroup: (userId: string, groupId: number) =>
-      Effect.sync(() => { memberships.delete(`${userId}::${groupId}`) }),
+      Effect.sync(() => {
+        memberships.delete(`${userId}::${groupId}`)
+      }),
     ensureGroup: (displayName: string) =>
       Effect.sync(() => {
         const existing = groups.get(displayName)

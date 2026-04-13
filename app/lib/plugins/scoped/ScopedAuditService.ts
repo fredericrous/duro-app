@@ -20,10 +20,7 @@ type RealAuditService = {
  *  - Enforces that event types start with "plugin."
  *  - Write-only — plugins cannot query the audit log
  */
-export function makeScopedAuditService(
-  real: RealAuditService,
-  manifest: PluginManifest,
-): ScopedAuditService {
+export function makeScopedAuditService(real: RealAuditService, manifest: PluginManifest): ScopedAuditService {
   return {
     emit: (event) =>
       real

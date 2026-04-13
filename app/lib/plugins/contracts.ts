@@ -64,13 +64,7 @@ export type HttpGet = {
   readonly reversible: false
 }
 
-export type PluginAction =
-  | LldapAddGroupMember
-  | LldapRemoveGroupMember
-  | HttpPost
-  | HttpPut
-  | HttpDelete
-  | HttpGet
+export type PluginAction = LldapAddGroupMember | LldapRemoveGroupMember | HttpPost | HttpPut | HttpDelete | HttpGet
 
 /** True if the action can be auto-reversed by the host on deprovision. */
 export function isReversible(action: PluginAction): boolean {
@@ -122,7 +116,9 @@ export interface PluginManifest {
 export interface ScopedLldapClient {
   readonly addUserToGroup: (userId: string, groupName: string) => Effect.Effect<void, ScopeViolation>
   readonly removeUserFromGroup: (userId: string, groupName: string) => Effect.Effect<void, ScopeViolation>
-  readonly findGroupByName: (groupName: string) => Effect.Effect<{ id: number; displayName: string } | null, ScopeViolation>
+  readonly findGroupByName: (
+    groupName: string,
+  ) => Effect.Effect<{ id: number; displayName: string } | null, ScopeViolation>
 }
 
 export interface HttpCallOpts {
@@ -150,10 +146,7 @@ export interface ScopedVaultClient {
 }
 
 export interface ScopedAuditService {
-  readonly emit: (event: {
-    eventType: string
-    metadata?: Record<string, unknown>
-  }) => Effect.Effect<void>
+  readonly emit: (event: { eventType: string; metadata?: Record<string, unknown> }) => Effect.Effect<void>
 }
 
 export interface PluginServices {

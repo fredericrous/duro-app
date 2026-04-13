@@ -7,18 +7,7 @@ import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import type { PluginAction, PluginManifest } from "~/lib/plugins/contracts"
 import type { AuditEvent, Application, ConnectedSystem } from "~/lib/governance/types"
-import {
-  Badge,
-  Button,
-  Heading,
-  Inline,
-  Panel,
-  ScrollArea,
-  Stack,
-  Table,
-  Tag,
-  Text,
-} from "@duro-app/ui"
+import { Badge, Button, Heading, Inline, Panel, ScrollArea, Stack, Table, Tag, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
@@ -56,19 +45,15 @@ export async function loader({ params }: { params: { slug: string } }) {
         }
       }
 
-      const recentEvents = yield* audit
-        .query({ eventType: undefined, limit: 20 })
-        .pipe(
-          Effect.map((events) =>
-            events.filter(
-              (e) =>
-                e.metadata &&
-                typeof e.metadata === "object" &&
-                (e.metadata as Record<string, unknown>).plugin === slug,
-            ),
+      const recentEvents = yield* audit.query({ eventType: undefined, limit: 20 }).pipe(
+        Effect.map((events) =>
+          events.filter(
+            (e) =>
+              e.metadata && typeof e.metadata === "object" && (e.metadata as Record<string, unknown>).plugin === slug,
           ),
-          Effect.catchAll(() => Effect.succeed([] as AuditEvent[])),
-        )
+        ),
+        Effect.catchAll(() => Effect.succeed([] as AuditEvent[])),
+      )
 
       return { manifest: plugin.manifest, installs, recentEvents } satisfies LoaderData
     }),
@@ -87,11 +72,7 @@ const styles = css.create({
   },
 })
 
-export default function AdminPluginDetailPage({
-  loaderData,
-}: {
-  loaderData: Awaited<ReturnType<typeof loader>>
-}) {
+export default function AdminPluginDetailPage({ loaderData }: { loaderData: Awaited<ReturnType<typeof loader>> }) {
   const { manifest, installs, recentEvents } = loaderData
   const navigate = useNavigate()
 
@@ -124,7 +105,9 @@ export default function AdminPluginDetailPage({
             <Text color="muted">Capabilities</Text>
             <Inline gap="xs">
               {manifest.capabilities.map((cap: string) => (
-                <Tag key={cap} size="sm">{cap}</Tag>
+                <Tag key={cap} size="sm">
+                  {cap}
+                </Tag>
               ))}
             </Inline>
 
@@ -153,10 +136,7 @@ export default function AdminPluginDetailPage({
                   <Text>{"\u2192"}</Text>
                   <Text>
                     {actions
-                      .map(
-                        (a: PluginAction) =>
-                          `${a.op}(${"group" in a ? a.group : "url" in a ? a.url : ""})`,
-                      )
+                      .map((a: PluginAction) => `${a.op}(${"group" in a ? a.group : "url" in a ? a.url : ""})`)
                       .join(", ")}
                   </Text>
                 </Inline>
@@ -187,7 +167,9 @@ export default function AdminPluginDetailPage({
                         <Table.Cell>
                           <Stack gap="xs">
                             <Text>{i.applicationName}</Text>
-                            <Text color="muted" variant="caption">{i.applicationSlug}</Text>
+                            <Text color="muted" variant="caption">
+                              {i.applicationSlug}
+                            </Text>
                           </Stack>
                         </Table.Cell>
                         <Table.Cell>

@@ -35,9 +35,7 @@ export const STARTER_ENTITLEMENT_SLUGS: ReadonlySet<string> = new Set(STARTER_EN
  * Create the starter RBAC template (3 entitlements, 3 roles, 6 attachments) for an app.
  * Caller is responsible for running this inside a transaction so failures roll back.
  */
-export const seedDefaultRbac = (
-  appId: string,
-): Effect.Effect<void, RbacRepoError, RbacRepo> =>
+export const seedDefaultRbac = (appId: string): Effect.Effect<void, RbacRepoError, RbacRepo> =>
   Effect.gen(function* () {
     const rbac = yield* RbacRepo
 
@@ -62,10 +60,7 @@ export const seedDefaultRbac = (
  * True if all starter slugs (roles + entitlements) are present in the given lists.
  * Tolerates extra custom roles/entitlements added by admins.
  */
-export function hasStarterTemplate(
-  roleSlugs: ReadonlyArray<string>,
-  entitlementSlugs: ReadonlyArray<string>,
-): boolean {
+export function hasStarterTemplate(roleSlugs: ReadonlyArray<string>, entitlementSlugs: ReadonlyArray<string>): boolean {
   const r = new Set(roleSlugs)
   const e = new Set(entitlementSlugs)
   for (const slug of STARTER_ROLE_SLUGS) if (!r.has(slug)) return false

@@ -164,9 +164,7 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <Stack gap="md">
-      {error && (
-        <Text color="error">Failed to load audit events: {error}</Text>
-      )}
+      {error && <Text color="error">Failed to load audit events: {error}</Text>}
       <CardSection title="Audit Log">
         <html.div style={styles.filterBar}>
           <Inline gap="sm">

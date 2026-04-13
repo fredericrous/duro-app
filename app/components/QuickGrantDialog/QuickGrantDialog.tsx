@@ -1,16 +1,6 @@
 import { useFetcher } from "react-router"
 import { useEffect, useMemo } from "react"
-import {
-  Button,
-  Combobox,
-  Dialog,
-  EmptyState,
-  Field,
-  Input,
-  Select,
-  Stack,
-  Text,
-} from "@duro-app/ui"
+import { Button, Combobox, Dialog, EmptyState, Field, Input, Select, Stack, Text } from "@duro-app/ui"
 import type { Principal, Role } from "~/lib/governance/types"
 
 interface QuickGrantDialogProps {
@@ -150,9 +140,7 @@ export function QuickGrantDialog({
                   </Field.Description>
                 </Field.Root>
 
-                {fetcher.data && "error" in fetcher.data && (
-                  <Text color="error">{String(fetcher.data.error)}</Text>
-                )}
+                {fetcher.data && "error" in fetcher.data && <Text color="error">{String(fetcher.data.error)}</Text>}
 
                 <Button type="submit" variant="primary" disabled={isSubmitting}>
                   {isSubmitting ? "Granting…" : "Grant access"}

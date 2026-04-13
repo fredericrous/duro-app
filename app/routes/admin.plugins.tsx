@@ -4,16 +4,7 @@ import { runEffect } from "~/lib/runtime.server"
 import { PluginRegistry } from "~/lib/plugins/PluginRegistry.server"
 import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
 import type { PluginAction, PluginManifest } from "~/lib/plugins/contracts"
-import {
-  Badge,
-  Heading,
-  Inline,
-  ScrollArea,
-  Stack,
-  Table,
-  Tag,
-  Text,
-} from "@duro-app/ui"
+import { Badge, Heading, Inline, ScrollArea, Stack, Table, Tag, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { css, html } from "react-strict-dom"
 
@@ -32,10 +23,12 @@ export async function loader() {
 
       const countMap = new Map(counts.map((c) => [c.pluginSlug, c.count]))
 
-      return manifests.map((m): PluginRow => ({
-        manifest: m,
-        installCount: countMap.get(m.slug) ?? 0,
-      }))
+      return manifests.map(
+        (m): PluginRow => ({
+          manifest: m,
+          installCount: countMap.get(m.slug) ?? 0,
+        }),
+      )
     }),
   )
 
@@ -55,8 +48,8 @@ export default function AdminPluginsPage({ loaderData }: { loaderData: Awaited<R
     <Stack gap="md">
       <Heading level={2}>Provisioning Plugins</Heading>
       <Text color="muted">
-        Registered plugins that handle grant provisioning to external systems.
-        Click a plugin for details and recent activity.
+        Registered plugins that handle grant provisioning to external systems. Click a plugin for details and recent
+        activity.
       </Text>
 
       <CardSection title={`Plugins (${plugins.length})`}>

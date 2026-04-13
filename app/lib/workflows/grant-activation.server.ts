@@ -36,9 +36,7 @@ const forkProcessJob = (provisioning: Context.Tag.Service<typeof ProvisioningSer
  * Enqueues one provisioning_jobs row per matching ConnectedSystem, then forks
  * processing in the background so the caller returns immediately.
  */
-export const activateGrant = (
-  grantId: string,
-): Effect.Effect<void, ProvisioningError, ActivationDeps> =>
+export const activateGrant = (grantId: string): Effect.Effect<void, ProvisioningError, ActivationDeps> =>
   Effect.gen(function* () {
     const provisioning = yield* ProvisioningService
     const jobIds = yield* provisioning.onGrantActivated(grantId)
@@ -51,9 +49,7 @@ export const activateGrant = (
  * Symmetric deactivation workflow. Assumes the grant has already been marked
  * revoked in the DB (by the caller); this only handles the provisioning side.
  */
-export const deactivateGrant = (
-  grantId: string,
-): Effect.Effect<void, ProvisioningError, ActivationDeps> =>
+export const deactivateGrant = (grantId: string): Effect.Effect<void, ProvisioningError, ActivationDeps> =>
   Effect.gen(function* () {
     const provisioning = yield* ProvisioningService
     const jobIds = yield* provisioning.onGrantRevoked(grantId)

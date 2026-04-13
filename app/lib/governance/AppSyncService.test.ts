@@ -25,9 +25,23 @@ import { STARTER_ENTITLEMENTS, STARTER_ROLES } from "./defaultRbac"
 // ---------------------------------------------------------------------------
 
 const clusterApps: ClusterApp[] = [
-  { id: "jellyfin", name: "Jellyfin", url: "https://jellyfin.local", category: "media", groups: ["media"], priority: 10 },
+  {
+    id: "jellyfin",
+    name: "Jellyfin",
+    url: "https://jellyfin.local",
+    category: "media",
+    groups: ["media"],
+    priority: 10,
+  },
   { id: "gitea", name: "Gitea", url: "https://gitea.local", category: "dev", groups: ["dev"], priority: 20 },
-  { id: "grafana", name: "Grafana", url: "https://grafana.local", category: "monitoring", groups: ["admin"], priority: 30 },
+  {
+    id: "grafana",
+    name: "Grafana",
+    url: "https://grafana.local",
+    category: "monitoring",
+    groups: ["admin"],
+    priority: 30,
+  },
 ]
 
 // ---------------------------------------------------------------------------
@@ -60,7 +74,9 @@ function layersFor(operatorApps: ClusterApp[]) {
  * have produced) before the sync runs. Takes the same Application-shape
  * objects the old mock used. Called inside the Effect so SQL is available.
  */
-const seedExistingApps = (apps: Array<{ slug: string; displayName: string; enabled?: boolean; accessMode?: string; ownerId?: string }>) =>
+const seedExistingApps = (
+  apps: Array<{ slug: string; displayName: string; enabled?: boolean; accessMode?: string; ownerId?: string }>,
+) =>
   Effect.gen(function* () {
     const repo = yield* ApplicationRepo
     for (const a of apps) {
@@ -240,41 +256,38 @@ describe("AppSyncService", () => {
     }
   })
 
-  it(
-    "backfills LDAP connected system and connector mappings for known slugs",
-    async () => {
-      const nextcloudCluster: ClusterApp[] = [
-        { id: "nextcloud", name: "Nextcloud", url: "x", category: "cloud", groups: ["family"], priority: 50 },
-      ]
+  it("backfills LDAP connected system and connector mappings for known slugs", async () => {
+    const nextcloudCluster: ClusterApp[] = [
+      { id: "nextcloud", name: "Nextcloud", url: "x", category: "cloud", groups: ["family"], priority: 50 },
+    ]
 
-      const result = await Effect.gen(function* () {
-        const sync = yield* AppSyncService
-        yield* sync.syncFromCluster()
-        const appRepo = yield* ApplicationRepo
-        const rbac = yield* RbacRepo
-        const systems = yield* ConnectedSystemRepo
-        const mappings = yield* ConnectorMappingRepo
+    const result = await Effect.gen(function* () {
+      const sync = yield* AppSyncService
+      yield* sync.syncFromCluster()
+      const appRepo = yield* ApplicationRepo
+      const rbac = yield* RbacRepo
+      const systems = yield* ConnectedSystemRepo
+      const mappings = yield* ConnectorMappingRepo
 
-        const app = yield* appRepo.findBySlug("nextcloud")
-        const system = yield* systems.findByApplicationAndType(app!.id, "plugin")
-        const roles = yield* rbac.listRoles(app!.id)
+      const app = yield* appRepo.findBySlug("nextcloud")
+      const system = yield* systems.findByApplicationAndType(app!.id, "plugin")
+      const roles = yield* rbac.listRoles(app!.id)
 
-        const mappingsFor = new Map<string, string>()
-        for (const r of roles) {
-          const m = yield* mappings.findByConnectedSystemAndRole(system!.id, r.id)
-          if (m) mappingsFor.set(r.slug, m.externalRoleIdentifier)
-        }
+      const mappingsFor = new Map<string, string>()
+      for (const r of roles) {
+        const m = yield* mappings.findByConnectedSystemAndRole(system!.id, r.id)
+        if (m) mappingsFor.set(r.slug, m.externalRoleIdentifier)
+      }
 
-        return { system, mappingsFor }
-      }).pipe(Effect.provide(layersFor(nextcloudCluster)), Effect.runPromise)
+      return { system, mappingsFor }
+    }).pipe(Effect.provide(layersFor(nextcloudCluster)), Effect.runPromise)
 
-      expect(result.system).not.toBeNull()
-      expect(result.system!.connectorType).toBe("plugin")
-      expect(result.mappingsFor.get("viewer")).toBe("nextcloud-user")
-      expect(result.mappingsFor.get("editor")).toBe("nextcloud-user")
-      expect(result.mappingsFor.get("admin")).toBe("nextcloud-admin")
-    },
-  )
+    expect(result.system).not.toBeNull()
+    expect(result.system!.connectorType).toBe("plugin")
+    expect(result.mappingsFor.get("viewer")).toBe("nextcloud-user")
+    expect(result.mappingsFor.get("editor")).toBe("nextcloud-user")
+    expect(result.mappingsFor.get("admin")).toBe("nextcloud-admin")
+  })
 
   it("does NOT create an LDAP connected system for apps outside the allow-list", async () => {
     const system = await Effect.gen(function* () {
@@ -289,32 +302,29 @@ describe("AppSyncService", () => {
     expect(system).toBeNull()
   })
 
-  it(
-    "is idempotent — re-syncing a known-slug app does not duplicate connected systems or mappings",
-    async () => {
-      const nextcloudCluster: ClusterApp[] = [
-        { id: "nextcloud", name: "Nextcloud", url: "x", category: "cloud", groups: ["family"], priority: 50 },
-      ]
+  it("is idempotent — re-syncing a known-slug app does not duplicate connected systems or mappings", async () => {
+    const nextcloudCluster: ClusterApp[] = [
+      { id: "nextcloud", name: "Nextcloud", url: "x", category: "cloud", groups: ["family"], priority: 50 },
+    ]
 
-      const counts = await Effect.gen(function* () {
-        const sync = yield* AppSyncService
-        yield* sync.syncFromCluster() // first sync
-        yield* sync.syncFromCluster() // second sync — must not duplicate
-        const appRepo = yield* ApplicationRepo
-        const systems = yield* ConnectedSystemRepo
-        const mappings = yield* ConnectorMappingRepo
-        const app = yield* appRepo.findBySlug("nextcloud")
-        const systemList = yield* systems.listByApplication(app!.id)
-        const system = systemList[0]
-        const mappingList = yield* mappings.listByConnectedSystem(system!.id)
-        return { systems: systemList.length, mappings: mappingList.length }
-      }).pipe(Effect.provide(layersFor(nextcloudCluster)), Effect.runPromise)
+    const counts = await Effect.gen(function* () {
+      const sync = yield* AppSyncService
+      yield* sync.syncFromCluster() // first sync
+      yield* sync.syncFromCluster() // second sync — must not duplicate
+      const appRepo = yield* ApplicationRepo
+      const systems = yield* ConnectedSystemRepo
+      const mappings = yield* ConnectorMappingRepo
+      const app = yield* appRepo.findBySlug("nextcloud")
+      const systemList = yield* systems.listByApplication(app!.id)
+      const system = systemList[0]
+      const mappingList = yield* mappings.listByConnectedSystem(system!.id)
+      return { systems: systemList.length, mappings: mappingList.length }
+    }).pipe(Effect.provide(layersFor(nextcloudCluster)), Effect.runPromise)
 
-      expect(counts.systems).toBe(1)
-      // 3 starter roles × 1 mapping each
-      expect(counts.mappings).toBe(STARTER_ROLES.length)
-    },
-  )
+    expect(counts.systems).toBe(1)
+    // 3 starter roles × 1 mapping each
+    expect(counts.mappings).toBe(STARTER_ROLES.length)
+  })
 })
 
 // ---------------------------------------------------------------------------

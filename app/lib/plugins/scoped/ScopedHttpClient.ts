@@ -16,10 +16,7 @@ import { PluginError, ScopeViolation } from "../errors"
  * Phase 2A scaffolding only — the lldap-group-membership plugin doesn't
  * use HTTP. First real usage in 2B (gitea-teams).
  */
-export function makeScopedHttpClient(
-  manifest: PluginManifest,
-  vault: ScopedVaultClient,
-): ScopedHttpClient {
+export function makeScopedHttpClient(manifest: PluginManifest, vault: ScopedVaultClient): ScopedHttpClient {
   const isDev = process.env.NODE_ENV === "development"
 
   const assertUrlAllowed = (rawUrl: string) => {
@@ -53,7 +50,13 @@ export function makeScopedHttpClient(
     return null
   }
 
-  const doFetch = (url: string, init: RequestInit, secretName?: string, authHeader?: string, extraHeaders?: Readonly<Record<string, string>>) =>
+  const doFetch = (
+    url: string,
+    init: RequestInit,
+    secretName?: string,
+    authHeader?: string,
+    extraHeaders?: Readonly<Record<string, string>>,
+  ) =>
     Effect.gen(function* () {
       const violation = assertUrlAllowed(url)
       if (violation) return yield* violation
@@ -69,9 +72,13 @@ export function makeScopedHttpClient(
 
       // Inject Vault-backed auth token when `secret` is provided.
       if (secretName) {
-        const token = yield* vault.readSecret(secretName).pipe(
-          Effect.mapError((e) => new PluginError({ message: `Failed to resolve secret '${secretName}': ${e.message}`, cause: e })),
-        )
+        const token = yield* vault
+          .readSecret(secretName)
+          .pipe(
+            Effect.mapError(
+              (e) => new PluginError({ message: `Failed to resolve secret '${secretName}': ${e.message}`, cause: e }),
+            ),
+          )
         const scheme = authHeader ?? "token"
         if (scheme.toLowerCase() === "bearer" || scheme.toLowerCase() === "token") {
           headers.set("Authorization", `${scheme} ${token}`)
@@ -82,7 +89,8 @@ export function makeScopedHttpClient(
 
       const res = yield* Effect.tryPromise({
         try: () => fetch(url, { ...init, headers, signal: AbortSignal.timeout(manifest.timeoutMs) }),
-        catch: (e) => new PluginError({ message: `HTTP request failed: ${e instanceof Error ? e.message : String(e)}`, cause: e }),
+        catch: (e) =>
+          new PluginError({ message: `HTTP request failed: ${e instanceof Error ? e.message : String(e)}`, cause: e }),
       })
       if (!res.ok) {
         return yield* new PluginError({ message: `HTTP ${res.status} from ${url}` })
@@ -102,8 +110,27 @@ export function makeScopedHttpClient(
 
   return {
     get: (url, opts) => mapErr(doFetch(url, { method: "GET" }, opts?.secret, opts?.authHeader, opts?.headers)),
-    post: (url, body, opts) => mapErr(doFetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, opts?.secret, opts?.authHeader, opts?.headers)),
-    put: (url, body, opts) => mapErr(doFetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, opts?.secret, opts?.authHeader, opts?.headers)),
-    del: (url, opts) => mapErr(doFetch(url, { method: "DELETE" }, opts?.secret, opts?.authHeader, opts?.headers)).pipe(Effect.asVoid),
+    post: (url, body, opts) =>
+      mapErr(
+        doFetch(
+          url,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+          opts?.secret,
+          opts?.authHeader,
+          opts?.headers,
+        ),
+      ),
+    put: (url, body, opts) =>
+      mapErr(
+        doFetch(
+          url,
+          { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+          opts?.secret,
+          opts?.authHeader,
+          opts?.headers,
+        ),
+      ),
+    del: (url, opts) =>
+      mapErr(doFetch(url, { method: "DELETE" }, opts?.secret, opts?.authHeader, opts?.headers)).pipe(Effect.asVoid),
   }
 }

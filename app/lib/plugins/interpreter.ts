@@ -46,18 +46,22 @@ const dispatchAction = (
     case "lldap.addGroupMember": {
       const group = resolveTemplate(action.group, ctx)
       const user = resolveTemplate(action.user, ctx)
-      return svc.lldap.addUserToGroup(user, group).pipe(
-        Effect.mapError((e) => new PluginError({ message: `lldap.addGroupMember failed: ${e.message}`, cause: e })),
-      )
+      return svc.lldap
+        .addUserToGroup(user, group)
+        .pipe(
+          Effect.mapError((e) => new PluginError({ message: `lldap.addGroupMember failed: ${e.message}`, cause: e })),
+        )
     }
     case "lldap.removeGroupMember": {
       const group = resolveTemplate(action.group, ctx)
       const user = resolveTemplate(action.user, ctx)
-      return svc.lldap.removeUserFromGroup(user, group).pipe(
-        Effect.mapError(
-          (e) => new PluginError({ message: `lldap.removeGroupMember failed: ${e.message}`, cause: e }),
-        ),
-      )
+      return svc.lldap
+        .removeUserFromGroup(user, group)
+        .pipe(
+          Effect.mapError(
+            (e) => new PluginError({ message: `lldap.removeGroupMember failed: ${e.message}`, cause: e }),
+          ),
+        )
     }
     case "http.get": {
       const url = resolveTemplate(action.url, ctx)

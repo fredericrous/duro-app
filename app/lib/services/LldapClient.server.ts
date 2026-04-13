@@ -333,7 +333,14 @@ export const LldapClientLive = Layer.effect(
       ensureGroup: (displayName: string) =>
         Effect.gen(function* () {
           // 1. Lookup existing
-          const raw = yield* graphql(`{ groups { id displayName } }`)
+          const raw = yield* graphql(`
+            {
+              groups {
+                id
+                displayName
+              }
+            }
+          `)
           const parsed = yield* decodeGroupsData(raw).pipe(
             Effect.mapError((e) => new LldapError({ message: "Invalid groups response", cause: e })),
           )

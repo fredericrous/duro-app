@@ -47,9 +47,7 @@ const findSharedServerByEmail = (svc: PluginServices, email: string) =>
   Effect.gen(function* () {
     const raw = yield* svc.http.get(`${PLEX_TV}/api/v2/shared_servers`, AUTH)
     const servers = (Array.isArray(raw) ? raw : []) as PlexSharedServer[]
-    return servers.find(
-      (s) => s.invitedEmail?.toLowerCase() === email.toLowerCase(),
-    ) ?? null
+    return servers.find((s) => s.invitedEmail?.toLowerCase() === email.toLowerCase()) ?? null
   })
 
 const provision = (ctx: GrantContext, svc: PluginServices) =>

@@ -94,10 +94,7 @@ export const PluginRegistryLive = Layer.sync(PluginRegistry, () => {
   const bySlug = new Map(plugins.map((p) => [p.manifest.slug, p]))
 
   return {
-    get: (slug) =>
-      bySlug.has(slug)
-        ? Effect.succeed(bySlug.get(slug)!)
-        : Effect.fail(new PluginNotFound({ slug })),
+    get: (slug) => (bySlug.has(slug) ? Effect.succeed(bySlug.get(slug)!) : Effect.fail(new PluginNotFound({ slug }))),
     list: () => Effect.succeed(plugins.map((p) => p.manifest)),
   }
 })

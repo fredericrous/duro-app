@@ -88,12 +88,14 @@ export async function action({ request }: Route.ActionArgs) {
         const repo = yield* GrantRepo
         const audit = yield* AuditService
         yield* repo.revoke(grantId, principal.id)
-        yield* audit.emit({
-          eventType: "grant.revoked",
-          actorId: principal.id,
-          targetType: "grant",
-          targetId: grantId,
-        }).pipe(Effect.catchAll(() => Effect.void))
+        yield* audit
+          .emit({
+            eventType: "grant.revoked",
+            actorId: principal.id,
+            targetType: "grant",
+            targetId: grantId,
+          })
+          .pipe(Effect.catchAll(() => Effect.void))
         yield* deactivateGrant(grantId)
       }),
     )

@@ -32,7 +32,10 @@ export class ConnectedSystemRepo extends Context.Tag("ConnectedSystemRepo")<
       applicationId: string,
       pluginSlug: string,
     ) => Effect.Effect<ConnectedSystem | null, ConnectedSystemRepoError>
-    readonly countByPluginSlug: () => Effect.Effect<ReadonlyArray<{ pluginSlug: string; count: number }>, ConnectedSystemRepoError>
+    readonly countByPluginSlug: () => Effect.Effect<
+      ReadonlyArray<{ pluginSlug: string; count: number }>,
+      ConnectedSystemRepoError
+    >
     readonly listByApplication: (applicationId: string) => Effect.Effect<ConnectedSystem[], ConnectedSystemRepoError>
   }
 >() {}
@@ -96,9 +99,7 @@ export const ConnectedSystemRepoLive = Layer.effect(
             FROM connected_systems
             WHERE connector_type = 'plugin' AND plugin_slug IS NOT NULL
             GROUP BY plugin_slug
-          `.pipe(
-            Effect.map((rows) => rows.map((r) => ({ pluginSlug: r.pluginSlug, count: Number(r.count) }))),
-          ),
+          `.pipe(Effect.map((rows) => rows.map((r) => ({ pluginSlug: r.pluginSlug, count: Number(r.count) })))),
           "Failed to count connected systems by plugin slug",
         ),
 

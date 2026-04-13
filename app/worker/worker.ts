@@ -42,13 +42,7 @@ const GovernanceRepos = Layer.mergeAll(
 
 const PluginHostWired = PluginHostLive.pipe(
   Layer.provide(
-    Layer.mergeAll(
-      GovernanceRepos,
-      ApplicationRepoLive,
-      PluginRegistryLive,
-      LldapClientLive,
-      AuditServiceLive,
-    ),
+    Layer.mergeAll(GovernanceRepos, ApplicationRepoLive, PluginRegistryLive, LldapClientLive, AuditServiceLive),
   ),
 )
 
@@ -59,11 +53,7 @@ const WorkerLayer = Layer.mergeAll(
   ProvisioningServiceLive,
   PluginRegistryLive,
   PluginHostWired,
-).pipe(
-  Layer.provideMerge(DbLive),
-  Layer.provide(OtelLayer),
-  Layer.provide(FetchHttpClient.layer),
-)
+).pipe(Layer.provideMerge(DbLive), Layer.provide(OtelLayer), Layer.provide(FetchHttpClient.layer))
 
 // ---------------------------------------------------------------------------
 // Poll loop
@@ -78,9 +68,7 @@ const pollOnce = Effect.gen(function* () {
   // 1. Process the next pending job
   yield* provisioning.processNextPending().pipe(
     Effect.tapErrorCause((cause) =>
-      Effect.logError("worker: processNextPending failed").pipe(
-        Effect.annotateLogs({ cause: String(cause) }),
-      ),
+      Effect.logError("worker: processNextPending failed").pipe(Effect.annotateLogs({ cause: String(cause) })),
     ),
     Effect.catchAll(() => Effect.void),
   )
@@ -113,9 +101,7 @@ const pollOnce = Effect.gen(function* () {
 const pollLoop = pollOnce.pipe(
   Effect.repeat(Schedule.spaced("30 seconds")),
   Effect.tapErrorCause((cause) =>
-    Effect.logError("worker poll loop crashed").pipe(
-      Effect.annotateLogs({ cause: String(cause) }),
-    ),
+    Effect.logError("worker poll loop crashed").pipe(Effect.annotateLogs({ cause: String(cause) })),
   ),
   Effect.catchAll(() => Effect.void),
 )

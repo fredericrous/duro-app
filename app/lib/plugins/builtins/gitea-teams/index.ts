@@ -39,10 +39,7 @@ const provision = (ctx: GrantContext, svc: PluginServices) =>
       })
     }
 
-    const teamsRaw = yield* svc.http.get(
-      `${config.giteaUrl}/api/v1/orgs/${config.orgName}/teams`,
-      { secret: "token" },
-    )
+    const teamsRaw = yield* svc.http.get(`${config.giteaUrl}/api/v1/orgs/${config.orgName}/teams`, { secret: "token" })
     const teams = teamsRaw as GiteaTeam[]
 
     const team = findTeamByName(teams, teamName)
@@ -77,10 +74,7 @@ const deprovision = (ctx: GrantContext, svc: PluginServices) =>
       })
     }
 
-    const teamsRaw = yield* svc.http.get(
-      `${config.giteaUrl}/api/v1/orgs/${config.orgName}/teams`,
-      { secret: "token" },
-    )
+    const teamsRaw = yield* svc.http.get(`${config.giteaUrl}/api/v1/orgs/${config.orgName}/teams`, { secret: "token" })
     const teams = teamsRaw as GiteaTeam[]
 
     const team = findTeamByName(teams, teamName)
@@ -89,10 +83,9 @@ const deprovision = (ctx: GrantContext, svc: PluginServices) =>
       return
     }
 
-    yield* svc.http.del(
-      `${config.giteaUrl}/api/v1/teams/${team.id}/members/${ctx.principal.externalId}`,
-      { secret: "token" },
-    )
+    yield* svc.http.del(`${config.giteaUrl}/api/v1/teams/${team.id}/members/${ctx.principal.externalId}`, {
+      secret: "token",
+    })
 
     yield* svc.log("Gitea team member removed", {
       team: teamName,

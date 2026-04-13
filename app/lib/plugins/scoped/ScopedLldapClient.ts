@@ -66,12 +66,18 @@ export function makeScopedLldapClient(
         // Ensure the group exists (lazy creation for the provision path)
         const groupId = yield* real.ensureGroup(groupName).pipe(Effect.retry(retrySchedule))
         yield* real.addUserToGroup(userId, groupId).pipe(Effect.retry(retrySchedule))
-      }).pipe(Effect.mapError((e) => (e instanceof ScopeViolation ? e : new ScopeViolation({
-        pluginSlug: manifest.slug,
-        service: "ScopedLldapClient",
-        target: groupName,
-        message: `LLDAP addUserToGroup failed: ${e instanceof Error ? e.message : String(e)}`,
-      })))),
+      }).pipe(
+        Effect.mapError((e) =>
+          e instanceof ScopeViolation
+            ? e
+            : new ScopeViolation({
+                pluginSlug: manifest.slug,
+                service: "ScopedLldapClient",
+                target: groupName,
+                message: `LLDAP addUserToGroup failed: ${e instanceof Error ? e.message : String(e)}`,
+              }),
+        ),
+      ),
 
     removeUserFromGroup: (userId, groupName) =>
       Effect.gen(function* () {
@@ -87,23 +93,35 @@ export function makeScopedLldapClient(
           return
         }
         yield* real.removeUserFromGroup(userId, group.id).pipe(Effect.retry(retrySchedule))
-      }).pipe(Effect.mapError((e) => (e instanceof ScopeViolation ? e : new ScopeViolation({
-        pluginSlug: manifest.slug,
-        service: "ScopedLldapClient",
-        target: groupName,
-        message: `LLDAP removeUserFromGroup failed: ${e instanceof Error ? e.message : String(e)}`,
-      })))),
+      }).pipe(
+        Effect.mapError((e) =>
+          e instanceof ScopeViolation
+            ? e
+            : new ScopeViolation({
+                pluginSlug: manifest.slug,
+                service: "ScopedLldapClient",
+                target: groupName,
+                message: `LLDAP removeUserFromGroup failed: ${e instanceof Error ? e.message : String(e)}`,
+              }),
+        ),
+      ),
 
     findGroupByName: (groupName) =>
       Effect.gen(function* () {
         const violation = assertGroupAllowed(groupName)
         if (violation) return yield* violation
         return yield* resolveGroupId(groupName)
-      }).pipe(Effect.mapError((e) => (e instanceof ScopeViolation ? e : new ScopeViolation({
-        pluginSlug: manifest.slug,
-        service: "ScopedLldapClient",
-        target: groupName,
-        message: `LLDAP findGroupByName failed: ${e instanceof Error ? e.message : String(e)}`,
-      })))),
+      }).pipe(
+        Effect.mapError((e) =>
+          e instanceof ScopeViolation
+            ? e
+            : new ScopeViolation({
+                pluginSlug: manifest.slug,
+                service: "ScopedLldapClient",
+                target: groupName,
+                message: `LLDAP findGroupByName failed: ${e instanceof Error ? e.message : String(e)}`,
+              }),
+        ),
+      ),
   }
 }

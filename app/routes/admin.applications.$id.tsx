@@ -372,9 +372,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
 
   const isSubmitting = fetcher.state !== "idle"
 
-  const principalNameById = new Map<string, string>(
-    (principals as Principal[]).map((p) => [p.id, p.displayName]),
-  )
+  const principalNameById = new Map<string, string>((principals as Principal[]).map((p) => [p.id, p.displayName]))
   const roleNameById = new Map<string, string>(roles.map((r) => [r.id, `${r.displayName} (${r.slug})`]))
 
   const grantRows: GrantRow[] = (grants as Grant[]).map((g) => ({

@@ -79,9 +79,7 @@ const PLUGIN_PROVISIONING_TEMPLATES: ReadonlyArray<PluginProvisioningTemplate> =
   },
 ]
 
-export const PLUGIN_PROVISIONING_SLUGS: ReadonlySet<string> = new Set(
-  PLUGIN_PROVISIONING_TEMPLATES.map((t) => t.slug),
-)
+export const PLUGIN_PROVISIONING_SLUGS: ReadonlySet<string> = new Set(PLUGIN_PROVISIONING_TEMPLATES.map((t) => t.slug))
 
 const findTemplates = (slug: string) => PLUGIN_PROVISIONING_TEMPLATES.filter((t) => t.slug === slug)
 
@@ -111,12 +109,7 @@ export class AppSyncService extends Context.Tag("AppSyncService")<
     readonly syncFromCluster: () => Effect.Effect<
       SyncResult,
       AppSyncError,
-      | OperatorClient
-      | ApplicationRepo
-      | RbacRepo
-      | ConnectedSystemRepo
-      | ConnectorMappingRepo
-      | SqlClient.SqlClient
+      OperatorClient | ApplicationRepo | RbacRepo | ConnectedSystemRepo | ConnectorMappingRepo | SqlClient.SqlClient
     >
   }
 >() {}
@@ -125,10 +118,8 @@ export class AppSyncService extends Context.Tag("AppSyncService")<
 // Live implementation
 // ---------------------------------------------------------------------------
 
-const wrapAppRepoErr = (msg: string) => (e: ApplicationRepoError) =>
-  new AppSyncError({ message: msg, cause: e })
-const wrapRbacRepoErr = (msg: string) => (e: RbacRepoError) =>
-  new AppSyncError({ message: msg, cause: e })
+const wrapAppRepoErr = (msg: string) => (e: ApplicationRepoError) => new AppSyncError({ message: msg, cause: e })
+const wrapRbacRepoErr = (msg: string) => (e: RbacRepoError) => new AppSyncError({ message: msg, cause: e })
 const wrapConnectedSystemErr = (msg: string) => (e: ConnectedSystemRepoError) =>
   new AppSyncError({ message: msg, cause: e })
 const wrapConnectorMappingErr = (msg: string) => (e: ConnectorMappingRepoError) =>
@@ -151,7 +142,6 @@ const ensurePluginProvisioning = (appId: string, slug: string) =>
 
 const ensureSinglePlugin = (appId: string, slug: string, template: PluginProvisioningTemplate) =>
   Effect.gen(function* () {
-
     const connectedSystems = yield* ConnectedSystemRepo
     const connectorMappings = yield* ConnectorMappingRepo
     const rbac = yield* RbacRepo
@@ -159,7 +149,9 @@ const ensureSinglePlugin = (appId: string, slug: string, template: PluginProvisi
     // 1. Find or create the ConnectedSystem row for this specific plugin
     let system = yield* connectedSystems
       .findByApplicationAndPlugin(appId, template.pluginSlug)
-      .pipe(Effect.mapError(wrapConnectedSystemErr(`Failed to look up plugin system ${template.pluginSlug} for ${slug}`)))
+      .pipe(
+        Effect.mapError(wrapConnectedSystemErr(`Failed to look up plugin system ${template.pluginSlug} for ${slug}`)),
+      )
 
     if (!system) {
       system = yield* connectedSystems
@@ -204,9 +196,7 @@ export const AppSyncServiceLive = Layer.succeed(AppSyncService, {
         .listApps()
         .pipe(Effect.mapError((e: OperatorClientError) => new AppSyncError({ message: e.message, cause: e.cause })))
 
-      const existingApps = yield* appRepo
-        .list()
-        .pipe(Effect.mapError(wrapAppRepoErr("Failed to list applications")))
+      const existingApps = yield* appRepo.list().pipe(Effect.mapError(wrapAppRepoErr("Failed to list applications")))
 
       const existingBySlug = new Map(existingApps.map((a) => [a.slug, a]))
       const clusterSlugs = new Set(clusterApps.map((a) => a.id))

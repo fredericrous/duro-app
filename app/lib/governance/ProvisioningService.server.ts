@@ -76,11 +76,7 @@ const insertJob = (
   )
 
 /** Execute the HTTP connector for a provisioning job. */
-const executeHttpConnector = (
-  config: ConnectedSystemConfig,
-  operation: string,
-  body: Record<string, unknown>,
-) =>
+const executeHttpConnector = (config: ConnectedSystemConfig, operation: string, body: Record<string, unknown>) =>
   Effect.tryPromise({
     try: () => {
       const url = operation === "provision" ? config.provisionUrl : config.deprovisionUrl
@@ -173,9 +169,7 @@ const processJobInternal = (sql: SqlClient.SqlClient, job: ProvisioningJob) =>
               job.operation === "provision"
                 ? host.runProvision(system.pluginSlug!, job.grantId, job.connectedSystemId)
                 : host.runDeprovision(system.pluginSlug!, job.grantId, job.connectedSystemId)
-            yield* op.pipe(
-              Effect.mapError((e) => new ProvisioningError({ message: e.message, cause: e })),
-            )
+            yield* op.pipe(Effect.mapError((e) => new ProvisioningError({ message: e.message, cause: e })))
           })
         : connectorType === "http"
           ? (() => {
@@ -202,9 +196,7 @@ const processJobInternal = (sql: SqlClient.SqlClient, job: ProvisioningJob) =>
               })
               return loadAndPost as Effect.Effect<void, ProvisioningError, never>
             })()
-          : Effect.fail(
-              new ProvisioningError({ message: `Connector type not implemented: ${connectorType}` }),
-            )
+          : Effect.fail(new ProvisioningError({ message: `Connector type not implemented: ${connectorType}` }))
 
     // 5. Run + persist terminal status via onExit so cleanup is uninterruptible.
     //    If the fiber is interrupted mid-dispatch, the job still gets marked
@@ -257,10 +249,7 @@ export const ProvisioningServiceLive = Layer.effect(
       })
 
     const loadJob = (jobId: string) =>
-      withErr(
-        sql`SELECT * FROM provisioning_jobs WHERE id = ${jobId}`,
-        "Failed to fetch job",
-      ).pipe(
+      withErr(sql`SELECT * FROM provisioning_jobs WHERE id = ${jobId}`, "Failed to fetch job").pipe(
         Effect.flatMap((rows) =>
           rows.length === 0
             ? new ProvisioningError({ message: `Job ${jobId} not found` })
@@ -321,12 +310,8 @@ export const ProvisioningServiceDev = Layer.succeed(ProvisioningService, {
       Effect.as([] as string[]),
     ),
 
-  processNextPending: () =>
-    Effect.log("[ProvisioningService/dev] processNextPending (no-op)").pipe(Effect.asVoid),
+  processNextPending: () => Effect.log("[ProvisioningService/dev] processNextPending (no-op)").pipe(Effect.asVoid),
 
   processJob: (jobId) =>
-    Effect.log("[ProvisioningService/dev] processJob (no-op)").pipe(
-      Effect.annotateLogs({ jobId }),
-      Effect.asVoid,
-    ),
+    Effect.log("[ProvisioningService/dev] processJob (no-op)").pipe(Effect.annotateLogs({ jobId }), Effect.asVoid),
 })
