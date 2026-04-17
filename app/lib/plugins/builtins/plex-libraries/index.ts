@@ -1,7 +1,15 @@
 import { Effect } from "effect"
-import type { Plugin, GrantContext, PluginServices } from "../../contracts"
+import type { Plugin, GrantContext, PluginServices, ProvisioningTemplate } from "../../contracts"
 import { PluginError } from "../../errors"
 import { manifest, type PlexLibrariesConfig } from "./manifest"
+
+const provisioningTemplates: ReadonlyArray<ProvisioningTemplate> = [
+  {
+    appSlug: "plex",
+    config: { plexUrl: "https://plex.daddyshome.fr" },
+    mappings: { viewer: "plex-share", editor: "plex-share", admin: "plex-share" },
+  },
+]
 
 const PLEX_TV = "https://plex.tv"
 const AUTH = {
@@ -116,6 +124,7 @@ const deprovision = (ctx: GrantContext, svc: PluginServices) =>
 
 export const plexLibrariesPlugin: Plugin = {
   manifest,
+  provisioningTemplates,
   provision,
   deprovision,
 }

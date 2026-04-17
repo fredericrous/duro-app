@@ -6,82 +6,7 @@ import { RbacRepo, type RbacRepoError } from "./RbacRepo.server"
 import { ConnectedSystemRepo, type ConnectedSystemRepoError } from "./ConnectedSystemRepo.server"
 import { ConnectorMappingRepo, type ConnectorMappingRepoError } from "./ConnectorMappingRepo.server"
 import { seedDefaultRbac } from "./defaultRbac.server"
-
-// ---------------------------------------------------------------------------
-// Known plugin-provisioned apps. Hardcoded allow-list for phase 2A.
-// Each template seeds a ConnectedSystem (connector_type='plugin') + per-role
-// ConnectorMappings. The config shape matches the lldap-group-membership
-// plugin's configSchema.
-// ---------------------------------------------------------------------------
-
-interface PluginProvisioningTemplate {
-  readonly slug: string
-  readonly pluginSlug: string
-  readonly pluginVersion: string
-  readonly config: Record<string, unknown>
-  readonly mappings: Record<string, string>
-}
-
-const PLUGIN_PROVISIONING_TEMPLATES: ReadonlyArray<PluginProvisioningTemplate> = [
-  // Nextcloud: LLDAP groups for login gating
-  {
-    slug: "nextcloud",
-    pluginSlug: "lldap-group-membership",
-    pluginVersion: "1.0.0",
-    config: { viewerGroup: "nextcloud-user", editorGroup: "nextcloud-user", adminGroup: "nextcloud-admin" },
-    mappings: { viewer: "nextcloud-user", editor: "nextcloud-user", admin: "nextcloud-admin" },
-  },
-  // Gitea: LLDAP groups for Authelia access-control gating
-  {
-    slug: "gitea",
-    pluginSlug: "lldap-group-membership",
-    pluginVersion: "1.0.0",
-    config: { viewerGroup: "gitea-user", editorGroup: "gitea-user", adminGroup: "gitea-admin" },
-    mappings: { viewer: "gitea-user", editor: "gitea-user", admin: "gitea-admin" },
-  },
-  // Gitea: team membership for real viewer/editor/admin permission split
-  {
-    slug: "gitea",
-    pluginSlug: "gitea-teams",
-    pluginVersion: "1.0.0",
-    config: {
-      giteaUrl: "https://gitea.daddyshome.fr",
-      orgName: "homelab",
-      viewerTeamName: "viewers",
-      editorTeamName: "editors",
-      adminTeamName: "Owners",
-    },
-    mappings: { viewer: "viewers", editor: "editors", admin: "Owners" },
-  },
-  // Immich: LLDAP groups for login gating
-  {
-    slug: "immich",
-    pluginSlug: "lldap-group-membership",
-    pluginVersion: "1.0.0",
-    config: { viewerGroup: "immich-user", editorGroup: "immich-user", adminGroup: "immich-user" },
-    mappings: { viewer: "immich-user", editor: "immich-user", admin: "immich-user" },
-  },
-  // Immich: admin bit promotion via admin API
-  {
-    slug: "immich",
-    pluginSlug: "immich-admin-bit",
-    pluginVersion: "1.0.0",
-    config: { immichUrl: "https://photos.daddyshome.fr" },
-    mappings: { admin: "immich-admin" },
-  },
-  // Plex: direct API sharing (no LLDAP — Plex uses plex.tv accounts)
-  {
-    slug: "plex",
-    pluginSlug: "plex-libraries",
-    pluginVersion: "1.0.0",
-    config: { plexUrl: "https://plex.daddyshome.fr" },
-    mappings: { viewer: "plex-share", editor: "plex-share", admin: "plex-share" },
-  },
-]
-
-export const PLUGIN_PROVISIONING_SLUGS: ReadonlySet<string> = new Set(PLUGIN_PROVISIONING_TEMPLATES.map((t) => t.slug))
-
-const findTemplates = (slug: string) => PLUGIN_PROVISIONING_TEMPLATES.filter((t) => t.slug === slug)
+import { PluginRegistry, type ProvisioningTemplateRegistration } from "~/lib/plugins/PluginRegistry.server"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -109,7 +34,13 @@ export class AppSyncService extends Context.Tag("AppSyncService")<
     readonly syncFromCluster: () => Effect.Effect<
       SyncResult,
       AppSyncError,
-      OperatorClient | ApplicationRepo | RbacRepo | ConnectedSystemRepo | ConnectorMappingRepo | SqlClient.SqlClient
+      | OperatorClient
+      | ApplicationRepo
+      | RbacRepo
+      | ConnectedSystemRepo
+      | ConnectorMappingRepo
+      | PluginRegistry
+      | SqlClient.SqlClient
     >
   }
 >() {}
@@ -126,31 +57,54 @@ const wrapConnectorMappingErr = (msg: string) => (e: ConnectorMappingRepoError) 
   new AppSyncError({ message: msg, cause: e })
 
 /**
- * Idempotent backfill of ConnectedSystem + ConnectorMappings for known plugin-
- * provisioned apps. Runs on every sync, not just first create. Never calls
- * LLDAP (invariant 6) — groups are pre-created by the LLDAP bootstrap job.
+ * Idempotent backfill of additional roles, ConnectedSystem, and ConnectorMappings
+ * for plugin-provisioned apps. Templates are declared by the plugins themselves
+ * and indexed by the PluginRegistry at startup.
  */
 const ensurePluginProvisioning = (appId: string, slug: string) =>
   Effect.gen(function* () {
-    const templates = findTemplates(slug)
+    const registry = yield* PluginRegistry
+    const rbac = yield* RbacRepo
+    const templates = registry.getTemplatesForApp(slug)
     if (templates.length === 0) return
 
-    for (const template of templates) {
-      yield* ensureSinglePlugin(appId, slug, template)
+    for (const reg of templates) {
+      if (reg.template.additionalRoles) {
+        for (const roleDef of reg.template.additionalRoles) {
+          const role = yield* rbac
+            .ensureRole(appId, roleDef.slug, roleDef.displayName, roleDef.description)
+            .pipe(Effect.mapError(wrapRbacRepoErr(`Failed to ensure additional role ${roleDef.slug} for ${slug}`)))
+
+          if (roleDef.entitlements) {
+            const ents = yield* rbac
+              .listEntitlements(appId)
+              .pipe(Effect.mapError(wrapRbacRepoErr(`Failed to list entitlements for ${slug}`)))
+            for (const entSlug of roleDef.entitlements) {
+              const ent = ents.find((e) => e.slug === entSlug)
+              if (ent) {
+                yield* rbac
+                  .attachEntitlement(role.id, ent.id)
+                  .pipe(Effect.mapError(wrapRbacRepoErr(`Failed to attach ${entSlug} to ${roleDef.slug}`)))
+              }
+            }
+          }
+        }
+      }
+
+      yield* ensureSinglePlugin(appId, slug, reg)
     }
   })
 
-const ensureSinglePlugin = (appId: string, slug: string, template: PluginProvisioningTemplate) =>
+const ensureSinglePlugin = (appId: string, slug: string, reg: ProvisioningTemplateRegistration) =>
   Effect.gen(function* () {
     const connectedSystems = yield* ConnectedSystemRepo
     const connectorMappings = yield* ConnectorMappingRepo
     const rbac = yield* RbacRepo
 
-    // 1. Find or create the ConnectedSystem row for this specific plugin
     let system = yield* connectedSystems
-      .findByApplicationAndPlugin(appId, template.pluginSlug)
+      .findByApplicationAndPlugin(appId, reg.pluginSlug)
       .pipe(
-        Effect.mapError(wrapConnectedSystemErr(`Failed to look up plugin system ${template.pluginSlug} for ${slug}`)),
+        Effect.mapError(wrapConnectedSystemErr(`Failed to look up plugin system ${reg.pluginSlug} for ${slug}`)),
       )
 
     if (!system) {
@@ -158,21 +112,20 @@ const ensureSinglePlugin = (appId: string, slug: string, template: PluginProvisi
         .create({
           applicationId: appId,
           connectorType: "plugin",
-          config: template.config,
+          config: reg.template.config,
           status: "active",
-          pluginSlug: template.pluginSlug,
-          pluginVersion: template.pluginVersion,
+          pluginSlug: reg.pluginSlug,
+          pluginVersion: reg.pluginVersion,
         })
         .pipe(Effect.mapError(wrapConnectedSystemErr(`Failed to create plugin system for ${slug}`)))
     }
 
-    // 2. For each existing role matching a template entry, upsert a mapping
     const roles = yield* rbac
       .listRoles(appId)
       .pipe(Effect.mapError(wrapRbacRepoErr(`Failed to list roles for ${slug}`)))
 
     for (const role of roles) {
-      const externalRoleIdentifier = template.mappings[role.slug]
+      const externalRoleIdentifier = reg.template.mappings[role.slug]
       if (!externalRoleIdentifier) continue
       yield* connectorMappings
         .ensureForRole({
@@ -210,8 +163,6 @@ export const AppSyncServiceLive = Layer.succeed(AppSyncService, {
         const now = new Date().toISOString()
 
         if (!existing) {
-          // Wrap create + starter RBAC seed + LDAP provisioning backfill in
-          // one transaction so any failure rolls back the app row.
           yield* sql
             .withTransaction(
               Effect.gen(function* () {
@@ -240,18 +191,32 @@ export const AppSyncServiceLive = Layer.succeed(AppSyncService, {
             )
           created++
         } else {
-          const fields: { displayName?: string; lastSyncedAt: string } = { lastSyncedAt: now }
-          if (existing.displayName !== app.name) {
-            fields.displayName = app.name
-            updated++
-          }
-          yield* appRepo
-            .update(existing.id, fields)
-            .pipe(Effect.mapError(wrapAppRepoErr(`Failed to update app ${app.id}`)))
+          yield* sql
+            .withTransaction(
+              Effect.gen(function* () {
+                const fields: { displayName?: string; lastSyncedAt: string } = { lastSyncedAt: now }
+                if (existing.displayName !== app.name) {
+                  fields.displayName = app.name
+                  updated++
+                }
+                yield* appRepo
+                  .update(existing.id, fields)
+                  .pipe(Effect.mapError(wrapAppRepoErr(`Failed to update app ${app.id}`)))
 
-          // Idempotent backfill on every sync for known-slug apps. Catches
-          // apps that were synced before provisioning existed.
-          yield* ensurePluginProvisioning(existing.id, existing.slug)
+                yield* seedDefaultRbac(existing.id).pipe(
+                  Effect.mapError(wrapRbacRepoErr(`Failed to ensure starter RBAC for ${app.id}`)),
+                )
+
+                yield* ensurePluginProvisioning(existing.id, existing.slug)
+              }),
+            )
+            .pipe(
+              Effect.mapError((e) =>
+                e instanceof AppSyncError
+                  ? e
+                  : new AppSyncError({ message: `Transaction failed for existing ${app.id}`, cause: e }),
+              ),
+            )
         }
       }
 

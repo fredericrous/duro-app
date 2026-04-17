@@ -1,7 +1,15 @@
 import { Effect } from "effect"
-import type { Plugin, GrantContext, PluginServices } from "../../contracts"
+import type { Plugin, GrantContext, PluginServices, ProvisioningTemplate } from "../../contracts"
 import { PluginError } from "../../errors"
 import { manifest, type ImmichAdminConfig } from "./manifest"
+
+const provisioningTemplates: ReadonlyArray<ProvisioningTemplate> = [
+  {
+    appSlug: "immich",
+    config: { immichUrl: "https://photos.daddyshome.fr" },
+    mappings: { admin: "immich-admin" },
+  },
+]
 
 interface ImmichUser {
   id: string
@@ -86,6 +94,7 @@ const deprovision = (ctx: GrantContext, svc: PluginServices) =>
 
 export const immichAdminBitPlugin: Plugin = {
   manifest,
+  provisioningTemplates,
   provision,
   deprovision,
 }

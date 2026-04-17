@@ -11,12 +11,12 @@ export const seedDefaultRbac = (appId: string): Effect.Effect<void, RbacRepoErro
 
     const entitlementIdBySlug = new Map<string, string>()
     for (const e of STARTER_ENTITLEMENTS) {
-      const created = yield* rbac.createEntitlement(appId, e.slug, e.displayName, e.description)
-      entitlementIdBySlug.set(e.slug, created.id)
+      const ent = yield* rbac.ensureEntitlement(appId, e.slug, e.displayName, e.description)
+      entitlementIdBySlug.set(e.slug, ent.id)
     }
 
     for (const r of STARTER_ROLES) {
-      const role = yield* rbac.createRole(appId, r.slug, r.displayName, r.description)
+      const role = yield* rbac.ensureRole(appId, r.slug, r.displayName, r.description)
       for (const slug of r.entitlements) {
         const entId = entitlementIdBySlug.get(slug)
         if (entId) {

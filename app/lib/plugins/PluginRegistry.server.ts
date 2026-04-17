@@ -1,11 +1,22 @@
 import { Context, Effect, Layer } from "effect"
-import type { Plugin, PluginManifest, PluginCapability } from "./contracts"
+import type { Plugin, PluginManifest, PluginCapability, ProvisioningTemplate } from "./contracts"
 import { isReversible, PLUGIN_CAPABILITIES } from "./contracts"
+import { STARTER_ROLE_SLUGS, STARTER_ENTITLEMENT_SLUGS } from "~/lib/governance/defaultRbac"
 import { ManifestInvalid, PluginNotFound } from "./errors"
 import { lldapGroupMembershipPlugin } from "./builtins/lldap-group-membership"
 import { giteaTeamsPlugin } from "./builtins/gitea-teams"
 import { immichAdminBitPlugin } from "./builtins/immich-admin-bit"
 import { plexLibrariesPlugin } from "./builtins/plex-libraries"
+
+// ---------------------------------------------------------------------------
+// Provisioning template registration — returned by registry queries
+// ---------------------------------------------------------------------------
+
+export interface ProvisioningTemplateRegistration {
+  readonly pluginSlug: string
+  readonly pluginVersion: string
+  readonly template: ProvisioningTemplate
+}
 
 // ---------------------------------------------------------------------------
 // Service tag
@@ -16,6 +27,8 @@ export class PluginRegistry extends Context.Tag("PluginRegistry")<
   {
     readonly get: (slug: string) => Effect.Effect<Plugin, PluginNotFound>
     readonly list: () => Effect.Effect<ReadonlyArray<PluginManifest>>
+    readonly getTemplatesForApp: (appSlug: string) => ReadonlyArray<ProvisioningTemplateRegistration>
+    readonly provisionedAppSlugs: () => ReadonlySet<string>
   }
 >() {}
 
@@ -55,12 +68,6 @@ function validateManifest(manifest: PluginManifest, existingSlugs: Set<string>):
     }
   }
 
-  // Imperative plugins must provide provision function
-  if (manifest.imperative) {
-    // Validation of the Plugin object's provision field happens at registration
-    // time, not here (manifest doesn't have the function reference)
-  }
-
   existingSlugs.add(manifest.slug)
 }
 
@@ -70,6 +77,51 @@ function validatePlugin(plugin: Plugin): void {
       pluginSlug: plugin.manifest.slug,
       message: "imperative plugin must provide a provision function",
     })
+  }
+}
+
+function validateTemplates(plugin: Plugin): void {
+  const slug = plugin.manifest.slug
+  const e = (msg: string) => {
+    throw new ManifestInvalid({ pluginSlug: slug, message: msg })
+  }
+
+  if (!plugin.provisioningTemplates) return
+
+  for (const tpl of plugin.provisioningTemplates) {
+    if (!tpl.appSlug || tpl.appSlug.length === 0) {
+      e("provisioningTemplate has empty appSlug")
+    }
+
+    const additionalSlugs = new Set<string>()
+    if (tpl.additionalRoles) {
+      for (const role of tpl.additionalRoles) {
+        if (STARTER_ROLE_SLUGS.has(role.slug)) {
+          e(`additionalRoles slug '${role.slug}' duplicates a starter role`)
+        }
+        if (additionalSlugs.has(role.slug)) {
+          e(`duplicate additionalRoles slug '${role.slug}' in template for '${tpl.appSlug}'`)
+        }
+        additionalSlugs.add(role.slug)
+
+        if (role.entitlements) {
+          for (const entSlug of role.entitlements) {
+            if (!STARTER_ENTITLEMENT_SLUGS.has(entSlug)) {
+              e(`additionalRoles '${role.slug}' references unknown entitlement '${entSlug}'`)
+            }
+          }
+        }
+      }
+    }
+
+    for (const mappingKey of Object.keys(tpl.mappings)) {
+      if (!STARTER_ROLE_SLUGS.has(mappingKey) && !additionalSlugs.has(mappingKey)) {
+        e(
+          `mapping key '${mappingKey}' in template for '${tpl.appSlug}' is not a starter role ` +
+            `and not declared in additionalRoles`,
+        )
+      }
+    }
   }
 }
 
@@ -89,12 +141,31 @@ export const PluginRegistryLive = Layer.sync(PluginRegistry, () => {
   for (const p of plugins) {
     validateManifest(p.manifest, existingSlugs)
     validatePlugin(p)
+    validateTemplates(p)
   }
 
   const bySlug = new Map(plugins.map((p) => [p.manifest.slug, p]))
 
+  const templatesByApp = new Map<string, ProvisioningTemplateRegistration[]>()
+  for (const p of plugins) {
+    if (!p.provisioningTemplates) continue
+    for (const tpl of p.provisioningTemplates) {
+      const existing = templatesByApp.get(tpl.appSlug) ?? []
+      existing.push({
+        pluginSlug: p.manifest.slug,
+        pluginVersion: p.manifest.version,
+        template: tpl,
+      })
+      templatesByApp.set(tpl.appSlug, existing)
+    }
+  }
+
+  const provisionedSlugs: ReadonlySet<string> = new Set(templatesByApp.keys())
+
   return {
     get: (slug) => (bySlug.has(slug) ? Effect.succeed(bySlug.get(slug)!) : Effect.fail(new PluginNotFound({ slug }))),
     list: () => Effect.succeed(plugins.map((p) => p.manifest)),
+    getTemplatesForApp: (appSlug) => templatesByApp.get(appSlug) ?? [],
+    provisionedAppSlugs: () => provisionedSlugs,
   }
 })

@@ -1,7 +1,21 @@
 import { Effect } from "effect"
-import type { Plugin, GrantContext, PluginServices } from "../../contracts"
+import type { Plugin, GrantContext, PluginServices, ProvisioningTemplate } from "../../contracts"
 import { PluginError } from "../../errors"
 import { manifest, type GiteaTeamsConfig } from "./manifest"
+
+const provisioningTemplates: ReadonlyArray<ProvisioningTemplate> = [
+  {
+    appSlug: "gitea",
+    config: {
+      giteaUrl: "https://gitea.daddyshome.fr",
+      orgName: "homelab",
+      viewerTeamName: "viewers",
+      editorTeamName: "editors",
+      adminTeamName: "Owners",
+    },
+    mappings: { viewer: "viewers", editor: "editors", admin: "Owners" },
+  },
+]
 
 interface GiteaTeam {
   id: number
@@ -96,6 +110,7 @@ const deprovision = (ctx: GrantContext, svc: PluginServices) =>
 
 export const giteaTeamsPlugin: Plugin = {
   manifest,
+  provisioningTemplates,
   provision,
   deprovision,
 }

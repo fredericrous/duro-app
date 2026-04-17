@@ -29,12 +29,25 @@ export class RbacRepo extends Context.Tag("RbacRepo")<
       description?: string,
       maxDurationHours?: number,
     ) => Effect.Effect<Role, RbacRepoError>
+    readonly ensureRole: (
+      appId: string,
+      slug: string,
+      displayName: string,
+      description?: string,
+      maxDurationHours?: number,
+    ) => Effect.Effect<Role, RbacRepoError>
     readonly listRoles: (appId: string) => Effect.Effect<Role[], RbacRepoError>
     readonly findRoleById: (id: string) => Effect.Effect<Role | null, RbacRepoError>
     readonly deleteRole: (id: string) => Effect.Effect<void, RbacRepoError>
 
     // Entitlements
     readonly createEntitlement: (
+      appId: string,
+      slug: string,
+      displayName: string,
+      description?: string,
+    ) => Effect.Effect<Entitlement, RbacRepoError>
+    readonly ensureEntitlement: (
       appId: string,
       slug: string,
       displayName: string,
@@ -95,6 +108,24 @@ export const RbacRepoLive = Layer.effect(
           return decodeRole(rows[0])
         }),
 
+      ensureRole: (appId, slug, displayName, description?, maxDurationHours?) =>
+        Effect.gen(function* () {
+          const id = crypto.randomUUID()
+          const inserted = yield* withErr(
+            sql`INSERT INTO roles (id, application_id, slug, display_name, description, max_duration_hours)
+                VALUES (${id}, ${appId}, ${slug}, ${displayName}, ${description ?? null}, ${maxDurationHours ?? null})
+                ON CONFLICT (application_id, slug) DO NOTHING
+                RETURNING *`,
+            "Failed to ensure role",
+          )
+          if (inserted.length > 0) return decodeRole(inserted[0])
+          const existing = yield* withErr(
+            sql`SELECT * FROM roles WHERE application_id = ${appId} AND slug = ${slug}`,
+            "Failed to look up existing role",
+          )
+          return decodeRole(existing[0])
+        }),
+
       listRoles: (appId) =>
         withErr(
           sql`SELECT * FROM roles WHERE application_id = ${appId} ORDER BY slug`.pipe(
@@ -125,6 +156,24 @@ export const RbacRepoLive = Layer.effect(
             "Failed to create entitlement",
           )
           return decodeEntitlement(rows[0])
+        }),
+
+      ensureEntitlement: (appId, slug, displayName, description?) =>
+        Effect.gen(function* () {
+          const id = crypto.randomUUID()
+          const inserted = yield* withErr(
+            sql`INSERT INTO entitlements (id, application_id, slug, display_name, description)
+                VALUES (${id}, ${appId}, ${slug}, ${displayName}, ${description ?? null})
+                ON CONFLICT (application_id, slug) DO NOTHING
+                RETURNING *`,
+            "Failed to ensure entitlement",
+          )
+          if (inserted.length > 0) return decodeEntitlement(inserted[0])
+          const existing = yield* withErr(
+            sql`SELECT * FROM entitlements WHERE application_id = ${appId} AND slug = ${slug}`,
+            "Failed to look up existing entitlement",
+          )
+          return decodeEntitlement(existing[0])
         }),
 
       listEntitlements: (appId) =>

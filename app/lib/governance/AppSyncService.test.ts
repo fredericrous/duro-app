@@ -17,6 +17,7 @@ import { ApplicationRepo, ApplicationRepoLive } from "./ApplicationRepo.server"
 import { RbacRepo, RbacRepoLive, RbacRepoError } from "./RbacRepo.server"
 import { ConnectedSystemRepo, ConnectedSystemRepoLive } from "./ConnectedSystemRepo.server"
 import { ConnectorMappingRepo, ConnectorMappingRepoLive } from "./ConnectorMappingRepo.server"
+import { PluginRegistry, PluginRegistryLive } from "~/lib/plugins/PluginRegistry.server"
 import { makeTestDbLayer } from "~/lib/db/client.server"
 import { STARTER_ENTITLEMENTS, STARTER_ROLES } from "./defaultRbac"
 
@@ -66,6 +67,7 @@ function layersFor(operatorApps: ClusterApp[]) {
     RbacRepoLive,
     ConnectedSystemRepoLive,
     ConnectorMappingRepoLive,
+    PluginRegistryLive,
   ).pipe(Layer.provideMerge(makeTestDbLayer()))
 }
 
@@ -221,7 +223,7 @@ describe("AppSyncService", () => {
     expect(app.lastSyncedAt).not.toBeNull()
   })
 
-  it("does not re-seed starter rbac when app already exists", async () => {
+  it("backfills starter rbac for existing apps that had none", async () => {
     const rolesAfter = await Effect.gen(function* () {
       yield* seedExistingApps([{ slug: "jellyfin", displayName: "Jellyfin" }])
       const sync = yield* AppSyncService
@@ -232,9 +234,7 @@ describe("AppSyncService", () => {
       return yield* rbac.listRoles(jellyfin!.id)
     }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
 
-    // Pre-existing jellyfin was seeded without starter roles — sync doesn't
-    // retrofit them, so it still has zero roles.
-    expect(rolesAfter.length).toBe(0)
+    expect(new Set(rolesAfter.map((r) => r.slug))).toEqual(new Set(STARTER_ROLES.map((r) => r.slug)))
   })
 
   it("writes lastSyncedAt on every sync for both new and existing apps", async () => {
@@ -336,10 +336,12 @@ type RbacRepoService = Context.Tag.Service<typeof RbacRepo>
 
 const forcedError = new RbacRepoError({ message: "forced" })
 
-/** A RbacRepo that fails on createEntitlement (first step of seedDefaultRbac). */
+/** A RbacRepo that fails on ensureEntitlement (first step of seedDefaultRbac). */
 const FailingRbacRepo: RbacRepoService = {
   createEntitlement: () => Effect.fail(forcedError),
+  ensureEntitlement: () => Effect.fail(forcedError),
   createRole: () => Effect.fail(forcedError),
+  ensureRole: () => Effect.fail(forcedError),
   attachEntitlement: () => Effect.void,
   detachEntitlement: () => Effect.void,
   listRoles: () => Effect.succeed([]),
@@ -363,6 +365,7 @@ describe("AppSyncService — transactional seeding (real DB)", () => {
       Layer.succeed(RbacRepo, FailingRbacRepo),
       ConnectedSystemRepoLive,
       ConnectorMappingRepoLive,
+      PluginRegistryLive,
     ).pipe(Layer.provideMerge(makeTestDbLayer()))
 
     const { syncResult, apps } = await Effect.gen(function* () {

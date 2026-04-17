@@ -171,11 +171,30 @@ export interface GrantContext {
 }
 
 // ---------------------------------------------------------------------------
+// Provisioning templates — per-app binding config declared by plugins
+// ---------------------------------------------------------------------------
+
+export interface ProvisioningTemplateRole {
+  readonly slug: string
+  readonly displayName: string
+  readonly description: string
+  readonly entitlements?: ReadonlyArray<string>
+}
+
+export interface ProvisioningTemplate {
+  readonly appSlug: string
+  readonly config: Record<string, unknown>
+  readonly mappings: Readonly<Record<string, string>>
+  readonly additionalRoles?: ReadonlyArray<ProvisioningTemplateRole>
+}
+
+// ---------------------------------------------------------------------------
 // Plugin — the actual contract a plugin module exports
 // ---------------------------------------------------------------------------
 
 export interface Plugin {
   readonly manifest: PluginManifest
+  readonly provisioningTemplates?: ReadonlyArray<ProvisioningTemplate>
   readonly provision?: (ctx: GrantContext, svc: PluginServices) => Effect.Effect<void, PluginError>
   readonly deprovision?: (ctx: GrantContext, svc: PluginServices) => Effect.Effect<void, PluginError>
   readonly healthCheck?: (svc: PluginServices) => Effect.Effect<"healthy" | "degraded" | "unhealthy", PluginError>
