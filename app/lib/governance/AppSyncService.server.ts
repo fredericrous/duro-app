@@ -103,9 +103,7 @@ const ensureSinglePlugin = (appId: string, slug: string, reg: ProvisioningTempla
 
     let system = yield* connectedSystems
       .findByApplicationAndPlugin(appId, reg.pluginSlug)
-      .pipe(
-        Effect.mapError(wrapConnectedSystemErr(`Failed to look up plugin system ${reg.pluginSlug} for ${slug}`)),
-      )
+      .pipe(Effect.mapError(wrapConnectedSystemErr(`Failed to look up plugin system ${reg.pluginSlug} for ${slug}`)))
 
     if (!system) {
       system = yield* connectedSystems
