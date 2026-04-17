@@ -85,11 +85,11 @@ export function AppOverview({
 
       <StatGrid stats={stats} />
 
-      {showStarterCallout && (
+      {showStarterCallout && !pluginInfo && (
         <Callout variant="info">
           <Text>
             Starter roles created from the default template. These are placeholder labels — review entitlements before
-            granting production access. Auto-detection from Kubernetes RBAC is not yet wired up.
+            granting production access. Connect a provisioning plugin to automate role-to-permission mapping.
           </Text>
         </Callout>
       )}
