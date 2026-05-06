@@ -25,6 +25,7 @@ import {
 import { css, html } from "react-strict-dom"
 import { Button, Combobox, Dialog, EmptyState, Field, Inline, ScrollArea, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
 type GrantWithNames = Grant & {
   principalName: string
@@ -178,10 +179,17 @@ export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
     </Button>
   ) : null
 
+  const grantsHelpTitle = (
+    <>
+      {t("admin.nav.grants")}
+      <HelpPopover termKey="glossary.grants" />
+    </>
+  )
+
   if (grants.length === 0) {
     return (
       <Stack gap="md">
-        <CardSection title={t("admin.nav.grants")} action={createGrantAction}>
+        <CardSection title={grantsHelpTitle} action={createGrantAction}>
           <EmptyState
             message={t("admin.empty.grants")}
             action={createGrantAction}
@@ -204,7 +212,14 @@ export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <Stack gap="md">
-      <CardSection title={t("admin.grants.title", { count: grants.length })} action={createGrantAction}>
+      <CardSection
+        title={
+          <>
+            {grantsHelpTitle} ({grants.length})
+          </>
+        }
+        action={createGrantAction}
+      >
         <ScrollArea.Root>
           <ScrollArea.Viewport>
             <ScrollArea.Content>

@@ -16,7 +16,7 @@ const styles = css.create({
 })
 
 interface CardSectionProps {
-  title: string
+  title: ReactNode
   action?: ReactNode
   children: ReactNode
 }

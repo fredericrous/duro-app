@@ -19,6 +19,7 @@ import {
 import { css, html } from "react-strict-dom"
 import { Badge, EmptyState, ScrollArea, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
 export async function loader() {
   const requests = await runEffect(
@@ -102,10 +103,17 @@ export default function AdminAccessRequestsPage({ loaderData }: Route.ComponentP
     getPaginationRowModel: getPaginationRowModel(),
   })
 
+  const sectionTitle = (
+    <>
+      {t("admin.nav.accessRequests")}
+      <HelpPopover termKey="glossary.accessRequests" />
+    </>
+  )
+
   if (requests.length === 0) {
     return (
       <Stack gap="md">
-        <CardSection title={t("admin.nav.accessRequests")}>
+        <CardSection title={sectionTitle}>
           <EmptyState message={t("admin.empty.accessRequests")} />
         </CardSection>
       </Stack>
@@ -114,7 +122,13 @@ export default function AdminAccessRequestsPage({ loaderData }: Route.ComponentP
 
   return (
     <Stack gap="md">
-      <CardSection title={t("admin.accessRequests.title", { count: requests.length })}>
+      <CardSection
+        title={
+          <>
+            {sectionTitle} ({requests.length})
+          </>
+        }
+      >
         <ScrollArea.Root>
           <ScrollArea.Viewport>
             <ScrollArea.Content>

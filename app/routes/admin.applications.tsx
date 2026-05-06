@@ -21,6 +21,7 @@ import {
 import { css, html } from "react-strict-dom"
 import { Alert, Badge, Button, EmptyState, ScrollArea, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
 export async function loader() {
   const applications = await runEffect(
@@ -115,10 +116,17 @@ export default function AdminApplicationsPage({ loaderData }: Route.ComponentPro
     </fetcher.Form>
   )
 
+  const appsHelpTitle = (
+    <>
+      {t("admin.nav.applications")}
+      <HelpPopover termKey="glossary.applications" />
+    </>
+  )
+
   if (applications.length === 0) {
     return (
       <Stack gap="md">
-        <CardSection title={t("admin.nav.applications")} action={syncForm}>
+        <CardSection title={appsHelpTitle} action={syncForm}>
           {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
           <EmptyState message={t("admin.empty.applications")} />
         </CardSection>
@@ -128,7 +136,14 @@ export default function AdminApplicationsPage({ loaderData }: Route.ComponentPro
 
   return (
     <Stack gap="md">
-      <CardSection title={`${t("admin.nav.applications")} (${applications.length})`} action={syncForm}>
+      <CardSection
+        title={
+          <>
+            {appsHelpTitle} ({applications.length})
+          </>
+        }
+        action={syncForm}
+      >
         {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
         {actionData && "success" in actionData && actionData.success && (
           <Alert variant="success">{actionData.message}</Alert>

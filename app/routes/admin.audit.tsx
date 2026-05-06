@@ -16,8 +16,9 @@ import {
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { Badge, Button, Combobox, EmptyState, Inline, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
+import { Badge, Button, Combobox, EmptyState, Inline, Input, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
 function safeParseMetadata(metadata: unknown): Record<string, unknown> {
   if (metadata === null || metadata === undefined) return {}
@@ -43,6 +44,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url)
   const eventType = url.searchParams.get("eventType") || undefined
   const actorId = url.searchParams.get("actorId") || undefined
+  const targetType = url.searchParams.get("targetType") || undefined
+  const targetId = url.searchParams.get("targetId") || undefined
   const applicationId = url.searchParams.get("applicationId") || undefined
   const source = url.searchParams.get("source") || undefined
   const page = parseInt(url.searchParams.get("page") || "0", 10)
@@ -58,6 +61,8 @@ export async function loader({ request }: Route.LoaderArgs) {
         const raw = yield* svc.query({
           eventType,
           actorId,
+          targetType,
+          targetId,
           applicationId,
           limit: source ? pageSize * 5 : pageSize,
           offset: source ? 0 : page * pageSize,
@@ -146,14 +151,28 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
   })
 
   const currentEventType = searchParams.get("eventType") || ""
+  const currentActor = searchParams.get("actorId") || ""
+  const currentTargetType = searchParams.get("targetType") || ""
+  const currentTargetId = searchParams.get("targetId") || ""
 
-  const setEventTypeFilter = (value: string | null) => {
+  const setParam = (key: string, value: string | null) => {
     const next = new URLSearchParams(searchParams)
     if (value) {
-      next.set("eventType", value)
+      next.set(key, value)
     } else {
-      next.delete("eventType")
+      next.delete(key)
     }
+    next.set("page", "0")
+    setSearchParams(next)
+  }
+
+  const clearFilters = () => {
+    const next = new URLSearchParams(searchParams)
+    next.delete("eventType")
+    next.delete("actorId")
+    next.delete("targetType")
+    next.delete("targetId")
+    next.delete("applicationId")
     next.set("page", "0")
     setSearchParams(next)
   }
@@ -164,19 +183,40 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
     setSearchParams(next)
   }
 
-  // Derive unique event types for the filter combobox
-  const uniqueEventTypes = [...new Set(events.map((e) => e.eventType))].sort()
+  // Derive unique values for filter comboboxes from the current page's events
+  const uniqueEventTypes = useMemo(() => [...new Set(events.map((e) => e.eventType))].sort(), [events])
+  const uniqueActors = useMemo(
+    () => [...new Set(events.map((e) => e.actorId).filter((v): v is string => Boolean(v)))].sort(),
+    [events],
+  )
+  const uniqueTargetTypes = useMemo(
+    () => [...new Set(events.map((e) => e.targetType).filter((v): v is string => Boolean(v)))].sort(),
+    [events],
+  )
+
+  const hasActiveFilters =
+    Boolean(currentEventType) ||
+    Boolean(currentActor) ||
+    Boolean(currentTargetType) ||
+    Boolean(currentTargetId)
 
   return (
     <Stack gap="md">
       {error && <Text color="error">{t("admin.audit.loadFailed", { error })}</Text>}
-      <CardSection title={t("admin.audit.title")}>
+      <CardSection
+        title={
+          <>
+            {t("admin.audit.title")}
+            <HelpPopover termKey="glossary.audit" />
+          </>
+        }
+      >
         <html.div style={styles.filterBar}>
           <Inline gap="sm">
             <Combobox.Root
               value={currentEventType}
-              onValueChange={setEventTypeFilter}
-              onInputChange={setEventTypeFilter}
+              onValueChange={(v) => setParam("eventType", v)}
+              onInputChange={(v) => setParam("eventType", v)}
             >
               <Combobox.Input placeholder={t("admin.audit.filterPlaceholder")} />
               <Combobox.Popup>
@@ -188,6 +228,42 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
                 <Combobox.Empty>{t("admin.principals.noResults")}</Combobox.Empty>
               </Combobox.Popup>
             </Combobox.Root>
+            <Combobox.Root
+              value={currentActor}
+              onValueChange={(v) => setParam("actorId", v)}
+              onInputChange={(v) => setParam("actorId", v)}
+            >
+              <Combobox.Input placeholder={t("admin.audit.filterByActor")} />
+              <Combobox.Popup>
+                {uniqueActors.map((a) => (
+                  <Combobox.Item key={a} value={a}>
+                    {a}
+                  </Combobox.Item>
+                ))}
+                <Combobox.Empty>{t("admin.principals.noResults")}</Combobox.Empty>
+              </Combobox.Popup>
+            </Combobox.Root>
+            <Combobox.Root
+              value={currentTargetType}
+              onValueChange={(v) => setParam("targetType", v)}
+              onInputChange={(v) => setParam("targetType", v)}
+            >
+              <Combobox.Input placeholder={t("admin.cols.targetType")} />
+              <Combobox.Popup>
+                {uniqueTargetTypes.map((tt) => (
+                  <Combobox.Item key={tt} value={tt}>
+                    {tt}
+                  </Combobox.Item>
+                ))}
+                <Combobox.Empty>{t("admin.principals.noResults")}</Combobox.Empty>
+              </Combobox.Popup>
+            </Combobox.Root>
+            <TargetIdFilter currentValue={currentTargetId} onCommit={(v) => setParam("targetId", v)} />
+            {hasActiveFilters && (
+              <Button variant="secondary" size="small" onClick={clearFilters}>
+                {t("admin.audit.clearFilters")}
+              </Button>
+            )}
           </Inline>
         </html.div>
 
@@ -260,6 +336,32 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
         )}
       </CardSection>
     </Stack>
+  )
+}
+
+/**
+ * Target-id filter is a free-text input — Input's onBlur signature doesn't
+ * receive the event, and the design system has no onKeyDown affordance, so we
+ * keep a local string and call onCommit when the input loses focus.
+ */
+function TargetIdFilter({
+  currentValue,
+  onCommit,
+}: {
+  currentValue: string
+  onCommit: (value: string | null) => void
+}) {
+  const { t } = useTranslation()
+  const [draft, setDraft] = useState(currentValue)
+  return (
+    <Input
+      placeholder={t("admin.audit.filterByTarget")}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (draft !== currentValue) onCommit(draft.trim() || null)
+      }}
+    />
   )
 }
 

@@ -19,6 +19,7 @@ import {
 import { css, html } from "react-strict-dom"
 import { Badge, Combobox, EmptyState, Inline, ScrollArea, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
 export async function loader() {
@@ -94,10 +95,17 @@ export default function AdminPrincipalsPage({ loaderData }: Route.ComponentProps
     table.getColumn(columnId)?.setFilterValue(value || undefined)
   }
 
+  const sectionTitle = (
+    <>
+      {t("admin.nav.principals")}
+      <HelpPopover termKey="glossary.principals" />
+    </>
+  )
+
   if (principals.length === 0) {
     return (
       <Stack gap="md">
-        <CardSection title={t("admin.nav.principals")}>
+        <CardSection title={sectionTitle}>
           <EmptyState message={t("admin.empty.principals")} />
         </CardSection>
       </Stack>
@@ -106,7 +114,13 @@ export default function AdminPrincipalsPage({ loaderData }: Route.ComponentProps
 
   return (
     <Stack gap="md">
-      <CardSection title={`${t("admin.nav.principals")} (${principals.length})`}>
+      <CardSection
+        title={
+          <>
+            {sectionTitle} ({principals.length})
+          </>
+        }
+      >
         <html.div style={styles.filterBar}>
           <Inline gap="sm">
             <Combobox.Root

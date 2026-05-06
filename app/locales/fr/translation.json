@@ -82,7 +82,10 @@
         "revokeYes": "Oui, revoquer",
         "revoked": "Certificat revoque.",
         "revokeFailed": "La revocation a echoue. Reessayer ?",
-        "empty": "Aucun certificat."
+        "empty": "Aucun certificat.",
+        "expired": "Expire",
+        "expiresInDays_one": "Expire dans {{count}} jour",
+        "expiresInDays_other": "Expire dans {{count}} jours"
       }
     },
     "security": {
@@ -105,6 +108,17 @@
       "confirmHint": "Vous pouvez vous reconnecter a tout moment depuis l'accueil.",
       "confirmButton": "Se deconnecter"
     }
+  },
+  "glossary": {
+    "help": "Qu'est-ce que c'est ?",
+    "principals": "Un principal est tout ce qui peut recevoir un acces : un utilisateur, un groupe ou un compte de service. Les utilisateurs representent des personnes ; les groupes regroupent les utilisateurs par role ; les comptes de service representent des systemes automatises.",
+    "grants": "Un octroi lie un principal a un role (ou un droit) sur une application precise. C'est l'enregistrement qui dit \"alice peut ecrire sur nas\". Les octrois peuvent expirer et etre revoques.",
+    "applications": "Une application est tout ce dont Duro gouverne l'acces : une application web, un partage monte, un service gere. Chaque application possede ses propres roles, droits et ressources.",
+    "entitlements": "Un droit est une permission fine comme \"read\" ou \"admin\", limitee a une application. Les roles regroupent des droits ; les octrois lient des principals soit a un role, soit a un droit individuel.",
+    "authzPlayground": "Un outil en lecture seule pour tester les decisions d'acces. Choisissez un principal, une application et une action ; le moteur renvoie ALLOW ou DENY avec les octrois correspondants et le raisonnement. Executer une verification ne change rien.",
+    "audit": "Un journal en ajout seul de chaque evenement de gouvernance : octrois crees ou revoques, principals modifies, demandes d'acces tranchees. Filtrez par acteur, cible ou type d'evenement pour enqueter sur \"qui a fait quoi\".",
+    "accessRequests": "Demandes d'acces a une application initiees par les utilisateurs. Chaque demande est evaluee par un admin (ou une politique) et devient un octroi une fois approuvee.",
+    "invitations": "Une invitation d'acces pre-cree les octrois qu'une personne recevra a l'acceptation. A distinguer du flux Invitations utilisateur qui provisionne un compte dans le fournisseur d'identite."
   },
   "invite": {
     "title": "Rejoindre {{appName}}",
@@ -269,10 +283,45 @@
     "audit": {
       "title": "Journal d'audit",
       "filterPlaceholder": "Filtrer par type d'evenement...",
+      "filterByActor": "Filtrer par acteur…",
+      "filterByTarget": "Filtrer par identifiant de cible…",
+      "filterByApplication": "Filtrer par application…",
+      "clearFilters": "Reinitialiser les filtres",
       "loadFailed": "Impossible de charger les evenements d'audit : {{error}}",
       "previous": "Precedent",
       "next": "Suivant",
-      "page": "Page {{page}}"
+      "page": "Page {{page}}",
+      "viewMetadata": "Voir les metadonnees",
+      "hideMetadata": "Masquer les metadonnees",
+      "narrativeFallback": "{{eventType}}",
+      "narrativeWithTarget": "{{eventType}} sur {{targetType}} {{targetId}}",
+      "narrativeWithActor": "{{actor}} {{eventType}}",
+      "narrativeFull": "{{actor}} {{eventType}} sur {{targetType}} {{targetId}}"
+    },
+    "authz": {
+      "title": "Bac a sable d'autorisation",
+      "subtitle": "Executez le moteur d'autorisation contre un principal/application/action et voyez la decision actuelle.",
+      "readOnlyNotice": "Lecture seule — executer une verification ici ne modifie aucun octroi, permission, ou etat.",
+      "principalPlaceholder": "Choisir un principal…",
+      "applicationPlaceholder": "Choisir une application…",
+      "actionLabel": "Action",
+      "actionPlaceholder": "ex. read, write, admin",
+      "actionHint": "L'identifiant du droit demande. Valeurs courantes : access, read, write, admin.",
+      "resourceLabel": "Identifiant de ressource (optionnel)",
+      "resourcePlaceholder": "Identifiant de ressource (optionnel)",
+      "checkAccess": "Verifier l'acces",
+      "checking": "Verification…",
+      "result": "Resultat",
+      "allowed": "ACCES AUTORISE",
+      "denied": "ACCES REFUSE",
+      "reasons": "Raisons :",
+      "matchedGrants": "Octrois correspondants :",
+      "diagnostics": "Diagnostics :",
+      "principalId": "ID Principal",
+      "groupIds": "ID des groupes",
+      "none": "aucun",
+      "candidateGrants": "Octrois candidats",
+      "evaluationMs": "Temps d'evaluation : {{ms}}ms"
     },
     "principals": {
       "filterByName": "Filtrer par nom...",

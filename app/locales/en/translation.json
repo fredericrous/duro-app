@@ -82,7 +82,10 @@
         "revokeYes": "Yes, revoke",
         "revoked": "Certificate revoked.",
         "revokeFailed": "Revocation failed. Retry?",
-        "empty": "No certificates yet."
+        "empty": "No certificates yet.",
+        "expired": "Expired",
+        "expiresInDays_one": "Expires in {{count}} day",
+        "expiresInDays_other": "Expires in {{count}} days"
       }
     },
     "security": {
@@ -105,6 +108,17 @@
       "confirmHint": "You can always sign back in from the home page.",
       "confirmButton": "Sign out"
     }
+  },
+  "glossary": {
+    "help": "What is this?",
+    "principals": "A principal is anything that can be granted access — a user, a group, or a service account. Users represent people; groups bundle users by role; service accounts represent automated systems.",
+    "grants": "A grant binds a principal to a role (or entitlement) on a specific application. It's the actual record that says \"alice can write to nas\". Grants can expire and be revoked.",
+    "applications": "An application is anything Duro governs access to — a web app, a mounted share, a managed service. Each application has its own roles, entitlements, and resources.",
+    "entitlements": "An entitlement is a fine-grained permission like \"read\" or \"admin\", scoped to one application. Roles bundle entitlements; grants bind principals to either a role or a single entitlement.",
+    "authzPlayground": "A read-only tool for testing access decisions. Pick a principal, an application, and an action; the engine returns ALLOW or DENY plus the matched grants and the reasoning. Running a check changes nothing.",
+    "audit": "An append-only log of every governance event — grants created or revoked, principals changed, access requests decided. Filter by actor, target, or event type to investigate \"who did what\".",
+    "accessRequests": "User-initiated requests for access to an application. Each request is evaluated by an admin (or a policy) and turns into a grant when approved.",
+    "invitations": "An access invitation pre-creates the grants a person should receive when they accept. Distinct from the system-level User Invites flow which provisions an account in the identity provider."
   },
   "invite": {
     "title": "Join {{appName}}",
@@ -269,10 +283,45 @@
     "audit": {
       "title": "Audit Log",
       "filterPlaceholder": "Filter by event type...",
+      "filterByActor": "Filter by actor…",
+      "filterByTarget": "Filter by target ID…",
+      "filterByApplication": "Filter by application…",
+      "clearFilters": "Clear filters",
       "loadFailed": "Failed to load audit events: {{error}}",
       "previous": "Previous",
       "next": "Next",
-      "page": "Page {{page}}"
+      "page": "Page {{page}}",
+      "viewMetadata": "View metadata",
+      "hideMetadata": "Hide metadata",
+      "narrativeFallback": "{{eventType}}",
+      "narrativeWithTarget": "{{eventType}} on {{targetType}} {{targetId}}",
+      "narrativeWithActor": "{{actor}} {{eventType}}",
+      "narrativeFull": "{{actor}} {{eventType}} on {{targetType}} {{targetId}}"
+    },
+    "authz": {
+      "title": "Authorization Playground",
+      "subtitle": "Run the authorization engine against a principal/application/action and see what it would decide right now.",
+      "readOnlyNotice": "Read-only — running a check here does not change any grants, permissions, or state.",
+      "principalPlaceholder": "Pick a principal…",
+      "applicationPlaceholder": "Pick an application…",
+      "actionLabel": "Action",
+      "actionPlaceholder": "e.g. read, write, admin",
+      "actionHint": "The entitlement slug being requested. Common values: access, read, write, admin.",
+      "resourceLabel": "Resource ID (optional)",
+      "resourcePlaceholder": "Optional resource ID",
+      "checkAccess": "Check access",
+      "checking": "Checking…",
+      "result": "Result",
+      "allowed": "ACCESS ALLOWED",
+      "denied": "ACCESS DENIED",
+      "reasons": "Reasons:",
+      "matchedGrants": "Matched grant IDs:",
+      "diagnostics": "Diagnostics:",
+      "principalId": "Principal ID",
+      "groupIds": "Group IDs",
+      "none": "none",
+      "candidateGrants": "Candidate grants",
+      "evaluationMs": "Evaluation time: {{ms}}ms"
     },
     "principals": {
       "filterByName": "Filter by name...",

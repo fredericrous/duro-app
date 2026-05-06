@@ -4,7 +4,21 @@ import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 import type { SettingsResult } from "~/lib/mutations/settings"
 import { useAction } from "~/hooks/useAction"
 import { PasswordReveal } from "~/components/PasswordReveal/PasswordReveal"
-import { Alert, Button, Inline, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
+import { Alert, Badge, Button, Inline, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000
+
+function expiryStatus(expiresAt: string): "ok" | "soon" | "imminent" | "expired" {
+  const days = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / ONE_DAY_MS)
+  if (days <= 0) return "expired"
+  if (days <= 7) return "imminent"
+  if (days <= 30) return "soon"
+  return "ok"
+}
+
+function daysUntil(expiresAt: string): number {
+  return Math.ceil((new Date(expiresAt).getTime() - Date.now()) / ONE_DAY_MS)
+}
 
 const API_URL = "/settings"
 
@@ -27,7 +41,32 @@ function CertRow({ cert }: { cert: UserCertificate }) {
         </code>
       </Table.Cell>
       <Table.Cell>{new Date(cert.issuedAt).toLocaleDateString()}</Table.Cell>
-      <Table.Cell>{new Date(cert.expiresAt).toLocaleDateString()}</Table.Cell>
+      <Table.Cell>
+        <Inline gap="sm">
+          <Text as="span">{new Date(cert.expiresAt).toLocaleDateString()}</Text>
+          {(() => {
+            const status = expiryStatus(cert.expiresAt)
+            if (status === "expired") {
+              return <Badge variant="error" size="sm">{t("settings.cert.list.expired")}</Badge>
+            }
+            if (status === "imminent") {
+              return (
+                <Badge variant="error" size="sm">
+                  {t("settings.cert.list.expiresInDays", { count: Math.max(daysUntil(cert.expiresAt), 0) })}
+                </Badge>
+              )
+            }
+            if (status === "soon") {
+              return (
+                <Badge variant="warning" size="sm">
+                  {t("settings.cert.list.expiresInDays", { count: daysUntil(cert.expiresAt) })}
+                </Badge>
+              )
+            }
+            return null
+          })()}
+        </Inline>
+      </Table.Cell>
       <Table.Cell>
         {confirming ? (
           <Inline gap="sm">
