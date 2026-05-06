@@ -79,14 +79,19 @@
     "groupsLabel": "Groups: {{groups}}",
     "expired": {
       "title": "Invite Expired",
-      "message": "This invite has expired. Use the link in your invitation email to request a new one."
+      "message": "This invite has expired. You can request a fresh one below.",
+      "cta": "Request a new invite"
     },
     "used": {
       "title": "Already Joined",
       "message": "This invite has already been used. If you need help, contact the person who invited you."
     },
     "error": {
-      "title": "Unable to Join"
+      "title": "Unable to Join",
+      "invalid": "This invite link is invalid or could not be found.",
+      "missingToken": "This invite link is missing required information.",
+      "tooManyAttempts": "Too many attempts. Please contact an administrator.",
+      "unknown": "Something went wrong loading this invite. Please try again, or contact your administrator if the problem persists."
     },
     "password": {
       "title": "Certificate Password",
@@ -154,13 +159,38 @@
       "message": "A new invitation email has been sent to <strong>{{email}}</strong>. Check your inbox for the new link and certificate."
     },
     "error": {
-      "title": "Cannot Re-invite"
+      "title": "Cannot Re-invite",
+      "missingToken": "This re-invite link is missing required information.",
+      "invalid": "This re-invite link is invalid or could not be found.",
+      "alreadyUsed": "This invite has already been used to create an account. If you need help, contact the person who invited you.",
+      "stillValid": "Your invite is still valid. Check your email for the original invitation link.",
+      "unknown": "Something went wrong. Please try again, or contact your administrator if the problem persists.",
+      "sendFailed": "Failed to send a new invite. Please try again."
     }
   },
   "admin": {
     "title": "Admin - Duro",
     "tabs": {
       "invites": "Invites",
+      "users": "Users"
+    },
+    "nav": {
+      "title": "Navigation",
+      "menu": "Menu",
+      "accessManagement": "Access Management",
+      "applications": "Applications",
+      "principals": "Principals",
+      "grants": "Grants",
+      "groupMappings": "Group Mappings",
+      "workflows": "Workflows",
+      "accessRequests": "Access Requests",
+      "invitations": "Access Invitations",
+      "security": "Security",
+      "authzPlayground": "Authz Playground",
+      "auditLog": "Audit Log",
+      "system": "System",
+      "plugins": "Plugins",
+      "invites": "User Invites",
       "users": "Users"
     },
     "invites": {
@@ -246,7 +276,12 @@
         "usersSelected": "{{count}} user(s) selected",
         "selected": "{{count}} certificate(s) selected",
         "revokeAllForUsers": "Revoke all certs for {{count}} user(s)",
-        "revokeSelected": "Revoke {{count}} certificate(s)"
+        "revokeSelected": "Revoke {{count}} certificate(s)",
+        "confirmRevokeUsersTitle": "Revoke certificates for selected users?",
+        "confirmRevokeCertsTitle": "Revoke selected certificates?",
+        "confirmRevokeUsersBody": "All active certificates for {{count}} user(s) will be revoked. The users will lose access until a new certificate is issued.",
+        "confirmRevokeCertsBody": "{{count}} certificate(s) will be revoked. Devices using these certificates will lose access immediately.",
+        "confirmRevokeWarning": "This action cannot be undone. New certificates must be issued to restore access."
       }
     }
   },

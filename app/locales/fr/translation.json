@@ -79,14 +79,19 @@
     "groupsLabel": "Groupes : {{groups}}",
     "expired": {
       "title": "Invitation expiree",
-      "message": "Cette invitation a expire. Utilisez le lien dans votre e-mail d'invitation pour en demander une nouvelle."
+      "message": "Cette invitation a expire. Vous pouvez en demander une nouvelle ci-dessous.",
+      "cta": "Demander une nouvelle invitation"
     },
     "used": {
       "title": "Deja inscrit",
       "message": "Cette invitation a deja ete utilisee. Si vous avez besoin d'aide, contactez la personne qui vous a invite."
     },
     "error": {
-      "title": "Impossible de rejoindre"
+      "title": "Impossible de rejoindre",
+      "invalid": "Ce lien d'invitation est invalide ou introuvable.",
+      "missingToken": "Il manque des informations a ce lien d'invitation.",
+      "tooManyAttempts": "Trop de tentatives. Veuillez contacter un administrateur.",
+      "unknown": "Une erreur s'est produite lors du chargement de cette invitation. Veuillez reessayer, ou contacter votre administrateur si le probleme persiste."
     },
     "password": {
       "title": "Mot de passe du certificat",
@@ -154,13 +159,38 @@
       "message": "Un nouvel e-mail d'invitation a ete envoye a <strong>{{email}}</strong>. Verifiez votre boite de reception pour le nouveau lien et certificat."
     },
     "error": {
-      "title": "Impossible de reinviter"
+      "title": "Impossible de reinviter",
+      "missingToken": "Il manque des informations a ce lien.",
+      "invalid": "Ce lien est invalide ou introuvable.",
+      "alreadyUsed": "Cette invitation a deja ete utilisee pour creer un compte. Si vous avez besoin d'aide, contactez la personne qui vous a invite.",
+      "stillValid": "Votre invitation est encore valide. Verifiez votre e-mail pour retrouver le lien d'origine.",
+      "unknown": "Une erreur s'est produite. Veuillez reessayer, ou contacter votre administrateur si le probleme persiste.",
+      "sendFailed": "L'envoi de la nouvelle invitation a echoue. Veuillez reessayer."
     }
   },
   "admin": {
     "title": "Admin - Duro",
     "tabs": {
       "invites": "Invitations",
+      "users": "Utilisateurs"
+    },
+    "nav": {
+      "title": "Navigation",
+      "menu": "Menu",
+      "accessManagement": "Gestion des acces",
+      "applications": "Applications",
+      "principals": "Principaux",
+      "grants": "Octrois",
+      "groupMappings": "Mappage des groupes",
+      "workflows": "Flux de travail",
+      "accessRequests": "Demandes d'acces",
+      "invitations": "Invitations d'acces",
+      "security": "Securite",
+      "authzPlayground": "Bac a sable Authz",
+      "auditLog": "Journal d'audit",
+      "system": "Systeme",
+      "plugins": "Extensions",
+      "invites": "Invitations utilisateur",
       "users": "Utilisateurs"
     },
     "invites": {
@@ -246,7 +276,12 @@
         "usersSelected": "{{count}} utilisateur(s) sélectionné(s)",
         "selected": "{{count}} certificat(s) sélectionné(s)",
         "revokeAllForUsers": "Révoquer les certs de {{count}} utilisateur(s)",
-        "revokeSelected": "Révoquer {{count}} certificat(s)"
+        "revokeSelected": "Révoquer {{count}} certificat(s)",
+        "confirmRevokeUsersTitle": "Revoquer les certificats des utilisateurs selectionnes ?",
+        "confirmRevokeCertsTitle": "Revoquer les certificats selectionnes ?",
+        "confirmRevokeUsersBody": "Tous les certificats actifs de {{count}} utilisateur(s) seront revoques. Les utilisateurs perdront l'acces jusqu'a l'emission d'un nouveau certificat.",
+        "confirmRevokeCertsBody": "{{count}} certificat(s) seront revoques. Les appareils utilisant ces certificats perdront immediatement l'acces.",
+        "confirmRevokeWarning": "Cette action est irreversible. De nouveaux certificats devront etre emis pour restaurer l'acces."
       }
     }
   },

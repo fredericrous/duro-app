@@ -1,5 +1,5 @@
 import { Suspense, useMemo, useState } from "react"
-import { redirect } from "react-router"
+import { redirect, useParams } from "react-router"
 import { Trans, useTranslation } from "react-i18next"
 import type { Route } from "./+types/invite-create-account"
 import { runEffect } from "~/lib/runtime.server"
@@ -16,18 +16,21 @@ import { CertGate } from "~/components/CertGate/CertGate"
 import { useDevOverrides } from "~/components/DevToolbar/DevToolbar"
 import { Alert, Heading, LinkButton, Text } from "@duro-app/ui"
 
+type InviteErrorCode = "missing_token" | "invalid" | "already_used" | "expired" | "too_many_attempts" | "unknown"
+
 export function meta({ data }: Route.MetaArgs) {
   return [{ title: data?.appName ? `Create Account — ${data.appName}` : "Create Account" }]
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const token = params.token
+  const healthUrl = `${config.homeUrl}/health`
   if (!token) {
     return {
       valid: false as const,
-      error: "Missing invite token",
+      error: "missing_token" as InviteErrorCode,
       appName: config.appName,
-      healthUrl: `${config.homeUrl}/health`,
+      healthUrl,
     }
   }
 
@@ -49,9 +52,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     if (!invite) {
       return {
         valid: false as const,
-        error: "Invalid invite link",
+        error: "invalid" as InviteErrorCode,
         appName: config.appName,
-        healthUrl: `${config.homeUrl}/health`,
+        healthUrl,
       }
     }
 
@@ -65,28 +68,27 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     if (invite.usedAt) {
       return {
         valid: false as const,
-        error: "already_used",
+        error: "already_used" as InviteErrorCode,
         appName: config.appName,
-        healthUrl: `${config.homeUrl}/health`,
-        homeUrl: config.homeUrl,
+        healthUrl,
       }
     }
 
     if (new Date(invite.expiresAt) < new Date()) {
       return {
         valid: false as const,
-        error: "This invite has expired.",
+        error: "expired" as InviteErrorCode,
         appName: config.appName,
-        healthUrl: `${config.homeUrl}/health`,
+        healthUrl,
       }
     }
 
     if (invite.attempts >= 5) {
       return {
         valid: false as const,
-        error: "Too many attempts. Please contact an administrator.",
+        error: "too_many_attempts" as InviteErrorCode,
         appName: config.appName,
-        healthUrl: `${config.homeUrl}/health`,
+        healthUrl,
       }
     }
 
@@ -94,16 +96,16 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       valid: true as const,
       email: invite.email,
       appName: config.appName,
-      healthUrl: `${config.homeUrl}/health`,
+      healthUrl,
     }
   } catch (e) {
     if (e instanceof Response) throw e
     console.error("[create-account] loader error:", e)
     return {
       valid: false as const,
-      error: "Something went wrong",
+      error: "unknown" as InviteErrorCode,
       appName: config.appName,
-      healthUrl: `${config.homeUrl}/health`,
+      healthUrl,
     }
   }
 }
@@ -169,6 +171,7 @@ function checkCert(healthUrl: string): Promise<boolean> {
 
 export default function CreateAccountPage({ loaderData, actionData }: Route.ComponentProps) {
   const { t } = useTranslation()
+  const params = useParams()
   const devOverrides = useDevOverrides()
   const [realCertPromise] = useState(() => {
     if (typeof window === "undefined") return Promise.resolve(false)
@@ -194,20 +197,7 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
   }
 
   if (!loaderData.valid) {
-    if (loaderData.error === "already_used") {
-      return (
-        <CenteredCardPage>
-          <Heading level={1}>{t("createAccount.success.title")}</Heading>
-          <Alert variant="success">
-            <Text as="p">{t("createAccount.success.message")}</Text>
-          </Alert>
-          <LinkButton href={loaderData.homeUrl ?? "/"} variant="primary" fullWidth>
-            {t("createAccount.success.goHome")}
-          </LinkButton>
-        </CenteredCardPage>
-      )
-    }
-    return <ErrorCard title={t("createAccount.heading")} message={loaderData.error} />
+    return <InviteErrorView code={loaderData.error} token={params.token} />
   }
 
   return (
@@ -231,4 +221,48 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
       </Suspense>
     </CenteredCardPage>
   )
+}
+
+function InviteErrorView({ code, token }: { code: InviteErrorCode; token: string | undefined }) {
+  const { t } = useTranslation()
+
+  if (code === "already_used") {
+    return (
+      <ErrorCard
+        icon="check-done"
+        tone="info"
+        title={t("invite.used.title")}
+        message={t("invite.used.message")}
+      />
+    )
+  }
+
+  if (code === "expired") {
+    return (
+      <ErrorCard
+        icon="clock"
+        tone="warning"
+        title={t("invite.expired.title")}
+        message={t("invite.expired.message")}
+        action={
+          token ? (
+            <LinkButton href={`/reinvite/${token}`} variant="primary" fullWidth>
+              {t("invite.expired.cta")}
+            </LinkButton>
+          ) : null
+        }
+      />
+    )
+  }
+
+  const messageKey =
+    code === "missing_token"
+      ? "invite.error.missingToken"
+      : code === "invalid"
+        ? "invite.error.invalid"
+        : code === "too_many_attempts"
+          ? "invite.error.tooManyAttempts"
+          : "invite.error.unknown"
+
+  return <ErrorCard title={t("invite.error.title")} message={t(messageKey)} />
 }

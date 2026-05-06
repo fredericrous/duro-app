@@ -156,7 +156,7 @@ export default function AdminLayout() {
       </SideNav.Group>
       <SideNav.Group label={t("admin.nav.workflows", "Workflows")}>
         <SideNav.Item value="access-requests">{t("admin.nav.accessRequests", "Access Requests")}</SideNav.Item>
-        <SideNav.Item value="invitations">{t("admin.nav.invitations", "Invitations")}</SideNav.Item>
+        <SideNav.Item value="invitations">{t("admin.nav.invitations", "Access Invitations")}</SideNav.Item>
       </SideNav.Group>
       <SideNav.Group label={t("admin.nav.security", "Security")}>
         <SideNav.Item value="authz-playground">{t("admin.nav.authzPlayground", "Authz Playground")}</SideNav.Item>
@@ -164,7 +164,7 @@ export default function AdminLayout() {
       </SideNav.Group>
       <SideNav.Group label={t("admin.nav.system", "System")}>
         <SideNav.Item value="plugins">{t("admin.nav.plugins", "Plugins")}</SideNav.Item>
-        <SideNav.Item value="invites">{t("admin.nav.invites", "Invites")}</SideNav.Item>
+        <SideNav.Item value="invites">{t("admin.nav.invites", "User Invites")}</SideNav.Item>
         <SideNav.Item value="users">{t("admin.nav.users", "Users")}</SideNav.Item>
       </SideNav.Group>
     </SideNav.Root>

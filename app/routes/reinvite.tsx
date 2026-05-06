@@ -13,6 +13,8 @@ import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { Alert, Button, Heading, StatusIcon, Text } from "@duro-app/ui"
 
+type ReinviteErrorCode = "missing_token" | "invalid" | "already_used" | "still_valid" | "send_failed" | "unknown"
+
 export function meta({ data }: Route.MetaArgs) {
   return [{ title: data?.appName ? `Request New Invite - ${data.appName}` : "Request New Invite" }]
 }
@@ -20,7 +22,7 @@ export function meta({ data }: Route.MetaArgs) {
 export async function loader({ request, params }: Route.LoaderArgs) {
   const token = params.token
   if (!token) {
-    return { canReinvite: false as const, error: "Missing token", appName: config.appName }
+    return { canReinvite: false as const, error: "missing_token" as ReinviteErrorCode, appName: config.appName }
   }
 
   try {
@@ -37,7 +39,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     )
 
     if (!invite) {
-      return { canReinvite: false as const, error: "Invalid link", appName: config.appName }
+      return { canReinvite: false as const, error: "invalid" as ReinviteErrorCode, appName: config.appName }
     }
 
     const currentLocale = resolveLocale(request)
@@ -50,8 +52,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     if (invite.usedBy && invite.usedBy !== "__revoked__") {
       return {
         canReinvite: false as const,
-        error:
-          "This invite has already been used to create an account. If you need help, contact the person who invited you.",
+        error: "already_used" as ReinviteErrorCode,
         appName: config.appName,
       }
     }
@@ -62,7 +63,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     if (!isExpired && !passwordConsumed) {
       return {
         canReinvite: false as const,
-        error: "Your invite is still valid. Check your email for the original invitation link.",
+        error: "still_valid" as ReinviteErrorCode,
         appName: config.appName,
       }
     }
@@ -75,14 +76,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   } catch (e) {
     if (e instanceof Response) throw e
     console.error("[reinvite] loader error:", e)
-    return { canReinvite: false as const, error: "Something went wrong", appName: config.appName }
+    return { canReinvite: false as const, error: "unknown" as ReinviteErrorCode, appName: config.appName }
   }
 }
 
 export async function action({ params }: Route.ActionArgs) {
   const token = params.token
   if (!token) {
-    return { success: false as const, error: "Missing token" }
+    return { success: false as const, error: "missing_token" as ReinviteErrorCode }
   }
 
   try {
@@ -95,11 +96,11 @@ export async function action({ params }: Route.ActionArgs) {
 
         const invite = yield* repo.findByTokenHash(tokenHash)
         if (!invite) {
-          return { success: false as const, error: "Invalid link" }
+          return { success: false as const, error: "invalid" as ReinviteErrorCode }
         }
 
         if (invite.usedBy && invite.usedBy !== "__revoked__") {
-          return { success: false as const, error: "Account already created" }
+          return { success: false as const, error: "already_used" as ReinviteErrorCode }
         }
 
         yield* repo.revoke(invite.id).pipe(Effect.catchAll(() => Effect.void))
@@ -122,8 +123,25 @@ export async function action({ params }: Route.ActionArgs) {
 
     return result
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to send new invite"
-    return { success: false as const, error: message }
+    console.error("[reinvite] action error:", e)
+    return { success: false as const, error: "send_failed" as ReinviteErrorCode }
+  }
+}
+
+function reinviteErrorKey(code: ReinviteErrorCode): string {
+  switch (code) {
+    case "missing_token":
+      return "reinvite.error.missingToken"
+    case "invalid":
+      return "reinvite.error.invalid"
+    case "already_used":
+      return "reinvite.error.alreadyUsed"
+    case "still_valid":
+      return "reinvite.error.stillValid"
+    case "send_failed":
+      return "reinvite.error.sendFailed"
+    default:
+      return "reinvite.error.unknown"
   }
 }
 
@@ -145,7 +163,16 @@ export default function ReinvitePage({ loaderData, actionData }: Route.Component
   }
 
   if (!loaderData.canReinvite) {
-    return <ErrorCard title={t("reinvite.error.title")} message={loaderData.error} />
+    const tone = loaderData.error === "still_valid" ? "info" : "error"
+    const icon = loaderData.error === "still_valid" ? "check-done" : "x-circle"
+    return (
+      <ErrorCard
+        icon={icon}
+        tone={tone}
+        title={t("reinvite.error.title")}
+        message={t(reinviteErrorKey(loaderData.error))}
+      />
+    )
   }
 
   return (
@@ -155,7 +182,9 @@ export default function ReinvitePage({ loaderData, actionData }: Route.Component
         {t("reinvite.message", { email: loaderData.email })}
       </Text>
 
-      {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
+      {actionData && "error" in actionData && (
+        <Alert variant="error">{t(reinviteErrorKey(actionData.error))}</Alert>
+      )}
 
       <form method="post">
         <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>

@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect } from "react"
-import { redirect } from "react-router"
+import { redirect, useParams } from "react-router"
 import { Trans, useTranslation } from "react-i18next"
 import type { Route } from "./+types/invite"
 import { runEffect } from "~/lib/runtime.server"
@@ -14,7 +14,9 @@ import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { InvitePasswordReveal } from "~/components/InvitePasswordReveal/InvitePasswordReveal"
 import { CertCheck } from "~/components/CertCheck/CertCheck"
 import { useDevOverrides } from "~/components/DevToolbar/DevToolbar"
-import { Heading, Stack, Text } from "@duro-app/ui"
+import { Heading, LinkButton, Stack, Text } from "@duro-app/ui"
+
+type InviteErrorCode = "missing_token" | "invalid" | "already_used" | "expired" | "too_many_attempts" | "unknown"
 
 export function meta({ data }: Route.MetaArgs) {
   return [{ title: data?.appName ? `Join ${data.appName}` : "Join" }]
@@ -22,12 +24,13 @@ export function meta({ data }: Route.MetaArgs) {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const token = params.token
+  const healthUrl = `${config.homeUrl}/health`
   if (!token) {
     return {
       valid: false as const,
-      error: "Missing invite token",
+      error: "missing_token" as InviteErrorCode,
       appName: config.appName,
-      healthUrl: `${config.homeUrl}/health`,
+      healthUrl,
     }
   }
 
@@ -47,9 +50,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     if (!invite) {
       return {
         valid: false as const,
-        error: "Invalid invite link",
+        error: "invalid" as InviteErrorCode,
         appName: config.appName,
-        healthUrl: `${config.homeUrl}/health`,
+        healthUrl,
       }
     }
 
@@ -63,27 +66,27 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     if (invite.usedAt) {
       return {
         valid: false as const,
-        error: "already_used",
+        error: "already_used" as InviteErrorCode,
         appName: config.appName,
-        healthUrl: `${config.homeUrl}/health`,
+        healthUrl,
       }
     }
 
     if (new Date(invite.expiresAt) < new Date()) {
       return {
         valid: false as const,
-        error: "expired",
+        error: "expired" as InviteErrorCode,
         appName: config.appName,
-        healthUrl: `${config.homeUrl}/health`,
+        healthUrl,
       }
     }
 
     if (invite.attempts >= 5) {
       return {
         valid: false as const,
-        error: "Too many attempts. Please contact an administrator.",
+        error: "too_many_attempts" as InviteErrorCode,
         appName: config.appName,
-        healthUrl: `${config.homeUrl}/health`,
+        healthUrl,
       }
     }
 
@@ -93,16 +96,16 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       groupNames: JSON.parse(invite.groupNames) as string[],
       p12Password,
       appName: config.appName,
-      healthUrl: `${config.homeUrl}/health`,
+      healthUrl,
     }
   } catch (e) {
     if (e instanceof Response) throw e
     console.error("[invite] loader error:", e)
     return {
       valid: false as const,
-      error: "Something went wrong",
+      error: "unknown" as InviteErrorCode,
       appName: config.appName,
-      healthUrl: `${config.homeUrl}/health`,
+      healthUrl,
     }
   }
 }
@@ -136,6 +139,7 @@ function checkCert(healthUrl: string): Promise<boolean> {
 
 export default function InvitePage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
+  const params = useParams()
   const devOverrides = useDevOverrides()
   const [certStatus, setCertStatus] = useState<"checking" | "installed" | "not-installed">("checking")
 
@@ -161,14 +165,44 @@ export default function InvitePage({ loaderData }: Route.ComponentProps) {
     const { error } = loaderData
 
     if (error === "expired") {
-      return <ErrorCard icon="clock" title={t("invite.expired.title")} message={t("invite.expired.message")} />
+      return (
+        <ErrorCard
+          icon="clock"
+          tone="warning"
+          title={t("invite.expired.title")}
+          message={t("invite.expired.message")}
+          action={
+            params.token ? (
+              <LinkButton href={`/reinvite/${params.token}`} variant="primary" fullWidth>
+                {t("invite.expired.cta")}
+              </LinkButton>
+            ) : null
+          }
+        />
+      )
     }
 
     if (error === "already_used") {
-      return <ErrorCard icon="check-done" title={t("invite.used.title")} message={t("invite.used.message")} />
+      return (
+        <ErrorCard
+          icon="check-done"
+          tone="info"
+          title={t("invite.used.title")}
+          message={t("invite.used.message")}
+        />
+      )
     }
 
-    return <ErrorCard title={t("invite.error.title")} message={error} />
+    const messageKey =
+      error === "missing_token"
+        ? "invite.error.missingToken"
+        : error === "invalid"
+          ? "invite.error.invalid"
+          : error === "too_many_attempts"
+            ? "invite.error.tooManyAttempts"
+            : "invite.error.unknown"
+
+    return <ErrorCard title={t("invite.error.title")} message={t(messageKey)} />
   }
 
   return (

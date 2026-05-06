@@ -23,7 +23,7 @@ import { certStatus } from "~/lib/cert-status"
 
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { ActionBar, Button, Combobox, Inline, Input, ScrollArea, Stack, Table } from "@duro-app/ui"
+import { ActionBar, Button, Combobox, Dialog, Inline, Input, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { useAdminSidePanel } from "./admin"
 import { buildColumns, type UserData, type RevokeTarget } from "~/components/admin/UserColumns"
@@ -94,6 +94,7 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
   const [revokeReason, setRevokeReason] = useState("")
   const [selectedCerts, setSelectedCerts] = useState<Set<string>>(new Set())
   const [certPanelUserId, setCertPanelUserId] = useState<string | null>(null)
+  const [confirmBulk, setConfirmBulk] = useState<"users" | "certs" | null>(null)
   const sidePanel = useAdminSidePanel()
 
   const closeCertPanel = useCallback(() => {
@@ -369,7 +370,12 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
         selectedLabel={(count) => t("admin.users.certs.usersSelected", { count: Number(count) })}
         onClearSelection={() => table.resetRowSelection()}
       >
-        <Button variant="danger" size="small" disabled={isRevokingUserCerts} onClick={handleRevokeUserCerts}>
+        <Button
+          variant="danger"
+          size="small"
+          disabled={isRevokingUserCerts}
+          onClick={() => setConfirmBulk("users")}
+        >
           {isRevokingUserCerts
             ? t("admin.users.actions.revoking")
             : t("admin.users.certs.revokeAllForUsers", { count: selectedUserIds.length })}
@@ -382,12 +388,59 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
         selectedLabel={(count) => t("admin.users.certs.selected", { count: Number(count) })}
         onClearSelection={() => setSelectedCerts(new Set())}
       >
-        <Button variant="danger" size="small" disabled={isRevokingCerts} onClick={handleRevokeCerts}>
+        <Button
+          variant="danger"
+          size="small"
+          disabled={isRevokingCerts}
+          onClick={() => setConfirmBulk("certs")}
+        >
           {isRevokingCerts
             ? t("admin.users.actions.revoking")
             : t("admin.users.certs.revokeSelected", { count: selectedCerts.size })}
         </Button>
       </ActionBar>
+
+      <Dialog.Root open={confirmBulk !== null} onOpenChange={(o) => !o && setConfirmBulk(null)}>
+        <Dialog.Portal size="sm">
+          <Dialog.Header>
+            <Dialog.Title>
+              {confirmBulk === "users"
+                ? t("admin.users.certs.confirmRevokeUsersTitle")
+                : t("admin.users.certs.confirmRevokeCertsTitle")}
+            </Dialog.Title>
+            <Dialog.Close />
+          </Dialog.Header>
+          <Dialog.Body>
+            <Stack gap="md">
+              <Text as="p">
+                {confirmBulk === "users"
+                  ? t("admin.users.certs.confirmRevokeUsersBody", { count: selectedUserIds.length })
+                  : t("admin.users.certs.confirmRevokeCertsBody", { count: selectedCerts.size })}
+              </Text>
+              <Text as="p" color="muted" variant="bodySm">
+                {t("admin.users.certs.confirmRevokeWarning")}
+              </Text>
+            </Stack>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <Inline gap="sm">
+              <Button variant="secondary" onClick={() => setConfirmBulk(null)}>
+                {t("common.cancel")}
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  if (confirmBulk === "users") handleRevokeUserCerts()
+                  else if (confirmBulk === "certs") handleRevokeCerts()
+                  setConfirmBulk(null)
+                }}
+              >
+                {t("admin.users.actions.confirmRevoke")}
+              </Button>
+            </Inline>
+          </Dialog.Footer>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       {/* User revoke ActionBar */}
       <ActionBar
