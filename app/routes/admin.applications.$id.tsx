@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { useFetcher } from "react-router"
+import { useEffect, useState } from "react"
+import { useFetcher, useSearchParams } from "react-router"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import type { Route } from "./+types/admin.applications.$id"
@@ -363,12 +363,26 @@ const grantColumns = [
 export default function AdminApplicationDetailPage({ loaderData }: Route.ComponentProps) {
   const { application, roles, entitlements, resources, grants, principals, ldapProvisioned, pluginInfo } = loaderData
   const fetcher = useFetcher()
-  const [activeTab, setActiveTab] = useState("overview")
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialTab = searchParams.get("tab") ?? "overview"
+  const [activeTab, setActiveTab] = useState(initialTab)
   const settingsFetcher = useFetcher<typeof action>()
   const [roleDialogOpen, setRoleDialogOpen] = useState(false)
   const [entitlementDialogOpen, setEntitlementDialogOpen] = useState(false)
   const [resourceDialogOpen, setResourceDialogOpen] = useState(false)
-  const [quickGrantOpen, setQuickGrantOpen] = useState(false)
+  const [quickGrantOpen, setQuickGrantOpen] = useState(searchParams.get("grant") === "open")
+
+  // If we landed here from /admin/grants → "Create Grant", clear the deep-link
+  // params so the dialog state isn't replayed on reload or back-navigation.
+  useEffect(() => {
+    if (searchParams.get("grant") || searchParams.get("tab")) {
+      const next = new URLSearchParams(searchParams)
+      next.delete("grant")
+      next.delete("tab")
+      setSearchParams(next, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const isSubmitting = fetcher.state !== "idle"
 

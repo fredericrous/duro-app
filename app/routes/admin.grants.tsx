@@ -1,16 +1,18 @@
-import { useState } from "react"
-import { useFetcher } from "react-router"
+import { useMemo, useState } from "react"
+import { useFetcher, useNavigate } from "react-router"
+import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.grants"
 import { runEffect } from "~/lib/runtime.server"
 import { isOriginAllowed } from "~/lib/config.server"
 import { getAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"
+import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { deactivateGrant } from "~/lib/workflows/grant-activation.server"
-import type { Grant } from "~/lib/governance/types"
+import type { Application, Grant } from "~/lib/governance/types"
 import {
   useReactTable,
   getCoreRowModel,
@@ -21,7 +23,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Button, ScrollArea, Stack, Table } from "@duro-app/ui"
+import { Button, Combobox, Dialog, EmptyState, Field, Inline, ScrollArea, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 type GrantWithNames = Grant & {
@@ -48,11 +50,14 @@ export async function loader() {
         }
       }
 
-      return allGrants
+      const appRepo = yield* ApplicationRepo
+      const applications = yield* appRepo.list()
+
+      return { grants: allGrants, applications }
     }),
   )
 
-  return { grants: data }
+  return data
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -107,50 +112,54 @@ export async function action({ request }: Route.ActionArgs) {
 
 const columnHelper = createColumnHelper<GrantWithNames>()
 
-function buildColumns() {
+function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string) {
   return [
     columnHelper.accessor("principalName", {
-      header: "Principal",
+      header: t("admin.cols.principal"),
       enableSorting: true,
     }),
     columnHelper.accessor("roleId", {
-      header: "Role",
+      header: t("admin.cols.role"),
       cell: ({ getValue }) => getValue() ?? "\u2014",
     }),
     columnHelper.accessor("entitlementId", {
-      header: "Entitlement",
+      header: t("admin.cols.entitlement"),
       cell: ({ getValue }) => getValue() ?? "\u2014",
     }),
     columnHelper.accessor("resourceId", {
-      header: "Resource",
-      cell: ({ getValue }) => getValue() ?? "All",
+      header: t("admin.cols.resource"),
+      cell: ({ getValue }) => getValue() ?? t("admin.cols.all"),
     }),
     columnHelper.accessor("grantedBy", {
-      header: "Granted By",
+      header: t("admin.cols.grantedBy"),
       enableSorting: true,
     }),
     columnHelper.accessor("expiresAt", {
-      header: "Expires",
+      header: t("admin.cols.expires"),
       enableSorting: true,
       cell: ({ getValue }) => {
         const v = getValue()
-        return v ? new Date(v).toLocaleDateString() : "Never"
+        return v ? new Date(v).toLocaleDateString() : t("admin.cols.never")
       },
     }),
     columnHelper.display({
       id: "actions",
-      header: "Actions",
+      header: t("admin.cols.actions"),
       cell: () => null, // Rendered via RevokeCell component
     }),
   ]
 }
 
 export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
-  const { grants } = loaderData
+  const { t } = useTranslation()
+  const { grants, applications } = loaderData
+  const navigate = useNavigate()
   const [sorting, setSorting] = useState<SortingState>([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
+  const [pickAppOpen, setPickAppOpen] = useState(false)
+  const [pickedAppId, setPickedAppId] = useState<string>("")
 
-  const columns = buildColumns()
+  const columns = useMemo(() => buildColumns(t), [t])
 
   const table = useReactTable({
     data: grants,
@@ -163,9 +172,39 @@ export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
     getPaginationRowModel: getPaginationRowModel(),
   })
 
+  const createGrantAction = applications.length > 0 ? (
+    <Button variant="primary" size="small" onClick={() => setPickAppOpen(true)}>
+      {t("admin.grants.createGrant")}
+    </Button>
+  ) : null
+
+  if (grants.length === 0) {
+    return (
+      <Stack gap="md">
+        <CardSection title={t("admin.nav.grants")} action={createGrantAction}>
+          <EmptyState
+            message={t("admin.empty.grants")}
+            action={createGrantAction}
+          />
+        </CardSection>
+        <PickApplicationDialog
+          open={pickAppOpen}
+          onOpenChange={setPickAppOpen}
+          applications={applications}
+          pickedAppId={pickedAppId}
+          setPickedAppId={setPickedAppId}
+          onContinue={(appId) => {
+            setPickAppOpen(false)
+            navigate(`/admin/applications/${appId}?tab=grants&grant=open`)
+          }}
+        />
+      </Stack>
+    )
+  }
+
   return (
     <Stack gap="md">
-      <CardSection title={`Active Grants (${grants.length})`}>
+      <CardSection title={t("admin.grants.title", { count: grants.length })} action={createGrantAction}>
         <ScrollArea.Root>
           <ScrollArea.Viewport>
             <ScrollArea.Content>
@@ -216,11 +255,24 @@ export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
         </ScrollArea.Root>
         <Table.Pagination table={table} />
       </CardSection>
+
+      <PickApplicationDialog
+        open={pickAppOpen}
+        onOpenChange={setPickAppOpen}
+        applications={applications}
+        pickedAppId={pickedAppId}
+        setPickedAppId={setPickedAppId}
+        onContinue={(appId) => {
+          setPickAppOpen(false)
+          navigate(`/admin/applications/${appId}?tab=grants&grant=open`)
+        }}
+      />
     </Stack>
   )
 }
 
 function RevokeCell({ grantId }: { grantId: string }) {
+  const { t } = useTranslation()
   const fetcher = useFetcher()
   const isRevoking = fetcher.state !== "idle"
 
@@ -229,9 +281,74 @@ function RevokeCell({ grantId }: { grantId: string }) {
       <input type="hidden" name="intent" value="revoke" />
       <input type="hidden" name="grantId" value={grantId} />
       <Button type="submit" variant="danger" size="small" disabled={isRevoking}>
-        {isRevoking ? "Revoking..." : "Revoke"}
+        {isRevoking ? t("admin.grants.revoking") : t("admin.grants.revoke")}
       </Button>
     </fetcher.Form>
+  )
+}
+
+function PickApplicationDialog({
+  open,
+  onOpenChange,
+  applications,
+  pickedAppId,
+  setPickedAppId,
+  onContinue,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  applications: ReadonlyArray<Application>
+  pickedAppId: string
+  setPickedAppId: (id: string) => void
+  onContinue: (appId: string) => void
+}) {
+  const { t } = useTranslation()
+  const labels = useMemo<Record<string, string>>(
+    () => Object.fromEntries(applications.map((a) => [a.id, `${a.displayName} (${a.slug})`])),
+    [applications],
+  )
+
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal size="sm">
+        <Dialog.Header>
+          <Dialog.Title>{t("admin.grants.createGrant")}</Dialog.Title>
+          <Dialog.Close />
+        </Dialog.Header>
+        <Dialog.Body>
+          <Stack gap="md">
+            <Field.Root>
+              <Field.Label>{t("admin.cols.application")}</Field.Label>
+              <Combobox.Root
+                value={pickedAppId}
+                onValueChange={(v) => setPickedAppId(v ?? "")}
+                initialLabels={labels}
+              >
+                <Combobox.Input placeholder={t("admin.cols.application")} />
+                <Combobox.Popup>
+                  {applications.map((a) => (
+                    <Combobox.Item key={a.id} value={a.id}>
+                      {labels[a.id]}
+                    </Combobox.Item>
+                  ))}
+                  <Combobox.Empty>{t("admin.principals.noResults")}</Combobox.Empty>
+                </Combobox.Popup>
+              </Combobox.Root>
+            </Field.Root>
+          </Stack>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Inline gap="sm">
+            <Button variant="secondary" onClick={() => onOpenChange(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button variant="primary" disabled={!pickedAppId} onClick={() => onContinue(pickedAppId)}>
+              {t("admin.grants.createGrant")}
+            </Button>
+          </Inline>
+        </Dialog.Footer>
+      </Dialog.Portal>
+    </Dialog.Root>
   )
 }
 

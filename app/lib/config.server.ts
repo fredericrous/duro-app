@@ -13,6 +13,12 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   operatorApiUrl: process.env.OPERATOR_API_URL ?? "",
+  /**
+   * Base URL of the identity provider's user portal (e.g. Authelia).
+   * Empty when not configured — the settings UI hides the Account & security
+   * card in that case so users don't see broken external links.
+   */
+  autheliaUrl: process.env.AUTHELIA_URL ?? "",
 } as const
 
 /** Check if a request Origin header matches the allowed suffix. */

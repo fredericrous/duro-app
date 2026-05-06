@@ -41,7 +41,7 @@ export function CertPanelContent({
         <DetailPanel.Title>
           {t("admin.users.actions.viewCerts")} — {certPanelUser?.displayName || certPanelUserId}
         </DetailPanel.Title>
-        <DetailPanel.Close />
+        <DetailPanel.Close aria-label={t("admin.detailPanel.close")} />
       </DetailPanel.Header>
       <DetailPanel.Body padded={false}>
         <List.Root selectionMode="multiple" aria-label={t("admin.users.actions.viewCerts")}>

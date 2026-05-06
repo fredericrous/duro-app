@@ -1,18 +1,21 @@
 import { Effect } from "effect"
 import type { Route } from "./+types/home"
 import { getVisibleApps } from "~/lib/apps.server"
-import { config } from "~/lib/config.server"
+import { config, isOriginAllowed } from "~/lib/config.server"
 import { Header } from "~/components/Header/Header"
 import { AppGrid } from "~/components/AppGrid/AppGrid"
 import { NoAccess } from "~/components/NoAccess/NoAccess"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { PageShell } from "@duro-app/ui"
-import { useRouteLoaderData } from "react-router"
+import { useFetcher, useRouteLoaderData } from "react-router"
 import { authMode } from "~/lib/governance-mode.server"
 import { runEffect } from "~/lib/runtime.server"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { AuthzEngine } from "~/lib/governance/AuthzEngine.server"
+import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
+import { submitAccessRequest } from "~/lib/workflows/access-request.server"
 import type { AppDefinition } from "~/lib/apps"
+import type { Application } from "~/lib/governance/types"
 
 export function meta() {
   return [{ title: "Home - Duro" }, { name: "description", content: "Your personal app dashboard" }]
@@ -88,14 +91,77 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
   }
 
+  // Load the full application catalog so users with no current access can
+  // discover apps to request. Only meaningful when governance is active.
+  let requestableApps: Application[] = []
+  if (authMode !== "legacy" && auth.user && visibleApps.length === 0) {
+    try {
+      requestableApps = await runEffect(
+        Effect.gen(function* () {
+          const appRepo = yield* ApplicationRepo
+          const all = yield* appRepo.list()
+          return all.filter((a) => a.enabled !== false && a.accessMode === "request")
+        }),
+      )
+    } catch (err) {
+      await runEffect(Effect.logWarning("requestable apps load failed", { error: String(err) }))
+    }
+  }
+
   return {
     visibleApps,
+    requestableApps,
     categoryOrder: config.categoryOrder,
   }
 }
 
+export async function action({ request }: Route.ActionArgs) {
+  if (!isOriginAllowed(request.headers.get("Origin"))) {
+    return Response.json({ error: "Invalid origin" }, { status: 403 })
+  }
+
+  const { getAuth } = await import("~/lib/auth.server")
+  const auth = await getAuth(request)
+  if (!auth.user) {
+    return { error: "not_authenticated" as const }
+  }
+
+  const formData = await request.formData()
+  const intent = formData.get("intent") as string | null
+
+  if (intent === "requestAccess") {
+    const applicationId = (formData.get("applicationId") as string)?.trim()
+    const justification = ((formData.get("justification") as string) ?? "").trim() || undefined
+    if (!applicationId) {
+      return { error: "missing_application" as const }
+    }
+
+    try {
+      await runEffect(
+        Effect.gen(function* () {
+          const principalRepo = yield* PrincipalRepo
+          const principal = yield* principalRepo.findByExternalId(auth.user!)
+          if (!principal) return yield* Effect.fail("principal_not_found" as const)
+          return yield* submitAccessRequest({
+            requesterId: principal.id,
+            applicationId,
+            justification,
+          })
+        }),
+      )
+      return { success: true as const }
+    } catch (e) {
+      console.error("[home] requestAccess failed:", e)
+      return { error: "submit_failed" as const }
+    }
+  }
+
+  return { error: "unknown_intent" as const }
+}
+
 export default function HomePage({ loaderData }: Route.ComponentProps) {
-  const { visibleApps, categoryOrder } = loaderData
+  const { visibleApps, requestableApps, categoryOrder } = loaderData
+  const fetcher = useFetcher<typeof action>()
   const dashboardData = useRouteLoaderData("routes/dashboard") as {
     user: string
     isAdmin: boolean
@@ -107,7 +173,11 @@ export default function HomePage({ loaderData }: Route.ComponentProps) {
   if (!hasAccess) {
     return (
       <CenteredCardPage>
-        <NoAccess user={user} />
+        <NoAccess
+          user={user}
+          requestableApps={requestableApps ?? []}
+          fetcher={fetcher}
+        />
       </CenteredCardPage>
     )
   }

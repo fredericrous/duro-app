@@ -22,7 +22,26 @@
     "title": "No Access",
     "messageUser": "Hi {{user}}, you don't have permission to access any applications.",
     "messageAnon": "You don't have permission to access any applications.",
-    "hint": "Please contact an administrator if you believe this is an error."
+    "hint": "Please contact an administrator if you believe this is an error.",
+    "requestCta": "Request access",
+    "requestSubmitted": "Your access request has been submitted. An admin will review it shortly.",
+    "form": {
+      "application": "Application",
+      "applicationPlaceholder": "Pick an application…",
+      "noResults": "No matches",
+      "justification": "Why do you need access?",
+      "justificationPlaceholder": "Briefly explain what you'll use this access for.",
+      "justificationHint": "This is shared with the admin who will approve or reject your request.",
+      "submit": "Send request",
+      "submitting": "Sending…"
+    },
+    "error": {
+      "missing_application": "Please pick an application.",
+      "principal_not_found": "Your account isn't fully provisioned yet. Try again in a moment, or contact an administrator.",
+      "submit_failed": "Couldn't submit the request. Please try again.",
+      "not_authenticated": "You need to be signed in to request access.",
+      "unknown": "Something went wrong. Please try again."
+    }
   },
   "categories": {
     "media": "Media",
@@ -65,6 +84,12 @@
         "revokeFailed": "Revocation failed. Retry?",
         "empty": "No certificates yet."
       }
+    },
+    "security": {
+      "heading": "Account & security",
+      "description": "Your password, multi-factor authentication, sessions, and email are managed by your identity provider.",
+      "openPortal": "Open identity provider portal",
+      "managedBy": "Opens in a new tab. After making changes, you may need to sign back in here."
     }
   },
   "welcome": {
@@ -72,6 +97,14 @@
     "heading": "Welcome, {{user}}!",
     "message": "Your account has been created and you're all set. You now have access to your personal dashboard.",
     "cta": "Go to Dashboard"
+  },
+  "auth": {
+    "logout": {
+      "confirmTitle": "Sign out?",
+      "confirmBody": "You'll be signed out of Duro and any apps that share this single sign-on session.",
+      "confirmHint": "You can always sign back in from the home page.",
+      "confirmButton": "Sign out"
+    }
   },
   "invite": {
     "title": "Join {{appName}}",
@@ -192,6 +225,76 @@
       "plugins": "Plugins",
       "invites": "User Invites",
       "users": "Users"
+    },
+    "cols": {
+      "name": "Name",
+      "displayName": "Display Name",
+      "type": "Type",
+      "slug": "Slug",
+      "accessMode": "Access Mode",
+      "enabled": "Enabled",
+      "owner": "Owner",
+      "email": "Email",
+      "yes": "Yes",
+      "no": "No",
+      "principal": "Principal",
+      "role": "Role",
+      "entitlement": "Entitlement",
+      "resource": "Resource",
+      "grantedBy": "Granted By",
+      "expires": "Expires",
+      "never": "Never",
+      "all": "All",
+      "actions": "Actions",
+      "status": "Status",
+      "requester": "Requester",
+      "application": "Application",
+      "justification": "Justification",
+      "created": "Created",
+      "eventType": "Event Type",
+      "actor": "Actor",
+      "targetType": "Target Type",
+      "target": "Target",
+      "ipAddress": "IP Address",
+      "timestamp": "Timestamp"
+    },
+    "empty": {
+      "principals": "No principals yet. Sync your identity provider or invite users to get started.",
+      "applications": "No applications yet. Click \"Sync from cluster\" or define one in your governance config.",
+      "grants": "No active grants. Open an application to assign a role to a principal.",
+      "accessRequests": "No access requests yet.",
+      "audit": "No audit events match the current filters.",
+      "users": "No users yet. Invite someone from the User Invites page."
+    },
+    "audit": {
+      "title": "Audit Log",
+      "filterPlaceholder": "Filter by event type...",
+      "loadFailed": "Failed to load audit events: {{error}}",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {{page}}"
+    },
+    "principals": {
+      "filterByName": "Filter by name...",
+      "filterByType": "Filter by type...",
+      "noResults": "No results"
+    },
+    "applications": {
+      "syncFromCluster": "Sync from cluster",
+      "syncing": "Syncing..."
+    },
+    "grants": {
+      "title": "Active Grants ({{count}})",
+      "createGrant": "Create Grant",
+      "revoke": "Revoke",
+      "revoking": "Revoking..."
+    },
+    "accessRequests": {
+      "title": "Access Requests ({{count}})"
+    },
+    "detailPanel": {
+      "label": "Detail panel",
+      "close": "Close"
     },
     "invites": {
       "sendTitle": "Send Invite",

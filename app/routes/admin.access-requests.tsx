@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate } from "react-router"
+import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.access-requests"
 import { runEffect } from "~/lib/runtime.server"
@@ -16,7 +17,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Badge, ScrollArea, Stack, Table } from "@duro-app/ui"
+import { Badge, EmptyState, ScrollArea, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 export async function loader() {
@@ -31,57 +32,61 @@ export async function loader() {
 
 const columnHelper = createColumnHelper<AccessRequest>()
 
-const columns = [
-  columnHelper.accessor("status", {
-    header: "Status",
-    enableSorting: true,
-    cell: ({ getValue }) => {
-      const status = getValue()
-      const variant =
-        status === "pending"
-          ? "warning"
-          : status === "approved"
-            ? "success"
-            : status === "rejected"
-              ? "error"
-              : "default"
-      return <Badge variant={variant}>{status}</Badge>
-    },
-  }),
-  columnHelper.accessor("requesterId", {
-    header: "Requester",
-    enableSorting: true,
-  }),
-  columnHelper.accessor("applicationId", {
-    header: "Application",
-    enableSorting: true,
-  }),
-  columnHelper.accessor("roleId", {
-    header: "Role",
-    cell: ({ getValue }) => getValue() ?? "\u2014",
-  }),
-  columnHelper.accessor("entitlementId", {
-    header: "Entitlement",
-    cell: ({ getValue }) => getValue() ?? "\u2014",
-  }),
-  columnHelper.accessor("justification", {
-    header: "Justification",
-    cell: ({ getValue }) => {
-      const v = getValue()
-      if (!v) return "\u2014"
-      return v.length > 60 ? v.slice(0, 60) + "..." : v
-    },
-  }),
-  columnHelper.accessor("createdAt", {
-    header: "Created",
-    enableSorting: true,
-    cell: ({ getValue }) => new Date(getValue()).toLocaleDateString(),
-  }),
-]
+function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string) {
+  return [
+    columnHelper.accessor("status", {
+      header: t("admin.cols.status"),
+      enableSorting: true,
+      cell: ({ getValue }) => {
+        const status = getValue()
+        const variant =
+          status === "pending"
+            ? "warning"
+            : status === "approved"
+              ? "success"
+              : status === "rejected"
+                ? "error"
+                : "default"
+        return <Badge variant={variant}>{status}</Badge>
+      },
+    }),
+    columnHelper.accessor("requesterId", {
+      header: t("admin.cols.requester"),
+      enableSorting: true,
+    }),
+    columnHelper.accessor("applicationId", {
+      header: t("admin.cols.application"),
+      enableSorting: true,
+    }),
+    columnHelper.accessor("roleId", {
+      header: t("admin.cols.role"),
+      cell: ({ getValue }) => getValue() ?? "\u2014",
+    }),
+    columnHelper.accessor("entitlementId", {
+      header: t("admin.cols.entitlement"),
+      cell: ({ getValue }) => getValue() ?? "\u2014",
+    }),
+    columnHelper.accessor("justification", {
+      header: t("admin.cols.justification"),
+      cell: ({ getValue }) => {
+        const v = getValue()
+        if (!v) return "\u2014"
+        return v.length > 60 ? v.slice(0, 60) + "..." : v
+      },
+    }),
+    columnHelper.accessor("createdAt", {
+      header: t("admin.cols.created"),
+      enableSorting: true,
+      cell: ({ getValue }) => new Date(getValue()).toLocaleDateString(),
+    }),
+  ]
+}
 
 export default function AdminAccessRequestsPage({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation()
   const { requests } = loaderData
   const navigate = useNavigate()
+  const columns = useMemo(() => buildColumns(t), [t])
   const [sorting, setSorting] = useState<SortingState>([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
 
@@ -97,9 +102,19 @@ export default function AdminAccessRequestsPage({ loaderData }: Route.ComponentP
     getPaginationRowModel: getPaginationRowModel(),
   })
 
+  if (requests.length === 0) {
+    return (
+      <Stack gap="md">
+        <CardSection title={t("admin.nav.accessRequests")}>
+          <EmptyState message={t("admin.empty.accessRequests")} />
+        </CardSection>
+      </Stack>
+    )
+  }
+
   return (
     <Stack gap="md">
-      <CardSection title={`Access Requests (${requests.length})`}>
+      <CardSection title={t("admin.accessRequests.title", { count: requests.length })}>
         <ScrollArea.Root>
           <ScrollArea.Viewport>
             <ScrollArea.Content>
@@ -127,21 +142,32 @@ export default function AdminAccessRequestsPage({ loaderData }: Route.ComponentP
                   ))}
                 </Table.Header>
                 <Table.Body>
-                  {table.getRowModel().rows.map((row) => (
-                    <html.div
-                      key={row.id}
-                      onClick={() => navigate(`/admin/access-requests/${row.original.id}`)}
-                      style={[styles.clickableRow, styles.displayContents]}
-                    >
-                      <Table.Row>
-                        {row.getVisibleCells().map((cell) => (
-                          <Table.Cell key={cell.id}>
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </Table.Cell>
-                        ))}
-                      </Table.Row>
-                    </html.div>
-                  ))}
+                  {table.getRowModel().rows.map((row) => {
+                    const href = `/admin/access-requests/${row.original.id}`
+                    return (
+                      <html.div
+                        key={row.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`${row.original.requesterId} → ${row.original.applicationId}`}
+                        onClick={() => navigate(href)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            navigate(href)
+                          }
+                        }}
+                        style={[styles.clickableRow, styles.displayContents]}
+                      >
+                        <Table.Row>
+                          {row.getVisibleCells().map((cell) => (
+                            <Table.Cell key={cell.id}>
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </Table.Cell>
+                          ))}
+                        </Table.Row>
+                      </html.div>
+                    )
+                  })}
                 </Table.Body>
               </Table.Root>
             </ScrollArea.Content>

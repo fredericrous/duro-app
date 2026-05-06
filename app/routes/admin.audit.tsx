@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useSearchParams } from "react-router"
+import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.audit"
 import { runEffect } from "~/lib/runtime.server"
@@ -15,7 +16,7 @@ import {
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { Badge, Combobox, Inline, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
+import { Badge, Button, Combobox, EmptyState, Inline, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 function safeParseMetadata(metadata: unknown): Record<string, unknown> {
@@ -89,47 +90,51 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 const columnHelper = createColumnHelper<AuditEvent>()
 
-const columns = [
-  columnHelper.accessor("eventType", {
-    header: "Event Type",
-    enableSorting: true,
-    cell: ({ getValue }) => <Badge>{getValue()}</Badge>,
-  }),
-  columnHelper.accessor("actorId", {
-    header: "Actor",
-    cell: ({ getValue }) => getValue() ?? "\u2014",
-  }),
-  columnHelper.accessor("targetType", {
-    header: "Target Type",
-    cell: ({ getValue }) => getValue() ?? "\u2014",
-  }),
-  columnHelper.accessor("targetId", {
-    header: "Target",
-    cell: ({ getValue }) => {
-      const v = getValue()
-      if (!v) return "\u2014"
-      return v.length > 16 ? v.slice(0, 16) + "..." : v
-    },
-  }),
-  columnHelper.accessor("applicationId", {
-    header: "Application",
-    cell: ({ getValue }) => getValue() ?? "\u2014",
-  }),
-  columnHelper.accessor("ipAddress", {
-    header: "IP Address",
-    cell: ({ getValue }) => getValue() ?? "\u2014",
-  }),
-  columnHelper.accessor("createdAt", {
-    header: "Timestamp",
-    enableSorting: true,
-    cell: ({ getValue }) => new Date(getValue()).toLocaleString(),
-  }),
-]
+function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string) {
+  return [
+    columnHelper.accessor("eventType", {
+      header: t("admin.cols.eventType"),
+      enableSorting: true,
+      cell: ({ getValue }) => <Badge>{getValue()}</Badge>,
+    }),
+    columnHelper.accessor("actorId", {
+      header: t("admin.cols.actor"),
+      cell: ({ getValue }) => getValue() ?? "\u2014",
+    }),
+    columnHelper.accessor("targetType", {
+      header: t("admin.cols.targetType"),
+      cell: ({ getValue }) => getValue() ?? "\u2014",
+    }),
+    columnHelper.accessor("targetId", {
+      header: t("admin.cols.target"),
+      cell: ({ getValue }) => {
+        const v = getValue()
+        if (!v) return "\u2014"
+        return v.length > 16 ? v.slice(0, 16) + "..." : v
+      },
+    }),
+    columnHelper.accessor("applicationId", {
+      header: t("admin.cols.application"),
+      cell: ({ getValue }) => getValue() ?? "\u2014",
+    }),
+    columnHelper.accessor("ipAddress", {
+      header: t("admin.cols.ipAddress"),
+      cell: ({ getValue }) => getValue() ?? "\u2014",
+    }),
+    columnHelper.accessor("createdAt", {
+      header: t("admin.cols.timestamp"),
+      enableSorting: true,
+      cell: ({ getValue }) => new Date(getValue()).toLocaleString(),
+    }),
+  ]
+}
 
 export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation()
   const { events, page, pageSize, error } = loaderData as Awaited<ReturnType<typeof loader>>
   const [searchParams, setSearchParams] = useSearchParams()
   const [sorting, setSorting] = useState<SortingState>([])
+  const columns = useMemo(() => buildColumns(t), [t])
 
   const table = useReactTable({
     data: events,
@@ -164,8 +169,8 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <Stack gap="md">
-      {error && <Text color="error">Failed to load audit events: {error}</Text>}
-      <CardSection title="Audit Log">
+      {error && <Text color="error">{t("admin.audit.loadFailed", { error })}</Text>}
+      <CardSection title={t("admin.audit.title")}>
         <html.div style={styles.filterBar}>
           <Inline gap="sm">
             <Combobox.Root
@@ -173,19 +178,22 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
               onValueChange={setEventTypeFilter}
               onInputChange={setEventTypeFilter}
             >
-              <Combobox.Input placeholder="Filter by event type..." />
+              <Combobox.Input placeholder={t("admin.audit.filterPlaceholder")} />
               <Combobox.Popup>
                 {uniqueEventTypes.map((et) => (
                   <Combobox.Item key={et} value={et}>
                     {et}
                   </Combobox.Item>
                 ))}
-                <Combobox.Empty>No results</Combobox.Empty>
+                <Combobox.Empty>{t("admin.principals.noResults")}</Combobox.Empty>
               </Combobox.Popup>
             </Combobox.Root>
           </Inline>
         </html.div>
 
+        {events.length === 0 ? (
+          <EmptyState message={t("admin.empty.audit")} />
+        ) : (
         <ScrollArea.Root>
           <ScrollArea.Viewport>
             <ScrollArea.Content>
@@ -230,18 +238,26 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
             <ScrollArea.Thumb orientation="horizontal" />
           </ScrollArea.Scrollbar>
         </ScrollArea.Root>
+        )}
 
-        <html.div style={styles.pagination}>
-          <Inline gap="sm">
-            <button disabled={page === 0} onClick={() => goToPage(page - 1)}>
-              Previous
-            </button>
-            <Text color="muted">Page {page + 1}</Text>
-            <button disabled={events.length < pageSize} onClick={() => goToPage(page + 1)}>
-              Next
-            </button>
-          </Inline>
-        </html.div>
+        {events.length > 0 && (
+          <html.div style={styles.pagination}>
+            <Inline gap="sm">
+              <Button variant="secondary" size="small" disabled={page === 0} onClick={() => goToPage(page - 1)}>
+                {t("admin.audit.previous")}
+              </Button>
+              <Text color="muted">{t("admin.audit.page", { page: page + 1 })}</Text>
+              <Button
+                variant="secondary"
+                size="small"
+                disabled={events.length < pageSize}
+                onClick={() => goToPage(page + 1)}
+              >
+                {t("admin.audit.next")}
+              </Button>
+            </Inline>
+          </html.div>
+        )}
       </CardSection>
     </Stack>
   )

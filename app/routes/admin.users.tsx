@@ -23,7 +23,19 @@ import { certStatus } from "~/lib/cert-status"
 
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { ActionBar, Button, Combobox, Dialog, Inline, Input, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
+import {
+  ActionBar,
+  Button,
+  Combobox,
+  Dialog,
+  EmptyState,
+  Inline,
+  Input,
+  ScrollArea,
+  Stack,
+  Table,
+  Text,
+} from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { useAdminSidePanel } from "./admin"
 import { buildColumns, type UserData, type RevokeTarget } from "~/components/admin/UserColumns"
@@ -269,6 +281,16 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
 
   const setFilter = (columnId: string, value: string | null) => {
     table.getColumn(columnId)?.setFilterValue(value || undefined)
+  }
+
+  if (users.length === 0 && revocations.length === 0) {
+    return (
+      <Stack gap="md">
+        <CardSection title={t("admin.users.title")}>
+          <EmptyState message={t("admin.empty.users")} />
+        </CardSection>
+      </Stack>
+    )
   }
 
   return (

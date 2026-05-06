@@ -6,10 +6,11 @@ import { runEffect } from "~/lib/runtime.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
+import { config } from "~/lib/config.server"
 import { resolveLocale } from "~/lib/i18n.server"
 import { handleSettingsMutation, parseSettingsMutation } from "~/lib/mutations/settings"
 import { Effect } from "effect"
-import { Alert, Button, Field, PageShell, Stack } from "@duro-app/ui"
+import { Alert, Button, Field, LinkButton, PageShell, Stack, Text } from "@duro-app/ui"
 import { Header } from "~/components/Header/Header"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
@@ -42,6 +43,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     lastCertRenewalAt: lastCertRenewal.at?.toISOString() ?? null,
     p12Password,
     certificates,
+    autheliaUrl: config.autheliaUrl,
   }
 }
 
@@ -101,6 +103,27 @@ export default function SettingsPage({ loaderData }: Route.ComponentProps) {
             certificates={loaderData.certificates}
           />
         </CardSection>
+
+        {loaderData.autheliaUrl && (
+          <CardSection title={t("settings.security.heading")}>
+            <Stack gap="sm">
+              <Text as="p" color="muted" variant="bodySm">
+                {t("settings.security.description")}
+              </Text>
+              <LinkButton
+                href={loaderData.autheliaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="secondary"
+              >
+                {t("settings.security.openPortal")}
+              </LinkButton>
+              <Text as="p" color="muted" variant="bodySm">
+                {t("settings.security.managedBy")}
+              </Text>
+            </Stack>
+          </CardSection>
+        )}
       </Stack>
     </PageShell>
   )

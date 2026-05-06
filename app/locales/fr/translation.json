@@ -22,7 +22,26 @@
     "title": "Acces refuse",
     "messageUser": "Bonjour {{user}}, vous n'avez pas la permission d'acceder aux applications.",
     "messageAnon": "Vous n'avez pas la permission d'acceder aux applications.",
-    "hint": "Veuillez contacter un administrateur si vous pensez qu'il s'agit d'une erreur."
+    "hint": "Veuillez contacter un administrateur si vous pensez qu'il s'agit d'une erreur.",
+    "requestCta": "Demander l'acces",
+    "requestSubmitted": "Votre demande d'acces a ete soumise. Un administrateur l'examinera bientot.",
+    "form": {
+      "application": "Application",
+      "applicationPlaceholder": "Choisissez une application…",
+      "noResults": "Aucun resultat",
+      "justification": "Pourquoi avez-vous besoin de cet acces ?",
+      "justificationPlaceholder": "Expliquez brievement l'usage prevu.",
+      "justificationHint": "Ce message sera partage avec l'administrateur qui validera votre demande.",
+      "submit": "Envoyer la demande",
+      "submitting": "Envoi…"
+    },
+    "error": {
+      "missing_application": "Veuillez choisir une application.",
+      "principal_not_found": "Votre compte n'est pas encore entierement provisionne. Reessayez dans un instant ou contactez un administrateur.",
+      "submit_failed": "L'envoi de la demande a echoue. Veuillez reessayer.",
+      "not_authenticated": "Vous devez etre connecte pour demander l'acces.",
+      "unknown": "Une erreur s'est produite. Veuillez reessayer."
+    }
   },
   "categories": {
     "media": "Medias",
@@ -65,6 +84,12 @@
         "revokeFailed": "La revocation a echoue. Reessayer ?",
         "empty": "Aucun certificat."
       }
+    },
+    "security": {
+      "heading": "Compte et securite",
+      "description": "Votre mot de passe, l'authentification multifacteur, les sessions et l'e-mail sont geres par votre fournisseur d'identite.",
+      "openPortal": "Ouvrir le portail du fournisseur d'identite",
+      "managedBy": "S'ouvre dans un nouvel onglet. Vous devrez peut-etre vous reconnecter ici apres modification."
     }
   },
   "welcome": {
@@ -72,6 +97,14 @@
     "heading": "Bienvenue, {{user}} !",
     "message": "Votre compte a ete cree et tout est pret. Vous avez maintenant acces a votre tableau de bord personnel.",
     "cta": "Aller au tableau de bord"
+  },
+  "auth": {
+    "logout": {
+      "confirmTitle": "Se deconnecter ?",
+      "confirmBody": "Vous serez deconnecte de Duro et de toutes les applications partageant cette session SSO.",
+      "confirmHint": "Vous pouvez vous reconnecter a tout moment depuis l'accueil.",
+      "confirmButton": "Se deconnecter"
+    }
   },
   "invite": {
     "title": "Rejoindre {{appName}}",
@@ -192,6 +225,76 @@
       "plugins": "Extensions",
       "invites": "Invitations utilisateur",
       "users": "Utilisateurs"
+    },
+    "cols": {
+      "name": "Nom",
+      "displayName": "Nom d'affichage",
+      "type": "Type",
+      "slug": "Identifiant",
+      "accessMode": "Mode d'acces",
+      "enabled": "Active",
+      "owner": "Proprietaire",
+      "email": "E-mail",
+      "yes": "Oui",
+      "no": "Non",
+      "principal": "Principal",
+      "role": "Role",
+      "entitlement": "Droit",
+      "resource": "Ressource",
+      "grantedBy": "Octroye par",
+      "expires": "Expire",
+      "never": "Jamais",
+      "all": "Tous",
+      "actions": "Actions",
+      "status": "Statut",
+      "requester": "Demandeur",
+      "application": "Application",
+      "justification": "Justification",
+      "created": "Cree le",
+      "eventType": "Type d'evenement",
+      "actor": "Acteur",
+      "targetType": "Type de cible",
+      "target": "Cible",
+      "ipAddress": "Adresse IP",
+      "timestamp": "Horodatage"
+    },
+    "empty": {
+      "principals": "Aucun principal pour l'instant. Synchronisez votre fournisseur d'identite ou invitez des utilisateurs pour commencer.",
+      "applications": "Aucune application pour l'instant. Cliquez sur « Synchroniser depuis le cluster » ou definissez-en une dans votre configuration de gouvernance.",
+      "grants": "Aucun octroi actif. Ouvrez une application pour assigner un role a un principal.",
+      "accessRequests": "Aucune demande d'acces pour l'instant.",
+      "audit": "Aucun evenement d'audit ne correspond aux filtres actuels.",
+      "users": "Aucun utilisateur pour l'instant. Invitez quelqu'un depuis la page Invitations utilisateur."
+    },
+    "audit": {
+      "title": "Journal d'audit",
+      "filterPlaceholder": "Filtrer par type d'evenement...",
+      "loadFailed": "Impossible de charger les evenements d'audit : {{error}}",
+      "previous": "Precedent",
+      "next": "Suivant",
+      "page": "Page {{page}}"
+    },
+    "principals": {
+      "filterByName": "Filtrer par nom...",
+      "filterByType": "Filtrer par type...",
+      "noResults": "Aucun resultat"
+    },
+    "applications": {
+      "syncFromCluster": "Synchroniser depuis le cluster",
+      "syncing": "Synchronisation..."
+    },
+    "grants": {
+      "title": "Octrois actifs ({{count}})",
+      "createGrant": "Creer un octroi",
+      "revoke": "Revoquer",
+      "revoking": "Revocation..."
+    },
+    "accessRequests": {
+      "title": "Demandes d'acces ({{count}})"
+    },
+    "detailPanel": {
+      "label": "Panneau de details",
+      "close": "Fermer"
     },
     "invites": {
       "sendTitle": "Envoyer une invitation",

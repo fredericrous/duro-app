@@ -202,7 +202,7 @@ export default function AdminLayout() {
         <Drawer.Portal size="sm">
           <Drawer.Header>
             <Drawer.Title>{t("admin.nav.title", "Navigation")}</Drawer.Title>
-            <Drawer.Close />
+            <Drawer.Close aria-label={t("admin.detailPanel.close")} />
           </Drawer.Header>
           <Drawer.Body>{navContent}</Drawer.Body>
         </Drawer.Portal>
@@ -211,7 +211,7 @@ export default function AdminLayout() {
       {/* DetailPanel rendered at layout level — pushes entire page left */}
       {isWide && (
         <DetailPanel.Root open={sidePanelOpen} onOpenChange={handlePanelOpenChange}>
-          <DetailPanel.Content size="md" label="Detail panel">
+          <DetailPanel.Content size="md" label={t("admin.detailPanel.label")}>
             {sidePanelContent}
           </DetailPanel.Content>
         </DetailPanel.Root>

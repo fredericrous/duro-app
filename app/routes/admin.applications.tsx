@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useFetcher, useNavigate } from "react-router"
+import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.applications"
 import { runEffect } from "~/lib/runtime.server"
@@ -18,7 +19,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Alert, Badge, Button, ScrollArea, Stack, Table } from "@duro-app/ui"
+import { Alert, Badge, Button, EmptyState, ScrollArea, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 export async function loader() {
@@ -45,40 +46,48 @@ export async function action({ request }: Route.ActionArgs) {
 
 const columnHelper = createColumnHelper<Application>()
 
-const columns = [
-  columnHelper.accessor("displayName", {
-    header: "Name",
-    enableSorting: true,
-  }),
-  columnHelper.accessor("slug", {
-    header: "Slug",
-    enableSorting: true,
-  }),
-  columnHelper.accessor("accessMode", {
-    header: "Access Mode",
-    enableSorting: true,
-    cell: ({ getValue }) => {
-      const mode = getValue()
-      const variant = mode === "open" ? "success" : mode === "request" ? "warning" : "default"
-      return <Badge variant={variant}>{mode}</Badge>
-    },
-  }),
-  columnHelper.accessor("enabled", {
-    header: "Enabled",
-    enableSorting: true,
-    cell: ({ getValue }) => <Badge variant={getValue() ? "success" : "default"}>{getValue() ? "Yes" : "No"}</Badge>,
-  }),
-  columnHelper.accessor("ownerId", {
-    header: "Owner",
-    cell: ({ getValue }) => getValue() ?? "\u2014",
-  }),
-]
+function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string) {
+  return [
+    columnHelper.accessor("displayName", {
+      header: t("admin.cols.name"),
+      enableSorting: true,
+    }),
+    columnHelper.accessor("slug", {
+      header: t("admin.cols.slug"),
+      enableSorting: true,
+    }),
+    columnHelper.accessor("accessMode", {
+      header: t("admin.cols.accessMode"),
+      enableSorting: true,
+      cell: ({ getValue }) => {
+        const mode = getValue()
+        const variant = mode === "open" ? "success" : mode === "request" ? "warning" : "default"
+        return <Badge variant={variant}>{mode}</Badge>
+      },
+    }),
+    columnHelper.accessor("enabled", {
+      header: t("admin.cols.enabled"),
+      enableSorting: true,
+      cell: ({ getValue }) => (
+        <Badge variant={getValue() ? "success" : "default"}>
+          {getValue() ? t("admin.cols.yes") : t("admin.cols.no")}
+        </Badge>
+      ),
+    }),
+    columnHelper.accessor("ownerId", {
+      header: t("admin.cols.owner"),
+      cell: ({ getValue }) => getValue() ?? "\u2014",
+    }),
+  ]
+}
 
 export default function AdminApplicationsPage({ loaderData }: Route.ComponentProps) {
   "use no memo"
+  const { t } = useTranslation()
   const { applications } = loaderData
   const navigate = useNavigate()
   const fetcher = useFetcher<typeof action>()
+  const columns = useMemo(() => buildColumns(t), [t])
   const [sorting, setSorting] = useState<SortingState>([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
 
@@ -97,19 +106,29 @@ export default function AdminApplicationsPage({ loaderData }: Route.ComponentPro
   const isSyncing = fetcher.state !== "idle"
   const actionData = fetcher.data
 
+  const syncForm = (
+    <fetcher.Form method="post">
+      <input type="hidden" name="intent" value="syncFromCluster" />
+      <Button type="submit" variant="primary" size="small" disabled={isSyncing}>
+        {isSyncing ? t("admin.applications.syncing") : t("admin.applications.syncFromCluster")}
+      </Button>
+    </fetcher.Form>
+  )
+
+  if (applications.length === 0) {
+    return (
+      <Stack gap="md">
+        <CardSection title={t("admin.nav.applications")} action={syncForm}>
+          {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
+          <EmptyState message={t("admin.empty.applications")} />
+        </CardSection>
+      </Stack>
+    )
+  }
+
   return (
     <Stack gap="md">
-      <CardSection
-        title={`Applications (${applications.length})`}
-        action={
-          <fetcher.Form method="post">
-            <input type="hidden" name="intent" value="syncFromCluster" />
-            <Button type="submit" variant="primary" size="small" disabled={isSyncing}>
-              {isSyncing ? "Syncing..." : "Sync from cluster"}
-            </Button>
-          </fetcher.Form>
-        }
-      >
+      <CardSection title={`${t("admin.nav.applications")} (${applications.length})`} action={syncForm}>
         {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
         {actionData && "success" in actionData && actionData.success && (
           <Alert variant="success">{actionData.message}</Alert>
@@ -142,21 +161,32 @@ export default function AdminApplicationsPage({ loaderData }: Route.ComponentPro
                   ))}
                 </Table.Header>
                 <Table.Body>
-                  {table.getRowModel().rows.map((row) => (
-                    <html.div
-                      key={row.id}
-                      onClick={() => navigate(`/admin/applications/${row.original.id}`)}
-                      style={[styles.clickableRow, styles.displayContents]}
-                    >
-                      <Table.Row>
-                        {row.getVisibleCells().map((cell) => (
-                          <Table.Cell key={cell.id}>
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </Table.Cell>
-                        ))}
-                      </Table.Row>
-                    </html.div>
-                  ))}
+                  {table.getRowModel().rows.map((row) => {
+                    const href = `/admin/applications/${row.original.id}`
+                    return (
+                      <html.div
+                        key={row.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={row.original.displayName}
+                        onClick={() => navigate(href)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            navigate(href)
+                          }
+                        }}
+                        style={[styles.clickableRow, styles.displayContents]}
+                      >
+                        <Table.Row>
+                          {row.getVisibleCells().map((cell) => (
+                            <Table.Cell key={cell.id}>
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </Table.Cell>
+                          ))}
+                        </Table.Row>
+                      </html.div>
+                    )
+                  })}
                 </Table.Body>
               </Table.Root>
             </ScrollArea.Content>

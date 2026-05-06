@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useNavigate } from "react-router"
+import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.principals"
 import { runEffect } from "~/lib/runtime.server"
@@ -16,10 +17,9 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Badge, Combobox, Inline, ScrollArea, Stack, Table } from "@duro-app/ui"
+import { Badge, Combobox, EmptyState, Inline, ScrollArea, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { useMemo } from "react"
 
 export async function loader() {
   const principals = await runEffect(
@@ -33,38 +33,46 @@ export async function loader() {
 
 const columnHelper = createColumnHelper<Principal>()
 
-const columns = [
-  columnHelper.accessor("displayName", {
-    header: "Display Name",
-    enableSorting: true,
-    enableColumnFilter: true,
-  }),
-  columnHelper.accessor("principalType", {
-    header: "Type",
-    enableSorting: true,
-    cell: ({ getValue }) => {
-      const type = getValue()
-      const variant =
-        type === "user" ? "default" : type === "group" ? "info" : type === "service_account" ? "warning" : "default"
-      return <Badge variant={variant}>{type}</Badge>
-    },
-  }),
-  columnHelper.accessor("email", {
-    header: "Email",
-    enableSorting: true,
-    enableColumnFilter: true,
-    cell: ({ getValue }) => getValue() ?? "\u2014",
-  }),
-  columnHelper.accessor("enabled", {
-    header: "Enabled",
-    enableSorting: true,
-    cell: ({ getValue }) => <Badge variant={getValue() ? "success" : "default"}>{getValue() ? "Yes" : "No"}</Badge>,
-  }),
-]
+function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string) {
+  return [
+    columnHelper.accessor("displayName", {
+      header: t("admin.cols.displayName"),
+      enableSorting: true,
+      enableColumnFilter: true,
+    }),
+    columnHelper.accessor("principalType", {
+      header: t("admin.cols.type"),
+      enableSorting: true,
+      cell: ({ getValue }) => {
+        const type = getValue()
+        const variant =
+          type === "user" ? "default" : type === "group" ? "info" : type === "service_account" ? "warning" : "default"
+        return <Badge variant={variant}>{type}</Badge>
+      },
+    }),
+    columnHelper.accessor("email", {
+      header: t("admin.cols.email"),
+      enableSorting: true,
+      enableColumnFilter: true,
+      cell: ({ getValue }) => getValue() ?? "\u2014",
+    }),
+    columnHelper.accessor("enabled", {
+      header: t("admin.cols.enabled"),
+      enableSorting: true,
+      cell: ({ getValue }) => (
+        <Badge variant={getValue() ? "success" : "default"}>
+          {getValue() ? t("admin.cols.yes") : t("admin.cols.no")}
+        </Badge>
+      ),
+    }),
+  ]
+}
 
 export default function AdminPrincipalsPage({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation()
   const { principals } = loaderData
   const navigate = useNavigate()
+  const columns = useMemo(() => buildColumns(t), [t])
   const [sorting, setSorting] = useState<SortingState>([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
 
@@ -86,37 +94,47 @@ export default function AdminPrincipalsPage({ loaderData }: Route.ComponentProps
     table.getColumn(columnId)?.setFilterValue(value || undefined)
   }
 
+  if (principals.length === 0) {
+    return (
+      <Stack gap="md">
+        <CardSection title={t("admin.nav.principals")}>
+          <EmptyState message={t("admin.empty.principals")} />
+        </CardSection>
+      </Stack>
+    )
+  }
+
   return (
     <Stack gap="md">
-      <CardSection title={`Principals (${principals.length})`}>
+      <CardSection title={`${t("admin.nav.principals")} (${principals.length})`}>
         <html.div style={styles.filterBar}>
           <Inline gap="sm">
             <Combobox.Root
               onValueChange={(v) => setFilter("displayName", v)}
               onInputChange={(v) => setFilter("displayName", v)}
             >
-              <Combobox.Input placeholder="Filter by name..." />
+              <Combobox.Input placeholder={t("admin.principals.filterByName")} />
               <Combobox.Popup>
                 {principals.map((p) => (
                   <Combobox.Item key={p.id} value={p.displayName}>
                     {p.displayName}
                   </Combobox.Item>
                 ))}
-                <Combobox.Empty>No results</Combobox.Empty>
+                <Combobox.Empty>{t("admin.principals.noResults")}</Combobox.Empty>
               </Combobox.Popup>
             </Combobox.Root>
             <Combobox.Root
               onValueChange={(v) => setFilter("principalType", v)}
               onInputChange={(v) => setFilter("principalType", v)}
             >
-              <Combobox.Input placeholder="Filter by type..." />
+              <Combobox.Input placeholder={t("admin.principals.filterByType")} />
               <Combobox.Popup>
-                {uniqueTypes.map((t) => (
-                  <Combobox.Item key={t} value={t}>
-                    {t}
+                {uniqueTypes.map((typ) => (
+                  <Combobox.Item key={typ} value={typ}>
+                    {typ}
                   </Combobox.Item>
                 ))}
-                <Combobox.Empty>No results</Combobox.Empty>
+                <Combobox.Empty>{t("admin.principals.noResults")}</Combobox.Empty>
               </Combobox.Popup>
             </Combobox.Root>
           </Inline>
@@ -148,21 +166,32 @@ export default function AdminPrincipalsPage({ loaderData }: Route.ComponentProps
                   ))}
                 </Table.Header>
                 <Table.Body>
-                  {table.getRowModel().rows.map((row) => (
-                    <html.div
-                      key={row.id}
-                      onClick={() => navigate(`/admin/principals/${row.original.id}`)}
-                      style={[styles.clickableRow, styles.displayContents]}
-                    >
-                      <Table.Row>
-                        {row.getVisibleCells().map((cell) => (
-                          <Table.Cell key={cell.id}>
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </Table.Cell>
-                        ))}
-                      </Table.Row>
-                    </html.div>
-                  ))}
+                  {table.getRowModel().rows.map((row) => {
+                    const href = `/admin/principals/${row.original.id}`
+                    return (
+                      <html.div
+                        key={row.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={row.original.displayName}
+                        onClick={() => navigate(href)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            navigate(href)
+                          }
+                        }}
+                        style={[styles.clickableRow, styles.displayContents]}
+                      >
+                        <Table.Row>
+                          {row.getVisibleCells().map((cell) => (
+                            <Table.Cell key={cell.id}>
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </Table.Cell>
+                          ))}
+                        </Table.Row>
+                      </html.div>
+                    )
+                  })}
                 </Table.Body>
               </Table.Root>
             </ScrollArea.Content>
