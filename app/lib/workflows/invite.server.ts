@@ -74,7 +74,12 @@ export const queueInvite = (input: InviteInput) =>
       ),
     )
 
-    return { success: true as const, message: `Invite sent to ${input.email}` }
+    return {
+      success: true as const,
+      message: `Invite sent to ${input.email}`,
+      token: invite.token,
+      inviteId: invite.id,
+    }
   }).pipe(Effect.withSpan("queueInvite", { attributes: { email: input.email } }))
 
 // --- Accept Invite ---

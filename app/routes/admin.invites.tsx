@@ -4,9 +4,11 @@ import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/admin.invites"
 import { Effect } from "effect"
 import { runEffect } from "~/lib/runtime.server"
-import { isOriginAllowed } from "~/lib/config.server"
+import { config, isOriginAllowed } from "~/lib/config.server"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
+import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
+import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
 import { handleAdminInvitesMutation, parseAdminInvitesMutation } from "~/lib/mutations/admin-invites"
 import {
   Alert,
@@ -17,6 +19,7 @@ import {
   Field,
   Fieldset,
   Inline,
+  LinkButton,
   ScrollArea,
   Stack,
   Table,
@@ -28,7 +31,7 @@ import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 
 export async function loader() {
-  const [groups, pendingInvites, failedInvites] = await Promise.all([
+  const [groups, pendingInvites, failedInvites, checklist] = await Promise.all([
     runEffect(
       Effect.gen(function* () {
         const users = yield* UserManager
@@ -47,9 +50,38 @@ export async function loader() {
         return yield* repo.findFailed()
       }),
     ),
+    runEffect(
+      Effect.gen(function* () {
+        const userMgr = yield* UserManager
+        const appRepo = yield* ApplicationRepo
+        const systems = yield* ConnectedSystemRepo
+
+        // Each branch is best-effort: if any one fails, we hide that
+        // checklist item rather than failing the whole admin index.
+        const users = yield* userMgr.getUsers.pipe(
+          Effect.catchAll(() => Effect.succeed([] as Array<{ id: string }>)),
+        )
+        const apps = yield* appRepo.list().pipe(Effect.catchAll(() => Effect.succeed([] as Array<unknown>)))
+        const connectedSystems = yield* systems.countByPluginSlug().pipe(
+          Effect.catchAll(() =>
+            Effect.succeed([] as ReadonlyArray<{ pluginSlug: string; count: number }>),
+          ),
+        )
+
+        const humanCount = users.filter((u) => !config.isSystemUser(u.id)).length
+        const appCount = apps.length
+        const connectedSystemCount = connectedSystems.reduce<number>((sum, s) => sum + s.count, 0)
+
+        return {
+          showAddApplication: appCount === 0,
+          showInviteTeammate: humanCount <= 1,
+          showConfigurePlugins: connectedSystemCount === 0,
+        }
+      }),
+    ),
   ])
 
-  return { groups, pendingInvites, failedInvites }
+  return { groups, pendingInvites, failedInvites, checklist }
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -73,10 +105,40 @@ function StepBadges({ invite }: { invite: Invite }) {
   return <Badge variant="warning">{t("admin.invites.badge.processing")}</Badge>
 }
 
+function GetStartedChecklist({ checklist }: { checklist: { showAddApplication: boolean; showInviteTeammate: boolean; showConfigurePlugins: boolean } }) {
+  const { t } = useTranslation()
+  const items: Array<{ key: string; href: string; label: string }> = []
+  if (checklist.showAddApplication) {
+    items.push({ key: "app", href: "/admin/applications", label: t("admin.checklist.addApplication") })
+  }
+  if (checklist.showInviteTeammate) {
+    items.push({ key: "teammate", href: "/admin", label: t("admin.checklist.inviteTeammate") })
+  }
+  if (checklist.showConfigurePlugins) {
+    items.push({ key: "plugins", href: "/admin/plugins", label: t("admin.checklist.configurePlugins") })
+  }
+  if (items.length === 0) return null
+
+  return (
+    <CardSection title={t("admin.checklist.title")}>
+      <Stack gap="sm">
+        <Text as="p" color="muted">{t("admin.checklist.subtitle")}</Text>
+        <Inline gap="sm">
+          {items.map((item) => (
+            <LinkButton key={item.key} href={item.href} variant="secondary">
+              {item.label}
+            </LinkButton>
+          ))}
+        </Inline>
+      </Stack>
+    </CardSection>
+  )
+}
+
 export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
   "use no memo"
   const { t } = useTranslation()
-  const { groups, pendingInvites, failedInvites } = loaderData
+  const { groups, pendingInvites, failedInvites, checklist } = loaderData
   const fetcher = useFetcher<typeof action>()
   const formRef = useRef<HTMLFormElement>(null)
   const isSubmitting = fetcher.state !== "idle"
@@ -114,6 +176,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <Stack gap="md">
+      <GetStartedChecklist checklist={checklist} />
       <CardSection title={t("admin.invites.sendTitle")}>
         {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
         {actionData && "success" in actionData && actionData.success && (

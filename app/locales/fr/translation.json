@@ -118,7 +118,8 @@
     "authzPlayground": "Un outil en lecture seule pour tester les decisions d'acces. Choisissez un principal, une application et une action ; le moteur renvoie ALLOW ou DENY avec les octrois correspondants et le raisonnement. Executer une verification ne change rien.",
     "audit": "Un journal en ajout seul de chaque evenement de gouvernance : octrois crees ou revoques, principals modifies, demandes d'acces tranchees. Filtrez par acteur, cible ou type d'evenement pour enqueter sur \"qui a fait quoi\".",
     "accessRequests": "Demandes d'acces a une application initiees par les utilisateurs. Chaque demande est evaluee par un admin (ou une politique) et devient un octroi une fois approuvee.",
-    "invitations": "Une invitation d'acces pre-cree les octrois qu'une personne recevra a l'acceptation. A distinguer du flux Invitations utilisateur qui provisionne un compte dans le fournisseur d'identite."
+    "invitations": "Une invitation d'acces pre-cree les octrois qu'une personne recevra a l'acceptation. A distinguer du flux Invitations utilisateur qui provisionne un compte dans le fournisseur d'identite.",
+    "bootstrap": "Sur un deploiement neuf, le tout premier admin est cree a partir d'un jeton d'amorcage a usage unique que votre operateur a place dans Vault. Cet assistant lit le jeton cote serveur et met en file d'attente une invitation pour l'adresse e-mail saisie. Une fois l'invitation consommee, cette page se verrouille."
   },
   "invite": {
     "title": "Rejoindre {{appName}}",
@@ -220,6 +221,40 @@
     "tabs": {
       "invites": "Invitations",
       "users": "Utilisateurs"
+    },
+    "setup": {
+      "heading": "Configurez votre deploiement",
+      "subtitle": "Creez le premier compte admin pour {{appName}}. Cette page n'est accessible que tant qu'aucun admin n'existe.",
+      "emailLabel": "Adresse e-mail de l'admin",
+      "submit": "Creer l'invitation admin",
+      "submitting": "Creation de l'invitation…",
+      "success": {
+        "title": "Invitation prete",
+        "body": "Une invitation pour {{email}} a ete mise en file d'attente et envoyee par e-mail. Vous pouvez aussi continuer ici :",
+        "urlLabel": "URL d'invitation",
+        "continue": "Continuer vers l'invitation"
+      },
+      "error": {
+        "no_token": "Aucun jeton d'amorcage trouve dans Vault. Verifiez que votre operateur a place un jeton dans secret/data/duro/bootstrap-token avant d'ouvrir cette page.",
+        "vault_unreachable": "Vault est injoignable. Verifiez VAULT_ADDR et la configuration du compte de service Kubernetes du deploiement.",
+        "vault_invalid_response": "Le secret d'amorcage dans Vault a une structure invalide. Champs attendus : token, expires_at.",
+        "token_mismatch": "Le jeton fourni ne correspond pas a celui stocke dans Vault.",
+        "token_expired": "Le jeton d'amorcage a expire. Generez-en un nouveau et reessayez.",
+        "email_invalid": "Veuillez saisir une adresse e-mail valide.",
+        "email_in_use": "Un utilisateur avec cette adresse existe deja dans l'annuaire. Choisissez-en une autre ou supprimez d'abord l'utilisateur existant.",
+        "admin_group_missing": "Le groupe admin n'est pas encore provisionne dans l'annuaire. Creez-le avant l'amorcage.",
+        "bootstrap_in_progress": "Une autre soumission d'amorcage est deja en cours. Reessayez dans un instant.",
+        "queue_failed": "L'invitation a ete rejetee lors de la mise en file d'attente — probablement une erreur SMTP ou PKI. Verifiez les journaux du serveur et reessayez.",
+        "missing_email": "Veuillez saisir une adresse e-mail.",
+        "wrong_origin": "Origine de la requete non autorisee."
+      }
+    },
+    "checklist": {
+      "title": "Pour commencer",
+      "subtitle": "Quelques etapes pour rendre ce deploiement utile :",
+      "addApplication": "Ajouter une application",
+      "inviteTeammate": "Inviter un coequipier",
+      "configurePlugins": "Configurer les extensions"
     },
     "nav": {
       "title": "Navigation",

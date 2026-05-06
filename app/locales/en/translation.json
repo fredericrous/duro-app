@@ -118,7 +118,8 @@
     "authzPlayground": "A read-only tool for testing access decisions. Pick a principal, an application, and an action; the engine returns ALLOW or DENY plus the matched grants and the reasoning. Running a check changes nothing.",
     "audit": "An append-only log of every governance event — grants created or revoked, principals changed, access requests decided. Filter by actor, target, or event type to investigate \"who did what\".",
     "accessRequests": "User-initiated requests for access to an application. Each request is evaluated by an admin (or a policy) and turns into a grant when approved.",
-    "invitations": "An access invitation pre-creates the grants a person should receive when they accept. Distinct from the system-level User Invites flow which provisions an account in the identity provider."
+    "invitations": "An access invitation pre-creates the grants a person should receive when they accept. Distinct from the system-level User Invites flow which provisions an account in the identity provider.",
+    "bootstrap": "On a fresh deployment, the very first admin is created from a single-use bootstrap token your operator placed in Vault. This wizard reads that token server-side and queues an invite for the email you enter. After the invite is consumed, this page locks itself."
   },
   "invite": {
     "title": "Join {{appName}}",
@@ -220,6 +221,40 @@
     "tabs": {
       "invites": "Invites",
       "users": "Users"
+    },
+    "setup": {
+      "heading": "Set up your deployment",
+      "subtitle": "Create the first admin account for {{appName}}. This page is only available until the first admin exists.",
+      "emailLabel": "Admin email address",
+      "submit": "Create admin invite",
+      "submitting": "Creating invite…",
+      "success": {
+        "title": "Invite ready",
+        "body": "An invite for {{email}} has been queued and emailed. You can also continue right here:",
+        "urlLabel": "Invite URL",
+        "continue": "Continue to invite"
+      },
+      "error": {
+        "no_token": "No bootstrap token was found in Vault. Make sure your operator placed one at secret/data/duro/bootstrap-token before opening this page.",
+        "vault_unreachable": "Could not reach Vault. Check VAULT_ADDR and the deployment's Kubernetes service account configuration.",
+        "vault_invalid_response": "The bootstrap secret in Vault has an invalid structure. Expected fields: token, expires_at.",
+        "token_mismatch": "The supplied token does not match the one stored in Vault.",
+        "token_expired": "The bootstrap token has expired. Generate a fresh one and retry.",
+        "email_invalid": "Please enter a valid email address.",
+        "email_in_use": "A user with that email already exists in the directory. Pick a different one or remove the existing user first.",
+        "admin_group_missing": "The admin group is not yet provisioned in the directory. Create it before bootstrapping.",
+        "bootstrap_in_progress": "Another bootstrap submit is already in progress. Try again in a moment.",
+        "queue_failed": "The invite was rejected during queueing — likely an SMTP or PKI failure. Check server logs and retry.",
+        "missing_email": "Please enter an email address.",
+        "wrong_origin": "Request origin not allowed."
+      }
+    },
+    "checklist": {
+      "title": "Get started",
+      "subtitle": "A few next steps to make this deployment useful:",
+      "addApplication": "Add an application",
+      "inviteTeammate": "Invite a teammate",
+      "configurePlugins": "Configure plugins"
     },
     "nav": {
       "title": "Navigation",

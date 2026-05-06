@@ -22,6 +22,7 @@ export default [
       route("plugins/:slug", "routes/admin.plugins.$slug.tsx"),
     ]),
   ]),
+  route("admin/setup", "routes/admin.setup.tsx"),
   route("auth/callback", "routes/auth.callback.tsx"),
   route("auth/logout", "routes/auth.logout.ts"),
   route("health", "routes/health.ts"),
