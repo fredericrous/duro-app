@@ -392,12 +392,7 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
         selectedLabel={(count) => t("admin.users.certs.usersSelected", { count: Number(count) })}
         onClearSelection={() => table.resetRowSelection()}
       >
-        <Button
-          variant="danger"
-          size="small"
-          disabled={isRevokingUserCerts}
-          onClick={() => setConfirmBulk("users")}
-        >
+        <Button variant="danger" size="small" disabled={isRevokingUserCerts} onClick={() => setConfirmBulk("users")}>
           {isRevokingUserCerts
             ? t("admin.users.actions.revoking")
             : t("admin.users.certs.revokeAllForUsers", { count: selectedUserIds.length })}
@@ -410,12 +405,7 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
         selectedLabel={(count) => t("admin.users.certs.selected", { count: Number(count) })}
         onClearSelection={() => setSelectedCerts(new Set())}
       >
-        <Button
-          variant="danger"
-          size="small"
-          disabled={isRevokingCerts}
-          onClick={() => setConfirmBulk("certs")}
-        >
+        <Button variant="danger" size="small" disabled={isRevokingCerts} onClick={() => setConfirmBulk("certs")}>
           {isRevokingCerts
             ? t("admin.users.actions.revoking")
             : t("admin.users.certs.revokeSelected", { count: selectedCerts.size })}

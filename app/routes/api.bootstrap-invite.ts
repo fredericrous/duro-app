@@ -30,14 +30,11 @@ export async function action({ request }: Route.ActionArgs) {
     return Response.json({ error: "Missing required fields: token, email" }, { status: 400 })
   }
 
-  const result = await runEffect(
-    submitBootstrapInviteWithCallerToken({ token, email }).pipe(Effect.either),
-  )
+  const result = await runEffect(submitBootstrapInviteWithCallerToken({ token, email }).pipe(Effect.either))
 
   if (result._tag === "Left") {
     const err = result.left
-    const status =
-      err.code === "no_token" || err.code === "token_mismatch" || err.code === "token_expired" ? 401 : 500
+    const status = err.code === "no_token" || err.code === "token_mismatch" || err.code === "token_expired" ? 401 : 500
     return Response.json({ error: err.message ?? err.code }, { status })
   }
 

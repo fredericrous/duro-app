@@ -84,11 +84,7 @@ export function NoAccess({ user, requestableApps = [], fetcher }: NoAccessProps)
               )}
               <Field.Root>
                 <Field.Label>{t("noAccess.form.application")}</Field.Label>
-                <Combobox.Root
-                  value={appId}
-                  onValueChange={(v) => setAppId(v ?? "")}
-                  initialLabels={labels}
-                >
+                <Combobox.Root value={appId} onValueChange={(v) => setAppId(v ?? "")} initialLabels={labels}>
                   <Combobox.Input placeholder={t("noAccess.form.applicationPlaceholder")} />
                   <Combobox.Popup>
                     {requestableApps.map((a) => (

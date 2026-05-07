@@ -184,12 +184,7 @@ export default function InvitePage({ loaderData }: Route.ComponentProps) {
 
     if (error === "already_used") {
       return (
-        <ErrorCard
-          icon="check-done"
-          tone="info"
-          title={t("invite.used.title")}
-          message={t("invite.used.message")}
-        />
+        <ErrorCard icon="check-done" tone="info" title={t("invite.used.title")} message={t("invite.used.message")} />
       )
     }
 

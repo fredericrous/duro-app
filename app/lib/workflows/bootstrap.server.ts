@@ -64,8 +64,7 @@ const vaultLogin = (deps: VaultDeps) =>
       }
       return token
     },
-    catch: (e) =>
-      e instanceof BootstrapError ? e : new BootstrapError({ code: "vault_unreachable", cause: e }),
+    catch: (e) => (e instanceof BootstrapError ? e : new BootstrapError({ code: "vault_unreachable", cause: e })),
   })
 
 const readBootstrapSecret = (deps: VaultDeps, vaultToken: string) =>
@@ -88,8 +87,7 @@ const readBootstrapSecret = (deps: VaultDeps, vaultToken: string) =>
       }
       return { token: tokenData.token, expiresAt: Number(tokenData.expires_at) }
     },
-    catch: (e) =>
-      e instanceof BootstrapError ? e : new BootstrapError({ code: "vault_unreachable", cause: e }),
+    catch: (e) => (e instanceof BootstrapError ? e : new BootstrapError({ code: "vault_unreachable", cause: e })),
   })
 
 /**
@@ -153,9 +151,9 @@ export const createAdminInvite = (email: string) =>
       })
     }
 
-    const pending = yield* inviteRepo.findPending().pipe(
-      Effect.mapError((e) => new BootstrapError({ code: "queue_failed", cause: e })),
-    )
+    const pending = yield* inviteRepo
+      .findPending()
+      .pipe(Effect.mapError((e) => new BootstrapError({ code: "queue_failed", cause: e })))
     const stale = pending.find((i) => i.email === cleanEmail)
     if (stale) {
       yield* Effect.logWarning(`bootstrap: revoking existing pending invite for ${cleanEmail}`)

@@ -13,7 +13,11 @@
     "format:check": "prettier --check app/",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:wasm": "cd packages/opaque-client && ~/.cargo/bin/wasm-pack build --target nodejs --out-dir pkg --release"
+    "build:wasm": "cd packages/opaque-client && ~/.cargo/bin/wasm-pack build --target nodejs --out-dir pkg --release",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "app/**/*.{ts,tsx,js,jsx,json,css}": "prettier --write"
   },
   "dependencies": {
     "@duro-app/tokens": "^0.15.2",
@@ -77,7 +81,9 @@
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.0.1",
+    "husky": "^9.1.7",
     "jsdom": "^29.0.0",
+    "lint-staged": "^17.0.2",
     "msw": "^2.12.14",
     "postcss": "^8.5.8",
     "prettier": "^3.8.1",

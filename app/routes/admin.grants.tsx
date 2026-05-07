@@ -173,11 +173,12 @@ export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
     getPaginationRowModel: getPaginationRowModel(),
   })
 
-  const createGrantAction = applications.length > 0 ? (
-    <Button variant="primary" size="small" onClick={() => setPickAppOpen(true)}>
-      {t("admin.grants.createGrant")}
-    </Button>
-  ) : null
+  const createGrantAction =
+    applications.length > 0 ? (
+      <Button variant="primary" size="small" onClick={() => setPickAppOpen(true)}>
+        {t("admin.grants.createGrant")}
+      </Button>
+    ) : null
 
   const grantsHelpTitle = (
     <>
@@ -190,10 +191,7 @@ export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
     return (
       <Stack gap="md">
         <CardSection title={grantsHelpTitle} action={createGrantAction}>
-          <EmptyState
-            message={t("admin.empty.grants")}
-            action={createGrantAction}
-          />
+          <EmptyState message={t("admin.empty.grants")} action={createGrantAction} />
         </CardSection>
         <PickApplicationDialog
           open={pickAppOpen}
@@ -334,11 +332,7 @@ function PickApplicationDialog({
           <Stack gap="md">
             <Field.Root>
               <Field.Label>{t("admin.cols.application")}</Field.Label>
-              <Combobox.Root
-                value={pickedAppId}
-                onValueChange={(v) => setPickedAppId(v ?? "")}
-                initialLabels={labels}
-              >
+              <Combobox.Root value={pickedAppId} onValueChange={(v) => setPickedAppId(v ?? "")} initialLabels={labels}>
                 <Combobox.Input placeholder={t("admin.cols.application")} />
                 <Combobox.Popup>
                   {applications.map((a) => (

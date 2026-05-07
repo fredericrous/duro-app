@@ -161,8 +161,7 @@ const mockCertificateRepo = () =>
 
 const mockEmailService = (sendShouldFail = false) =>
   Layer.succeed(EmailService, {
-    sendInviteEmail: () =>
-      sendShouldFail ? Effect.fail(new EmailError({ message: "SMTP down" })) : Effect.void,
+    sendInviteEmail: () => (sendShouldFail ? Effect.fail(new EmailError({ message: "SMTP down" })) : Effect.void),
     sendCertRenewalEmail: () => Effect.void,
   })
 

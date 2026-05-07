@@ -182,9 +182,7 @@ export default function ReinvitePage({ loaderData, actionData }: Route.Component
         {t("reinvite.message", { email: loaderData.email })}
       </Text>
 
-      {actionData && "error" in actionData && (
-        <Alert variant="error">{t(reinviteErrorKey(actionData.error))}</Alert>
-      )}
+      {actionData && "error" in actionData && <Alert variant="error">{t(reinviteErrorKey(actionData.error))}</Alert>}
 
       <form method="post">
         <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>

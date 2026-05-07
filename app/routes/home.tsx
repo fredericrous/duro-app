@@ -173,11 +173,7 @@ export default function HomePage({ loaderData }: Route.ComponentProps) {
   if (!hasAccess) {
     return (
       <CenteredCardPage>
-        <NoAccess
-          user={user}
-          requestableApps={requestableApps ?? []}
-          fetcher={fetcher}
-        />
+        <NoAccess user={user} requestableApps={requestableApps ?? []} fetcher={fetcher} />
       </CenteredCardPage>
     )
   }

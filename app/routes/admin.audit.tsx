@@ -195,10 +195,7 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
   )
 
   const hasActiveFilters =
-    Boolean(currentEventType) ||
-    Boolean(currentActor) ||
-    Boolean(currentTargetType) ||
-    Boolean(currentTargetId)
+    Boolean(currentEventType) || Boolean(currentActor) || Boolean(currentTargetType) || Boolean(currentTargetId)
 
   return (
     <Stack gap="md">
@@ -270,50 +267,53 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
         {events.length === 0 ? (
           <EmptyState message={t("admin.empty.audit")} />
         ) : (
-        <ScrollArea.Root>
-          <ScrollArea.Viewport>
-            <ScrollArea.Content>
-              <Table.Root>
-                <Table.Header>
-                  {table.getHeaderGroups().map((headerGroup) => (
-                    <Table.Row key={headerGroup.id}>
-                      {headerGroup.headers.map((header) => (
-                        <Table.HeaderCell key={header.id}>
-                          {header.isPlaceholder ? null : (
-                            <>
-                              {header.column.getCanSort() ? (
-                                <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
-                                  {flexRender(header.column.columnDef.header, header.getContext())}
-                                  <Table.SortIndicator column={header.column} />
-                                </html.span>
-                              ) : (
-                                flexRender(header.column.columnDef.header, header.getContext())
-                              )}
-                            </>
-                          )}
-                        </Table.HeaderCell>
-                      ))}
-                    </Table.Row>
-                  ))}
-                </Table.Header>
-                <Table.Body>
-                  {table.getRowModel().rows.map((row) => (
-                    <Table.Row key={row.id}>
-                      {row.getVisibleCells().map((cell) => (
-                        <Table.Cell key={cell.id}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </Table.Cell>
-                      ))}
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table.Root>
-            </ScrollArea.Content>
-          </ScrollArea.Viewport>
-          <ScrollArea.Scrollbar orientation="horizontal">
-            <ScrollArea.Thumb orientation="horizontal" />
-          </ScrollArea.Scrollbar>
-        </ScrollArea.Root>
+          <ScrollArea.Root>
+            <ScrollArea.Viewport>
+              <ScrollArea.Content>
+                <Table.Root>
+                  <Table.Header>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <Table.Row key={headerGroup.id}>
+                        {headerGroup.headers.map((header) => (
+                          <Table.HeaderCell key={header.id}>
+                            {header.isPlaceholder ? null : (
+                              <>
+                                {header.column.getCanSort() ? (
+                                  <html.span
+                                    style={styles.sortHeader}
+                                    onClick={header.column.getToggleSortingHandler()}
+                                  >
+                                    {flexRender(header.column.columnDef.header, header.getContext())}
+                                    <Table.SortIndicator column={header.column} />
+                                  </html.span>
+                                ) : (
+                                  flexRender(header.column.columnDef.header, header.getContext())
+                                )}
+                              </>
+                            )}
+                          </Table.HeaderCell>
+                        ))}
+                      </Table.Row>
+                    ))}
+                  </Table.Header>
+                  <Table.Body>
+                    {table.getRowModel().rows.map((row) => (
+                      <Table.Row key={row.id}>
+                        {row.getVisibleCells().map((cell) => (
+                          <Table.Cell key={cell.id}>
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </Table.Cell>
+                        ))}
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+              </ScrollArea.Content>
+            </ScrollArea.Viewport>
+            <ScrollArea.Scrollbar orientation="horizontal">
+              <ScrollArea.Thumb orientation="horizontal" />
+            </ScrollArea.Scrollbar>
+          </ScrollArea.Root>
         )}
 
         {events.length > 0 && (

@@ -110,12 +110,7 @@ export default function SettingsPage({ loaderData }: Route.ComponentProps) {
               <Text as="p" color="muted" variant="bodySm">
                 {t("settings.security.description")}
               </Text>
-              <LinkButton
-                href={loaderData.autheliaUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="secondary"
-              >
+              <LinkButton href={loaderData.autheliaUrl} target="_blank" rel="noopener noreferrer" variant="secondary">
                 {t("settings.security.openPortal")}
               </LinkButton>
               <Text as="p" color="muted" variant="bodySm">

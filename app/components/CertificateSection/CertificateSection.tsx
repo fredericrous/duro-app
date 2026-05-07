@@ -47,7 +47,11 @@ function CertRow({ cert }: { cert: UserCertificate }) {
           {(() => {
             const status = expiryStatus(cert.expiresAt)
             if (status === "expired") {
-              return <Badge variant="error" size="sm">{t("settings.cert.list.expired")}</Badge>
+              return (
+                <Badge variant="error" size="sm">
+                  {t("settings.cert.list.expired")}
+                </Badge>
+              )
             }
             if (status === "imminent") {
               return (

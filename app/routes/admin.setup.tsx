@@ -48,9 +48,7 @@ export async function action({ request }: Route.ActionArgs) {
     return { ok: false as const, error: "missing_email" as SetupErrorCode }
   }
 
-  const result = await runEffect(
-    submitBootstrapInviteAuto({ email }).pipe(Effect.either),
-  )
+  const result = await runEffect(submitBootstrapInviteAuto({ email }).pipe(Effect.either))
 
   if (result._tag === "Left") {
     return { ok: false as const, error: result.left.code as SetupErrorCode }

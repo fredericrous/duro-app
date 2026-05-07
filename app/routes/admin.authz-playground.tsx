@@ -203,9 +203,7 @@ export default function AdminAuthzPlaygroundPage({ loaderData }: Route.Component
                         </Text>
                       </html.li>
                       <html.li>
-                        <Text>
-                          {t("admin.authz.evaluationMs", { ms: result.decision.diagnostics.evaluationMs })}
-                        </Text>
+                        <Text>{t("admin.authz.evaluationMs", { ms: result.decision.diagnostics.evaluationMs })}</Text>
                       </html.li>
                     </html.ul>
                   </>

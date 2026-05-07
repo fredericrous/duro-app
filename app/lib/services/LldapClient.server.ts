@@ -224,14 +224,14 @@ export const LldapClientLive = Layer.effect(
             catch: (e) => new LldapError({ message: "Failed to load OPAQUE module", cause: e }),
           })
 
-          // Step 1: OPAQUE registration start (client-side crypto)
-          // Argon2 params must match LLDAP's Argon2::default() from the argon2 0.5 crate:
-          // memory=19456 KiB, iterations=2, parallelism=1
+          // Step 1: OPAQUE registration start (client-side crypto).
+          // The KSF (Argon2) only runs in finishRegistration below — start
+          // is just an OPRF blind. @serenity-kit/opaque accordingly accepts
+          // keyStretching only on the finish call.
           const { clientRegistrationState, registrationRequest } = yield* Effect.try({
             try: () =>
               opaque.client.startRegistration({
                 password,
-                keyStretching: { "argon2id-custom": { memory: 19456, iterations: 2, parallelism: 1 } },
               }),
             catch: (e) => new LldapError({ message: "OPAQUE startRegistration failed", cause: e }),
           })

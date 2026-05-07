@@ -58,15 +58,11 @@ export async function loader() {
 
         // Each branch is best-effort: if any one fails, we hide that
         // checklist item rather than failing the whole admin index.
-        const users = yield* userMgr.getUsers.pipe(
-          Effect.catchAll(() => Effect.succeed([] as Array<{ id: string }>)),
-        )
+        const users = yield* userMgr.getUsers.pipe(Effect.catchAll(() => Effect.succeed([] as Array<{ id: string }>)))
         const apps = yield* appRepo.list().pipe(Effect.catchAll(() => Effect.succeed([] as Array<unknown>)))
-        const connectedSystems = yield* systems.countByPluginSlug().pipe(
-          Effect.catchAll(() =>
-            Effect.succeed([] as ReadonlyArray<{ pluginSlug: string; count: number }>),
-          ),
-        )
+        const connectedSystems = yield* systems
+          .countByPluginSlug()
+          .pipe(Effect.catchAll(() => Effect.succeed([] as ReadonlyArray<{ pluginSlug: string; count: number }>)))
 
         const humanCount = users.filter((u) => !config.isSystemUser(u.id)).length
         const appCount = apps.length
@@ -105,7 +101,11 @@ function StepBadges({ invite }: { invite: Invite }) {
   return <Badge variant="warning">{t("admin.invites.badge.processing")}</Badge>
 }
 
-function GetStartedChecklist({ checklist }: { checklist: { showAddApplication: boolean; showInviteTeammate: boolean; showConfigurePlugins: boolean } }) {
+function GetStartedChecklist({
+  checklist,
+}: {
+  checklist: { showAddApplication: boolean; showInviteTeammate: boolean; showConfigurePlugins: boolean }
+}) {
   const { t } = useTranslation()
   const items: Array<{ key: string; href: string; label: string }> = []
   if (checklist.showAddApplication) {
@@ -122,7 +122,9 @@ function GetStartedChecklist({ checklist }: { checklist: { showAddApplication: b
   return (
     <CardSection title={t("admin.checklist.title")}>
       <Stack gap="sm">
-        <Text as="p" color="muted">{t("admin.checklist.subtitle")}</Text>
+        <Text as="p" color="muted">
+          {t("admin.checklist.subtitle")}
+        </Text>
         <Inline gap="sm">
           {items.map((item) => (
             <LinkButton key={item.key} href={item.href} variant="secondary">
