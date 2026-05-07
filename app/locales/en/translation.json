@@ -371,7 +371,19 @@
       "title": "Active Grants ({{count}})",
       "createGrant": "Create Grant",
       "revoke": "Revoke",
-      "revoking": "Revoking..."
+      "revoking": "Revoking...",
+      "new": {
+        "title": "Create grant",
+        "creating": "Creating…",
+        "rolePlaceholder": "Pick a role",
+        "pickAppFirst": "Pick an application first",
+        "noRoles": "This application has no roles yet. Add one before granting access.",
+        "principalPlaceholder": "Search users or groups…",
+        "ldapNote": "This application is provisioned via LDAP. Group grants for provisioned apps arrive in phase 2 — only user principals are offered here.",
+        "reasonLabel": "Reason (optional)",
+        "reasonPlaceholder": "Why is this grant being created?",
+        "expiresHint": "Local date. The grant expires at midnight UTC on the chosen day."
+      }
     },
     "accessRequests": {
       "title": "Access Requests ({{count}})"

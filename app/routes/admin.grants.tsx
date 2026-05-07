@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { useFetcher, useNavigate } from "react-router"
+import { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.grants"
@@ -7,12 +7,11 @@ import { runEffect } from "~/lib/runtime.server"
 import { isOriginAllowed } from "~/lib/config.server"
 import { getAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"
-import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { deactivateGrant } from "~/lib/workflows/grant-activation.server"
-import type { Application, Grant } from "~/lib/governance/types"
+import type { Grant } from "~/lib/governance/types"
 import {
   useReactTable,
   getCoreRowModel,
@@ -23,7 +22,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Button, Combobox, Dialog, EmptyState, Field, Inline, ScrollArea, Stack, Table } from "@duro-app/ui"
+import { Button, EmptyState, LinkButton, ScrollArea, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
@@ -51,10 +50,7 @@ export async function loader() {
         }
       }
 
-      const appRepo = yield* ApplicationRepo
-      const applications = yield* appRepo.list()
-
-      return { grants: allGrants, applications }
+      return { grants: allGrants }
     }),
   )
 
@@ -153,12 +149,9 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
 
 export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
-  const { grants, applications } = loaderData
-  const navigate = useNavigate()
+  const { grants } = loaderData
   const [sorting, setSorting] = useState<SortingState>([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
-  const [pickAppOpen, setPickAppOpen] = useState(false)
-  const [pickedAppId, setPickedAppId] = useState<string>("")
 
   const columns = useMemo(() => buildColumns(t), [t])
 
@@ -173,12 +166,11 @@ export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
     getPaginationRowModel: getPaginationRowModel(),
   })
 
-  const createGrantAction =
-    applications.length > 0 ? (
-      <Button variant="primary" size="small" onClick={() => setPickAppOpen(true)}>
-        {t("admin.grants.createGrant")}
-      </Button>
-    ) : null
+  const createGrantAction = (
+    <LinkButton href="/admin/grants/new" variant="primary" size="small">
+      {t("admin.grants.createGrant")}
+    </LinkButton>
+  )
 
   const grantsHelpTitle = (
     <>
@@ -190,20 +182,9 @@ export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
   if (grants.length === 0) {
     return (
       <Stack gap="md">
-        <CardSection title={grantsHelpTitle} action={createGrantAction}>
+        <CardSection title={grantsHelpTitle}>
           <EmptyState message={t("admin.empty.grants")} action={createGrantAction} />
         </CardSection>
-        <PickApplicationDialog
-          open={pickAppOpen}
-          onOpenChange={setPickAppOpen}
-          applications={applications}
-          pickedAppId={pickedAppId}
-          setPickedAppId={setPickedAppId}
-          onContinue={(appId) => {
-            setPickAppOpen(false)
-            navigate(`/admin/applications/${appId}?tab=grants&grant=open`)
-          }}
-        />
       </Stack>
     )
   }
@@ -268,18 +249,6 @@ export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
         </ScrollArea.Root>
         <Table.Pagination table={table} />
       </CardSection>
-
-      <PickApplicationDialog
-        open={pickAppOpen}
-        onOpenChange={setPickAppOpen}
-        applications={applications}
-        pickedAppId={pickedAppId}
-        setPickedAppId={setPickedAppId}
-        onContinue={(appId) => {
-          setPickAppOpen(false)
-          navigate(`/admin/applications/${appId}?tab=grants&grant=open`)
-        }}
-      />
     </Stack>
   )
 }
@@ -297,67 +266,6 @@ function RevokeCell({ grantId }: { grantId: string }) {
         {isRevoking ? t("admin.grants.revoking") : t("admin.grants.revoke")}
       </Button>
     </fetcher.Form>
-  )
-}
-
-function PickApplicationDialog({
-  open,
-  onOpenChange,
-  applications,
-  pickedAppId,
-  setPickedAppId,
-  onContinue,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  applications: ReadonlyArray<Application>
-  pickedAppId: string
-  setPickedAppId: (id: string) => void
-  onContinue: (appId: string) => void
-}) {
-  const { t } = useTranslation()
-  const labels = useMemo<Record<string, string>>(
-    () => Object.fromEntries(applications.map((a) => [a.id, `${a.displayName} (${a.slug})`])),
-    [applications],
-  )
-
-  return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal size="sm">
-        <Dialog.Header>
-          <Dialog.Title>{t("admin.grants.createGrant")}</Dialog.Title>
-          <Dialog.Close />
-        </Dialog.Header>
-        <Dialog.Body>
-          <Stack gap="md">
-            <Field.Root>
-              <Field.Label>{t("admin.cols.application")}</Field.Label>
-              <Combobox.Root value={pickedAppId} onValueChange={(v) => setPickedAppId(v ?? "")} initialLabels={labels}>
-                <Combobox.Input placeholder={t("admin.cols.application")} />
-                <Combobox.Popup>
-                  {applications.map((a) => (
-                    <Combobox.Item key={a.id} value={a.id}>
-                      {labels[a.id]}
-                    </Combobox.Item>
-                  ))}
-                  <Combobox.Empty>{t("admin.principals.noResults")}</Combobox.Empty>
-                </Combobox.Popup>
-              </Combobox.Root>
-            </Field.Root>
-          </Stack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Inline gap="sm">
-            <Button variant="secondary" onClick={() => onOpenChange(false)}>
-              {t("common.cancel")}
-            </Button>
-            <Button variant="primary" disabled={!pickedAppId} onClick={() => onContinue(pickedAppId)}>
-              {t("admin.grants.createGrant")}
-            </Button>
-          </Inline>
-        </Dialog.Footer>
-      </Dialog.Portal>
-    </Dialog.Root>
   )
 }
 

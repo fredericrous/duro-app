@@ -371,7 +371,19 @@
       "title": "Octrois actifs ({{count}})",
       "createGrant": "Creer un octroi",
       "revoke": "Revoquer",
-      "revoking": "Revocation..."
+      "revoking": "Revocation...",
+      "new": {
+        "title": "Creer un octroi",
+        "creating": "Creation…",
+        "rolePlaceholder": "Choisissez un role",
+        "pickAppFirst": "Choisissez d'abord une application",
+        "noRoles": "Cette application n'a pas encore de role. Creez-en un avant d'accorder un acces.",
+        "principalPlaceholder": "Cherchez un utilisateur ou un groupe…",
+        "ldapNote": "Cette application est provisionnee via LDAP. Les octrois de groupe pour les applications provisionnees arrivent en phase 2 — seuls les utilisateurs sont proposes ici.",
+        "reasonLabel": "Raison (optionnel)",
+        "reasonPlaceholder": "Pourquoi cet octroi ?",
+        "expiresHint": "Date locale. L'octroi expire a minuit UTC le jour choisi."
+      }
     },
     "accessRequests": {
       "title": "Demandes d'acces ({{count}})"

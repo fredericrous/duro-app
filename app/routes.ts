@@ -12,6 +12,7 @@ export default [
       route("principals", "routes/admin.principals.tsx"),
       route("principals/:id", "routes/admin.principals.$id.tsx"),
       route("grants", "routes/admin.grants.tsx"),
+      route("grants/new", "routes/admin.grants.new.tsx"),
       route("group-mappings", "routes/admin.group-mappings.tsx"),
       route("access-requests", "routes/admin.access-requests.tsx"),
       route("access-requests/:id", "routes/admin.access-requests.$id.tsx"),
