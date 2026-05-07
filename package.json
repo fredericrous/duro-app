@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build:wasm": "cd packages/opaque-client && ~/.cargo/bin/wasm-pack build --target nodejs --out-dir pkg --release",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "lint-staged": {
     "app/**/*.{ts,tsx,js,jsx,json,css}": "prettier --write"
