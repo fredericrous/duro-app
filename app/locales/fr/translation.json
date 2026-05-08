@@ -298,6 +298,7 @@
       "status": "Statut",
       "requester": "Demandeur",
       "application": "Application",
+      "applicationPlaceholder": "Choisissez une application…",
       "justification": "Justification",
       "created": "Cree le",
       "eventType": "Type d'evenement",
@@ -382,7 +383,8 @@
         "ldapNote": "Cette application est provisionnee via LDAP. Les octrois de groupe pour les applications provisionnees arrivent en phase 2 — seuls les utilisateurs sont proposes ici.",
         "reasonLabel": "Raison (optionnel)",
         "reasonPlaceholder": "Pourquoi cet octroi ?",
-        "expiresHint": "Date locale. L'octroi expire a minuit UTC le jour choisi."
+        "expiresHint": "Date locale. L'octroi expire a minuit UTC le jour choisi.",
+        "neverExpires": "N'expire jamais"
       }
     },
     "accessRequests": {

@@ -37,7 +37,7 @@ export async function checkAuthDecision(input: AuthDecisionInput): Promise<AuthD
       Effect.gen(function* () {
         const engine = yield* AuthzEngine
         return yield* engine.checkAccess({
-          subject: input.auth.user!,
+          subject: input.auth.sub!,
           application: input.application,
           action: input.action,
           resourceId: input.resourceId,

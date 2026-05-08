@@ -38,7 +38,7 @@ export async function loader({ request }: Route.LoaderArgs) {
           const engine = yield* AuthzEngine
           const allApps = yield* appRepo.list()
           const checks = allApps.map((a) => ({
-            subject: auth.user!,
+            subject: auth.sub!,
             application: a.slug,
             action: "access",
           }))
@@ -140,7 +140,7 @@ export async function action({ request }: Route.ActionArgs) {
       await runEffect(
         Effect.gen(function* () {
           const principalRepo = yield* PrincipalRepo
-          const principal = yield* principalRepo.findByExternalId(auth.user!)
+          const principal = yield* principalRepo.findByExternalId(auth.sub!)
           if (!principal) return yield* Effect.fail("principal_not_found" as const)
           return yield* submitAccessRequest({
             requesterId: principal.id,

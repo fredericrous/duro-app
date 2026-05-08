@@ -72,13 +72,13 @@ export async function action({ request }: Route.ActionArgs) {
     // grants.revoked_by → principals.id). Same pattern as createGrant.
     const auth = await getAuth(request)
     const decision = await checkAuthDecision({ auth, application: "duro", action: "admin" })
-    if (!decision.allow || !auth.user) {
+    if (!decision.allow || !auth.sub) {
       throw new Response("Forbidden", { status: 403 })
     }
     const principal = await runEffect(
       Effect.gen(function* () {
         const repo = yield* PrincipalRepo
-        return yield* repo.findByExternalId(auth.user!)
+        return yield* repo.findByExternalId(auth.sub!)
       }),
     )
     if (!principal) {

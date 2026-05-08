@@ -4,12 +4,24 @@ import { OidcClient } from "./services/OidcClient.server"
 import { runEffect } from "./runtime.server"
 
 export interface AuthInfo {
+  /**
+   * OIDC subject (stable per-user identifier). This is what
+   * principals.external_id is keyed on — use this for any DB
+   * lookup of the actor, never `user` (display name, not unique).
+   */
+  sub: string | null
+  /** Display name. Useful for UI strings only. */
   user: string | null
   email: string | null
   groups: string[]
 }
 
-const DEV_AUTH: AuthInfo = { user: "dev", email: "dev@localhost", groups: ["family", "media", "lldap_admin"] }
+const DEV_AUTH: AuthInfo = {
+  sub: "dev",
+  user: "dev",
+  email: "dev@localhost",
+  groups: ["family", "media", "lldap_admin"],
+}
 const isDevServer = process.env.NODE_ENV === "development" && process.env.VITEST !== "true"
 
 /**
@@ -19,7 +31,7 @@ const isDevServer = process.env.NODE_ENV === "development" && process.env.VITEST
 export async function requireAuth(request: Request): Promise<AuthInfo> {
   const session = await getSession(request)
   if (session) {
-    return { user: session.name, email: session.email, groups: session.groups }
+    return { sub: session.sub, user: session.name, email: session.email, groups: session.groups }
   }
 
   if (isDevServer) {
@@ -51,10 +63,10 @@ export async function requireAuth(request: Request): Promise<AuthInfo> {
 export async function getAuth(request: Request): Promise<AuthInfo> {
   const session = await getSession(request)
   if (session) {
-    return { user: session.name, email: session.email, groups: session.groups }
+    return { sub: session.sub, user: session.name, email: session.email, groups: session.groups }
   }
   if (isDevServer) {
     return DEV_AUTH
   }
-  return { user: null, email: null, groups: [] }
+  return { sub: null, user: null, email: null, groups: [] }
 }

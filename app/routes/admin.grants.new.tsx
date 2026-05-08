@@ -16,7 +16,7 @@ import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { activateGrant } from "~/lib/workflows/grant-activation.server"
 import type { Role } from "~/lib/governance/types"
-import { Button, Combobox, Field, Inline, LinkButton, Select, Stack, Text, Input } from "@duro-app/ui"
+import { Button, Checkbox, Combobox, Field, Inline, LinkButton, Select, Stack, Text, Input } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 // ---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   const auth = await getAuth(request)
   const decision = await checkAuthDecision({ auth, application: "duro", action: "admin" })
-  if (!decision.allow || !auth.user) {
+  if (!decision.allow || !auth.sub) {
     throw new Response("Forbidden", { status: 403 })
   }
 
@@ -90,7 +90,7 @@ export async function action({ request }: Route.ActionArgs) {
     await runEffect(
       Effect.gen(function* () {
         const principalRepo = yield* PrincipalRepo
-        const actor = yield* principalRepo.findByExternalId(auth.user!)
+        const actor = yield* principalRepo.findByExternalId(auth.sub!)
         if (!actor) return yield* Effect.fail(new Error("Principal not found for current session"))
 
         const sql = yield* SqlClient.SqlClient
@@ -141,6 +141,8 @@ export default function AdminGrantsNewPage({ loaderData, actionData }: Route.Com
   const [appId, setAppId] = useState<string>(() => (applications.length === 1 ? applications[0].id : ""))
   const [principalId, setPrincipalId] = useState<string>("")
   const [roleId, setRoleId] = useState<string>("")
+  const [neverExpires, setNeverExpires] = useState<boolean>(true)
+  const [expiresAt, setExpiresAt] = useState<string>("")
 
   const ldapSet = useMemo(() => new Set(ldapAppIds), [ldapAppIds])
   const isLdapApp = appId !== "" && ldapSet.has(appId)
@@ -254,11 +256,19 @@ export default function AdminGrantsNewPage({ loaderData, actionData }: Route.Com
             <Input name="reason" placeholder={t("admin.grants.new.reasonPlaceholder")} />
           </Field.Root>
 
-          {/* Expires — optional */}
+          {/* Expires — optional. Default to never-expires; the operator
+              opts in to a date when they want one. The date input only
+              renders (and contributes to form data) when the toggle is
+              off, so an empty submission becomes undefined server-side. */}
           <Field.Root>
             <Field.Label>{t("admin.cols.expires")}</Field.Label>
-            <Input name="expiresAt" type="date" />
-            <Field.Description>{t("admin.grants.new.expiresHint")}</Field.Description>
+            <Checkbox checked={neverExpires} onChange={(e) => setNeverExpires(e.target.checked)}>
+              {t("admin.grants.new.neverExpires")}
+            </Checkbox>
+            {!neverExpires && (
+              <Input name="expiresAt" type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+            )}
+            {!neverExpires && <Field.Description>{t("admin.grants.new.expiresHint")}</Field.Description>}
           </Field.Root>
 
           {actionData && "error" in actionData && <Text color="error">{String(actionData.error)}</Text>}

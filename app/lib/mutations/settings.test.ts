@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { parseSettingsMutation } from "./settings"
 import type { AuthInfo } from "~/lib/auth.server"
 
-const auth: AuthInfo = { user: "testuser", email: "test@example.com", groups: ["users"] }
+const auth: AuthInfo = { sub: "testuser-sub", user: "testuser", email: "test@example.com", groups: ["users"] }
 
 describe("parseSettingsMutation", () => {
   it("parses issueCert", () => {

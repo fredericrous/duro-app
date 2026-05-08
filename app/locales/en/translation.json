@@ -298,6 +298,7 @@
       "status": "Status",
       "requester": "Requester",
       "application": "Application",
+      "applicationPlaceholder": "Pick an application…",
       "justification": "Justification",
       "created": "Created",
       "eventType": "Event Type",
@@ -382,7 +383,8 @@
         "ldapNote": "This application is provisioned via LDAP. Group grants for provisioned apps arrive in phase 2 — only user principals are offered here.",
         "reasonLabel": "Reason (optional)",
         "reasonPlaceholder": "Why is this grant being created?",
-        "expiresHint": "Local date. The grant expires at midnight UTC on the chosen day."
+        "expiresHint": "Local date. The grant expires at midnight UTC on the chosen day.",
+        "neverExpires": "Never expires"
       }
     },
     "accessRequests": {
