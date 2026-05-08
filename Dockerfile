@@ -1,20 +1,17 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
-RUN corepack enable
-COPY package.json pnpm-lock.yaml .npmrc ./
-RUN pnpm install --frozen-lockfile
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci
 COPY . .
-RUN pnpm build
+RUN npm run build
 
-# Prod-only deps. Kept in its own stage so the runtime image stays
-# corepack/pnpm-free — no package manager runs as PID 1, no corepack
-# tries to download to a missing per-user cache.
+# Prod-only deps in their own stage so the runtime image is just
+# node + node_modules + build artifacts — no package manager.
 FROM node:24-alpine AS deps
 WORKDIR /app
-RUN corepack enable
-COPY package.json pnpm-lock.yaml .npmrc ./
-RUN pnpm install --frozen-lockfile --prod
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci --omit=dev
 
 FROM node:24-alpine
 RUN adduser -u 1001 -D appuser
@@ -25,8 +22,6 @@ COPY --from=builder /app/package.json ./package.json
 RUN mkdir -p /db && chown appuser:appuser /db
 USER appuser
 EXPOSE 3000
-# Direct node invocation — no pnpm/corepack at runtime. Point at
-# bin.js directly because pnpm's .bin/ entry is a POSIX shell shim,
-# not a JS file, so `node ./node_modules/.bin/react-router-serve`
-# fails with "missing ) after argument list".
+# Direct node invocation against react-router-serve's bin entry —
+# no package manager at runtime.
 CMD ["node", "./node_modules/@react-router/serve/bin.js", "./build/server/index.js"]
