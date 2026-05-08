@@ -25,7 +25,8 @@ COPY --from=builder /app/package.json ./package.json
 RUN mkdir -p /db && chown appuser:appuser /db
 USER appuser
 EXPOSE 3000
-# Direct node invocation — no pnpm/corepack at runtime. The bin
-# symlink resolves to @react-router/serve/bin.js which is itself a
-# node entrypoint (#!/usr/bin/env node).
-CMD ["node", "./node_modules/.bin/react-router-serve", "./build/server/index.js"]
+# Direct node invocation — no pnpm/corepack at runtime. Point at
+# bin.js directly because pnpm's .bin/ entry is a POSIX shell shim,
+# not a JS file, so `node ./node_modules/.bin/react-router-serve`
+# fails with "missing ) after argument list".
+CMD ["node", "./node_modules/@react-router/serve/bin.js", "./build/server/index.js"]
