@@ -15,7 +15,7 @@ export function RevokedUserRow({ revocation }: { revocation: Revocation }) {
       <Table.Cell>{revocation.reason ?? "\u2014"}</Table.Cell>
       <Table.Cell>{new Date(revocation.revokedAt).toLocaleDateString()}</Table.Cell>
       <Table.Cell>{revocation.revokedBy}</Table.Cell>
-      <Table.Cell>
+      <Table.Cell isActions>
         <fetcher.Form method="post">
           <input type="hidden" name="intent" value="reinviteRevoked" />
           <input type="hidden" name="revocationId" value={revocation.id} />

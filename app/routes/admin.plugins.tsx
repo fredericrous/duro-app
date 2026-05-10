@@ -4,7 +4,7 @@ import { runEffect } from "~/lib/runtime.server"
 import { PluginRegistry } from "~/lib/plugins/PluginRegistry.server"
 import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
 import type { PluginAction, PluginManifest } from "~/lib/plugins/contracts"
-import { Badge, Heading, Inline, ScrollArea, Stack, Table, Tag, Text } from "@duro-app/ui"
+import { Badge, Heading, Inline, Stack, Table, Tag, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { css, html } from "react-strict-dom"
 
@@ -53,70 +53,63 @@ export default function AdminPluginsPage({ loaderData }: { loaderData: Awaited<R
       </Text>
 
       <CardSection title={`Plugins (${plugins.length})`}>
-        <ScrollArea.Root>
-          <ScrollArea.Viewport>
-            <ScrollArea.Content>
-              <Table.Root>
-                <Table.Header>
+        <Table.Container>
+          <Table.Root>
+            <Table.Header>
+              <Table.Row>
+                <Table.HeaderCell label="Plugin">Plugin</Table.HeaderCell>
+                <Table.HeaderCell label="Version">Version</Table.HeaderCell>
+                <Table.HeaderCell label="Mode">Mode</Table.HeaderCell>
+                <Table.HeaderCell label="Capabilities">Capabilities</Table.HeaderCell>
+                <Table.HeaderCell label="Installs">Installs</Table.HeaderCell>
+                <Table.HeaderCell label="Timeout">Timeout</Table.HeaderCell>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {plugins.map((p: PluginRow) => (
+                <html.div
+                  key={p.manifest.slug}
+                  onClick={() => navigate(`/admin/plugins/${p.manifest.slug}`)}
+                  style={[styles.clickableRow, styles.displayContents]}
+                >
                   <Table.Row>
-                    <Table.HeaderCell>Plugin</Table.HeaderCell>
-                    <Table.HeaderCell>Version</Table.HeaderCell>
-                    <Table.HeaderCell>Mode</Table.HeaderCell>
-                    <Table.HeaderCell>Capabilities</Table.HeaderCell>
-                    <Table.HeaderCell>Installs</Table.HeaderCell>
-                    <Table.HeaderCell>Timeout</Table.HeaderCell>
+                    <Table.Cell>
+                      <Stack gap="xs">
+                        <Text>{p.manifest.displayName}</Text>
+                        <Text color="muted" variant="caption">
+                          {p.manifest.slug}
+                        </Text>
+                      </Stack>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Badge variant="default">{p.manifest.version}</Badge>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Badge variant={p.manifest.imperative ? "warning" : "success"}>
+                        {p.manifest.imperative ? "Imperative" : "Declarative"}
+                      </Badge>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Inline gap="xs">
+                        {p.manifest.capabilities.map((cap: string) => (
+                          <Tag key={cap} size="sm">
+                            {cap}
+                          </Tag>
+                        ))}
+                      </Inline>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text>{p.installCount}</Text>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text>{p.manifest.timeoutMs / 1000}s</Text>
+                    </Table.Cell>
                   </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {plugins.map((p: PluginRow) => (
-                    <html.div
-                      key={p.manifest.slug}
-                      onClick={() => navigate(`/admin/plugins/${p.manifest.slug}`)}
-                      style={[styles.clickableRow, styles.displayContents]}
-                    >
-                      <Table.Row>
-                        <Table.Cell>
-                          <Stack gap="xs">
-                            <Text>{p.manifest.displayName}</Text>
-                            <Text color="muted" variant="caption">
-                              {p.manifest.slug}
-                            </Text>
-                          </Stack>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Badge variant="default">{p.manifest.version}</Badge>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Badge variant={p.manifest.imperative ? "warning" : "success"}>
-                            {p.manifest.imperative ? "Imperative" : "Declarative"}
-                          </Badge>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Inline gap="xs">
-                            {p.manifest.capabilities.map((cap: string) => (
-                              <Tag key={cap} size="sm">
-                                {cap}
-                              </Tag>
-                            ))}
-                          </Inline>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text>{p.installCount}</Text>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text>{p.manifest.timeoutMs / 1000}s</Text>
-                        </Table.Cell>
-                      </Table.Row>
-                    </html.div>
-                  ))}
-                </Table.Body>
-              </Table.Root>
-            </ScrollArea.Content>
-          </ScrollArea.Viewport>
-          <ScrollArea.Scrollbar orientation="horizontal">
-            <ScrollArea.Thumb orientation="horizontal" />
-          </ScrollArea.Scrollbar>
-        </ScrollArea.Root>
+                </html.div>
+              ))}
+            </Table.Body>
+          </Table.Root>
+        </Table.Container>
       </CardSection>
     </Stack>
   )

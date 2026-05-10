@@ -17,7 +17,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Badge, EmptyState, ScrollArea, Stack, Table } from "@duro-app/ui"
+import { Badge, EmptyState, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
@@ -129,68 +129,65 @@ export default function AdminAccessRequestsPage({ loaderData }: Route.ComponentP
           </>
         }
       >
-        <ScrollArea.Root>
-          <ScrollArea.Viewport>
-            <ScrollArea.Content>
-              <Table.Root>
-                <Table.Header>
-                  {table.getHeaderGroups().map((headerGroup) => (
-                    <Table.Row key={headerGroup.id}>
-                      {headerGroup.headers.map((header) => (
-                        <Table.HeaderCell key={header.id}>
-                          {header.isPlaceholder ? null : (
-                            <>
-                              {header.column.getCanSort() ? (
-                                <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
-                                  {flexRender(header.column.columnDef.header, header.getContext())}
-                                  <Table.SortIndicator column={header.column} />
-                                </html.span>
-                              ) : (
-                                flexRender(header.column.columnDef.header, header.getContext())
-                              )}
-                            </>
-                          )}
-                        </Table.HeaderCell>
+        <Table.Container>
+          <Table.SortChip
+            options={table
+              .getAllColumns()
+              .filter((c) => c.getCanSort())
+              .map((c) => ({ id: c.id, label: String(c.columnDef.header ?? c.id) }))}
+            value={sorting[0] ? { id: sorting[0].id, desc: sorting[0].desc } : null}
+            onChange={(next) => setSorting(next ? [{ id: next.id, desc: next.desc }] : [])}
+          />
+          <Table.Root>
+            <Table.Header>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <Table.Row key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <Table.HeaderCell key={header.id} label={String(header.column.columnDef.header ?? "")}>
+                      {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                        <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          <Table.SortIndicator column={header.column} />
+                        </html.span>
+                      ) : (
+                        flexRender(header.column.columnDef.header, header.getContext())
+                      )}
+                    </Table.HeaderCell>
+                  ))}
+                </Table.Row>
+              ))}
+            </Table.Header>
+            <Table.Body>
+              {table.getRowModel().rows.map((row) => {
+                const href = `/admin/access-requests/${row.original.id}`
+                return (
+                  <html.div
+                    key={row.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${row.original.requesterId} → ${row.original.applicationId}`}
+                    onClick={() => navigate(href)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        navigate(href)
+                      }
+                    }}
+                    style={[styles.clickableRow, styles.displayContents]}
+                  >
+                    <Table.Row>
+                      {row.getVisibleCells().map((cell) => (
+                        <Table.Cell key={cell.id}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </Table.Cell>
                       ))}
                     </Table.Row>
-                  ))}
-                </Table.Header>
-                <Table.Body>
-                  {table.getRowModel().rows.map((row) => {
-                    const href = `/admin/access-requests/${row.original.id}`
-                    return (
-                      <html.div
-                        key={row.id}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`${row.original.requesterId} → ${row.original.applicationId}`}
-                        onClick={() => navigate(href)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            navigate(href)
-                          }
-                        }}
-                        style={[styles.clickableRow, styles.displayContents]}
-                      >
-                        <Table.Row>
-                          {row.getVisibleCells().map((cell) => (
-                            <Table.Cell key={cell.id}>
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </Table.Cell>
-                          ))}
-                        </Table.Row>
-                      </html.div>
-                    )
-                  })}
-                </Table.Body>
-              </Table.Root>
-            </ScrollArea.Content>
-          </ScrollArea.Viewport>
-          <ScrollArea.Scrollbar orientation="horizontal">
-            <ScrollArea.Thumb orientation="horizontal" />
-          </ScrollArea.Scrollbar>
-        </ScrollArea.Root>
-        <Table.Pagination table={table} />
+                  </html.div>
+                )
+              })}
+            </Table.Body>
+          </Table.Root>
+          <Table.Pagination table={table} />
+        </Table.Container>
       </CardSection>
     </Stack>
   )

@@ -30,7 +30,6 @@ import {
   Heading,
   Icon,
   Input,
-  ScrollArea,
   Select,
   Stack,
   Tabs,
@@ -754,37 +753,30 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
 /** Reusable table renderer for any TanStack table instance */
 function DataTable<T>({ table }: { table: ReturnType<typeof useReactTable<T>> }) {
   return (
-    <ScrollArea.Root>
-      <ScrollArea.Viewport>
-        <ScrollArea.Content>
-          <Table.Root>
-            <Table.Header>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <Table.Row key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <Table.HeaderCell key={header.id}>
-                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                    </Table.HeaderCell>
-                  ))}
-                </Table.Row>
+    <Table.Container>
+      <Table.Root>
+        <Table.Header>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <Table.Row key={headerGroup.id}>
+              {headerGroup.headers.map((header) => (
+                <Table.HeaderCell key={header.id} label={String(header.column.columnDef.header ?? "")}>
+                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                </Table.HeaderCell>
               ))}
-            </Table.Header>
-            <Table.Body>
-              {table.getRowModel().rows.map((row) => (
-                <Table.Row key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <Table.Cell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</Table.Cell>
-                  ))}
-                </Table.Row>
+            </Table.Row>
+          ))}
+        </Table.Header>
+        <Table.Body>
+          {table.getRowModel().rows.map((row) => (
+            <Table.Row key={row.id}>
+              {row.getVisibleCells().map((cell) => (
+                <Table.Cell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</Table.Cell>
               ))}
-            </Table.Body>
-          </Table.Root>
-        </ScrollArea.Content>
-      </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar orientation="horizontal">
-        <ScrollArea.Thumb orientation="horizontal" />
-      </ScrollArea.Scrollbar>
-    </ScrollArea.Root>
+            </Table.Row>
+          ))}
+        </Table.Body>
+      </Table.Root>
+    </Table.Container>
   )
 }
 

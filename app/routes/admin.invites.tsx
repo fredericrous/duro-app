@@ -20,7 +20,6 @@ import {
   Fieldset,
   Inline,
   LinkButton,
-  ScrollArea,
   Stack,
   Table,
   Tag,
@@ -250,30 +249,31 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
 
       {failedInvites.length > 0 && (
         <CardSection title={`${t("admin.invites.failedTitle")} (${failedInvites.length})`}>
-          <ScrollArea.Root>
-            <ScrollArea.Viewport>
-              <ScrollArea.Content>
-                <Table.Root>
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.HeaderCell>{t("admin.invites.cols.email")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("admin.invites.cols.error")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("admin.invites.cols.failedAt")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("admin.invites.cols.actions")}</Table.HeaderCell>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {failedInvites.map((i) => (
-                      <FailedInviteRow key={i.id} invite={i} />
-                    ))}
-                  </Table.Body>
-                </Table.Root>
-              </ScrollArea.Content>
-            </ScrollArea.Viewport>
-            <ScrollArea.Scrollbar orientation="horizontal">
-              <ScrollArea.Thumb orientation="horizontal" />
-            </ScrollArea.Scrollbar>
-          </ScrollArea.Root>
+          <Table.Container>
+            <Table.Root>
+              <Table.Header>
+                <Table.Row>
+                  <Table.HeaderCell label={t("admin.invites.cols.email")}>
+                    {t("admin.invites.cols.email")}
+                  </Table.HeaderCell>
+                  <Table.HeaderCell label={t("admin.invites.cols.error")}>
+                    {t("admin.invites.cols.error")}
+                  </Table.HeaderCell>
+                  <Table.HeaderCell label={t("admin.invites.cols.failedAt")}>
+                    {t("admin.invites.cols.failedAt")}
+                  </Table.HeaderCell>
+                  <Table.HeaderCell label={t("admin.invites.cols.actions")} isActions>
+                    {t("admin.invites.cols.actions")}
+                  </Table.HeaderCell>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {failedInvites.map((i) => (
+                  <FailedInviteRow key={i.id} invite={i} />
+                ))}
+              </Table.Body>
+            </Table.Root>
+          </Table.Container>
         </CardSection>
       )}
 
@@ -283,32 +283,37 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
             {t("admin.invites.noActive")}
           </Text>
         ) : (
-          <ScrollArea.Root>
-            <ScrollArea.Viewport>
-              <ScrollArea.Content>
-                <Table.Root>
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.HeaderCell>{t("admin.invites.cols.email")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("admin.invites.cols.groups")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("admin.invites.cols.status")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("admin.invites.cols.invitedBy")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("admin.invites.cols.expires")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("admin.invites.cols.actions")}</Table.HeaderCell>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {pendingInvites.map((i) => (
-                      <PendingInviteRow key={i.id} invite={i} />
-                    ))}
-                  </Table.Body>
-                </Table.Root>
-              </ScrollArea.Content>
-            </ScrollArea.Viewport>
-            <ScrollArea.Scrollbar orientation="horizontal">
-              <ScrollArea.Thumb orientation="horizontal" />
-            </ScrollArea.Scrollbar>
-          </ScrollArea.Root>
+          <Table.Container>
+            <Table.Root>
+              <Table.Header>
+                <Table.Row>
+                  <Table.HeaderCell label={t("admin.invites.cols.email")}>
+                    {t("admin.invites.cols.email")}
+                  </Table.HeaderCell>
+                  <Table.HeaderCell label={t("admin.invites.cols.groups")}>
+                    {t("admin.invites.cols.groups")}
+                  </Table.HeaderCell>
+                  <Table.HeaderCell label={t("admin.invites.cols.status")}>
+                    {t("admin.invites.cols.status")}
+                  </Table.HeaderCell>
+                  <Table.HeaderCell label={t("admin.invites.cols.invitedBy")}>
+                    {t("admin.invites.cols.invitedBy")}
+                  </Table.HeaderCell>
+                  <Table.HeaderCell label={t("admin.invites.cols.expires")}>
+                    {t("admin.invites.cols.expires")}
+                  </Table.HeaderCell>
+                  <Table.HeaderCell label={t("admin.invites.cols.actions")} isActions>
+                    {t("admin.invites.cols.actions")}
+                  </Table.HeaderCell>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {pendingInvites.map((i) => (
+                  <PendingInviteRow key={i.id} invite={i} />
+                ))}
+              </Table.Body>
+            </Table.Root>
+          </Table.Container>
         )}
       </CardSection>
     </Stack>
@@ -331,7 +336,7 @@ function PendingInviteRow({ invite }: { invite: Invite }) {
       </Table.Cell>
       <Table.Cell>{invite.invitedBy}</Table.Cell>
       <Table.Cell>{new Date(invite.expiresAt).toLocaleDateString()}</Table.Cell>
-      <Table.Cell>
+      <Table.Cell isActions>
         <Inline gap="sm">
           <resendFetcher.Form method="post">
             <input type="hidden" name="intent" value="resend" />
@@ -369,7 +374,7 @@ function FailedInviteRow({ invite }: { invite: Invite }) {
         </Text>
       </Table.Cell>
       <Table.Cell>{invite.failedAt ? new Date(invite.failedAt).toLocaleString() : "\u2014"}</Table.Cell>
-      <Table.Cell>
+      <Table.Cell isActions>
         <Inline gap="sm">
           <retryFetcher.Form method="post">
             <input type="hidden" name="intent" value="retry" />

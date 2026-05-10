@@ -7,7 +7,7 @@ import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import type { PluginAction, PluginManifest } from "~/lib/plugins/contracts"
 import type { AuditEvent, Application, ConnectedSystem } from "~/lib/governance/types"
-import { Badge, Button, Heading, Inline, Panel, ScrollArea, Stack, Table, Tag, Text } from "@duro-app/ui"
+import { Badge, Button, Heading, Inline, Panel, Stack, Table, Tag, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
@@ -150,43 +150,37 @@ export default function AdminPluginDetailPage({ loaderData }: { loaderData: Awai
         {installs.length === 0 ? (
           <Text color="muted">Not installed on any application yet.</Text>
         ) : (
-          <ScrollArea.Root>
-            <ScrollArea.Viewport>
-              <ScrollArea.Content>
-                <Table.Root>
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.HeaderCell>Application</Table.HeaderCell>
-                      <Table.HeaderCell>Status</Table.HeaderCell>
-                      <Table.HeaderCell>Version</Table.HeaderCell>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {installs.map((i) => (
-                      <Table.Row key={i.system.id}>
-                        <Table.Cell>
-                          <Stack gap="xs">
-                            <Text>{i.applicationName}</Text>
-                            <Text color="muted" variant="caption">
-                              {i.applicationSlug}
-                            </Text>
-                          </Stack>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Badge variant={i.system.status === "active" ? "success" : "default"}>
-                            {i.system.status}
-                          </Badge>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text>{i.system.pluginVersion ?? "?"}</Text>
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
-                  </Table.Body>
-                </Table.Root>
-              </ScrollArea.Content>
-            </ScrollArea.Viewport>
-          </ScrollArea.Root>
+          <Table.Container>
+            <Table.Root>
+              <Table.Header>
+                <Table.Row>
+                  <Table.HeaderCell label="Application">Application</Table.HeaderCell>
+                  <Table.HeaderCell label="Status">Status</Table.HeaderCell>
+                  <Table.HeaderCell label="Version">Version</Table.HeaderCell>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {installs.map((i) => (
+                  <Table.Row key={i.system.id}>
+                    <Table.Cell>
+                      <Stack gap="xs">
+                        <Text>{i.applicationName}</Text>
+                        <Text color="muted" variant="caption">
+                          {i.applicationSlug}
+                        </Text>
+                      </Stack>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Badge variant={i.system.status === "active" ? "success" : "default"}>{i.system.status}</Badge>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text>{i.system.pluginVersion ?? "?"}</Text>
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Root>
+          </Table.Container>
         )}
       </CardSection>
 
@@ -194,55 +188,51 @@ export default function AdminPluginDetailPage({ loaderData }: { loaderData: Awai
         {recentEvents.length === 0 ? (
           <Text color="muted">No recent plugin invocations.</Text>
         ) : (
-          <ScrollArea.Root>
-            <ScrollArea.Viewport>
-              <ScrollArea.Content>
-                <Table.Root>
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.HeaderCell>Event</Table.HeaderCell>
-                      <Table.HeaderCell>Operation</Table.HeaderCell>
-                      <Table.HeaderCell>Grant</Table.HeaderCell>
-                      <Table.HeaderCell>Time</Table.HeaderCell>
+          <Table.Container>
+            <Table.Root>
+              <Table.Header>
+                <Table.Row>
+                  <Table.HeaderCell label="Event">Event</Table.HeaderCell>
+                  <Table.HeaderCell label="Operation">Operation</Table.HeaderCell>
+                  <Table.HeaderCell label="Grant">Grant</Table.HeaderCell>
+                  <Table.HeaderCell label="Time">Time</Table.HeaderCell>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {recentEvents.map((e) => {
+                  const meta = (e.metadata ?? {}) as Record<string, unknown>
+                  return (
+                    <Table.Row key={e.id}>
+                      <Table.Cell>
+                        <Badge
+                          variant={
+                            e.eventType.includes("completed")
+                              ? "success"
+                              : e.eventType.includes("failed")
+                                ? "error"
+                                : e.eventType.includes("skipped")
+                                  ? "warning"
+                                  : "default"
+                          }
+                        >
+                          {e.eventType.replace("plugin.action.", "")}
+                        </Badge>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text>{String(meta.operation ?? "—")}</Text>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text variant="caption">{e.targetId ?? "—"}</Text>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text variant="caption">{new Date(e.createdAt).toLocaleString()}</Text>
+                      </Table.Cell>
                     </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {recentEvents.map((e) => {
-                      const meta = (e.metadata ?? {}) as Record<string, unknown>
-                      return (
-                        <Table.Row key={e.id}>
-                          <Table.Cell>
-                            <Badge
-                              variant={
-                                e.eventType.includes("completed")
-                                  ? "success"
-                                  : e.eventType.includes("failed")
-                                    ? "error"
-                                    : e.eventType.includes("skipped")
-                                      ? "warning"
-                                      : "default"
-                              }
-                            >
-                              {e.eventType.replace("plugin.action.", "")}
-                            </Badge>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Text>{String(meta.operation ?? "—")}</Text>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Text variant="caption">{e.targetId ?? "—"}</Text>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Text variant="caption">{new Date(e.createdAt).toLocaleString()}</Text>
-                          </Table.Cell>
-                        </Table.Row>
-                      )
-                    })}
-                  </Table.Body>
-                </Table.Root>
-              </ScrollArea.Content>
-            </ScrollArea.Viewport>
-          </ScrollArea.Root>
+                  )
+                })}
+              </Table.Body>
+            </Table.Root>
+          </Table.Container>
         )}
       </CardSection>
 
