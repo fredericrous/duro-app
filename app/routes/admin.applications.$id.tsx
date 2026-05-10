@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useFetcher, useSearchParams } from "react-router"
+import { Link, useFetcher, useSearchParams } from "react-router"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import type { Route } from "./+types/admin.applications.$id"
@@ -11,6 +11,7 @@ import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { RbacRepo } from "~/lib/governance/RbacRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
+import { AccessRequestRepo, type AccessRequestEnriched } from "~/lib/governance/AccessRequestRepo.server"
 import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
 import { AppSyncService } from "~/lib/governance/AppSyncService.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
@@ -23,12 +24,14 @@ import {
   Alert,
   Badge,
   Button,
+  Callout,
   Checkbox,
   Dialog,
   EmptyState,
   Field,
   Heading,
   Icon,
+  Inline,
   Input,
   Select,
   Stack,
@@ -61,6 +64,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       const principalRepo = yield* PrincipalRepo
       const connectedSystems = yield* ConnectedSystemRepo
 
+      const requestRepo = yield* AccessRequestRepo
+
       const application = yield* appRepo.findById(appId)
       if (!application) return null
 
@@ -69,6 +74,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       const resources = yield* rbac.listResources(appId)
       const grants = yield* grantRepo.findActiveForApp(appId)
       const principals = yield* principalRepo.list()
+      const pendingRequests = yield* requestRepo.listAllEnriched({ applicationId: appId, status: "pending" })
       const pluginSystem = yield* connectedSystems.findByApplicationAndType(appId, "plugin")
       const ldapProvisioned = pluginSystem !== null && pluginSystem.status === "active"
 
@@ -76,7 +82,17 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         ? { pluginSlug: pluginSystem.pluginSlug, pluginVersion: pluginSystem.pluginVersion ?? "?" }
         : null
 
-      return { application, roles, entitlements, resources, grants, principals, ldapProvisioned, pluginInfo }
+      return {
+        application,
+        roles,
+        entitlements,
+        resources,
+        grants,
+        principals,
+        pendingRequests,
+        ldapProvisioned,
+        pluginInfo,
+      }
     }),
   )
 
@@ -360,7 +376,17 @@ const grantColumns = [
 // ---------------------------------------------------------------------------
 
 export default function AdminApplicationDetailPage({ loaderData }: Route.ComponentProps) {
-  const { application, roles, entitlements, resources, grants, principals, ldapProvisioned, pluginInfo } = loaderData
+  const {
+    application,
+    roles,
+    entitlements,
+    resources,
+    grants,
+    principals,
+    pendingRequests,
+    ldapProvisioned,
+    pluginInfo,
+  } = loaderData
   const fetcher = useFetcher()
   const [searchParams, setSearchParams] = useSearchParams()
   const initialTab = searchParams.get("tab") ?? "overview"
@@ -454,20 +480,37 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
           <Tabs.Tab value="entitlements">Entitlements ({entitlements.length})</Tabs.Tab>
           <Tabs.Tab value="resources">Resources ({resources.length})</Tabs.Tab>
           <Tabs.Tab value="grants">Grants ({grants.length})</Tabs.Tab>
+          <Tabs.Tab value="requests">Requests ({pendingRequests.length})</Tabs.Tab>
           <Tabs.Tab value="settings">Settings</Tabs.Tab>
         </Tabs.List>
 
         <html.div style={styles.tabContent}>
           {activeTab === "overview" && (
-            <AppOverview
-              application={application}
-              roles={roles as Role[]}
-              entitlements={entitlements as Entitlement[]}
-              grants={grants as Grant[]}
-              pluginInfo={pluginInfo}
-              onOpenQuickGrant={() => setQuickGrantOpen(true)}
-              onSwitchTab={setActiveTab}
-            />
+            <Stack gap="md">
+              {pendingRequests.length > 0 && (
+                <Callout variant="info">
+                  <Inline gap="sm" align="center" justify="between">
+                    <Text>
+                      {pendingRequests.length === 1
+                        ? "1 access request is awaiting your review."
+                        : `${pendingRequests.length} access requests are awaiting your review.`}
+                    </Text>
+                    <Button variant="secondary" size="small" onClick={() => setActiveTab("requests")}>
+                      Review
+                    </Button>
+                  </Inline>
+                </Callout>
+              )}
+              <AppOverview
+                application={application}
+                roles={roles as Role[]}
+                entitlements={entitlements as Entitlement[]}
+                grants={grants as Grant[]}
+                pluginInfo={pluginInfo}
+                onOpenQuickGrant={() => setQuickGrantOpen(true)}
+                onSwitchTab={setActiveTab}
+              />
+            </Stack>
           )}
 
           {activeTab === "roles" && (
@@ -566,6 +609,58 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                 />
               ) : (
                 <DataTable table={grantsTable} />
+              )}
+            </CardSection>
+          )}
+
+          {activeTab === "requests" && (
+            <CardSection title="Pending requests">
+              {pendingRequests.length === 0 ? (
+                <EmptyState
+                  icon={<Icon name="check-circle" size={32} />}
+                  message="No pending requests for this application."
+                />
+              ) : (
+                <Table.Container>
+                  <Table.Root>
+                    <Table.Header>
+                      <Table.Row>
+                        <Table.HeaderCell label="Requester">Requester</Table.HeaderCell>
+                        <Table.HeaderCell label="Role">Role</Table.HeaderCell>
+                        <Table.HeaderCell label="Entitlement">Entitlement</Table.HeaderCell>
+                        <Table.HeaderCell label="Justification">Justification</Table.HeaderCell>
+                        <Table.HeaderCell label="Created">Created</Table.HeaderCell>
+                        <Table.HeaderCell label="Action">Action</Table.HeaderCell>
+                      </Table.Row>
+                    </Table.Header>
+                    <Table.Body>
+                      {(pendingRequests as AccessRequestEnriched[]).map((r) => (
+                        <Table.Row key={r.id}>
+                          <Table.Cell>{r.requesterName ?? r.requesterId}</Table.Cell>
+                          <Table.Cell>{r.roleName ?? r.roleId ?? "—"}</Table.Cell>
+                          <Table.Cell>{r.entitlementName ?? r.entitlementId ?? "—"}</Table.Cell>
+                          <Table.Cell>
+                            {r.justification ? (
+                              <span title={r.justification}>
+                                {r.justification.length > 60 ? r.justification.slice(0, 60) + "…" : r.justification}
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </Table.Cell>
+                          <Table.Cell>{new Date(r.createdAt).toLocaleDateString()}</Table.Cell>
+                          <Table.Cell>
+                            <Link to={`/admin/access-requests/${r.id}`}>
+                              <Button variant="secondary" size="small">
+                                Review
+                              </Button>
+                            </Link>
+                          </Table.Cell>
+                        </Table.Row>
+                      ))}
+                    </Table.Body>
+                  </Table.Root>
+                </Table.Container>
               )}
             </CardSection>
           )}

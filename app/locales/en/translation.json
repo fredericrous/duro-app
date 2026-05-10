@@ -12,11 +12,22 @@
     "actions": "Actions"
   },
   "header": {
-    "welcome": "Welcome, {{user}}"
+    "welcome": "Welcome, {{user}}",
+    "requestAccess": "Request access",
+    "browseApps": "Browse apps",
+    "myRequests": "My requests",
+    "requestDialog": {
+      "loading": "Loading available apps…",
+      "empty": "You already have access to every app available to you. If you think something is missing, contact an administrator."
+    }
   },
   "home": {
     "title": "Home - Duro",
-    "description": "Your personal app dashboard"
+    "description": "Your personal app dashboard",
+    "requestAnotherCta": "Request access to another app",
+    "appCard": {
+      "noLaunchUrl": "No launch URL configured"
+    }
   },
   "noAccess": {
     "title": "No Access",
@@ -25,9 +36,14 @@
     "hint": "Please contact an administrator if you believe this is an error.",
     "requestCta": "Request access",
     "requestSubmitted": "Your access request has been submitted. An admin will review it shortly.",
+    "alreadyPending": "You already have a pending request for this. An admin will review it shortly.",
+    "autoApproved": "Access granted. The app should appear on your home page.",
     "form": {
       "application": "Application",
       "applicationPlaceholder": "Pick an application…",
+      "role": "Role",
+      "rolePlaceholder": "Pick a role…",
+      "noRequestableRoles": "You already hold every role available on this app.",
       "noResults": "No matches",
       "justification": "Why do you need access?",
       "justificationPlaceholder": "Briefly explain what you'll use this access for.",
@@ -37,10 +53,60 @@
     },
     "error": {
       "missing_application": "Please pick an application.",
+      "missing_target": "Pick a role to request.",
+      "role_entitlement_conflict": "Pick either a role or an entitlement, not both.",
+      "role_entitlement_app_mismatch": "That role or entitlement does not belong to the chosen application.",
       "principal_not_found": "Your account isn't fully provisioned yet. Try again in a moment, or contact an administrator.",
       "submit_failed": "Couldn't submit the request. Please try again.",
       "not_authenticated": "You need to be signed in to request access.",
       "unknown": "Something went wrong. Please try again."
+    }
+  },
+  "apps": {
+    "title": "Apps",
+    "empty": "No apps are available.",
+    "cols": {
+      "app": "Application",
+      "status": "Status",
+      "action": "Action"
+    },
+    "status": {
+      "open": "Open",
+      "granted": "Granted",
+      "partiallyGranted": "Partial access",
+      "pending": "Pending",
+      "requestable": "Request access",
+      "canUpgrade": "Request more access",
+      "inviteOnly": "Invite only"
+    },
+    "pendingHint": "Awaiting approval.",
+    "inviteOnlyHint": "Ask an administrator to invite you.",
+    "allRolesGrantedHint": "All available roles granted.",
+    "viewRequest": "View request",
+    "openLaunch": "Open"
+  },
+  "requests": {
+    "title": "My requests",
+    "empty": "You haven't requested access to any apps yet.",
+    "cancel": "Cancel",
+    "cancelled": "Request cancelled.",
+    "cancelFailed": "Could not cancel this request.",
+    "cols": {
+      "status": "Status",
+      "application": "Application",
+      "role": "Role",
+      "entitlement": "Entitlement",
+      "justification": "Justification",
+      "created": "Created",
+      "action": "Action"
+    },
+    "error": {
+      "not_owned": "You don't own this request.",
+      "not_cancellable": "This request is no longer pending and can't be cancelled.",
+      "cancel_failed": "Could not cancel this request. Please try again.",
+      "missing_request_id": "Missing request id.",
+      "principal_not_found": "Your account isn't fully provisioned yet.",
+      "not_authenticated": "You need to be signed in."
     }
   },
   "categories": {
@@ -118,6 +184,8 @@
     "authzPlayground": "A read-only tool for testing access decisions. Pick a principal, an application, and an action; the engine returns ALLOW or DENY plus the matched grants and the reasoning. Running a check changes nothing.",
     "audit": "An append-only log of every governance event — grants created or revoked, principals changed, access requests decided. Filter by actor, target, or event type to investigate \"who did what\".",
     "accessRequests": "User-initiated requests for access to an application. Each request is evaluated by an admin (or a policy) and turns into a grant when approved.",
+    "appsCatalog": "Every application Duro governs. Badges show your status per app: Granted (you have a role), Partial access (you have a role but more are available), Pending (request awaiting approval), Open (no permission needed), Invite only (admin must invite you), Request access (you can ask for a role).",
+    "myRequests": "Your access requests across all applications. Pending ones can be cancelled here; approved/rejected/cancelled rows are kept as a record.",
     "invitations": "An access invitation pre-creates the grants a person should receive when they accept. Distinct from the system-level User Invites flow which provisions an account in the identity provider.",
     "bootstrap": "On a fresh deployment, the very first admin is created from a single-use bootstrap token your operator placed in Vault. This wizard reads that token server-side and queues an invite for the email you enter. After the invite is consumed, this page locks itself."
   },
@@ -388,7 +456,8 @@
       }
     },
     "accessRequests": {
-      "title": "Access Requests ({{count}})"
+      "title": "Access Requests ({{count}})",
+      "decisionHint": "Approve grants the requested role. Reject denies it permanently. Cancel marks the request as no longer relevant — for example, the requester left or the request is obsolete."
     },
     "detailPanel": {
       "label": "Detail panel",

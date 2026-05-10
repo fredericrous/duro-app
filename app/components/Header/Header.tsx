@@ -5,6 +5,7 @@ import { Button, Dialog, Inline, Menu, Stack, Text } from "@duro-app/ui"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { typeScale } from "@duro-app/tokens/tokens/typography.css"
 import { css, html } from "react-strict-dom"
+import { RequestAccessDialog } from "~/components/RequestAccessDialog/RequestAccessDialog"
 
 const styles = css.create({
   row: {
@@ -31,6 +32,13 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [logoutOpen, setLogoutOpen] = useState(false)
+  const [requestOpen, setRequestOpen] = useState(false)
+
+  // The "Request access" entry is intentionally always visible — predictable
+  // nav beats appearing/disappearing menu items, and the dialog itself can
+  // teach the user when there's nothing to request. The dialog fetches its
+  // own catalog from /api/catalog on open, so the Header pays no DB cost
+  // until the user actually clicks.
 
   return (
     <html.div style={styles.row}>
@@ -41,12 +49,17 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
         <Menu.Root>
           <Menu.Trigger>{t("header.welcome", { user })} &#9662;</Menu.Trigger>
           <Menu.Popup align="end">
+            <Menu.Item onClick={() => setRequestOpen(true)}>{t("header.requestAccess")}</Menu.Item>
+            <Menu.LinkItem href="/catalog">{t("header.browseApps")}</Menu.LinkItem>
+            <Menu.LinkItem href="/requests">{t("header.myRequests")}</Menu.LinkItem>
             {isAdmin && <Menu.LinkItem href="/admin">{t("common.admin")}</Menu.LinkItem>}
             <Menu.LinkItem href="/settings">{t("common.settings")}</Menu.LinkItem>
             <Menu.Item onClick={() => setLogoutOpen(true)}>{t("common.logout")}</Menu.Item>
           </Menu.Popup>
         </Menu.Root>
       )}
+
+      <RequestAccessDialog open={requestOpen} onOpenChange={setRequestOpen} />
 
       <Dialog.Root open={logoutOpen} onOpenChange={setLogoutOpen}>
         <Dialog.Portal size="sm">

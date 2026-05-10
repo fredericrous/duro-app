@@ -3,7 +3,17 @@ import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { makeTestDbLayer } from "~/lib/db/client.server"
-import { evaluatePolicy, submitAccessRequest, decideApproval } from "./access-request.server"
+import {
+  evaluatePolicy,
+  submitAccessRequest,
+  decideApproval,
+  cancelOwnAccessRequest,
+  MissingRoleOrEntitlementError,
+  BothRoleAndEntitlementError,
+  RoleEntitlementAppMismatchError,
+  AccessRequestNotOwnedError,
+  AccessRequestNotCancellableError,
+} from "./access-request.server"
 import { AccessRequestRepoLive } from "~/lib/governance/AccessRequestRepo.server"
 import { GrantRepoLive } from "~/lib/governance/GrantRepo.server"
 import { PrincipalRepoLive } from "~/lib/governance/PrincipalRepo.server"
@@ -205,6 +215,218 @@ describe("submitAccessRequest", () => {
         })
 
         expect(result.status).toBe("approved")
+      }),
+    )
+  })
+})
+
+describe("submitAccessRequest validation", () => {
+  it.layer(TestLayer)("rejects when neither role nor entitlement is supplied", (it) => {
+    it.effect("fails with MissingRoleOrEntitlementError", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+        const exit = yield* Effect.exit(submitAccessRequest({ requesterId: ids.requesterId, applicationId: ids.appId }))
+        expect(exit._tag).toBe("Failure")
+        if (exit._tag === "Failure") {
+          const failure = exit.cause as { _tag: string; error?: unknown }
+          const err = (failure as any).error ?? (failure as any).failure
+          expect(err).toBeInstanceOf(MissingRoleOrEntitlementError)
+        }
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("rejects when both role and entitlement are supplied", (it) => {
+    it.effect("fails with BothRoleAndEntitlementError", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+        const exit = yield* Effect.exit(
+          submitAccessRequest({
+            requesterId: ids.requesterId,
+            applicationId: ids.appId,
+            roleId: ids.roleId,
+            entitlementId: ids.entitlementId,
+          }),
+        )
+        expect(exit._tag).toBe("Failure")
+        if (exit._tag === "Failure") {
+          const failure = exit.cause as { _tag: string; error?: unknown }
+          const err = (failure as any).error ?? (failure as any).failure
+          expect(err).toBeInstanceOf(BothRoleAndEntitlementError)
+        }
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("rejects when role belongs to a different app", (it) => {
+    it.effect("fails with RoleEntitlementAppMismatchError", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+        // A second application with no roles linked back to the first.
+        yield* sql`INSERT INTO applications (id, slug, display_name, access_mode, owner_id)
+                   VALUES ('app-other', 'other-app', 'Other App', 'request', ${ids.approverId})`
+
+        const exit = yield* Effect.exit(
+          submitAccessRequest({
+            requesterId: ids.requesterId,
+            applicationId: "app-other",
+            roleId: ids.roleId, // belongs to ids.appId, not 'app-other'
+          }),
+        )
+        expect(exit._tag).toBe("Failure")
+        if (exit._tag === "Failure") {
+          const failure = exit.cause as { _tag: string; error?: unknown }
+          const err = (failure as any).error ?? (failure as any).failure
+          expect(err).toBeInstanceOf(RoleEntitlementAppMismatchError)
+        }
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("dedups a second pending request for the same target", (it) => {
+    it.effect("returns status 'duplicate' with the existing requestId", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        // Force a pending status: install a one_of policy so the request stays pending.
+        yield* sql`INSERT INTO approval_policies (id, application_id, scope_type, mode, rules)
+                   VALUES (
+                     'policy-dup',
+                     ${ids.appId},
+                     'application',
+                     'one_of',
+                     ${JSON.stringify([{ approverType: "app_owner" }])}::jsonb
+                   )`
+
+        const first = yield* submitAccessRequest({
+          requesterId: ids.requesterId,
+          applicationId: ids.appId,
+          roleId: ids.roleId,
+        })
+        expect(first.status).toBe("pending")
+
+        const second = yield* submitAccessRequest({
+          requesterId: ids.requesterId,
+          applicationId: ids.appId,
+          roleId: ids.roleId,
+        })
+        expect(second.status).toBe("duplicate")
+        expect(second.requestId).toBe(first.requestId)
+
+        const rows = yield* sql`SELECT count(*)::int AS n FROM access_requests
+                                WHERE requester_id = ${ids.requesterId}
+                                  AND application_id = ${ids.appId}
+                                  AND role_id = ${ids.roleId}
+                                  AND status = 'pending'`
+        expect((rows[0] as any).n).toBe(1)
+      }),
+    )
+  })
+})
+
+describe("cancelOwnAccessRequest", () => {
+  it.layer(TestLayer)("cancels a pending request owned by the caller", (it) => {
+    it.effect("flips status to cancelled", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        yield* sql`INSERT INTO approval_policies (id, application_id, scope_type, mode, rules)
+                   VALUES (
+                     'policy-cancel',
+                     ${ids.appId},
+                     'application',
+                     'one_of',
+                     ${JSON.stringify([{ approverType: "app_owner" }])}::jsonb
+                   )`
+
+        const submitted = yield* submitAccessRequest({
+          requesterId: ids.requesterId,
+          applicationId: ids.appId,
+          roleId: ids.roleId,
+        })
+        expect(submitted.status).toBe("pending")
+
+        const result = yield* cancelOwnAccessRequest({
+          requestId: submitted.requestId,
+          requesterId: ids.requesterId,
+        })
+        expect(result.status).toBe("cancelled")
+
+        const rows = yield* sql`SELECT status FROM access_requests WHERE id = ${submitted.requestId}`
+        expect((rows[0] as any).status).toBe("cancelled")
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("rejects when the caller is not the requester", (it) => {
+    it.effect("fails with AccessRequestNotOwnedError", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        yield* sql`INSERT INTO approval_policies (id, application_id, scope_type, mode, rules)
+                   VALUES (
+                     'policy-cancel-2',
+                     ${ids.appId},
+                     'application',
+                     'one_of',
+                     ${JSON.stringify([{ approverType: "app_owner" }])}::jsonb
+                   )`
+
+        const submitted = yield* submitAccessRequest({
+          requesterId: ids.requesterId,
+          applicationId: ids.appId,
+          roleId: ids.roleId,
+        })
+
+        const exit = yield* Effect.exit(
+          cancelOwnAccessRequest({
+            requestId: submitted.requestId,
+            requesterId: ids.approverId, // wrong owner
+          }),
+        )
+        expect(exit._tag).toBe("Failure")
+        if (exit._tag === "Failure") {
+          const failure = exit.cause as { _tag: string; error?: unknown }
+          const err = (failure as any).error ?? (failure as any).failure
+          expect(err).toBeInstanceOf(AccessRequestNotOwnedError)
+        }
+
+        // Status must be untouched.
+        const rows = yield* sql`SELECT status FROM access_requests WHERE id = ${submitted.requestId}`
+        expect((rows[0] as any).status).toBe("pending")
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("rejects when the request is not pending", (it) => {
+    it.effect("fails with AccessRequestNotCancellableError", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+
+        // No approval policy → auto-approves on submit.
+        const submitted = yield* submitAccessRequest({
+          requesterId: ids.requesterId,
+          applicationId: ids.appId,
+          roleId: ids.roleId,
+        })
+        expect(submitted.status).toBe("approved")
+
+        const exit = yield* Effect.exit(
+          cancelOwnAccessRequest({
+            requestId: submitted.requestId,
+            requesterId: ids.requesterId,
+          }),
+        )
+        expect(exit._tag).toBe("Failure")
+        if (exit._tag === "Failure") {
+          const failure = exit.cause as { _tag: string; error?: unknown }
+          const err = (failure as any).error ?? (failure as any).failure
+          expect(err).toBeInstanceOf(AccessRequestNotCancellableError)
+        }
       }),
     )
   })

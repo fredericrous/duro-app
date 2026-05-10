@@ -12,11 +12,22 @@
     "actions": "Actions"
   },
   "header": {
-    "welcome": "Bienvenue, {{user}}"
+    "welcome": "Bienvenue, {{user}}",
+    "requestAccess": "Demander l'acces",
+    "browseApps": "Parcourir les applications",
+    "myRequests": "Mes demandes",
+    "requestDialog": {
+      "loading": "Chargement des applications disponibles…",
+      "empty": "Vous avez deja acces a toutes les applications qui vous sont accessibles. Si vous pensez qu'il en manque, contactez un administrateur."
+    }
   },
   "home": {
     "title": "Accueil - Duro",
-    "description": "Votre tableau de bord personnel"
+    "description": "Votre tableau de bord personnel",
+    "requestAnotherCta": "Demander l'acces a une autre application",
+    "appCard": {
+      "noLaunchUrl": "Aucune URL de lancement configuree"
+    }
   },
   "noAccess": {
     "title": "Acces refuse",
@@ -25,9 +36,14 @@
     "hint": "Veuillez contacter un administrateur si vous pensez qu'il s'agit d'une erreur.",
     "requestCta": "Demander l'acces",
     "requestSubmitted": "Votre demande d'acces a ete soumise. Un administrateur l'examinera bientot.",
+    "alreadyPending": "Vous avez deja une demande en attente pour ceci. Un administrateur l'examinera bientot.",
+    "autoApproved": "Acces accorde. L'application devrait apparaitre sur votre page d'accueil.",
     "form": {
       "application": "Application",
       "applicationPlaceholder": "Choisissez une application…",
+      "role": "Role",
+      "rolePlaceholder": "Choisissez un role…",
+      "noRequestableRoles": "Vous detenez deja tous les roles disponibles sur cette application.",
       "noResults": "Aucun resultat",
       "justification": "Pourquoi avez-vous besoin de cet acces ?",
       "justificationPlaceholder": "Expliquez brievement l'usage prevu.",
@@ -37,10 +53,60 @@
     },
     "error": {
       "missing_application": "Veuillez choisir une application.",
+      "missing_target": "Choisissez un role a demander.",
+      "role_entitlement_conflict": "Choisissez soit un role soit une permission, pas les deux.",
+      "role_entitlement_app_mismatch": "Ce role ou cette permission n'appartient pas a l'application choisie.",
       "principal_not_found": "Votre compte n'est pas encore entierement provisionne. Reessayez dans un instant ou contactez un administrateur.",
       "submit_failed": "L'envoi de la demande a echoue. Veuillez reessayer.",
       "not_authenticated": "Vous devez etre connecte pour demander l'acces.",
       "unknown": "Une erreur s'est produite. Veuillez reessayer."
+    }
+  },
+  "apps": {
+    "title": "Applications",
+    "empty": "Aucune application disponible.",
+    "cols": {
+      "app": "Application",
+      "status": "Statut",
+      "action": "Action"
+    },
+    "status": {
+      "open": "Ouvert",
+      "granted": "Accorde",
+      "partiallyGranted": "Acces partiel",
+      "pending": "En attente",
+      "requestable": "Demander l'acces",
+      "canUpgrade": "Demander plus d'acces",
+      "inviteOnly": "Sur invitation"
+    },
+    "pendingHint": "En attente d'approbation.",
+    "inviteOnlyHint": "Demandez a un administrateur de vous inviter.",
+    "allRolesGrantedHint": "Tous les roles disponibles sont accordes.",
+    "viewRequest": "Voir la demande",
+    "openLaunch": "Ouvrir"
+  },
+  "requests": {
+    "title": "Mes demandes",
+    "empty": "Vous n'avez encore demande acces a aucune application.",
+    "cancel": "Annuler",
+    "cancelled": "Demande annulee.",
+    "cancelFailed": "Impossible d'annuler cette demande.",
+    "cols": {
+      "status": "Statut",
+      "application": "Application",
+      "role": "Role",
+      "entitlement": "Permission",
+      "justification": "Justification",
+      "created": "Cree",
+      "action": "Action"
+    },
+    "error": {
+      "not_owned": "Cette demande ne vous appartient pas.",
+      "not_cancellable": "Cette demande n'est plus en attente et ne peut pas etre annulee.",
+      "cancel_failed": "Impossible d'annuler cette demande. Veuillez reessayer.",
+      "missing_request_id": "Identifiant de demande manquant.",
+      "principal_not_found": "Votre compte n'est pas encore entierement provisionne.",
+      "not_authenticated": "Vous devez etre connecte."
     }
   },
   "categories": {
@@ -118,6 +184,8 @@
     "authzPlayground": "Un outil en lecture seule pour tester les decisions d'acces. Choisissez un principal, une application et une action ; le moteur renvoie ALLOW ou DENY avec les octrois correspondants et le raisonnement. Executer une verification ne change rien.",
     "audit": "Un journal en ajout seul de chaque evenement de gouvernance : octrois crees ou revoques, principals modifies, demandes d'acces tranchees. Filtrez par acteur, cible ou type d'evenement pour enqueter sur \"qui a fait quoi\".",
     "accessRequests": "Demandes d'acces a une application initiees par les utilisateurs. Chaque demande est evaluee par un admin (ou une politique) et devient un octroi une fois approuvee.",
+    "appsCatalog": "Toutes les applications gouvernees par Duro. Les badges indiquent votre statut sur chacune : Accorde (vous avez un role), Acces partiel (vous avez un role mais d'autres sont disponibles), En attente (demande en attente d'approbation), Ouvert (aucune permission necessaire), Sur invitation (un admin doit vous inviter), Demander l'acces (vous pouvez demander un role).",
+    "myRequests": "Vos demandes d'acces sur toutes les applications. Les demandes en attente peuvent etre annulees ici ; les lignes approuvees/rejetees/annulees sont conservees comme historique.",
     "invitations": "Une invitation d'acces pre-cree les octrois qu'une personne recevra a l'acceptation. A distinguer du flux Invitations utilisateur qui provisionne un compte dans le fournisseur d'identite.",
     "bootstrap": "Sur un deploiement neuf, le tout premier admin est cree a partir d'un jeton d'amorcage a usage unique que votre operateur a place dans Vault. Cet assistant lit le jeton cote serveur et met en file d'attente une invitation pour l'adresse e-mail saisie. Une fois l'invitation consommee, cette page se verrouille."
   },
@@ -388,7 +456,8 @@
       }
     },
     "accessRequests": {
-      "title": "Demandes d'acces ({{count}})"
+      "title": "Demandes d'acces ({{count}})",
+      "decisionHint": "Approuver accorde le role demande. Rejeter refuse la demande de maniere permanente. Annuler marque la demande comme obsolete (par exemple, le demandeur a quitte l'organisation)."
     },
     "detailPanel": {
       "label": "Panneau de details",

@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useFetcher } from "react-router"
+import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.access-requests.$id"
 import { runEffect } from "~/lib/runtime.server"
@@ -7,9 +8,10 @@ import { isOriginAllowed } from "~/lib/config.server"
 import { getAuth } from "~/lib/auth.server"
 import { AccessRequestRepo } from "~/lib/governance/AccessRequestRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
+import { handleAdminAccessRequestsMutation } from "~/lib/mutations/admin-access-requests"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { Badge, Button, ButtonGroup, Field, Heading, Panel, Stack, Text, Textarea } from "@duro-app/ui"
+import { Alert, Badge, Button, ButtonGroup, Field, Heading, Panel, Stack, Text, Textarea } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -19,7 +21,7 @@ export async function loader({ params }: Route.LoaderArgs) {
     runEffect(
       Effect.gen(function* () {
         const repo = yield* AccessRequestRepo
-        return yield* repo.findById(requestId)
+        return yield* repo.findByIdEnriched(requestId)
       }),
     ),
     runEffect(
@@ -34,14 +36,7 @@ export async function loader({ params }: Route.LoaderArgs) {
     throw new Response("Access request not found", { status: 404 })
   }
 
-  const requester = await runEffect(
-    Effect.gen(function* () {
-      const repo = yield* PrincipalRepo
-      return yield* repo.findById(accessRequest.requesterId)
-    }),
-  )
-
-  return { accessRequest, approvals, requester }
+  return { accessRequest, approvals }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -53,32 +48,41 @@ export async function action({ request, params }: Route.ActionArgs) {
   const intent = formData.get("intent") as string
   const requestId = params.id
   const auth = await getAuth(request)
-  const actorId = auth.user ?? "system"
+  if (!auth.sub) return { error: "not_authenticated" as const }
 
-  if (intent === "approve" || intent === "reject") {
+  // Resolve the OIDC subject to a governance principal id. The downstream
+  // tables (request_approvals.approver_id, audit_events.actor_id) are FK to
+  // principals(id), so passing the username string would FK-violate.
+  const approver = await runEffect(
+    Effect.gen(function* () {
+      const repo = yield* PrincipalRepo
+      return yield* repo.findByExternalId(auth.sub!)
+    }),
+  )
+  if (!approver) return { error: "principal_not_found" as const }
+
+  if (intent === "approve" || intent === "reject" || intent === "cancel") {
     const comment = (formData.get("comment") as string) || undefined
-    const decision = intent === "approve" ? "approved" : "rejected"
-
-    await runEffect(
-      Effect.gen(function* () {
-        const repo = yield* AccessRequestRepo
-        yield* repo.recordDecision(requestId, actorId, decision, comment)
-        yield* repo.updateStatus(requestId, decision)
-      }),
+    const result = await runEffect(
+      handleAdminAccessRequestsMutation(
+        intent === "cancel" ? { intent, requestId } : { intent, requestId, approverId: approver.id, comment },
+      ),
     )
-    return { success: true, decision }
+    return result
   }
 
-  return { error: "Unknown intent" }
+  return { error: "Unknown intent" as const }
 }
 
 export default function AdminAccessRequestDetailPage({ loaderData }: Route.ComponentProps) {
-  const { accessRequest, approvals, requester } = loaderData
-  const fetcher = useFetcher()
+  const { t } = useTranslation()
+  const { accessRequest, approvals } = loaderData
+  const fetcher = useFetcher<typeof action>()
   const [comment, setComment] = useState("")
 
   const isSubmitting = fetcher.state !== "idle"
   const isPending = accessRequest.status === "pending"
+  const result = (fetcher.data ?? null) as { success?: boolean; message?: string; error?: string } | null
 
   const statusVariant =
     accessRequest.status === "pending"
@@ -99,27 +103,30 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
         </Text>
       </html.div>
 
+      {result?.success && result.message && <Alert variant="success">{result.message}</Alert>}
+      {result?.error && <Alert variant="error">{result.error}</Alert>}
+
       <Panel.Root bordered>
         <Panel.Body>
           <Stack gap="sm">
             <html.div style={styles.field}>
               <Text color="muted">Requester</Text>
-              <Text>{requester?.displayName ?? accessRequest.requesterId}</Text>
+              <Text>{accessRequest.requesterName ?? accessRequest.requesterId}</Text>
             </html.div>
             <html.div style={styles.field}>
               <Text color="muted">Application</Text>
-              <Text>{accessRequest.applicationId}</Text>
+              <Text>{accessRequest.applicationName || accessRequest.applicationId}</Text>
             </html.div>
             {accessRequest.roleId && (
               <html.div style={styles.field}>
                 <Text color="muted">Role</Text>
-                <Text>{accessRequest.roleId}</Text>
+                <Text>{accessRequest.roleName ?? accessRequest.roleId}</Text>
               </html.div>
             )}
             {accessRequest.entitlementId && (
               <html.div style={styles.field}>
                 <Text color="muted">Entitlement</Text>
-                <Text>{accessRequest.entitlementId}</Text>
+                <Text>{accessRequest.entitlementName ?? accessRequest.entitlementId}</Text>
               </html.div>
             )}
             {accessRequest.resourceId && (
@@ -194,7 +201,16 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
                     {isSubmitting ? "Processing..." : "Reject"}
                   </Button>
                 </fetcher.Form>
+                <fetcher.Form method="post">
+                  <input type="hidden" name="intent" value="cancel" />
+                  <Button type="submit" variant="secondary" disabled={isSubmitting}>
+                    {isSubmitting ? "Processing..." : "Cancel"}
+                  </Button>
+                </fetcher.Form>
               </ButtonGroup>
+              <Text variant="bodySm" color="muted">
+                {t("admin.accessRequests.decisionHint")}
+              </Text>
             </Stack>
           </Panel.Body>
         </Panel.Root>

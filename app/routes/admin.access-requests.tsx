@@ -4,8 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.access-requests"
 import { runEffect } from "~/lib/runtime.server"
-import { AccessRequestRepo } from "~/lib/governance/AccessRequestRepo.server"
-import type { AccessRequest } from "~/lib/governance/types"
+import { AccessRequestRepo, type AccessRequestEnriched } from "~/lib/governance/AccessRequestRepo.server"
 import {
   useReactTable,
   getCoreRowModel,
@@ -17,7 +16,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Badge, EmptyState, Stack, Table } from "@duro-app/ui"
+import { Badge, EmptyState, Stack, Table, Tooltip } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
@@ -25,13 +24,13 @@ export async function loader() {
   const requests = await runEffect(
     Effect.gen(function* () {
       const repo = yield* AccessRequestRepo
-      return yield* repo.listAll()
+      return yield* repo.listAllEnriched()
     }),
   )
   return { requests }
 }
 
-const columnHelper = createColumnHelper<AccessRequest>()
+const columnHelper = createColumnHelper<AccessRequestEnriched>()
 
 function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string) {
   return [
@@ -51,19 +50,23 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
         return <Badge variant={variant}>{status}</Badge>
       },
     }),
-    columnHelper.accessor("requesterId", {
+    columnHelper.accessor((row) => row.requesterName ?? row.requesterId, {
+      id: "requester",
       header: t("admin.cols.requester"),
       enableSorting: true,
     }),
-    columnHelper.accessor("applicationId", {
+    columnHelper.accessor((row) => row.applicationName || row.applicationId, {
+      id: "application",
       header: t("admin.cols.application"),
       enableSorting: true,
     }),
-    columnHelper.accessor("roleId", {
+    columnHelper.accessor((row) => row.roleName ?? row.roleId ?? null, {
+      id: "role",
       header: t("admin.cols.role"),
       cell: ({ getValue }) => getValue() ?? "\u2014",
     }),
-    columnHelper.accessor("entitlementId", {
+    columnHelper.accessor((row) => row.entitlementName ?? row.entitlementId ?? null, {
+      id: "entitlement",
       header: t("admin.cols.entitlement"),
       cell: ({ getValue }) => getValue() ?? "\u2014",
     }),
@@ -72,7 +75,18 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
       cell: ({ getValue }) => {
         const v = getValue()
         if (!v) return "\u2014"
-        return v.length > 60 ? v.slice(0, 60) + "..." : v
+        if (v.length <= 60) return v
+        // Truncate visually but keep the full text reachable on hover/focus.
+        // The native title attribute is the screen-reader-friendly fallback;
+        // Tooltip layers a styled popover for sighted users.
+        const truncated = v.slice(0, 60) + "\u2026"
+        return (
+          <Tooltip.Root content={v} placement="top">
+            <Tooltip.Trigger>
+              <html.span style={styles.justificationTrigger}>{truncated}</html.span>
+            </Tooltip.Trigger>
+          </Tooltip.Root>
+        )
       },
     }),
     columnHelper.accessor("createdAt", {
@@ -165,7 +179,7 @@ export default function AdminAccessRequestsPage({ loaderData }: Route.ComponentP
                     key={row.id}
                     role="button"
                     tabIndex={0}
-                    aria-label={`${row.original.requesterId} → ${row.original.applicationId}`}
+                    aria-label={`${row.original.requesterName ?? row.original.requesterId} → ${row.original.applicationName || row.original.applicationId}`}
                     onClick={() => navigate(href)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -207,5 +221,11 @@ const styles = css.create({
   },
   displayContents: {
     display: "contents",
+  },
+  justificationTrigger: {
+    cursor: "help",
+    textDecorationLine: "underline",
+    textDecorationStyle: "dotted",
+    textUnderlineOffset: 2,
   },
 })

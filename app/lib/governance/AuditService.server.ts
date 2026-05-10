@@ -12,6 +12,60 @@ export class AuditError extends Data.TaggedError("AuditError")<{
 const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new AuditError({ message, cause: e })))
 
+// ---------------------------------------------------------------------------
+// Subscriber primitive
+//
+// Sinks are best-effort side-effect handlers that fan out from `emit` AFTER
+// the DB write succeeds. The DB row is the source of truth; sinks exist for
+// notifications (email, Slack, SSE-push to admin clients), metrics, etc.
+//
+// Errors in a sink are swallowed (logged) — one slow or broken subscriber
+// must not poison the audit emit path. The registry is process-local; for a
+// multi-process deployment, swap to LISTEN/NOTIFY or a real pub-sub later.
+// ---------------------------------------------------------------------------
+
+export interface AuditEventInput {
+  readonly eventType: string
+  readonly actorId?: string
+  readonly targetType?: string
+  readonly targetId?: string
+  readonly applicationId?: string
+  readonly metadata?: Record<string, unknown>
+  readonly ipAddress?: string
+}
+
+export type AuditSink = (event: AuditEventInput) => Effect.Effect<void, never>
+
+const sinks: AuditSink[] = []
+
+/** Register a sink. Returns an unsubscribe function. */
+export function registerAuditSink(sink: AuditSink): () => void {
+  sinks.push(sink)
+  return () => {
+    const i = sinks.indexOf(sink)
+    if (i >= 0) sinks.splice(i, 1)
+  }
+}
+
+/** Test-only escape hatch — clears the registry between tests. */
+export function _resetAuditSinksForTesting(): void {
+  sinks.length = 0
+}
+
+const fanoutToSinks = (event: AuditEventInput): Effect.Effect<void, never> =>
+  Effect.forEach(
+    sinks,
+    (sink) =>
+      sink(event).pipe(
+        // Sinks are typed as Effect<void, never>, but a misbehaving sink could
+        // still throw (defects). Swallow defects so emit never fails.
+        Effect.catchAllDefect((d) =>
+          Effect.logWarning("audit sink defect", { error: String(d), eventType: event.eventType }),
+        ),
+      ),
+    { concurrency: "unbounded" },
+  ).pipe(Effect.asVoid)
+
 export class AuditService extends Context.Tag("AuditService")<
   AuditService,
   {
@@ -50,7 +104,7 @@ export const AuditServiceLive = Layer.effect(
             Effect.asVoid,
           ),
           "Failed to emit audit event",
-        ),
+        ).pipe(Effect.zipLeft(fanoutToSinks(event))),
 
       query: (filters) => {
         const eventType = filters.eventType ?? null
@@ -83,7 +137,9 @@ export const AuditServiceDev = Layer.succeed(AuditService, {
       actorId: event.actorId,
       targetType: event.targetType,
       targetId: event.targetId,
-    }).pipe(Effect.asVoid),
+    })
+      .pipe(Effect.asVoid)
+      .pipe(Effect.zipLeft(fanoutToSinks(event))),
 
   query: (_filters) => Effect.log("[AuditService/dev] query").pipe(Effect.as([] as AuditEvent[])),
 })

@@ -1,10 +1,49 @@
-import { Effect } from "effect"
+import { Data, Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { AccessRequestRepo } from "~/lib/governance/AccessRequestRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { activateGrant } from "./grant-activation.server"
 import { type ApprovalPolicyRule } from "~/lib/governance/types"
+
+// ---------------------------------------------------------------------------
+// Typed errors
+// ---------------------------------------------------------------------------
+
+export class MissingRoleOrEntitlementError extends Data.TaggedError("MissingRoleOrEntitlementError")<{
+  readonly applicationId: string
+}> {}
+
+export class BothRoleAndEntitlementError extends Data.TaggedError("BothRoleAndEntitlementError")<{
+  readonly applicationId: string
+}> {}
+
+export class RoleEntitlementAppMismatchError extends Data.TaggedError("RoleEntitlementAppMismatchError")<{
+  readonly applicationId: string
+  readonly target: "role" | "entitlement"
+  readonly targetId: string
+}> {}
+
+export class AccessRequestNotOwnedError extends Data.TaggedError("AccessRequestNotOwnedError")<{
+  readonly requestId: string
+}> {}
+
+export class AccessRequestNotCancellableError extends Data.TaggedError("AccessRequestNotCancellableError")<{
+  readonly requestId: string
+  readonly status: string
+}> {}
+
+const isUniqueViolation = (e: unknown): boolean => {
+  // Postgres SQLSTATE 23505 — unique_violation. The repo wraps the driver
+  // error in SqlError, then in AccessRequestRepoError; the pg `.code` therefore
+  // lives a couple of `cause` hops down. Walk the chain instead of guessing.
+  let cur: unknown = e
+  for (let i = 0; i < 4 && cur; i++) {
+    if ((cur as { code?: string }).code === "23505") return true
+    cur = (cur as { cause?: unknown }).cause
+  }
+  return false
+}
 
 // ---------------------------------------------------------------------------
 // evaluatePolicy — pure function, exported for testing
@@ -52,17 +91,75 @@ export const submitAccessRequest = (input: SubmitRequestInput) =>
     const audit = yield* AuditService
     const sql = yield* SqlClient.SqlClient
 
-    // 1. Create access request
-    const request = yield* requestRepo.create(input)
+    // 0. Validate the request shape against the schema's XOR contract.
+    //    The DB CHECK enforces exactly one of role_id / entitlement_id; reject
+    //    upstream with a typed error so callers (route action, API handler) can
+    //    surface a helpful message instead of a constraint violation.
+    if (!input.roleId && !input.entitlementId) {
+      return yield* new MissingRoleOrEntitlementError({ applicationId: input.applicationId })
+    }
+    if (input.roleId && input.entitlementId) {
+      return yield* new BothRoleAndEntitlementError({ applicationId: input.applicationId })
+    }
+    if (input.roleId) {
+      const rows =
+        yield* sql`SELECT 1 FROM roles WHERE id = ${input.roleId} AND application_id = ${input.applicationId}`
+      if (rows.length === 0) {
+        return yield* new RoleEntitlementAppMismatchError({
+          applicationId: input.applicationId,
+          target: "role",
+          targetId: input.roleId,
+        })
+      }
+    } else if (input.entitlementId) {
+      const rows =
+        yield* sql`SELECT 1 FROM entitlements WHERE id = ${input.entitlementId} AND application_id = ${input.applicationId}`
+      if (rows.length === 0) {
+        return yield* new RoleEntitlementAppMismatchError({
+          applicationId: input.applicationId,
+          target: "entitlement",
+          targetId: input.entitlementId,
+        })
+      }
+    }
+
+    // 1. Create access request — catch unique-violation from the partial
+    //    pending-uniq index (migration 0013) and resolve to the existing row.
+    const request = yield* requestRepo.create(input).pipe(
+      Effect.catchAll((err) =>
+        isUniqueViolation(err)
+          ? requestRepo.listForRequester(input.requesterId).pipe(
+              Effect.map((rows) =>
+                rows.find(
+                  (r) =>
+                    r.status === "pending" &&
+                    r.applicationId === input.applicationId &&
+                    (r.roleId ?? null) === (input.roleId ?? null) &&
+                    (r.entitlementId ?? null) === (input.entitlementId ?? null),
+                ),
+              ),
+              Effect.flatMap((existing) =>
+                existing ? Effect.succeed({ duplicate: true as const, request: existing }) : Effect.fail(err),
+              ),
+            )
+          : Effect.fail(err),
+      ),
+    )
+
+    if ("duplicate" in request && request.duplicate) {
+      return { requestId: request.request.id, status: "duplicate" as const }
+    }
+    const created = "duplicate" in request ? request.request : request
 
     // 2. Find approval policy
     const policy = yield* requestRepo.findApprovalPolicy(input.applicationId, input.roleId, input.entitlementId)
 
     if (!policy || policy.mode === "none") {
-      // Auto-approve in a transaction
+      // Auto-approve in a transaction. Validation above guarantees exactly
+      // one of roleId / entitlementId is set; narrow on roleId to drive both
+      // branches without non-null assertions.
       yield* sql.withTransaction(
         Effect.gen(function* () {
-          // Create grant
           const grant = input.roleId
             ? yield* grantRepo.grantRole({
                 principalId: input.requesterId,
@@ -73,23 +170,23 @@ export const submitAccessRequest = (input: SubmitRequestInput) =>
               })
             : yield* grantRepo.grantEntitlement({
                 principalId: input.requesterId,
-                entitlementId: input.entitlementId!,
+                entitlementId: input.entitlementId as string,
                 resourceId: input.resourceId,
                 grantedBy: input.requesterId,
                 reason: "auto-approved",
               })
-          yield* requestRepo.updateStatus(request.id, "approved")
-          yield* requestRepo.linkGrant(request.id, grant.id)
+          yield* requestRepo.updateStatus(created.id, "approved")
+          yield* requestRepo.linkGrant(created.id, grant.id)
           yield* audit.emit({
             eventType: "access.auto_approved",
             actorId: input.requesterId,
             targetType: "access_request",
-            targetId: request.id,
+            targetId: created.id,
             applicationId: input.applicationId,
           })
         }),
       )
-      return { requestId: request.id, status: "approved" as const }
+      return { requestId: created.id, status: "approved" as const }
     }
 
     // 3. Resolve approvers
@@ -109,21 +206,21 @@ export const submitAccessRequest = (input: SubmitRequestInput) =>
     if (approverIds.length === 0) {
       yield* Effect.logWarning("No approvers resolved, auto-approving")
       // auto-approve same as above... (simplified: just update status)
-      yield* requestRepo.updateStatus(request.id, "approved")
-      return { requestId: request.id, status: "approved" as const }
+      yield* requestRepo.updateStatus(created.id, "approved")
+      return { requestId: created.id, status: "approved" as const }
     }
 
     // 4. Create approval records
-    yield* requestRepo.createApprovalRecords(request.id, approverIds)
+    yield* requestRepo.createApprovalRecords(created.id, approverIds)
     yield* audit.emit({
       eventType: "access.requested",
       actorId: input.requesterId,
       targetType: "access_request",
-      targetId: request.id,
+      targetId: created.id,
       applicationId: input.applicationId,
     })
 
-    return { requestId: request.id, status: "pending" as const }
+    return { requestId: created.id, status: "pending" as const }
   }).pipe(Effect.withSpan("submitAccessRequest"))
 
 // ---------------------------------------------------------------------------
@@ -211,3 +308,40 @@ export const decideApproval = (input: DecideInput) =>
       yield* activateGrant(newGrantId)
     }
   }).pipe(Effect.withSpan("decideApproval"))
+
+// ---------------------------------------------------------------------------
+// cancelOwnAccessRequest
+// ---------------------------------------------------------------------------
+
+export interface CancelOwnInput {
+  requestId: string
+  requesterId: string
+}
+
+export const cancelOwnAccessRequest = (input: CancelOwnInput) =>
+  Effect.gen(function* () {
+    const requestRepo = yield* AccessRequestRepo
+    const audit = yield* AuditService
+
+    const request = yield* requestRepo.findById(input.requestId)
+    if (!request) {
+      return yield* new AccessRequestNotOwnedError({ requestId: input.requestId })
+    }
+    if (request.requesterId !== input.requesterId) {
+      return yield* new AccessRequestNotOwnedError({ requestId: input.requestId })
+    }
+    if (request.status !== "pending") {
+      return yield* new AccessRequestNotCancellableError({ requestId: input.requestId, status: request.status })
+    }
+
+    yield* requestRepo.updateStatus(input.requestId, "cancelled")
+    yield* audit.emit({
+      eventType: "access.cancelled",
+      actorId: input.requesterId,
+      targetType: "access_request",
+      targetId: input.requestId,
+      applicationId: request.applicationId,
+    })
+
+    return { requestId: input.requestId, status: "cancelled" as const }
+  }).pipe(Effect.withSpan("cancelOwnAccessRequest"))

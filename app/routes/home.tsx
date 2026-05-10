@@ -14,8 +14,8 @@ import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { AuthzEngine } from "~/lib/governance/AuthzEngine.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { submitAccessRequest } from "~/lib/workflows/access-request.server"
+import { loadAppsCatalogForPrincipal, type AppCatalogEntry } from "~/lib/apps-catalog.server"
 import type { AppDefinition } from "~/lib/apps"
-import type { Application } from "~/lib/governance/types"
 
 export function meta() {
   return [{ title: "Home - Duro" }, { name: "description", content: "Your personal app dashboard" }]
@@ -49,7 +49,9 @@ export async function loader({ request }: Route.LoaderArgs) {
               (a): AppDefinition => ({
                 id: a.slug,
                 name: a.displayName,
-                url: "#", // governance apps don't have URLs in the table yet
+                // Empty string signals "no launch URL configured" — AppCard
+                // renders a non-link state with a help hint instead of a 404.
+                url: a.url ?? "",
                 category: "governance",
                 icon: "",
                 groups: [],
@@ -75,13 +77,10 @@ export async function loader({ request }: Route.LoaderArgs) {
           )
         }
       } else if (authMode === "dual") {
-        // Governance first; if governance returns apps, use those + static
-        // But avoid duplicates: governance takes precedence
         const govSlugs = new Set(governedApps.map((a) => a.id))
         const uniqueStatic = staticApps.filter((a) => !govSlugs.has(a.id))
         visibleApps = [...governedApps, ...uniqueStatic]
       } else {
-        // governance mode: only governed apps
         visibleApps = governedApps
       }
     } catch (err) {
@@ -91,39 +90,49 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
   }
 
-  // Load the full application catalog so users with no current access can
-  // discover apps to request. Only meaningful when governance is active.
-  let requestableApps: Application[] = []
+  // Only load the catalog if we'll actually render NoAccess. The header
+  // dialog fetches its own catalog from /api/catalog on demand.
+  let appsCatalog: AppCatalogEntry[] = []
   if (authMode !== "legacy" && auth.user && visibleApps.length === 0) {
     try {
-      requestableApps = await runEffect(
+      appsCatalog = await runEffect(
         Effect.gen(function* () {
-          const appRepo = yield* ApplicationRepo
-          const all = yield* appRepo.list()
-          return all.filter((a) => a.enabled !== false && a.accessMode === "request")
+          const principalRepo = yield* PrincipalRepo
+          const principal = yield* principalRepo.findByExternalId(auth.sub!)
+          if (!principal) return [] as AppCatalogEntry[]
+          return yield* loadAppsCatalogForPrincipal(principal.id)
         }),
       )
     } catch (err) {
-      await runEffect(Effect.logWarning("requestable apps load failed", { error: String(err) }))
+      await runEffect(Effect.logWarning("home catalog load failed", { error: String(err) }))
     }
   }
 
   return {
     visibleApps,
-    requestableApps,
     categoryOrder: config.categoryOrder,
+    appsCatalog,
   }
 }
 
-export async function action({ request }: Route.ActionArgs) {
+// Discriminated outcomes for the submit action — split clean states so the
+// form/dialog can branch on intent without overloading a `success` flag.
+export type SubmitOutcome =
+  | { outcome: "submitted"; requestId: string }
+  | { outcome: "auto_approved"; requestId: string }
+  | { outcome: "duplicate"; requestId: string }
+  | { outcome: "error"; error: string }
+
+export async function action({ request }: Route.ActionArgs): Promise<SubmitOutcome | Response> {
   if (!isOriginAllowed(request.headers.get("Origin"))) {
-    return Response.json({ error: "Invalid origin" }, { status: 403 })
+    return Response.json({ outcome: "error", error: "invalid_origin" }, { status: 403 })
   }
 
   const { getAuth } = await import("~/lib/auth.server")
+  const { PrincipalRepo } = await import("~/lib/governance/PrincipalRepo.server")
   const auth = await getAuth(request)
   if (!auth.user) {
-    return { error: "not_authenticated" as const }
+    return { outcome: "error", error: "not_authenticated" }
   }
 
   const formData = await request.formData()
@@ -131,13 +140,16 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "requestAccess") {
     const applicationId = (formData.get("applicationId") as string)?.trim()
+    const roleId = ((formData.get("roleId") as string) ?? "").trim() || undefined
     const justification = ((formData.get("justification") as string) ?? "").trim() || undefined
-    if (!applicationId) {
-      return { error: "missing_application" as const }
-    }
+    if (!applicationId) return { outcome: "error", error: "missing_application" }
+    if (!roleId) return { outcome: "error", error: "missing_target" }
 
+    // The user-facing form is role-only by design (audit M9): entitlements are
+    // an admin-side concept. Requests for entitlements still flow through
+    // /api/access-requests for programmatic callers.
     try {
-      await runEffect(
+      const result = await runEffect(
         Effect.gen(function* () {
           const principalRepo = yield* PrincipalRepo
           const principal = yield* principalRepo.findByExternalId(auth.sub!)
@@ -145,22 +157,29 @@ export async function action({ request }: Route.ActionArgs) {
           return yield* submitAccessRequest({
             requesterId: principal.id,
             applicationId,
+            roleId,
             justification,
           })
         }),
       )
-      return { success: true as const }
+      if (result.status === "duplicate") return { outcome: "duplicate", requestId: result.requestId }
+      if (result.status === "approved") return { outcome: "auto_approved", requestId: result.requestId }
+      return { outcome: "submitted", requestId: result.requestId }
     } catch (e) {
+      const tag = (e as { _tag?: string } | null)?._tag
+      if (tag === "MissingRoleOrEntitlementError") return { outcome: "error", error: "missing_target" }
+      if (tag === "BothRoleAndEntitlementError") return { outcome: "error", error: "role_entitlement_conflict" }
+      if (tag === "RoleEntitlementAppMismatchError") return { outcome: "error", error: "role_entitlement_app_mismatch" }
       console.error("[home] requestAccess failed:", e)
-      return { error: "submit_failed" as const }
+      return { outcome: "error", error: "submit_failed" }
     }
   }
 
-  return { error: "unknown_intent" as const }
+  return { outcome: "error", error: "unknown_intent" }
 }
 
 export default function HomePage({ loaderData }: Route.ComponentProps) {
-  const { visibleApps, requestableApps, categoryOrder } = loaderData
+  const { visibleApps, categoryOrder, appsCatalog } = loaderData
   const fetcher = useFetcher<typeof action>()
   const dashboardData = useRouteLoaderData("routes/dashboard") as {
     user: string
@@ -173,7 +192,11 @@ export default function HomePage({ loaderData }: Route.ComponentProps) {
   if (!hasAccess) {
     return (
       <CenteredCardPage>
-        <NoAccess user={user} requestableApps={requestableApps ?? []} fetcher={fetcher} />
+        <NoAccess
+          user={user}
+          requestableApps={appsCatalog.filter((e) => e.state === "requestable")}
+          fetcher={fetcher}
+        />
       </CenteredCardPage>
     )
   }

@@ -11,6 +11,15 @@ import {
   type ApprovalPolicy,
 } from "./types"
 
+export interface AccessRequestEnriched extends AccessRequest {
+  applicationName: string
+  applicationSlug: string
+  roleName: string | null
+  entitlementName: string | null
+  /** Display name of the requesting principal (only set on listAllEnriched / findByIdEnriched). */
+  requesterName?: string | null
+}
+
 export class AccessRequestRepoError extends Data.TaggedError("AccessRequestRepoError")<{
   readonly message: string
   readonly cause?: unknown
@@ -34,12 +43,22 @@ export class AccessRequestRepo extends Context.Tag("AccessRequestRepo")<
     readonly findById: (id: string) => Effect.Effect<AccessRequest | null, AccessRequestRepoError>
     readonly listPending: (applicationId?: string) => Effect.Effect<AccessRequest[], AccessRequestRepoError>
     readonly listForRequester: (requesterId: string) => Effect.Effect<AccessRequest[], AccessRequestRepoError>
+    readonly listForRequesterEnriched: (
+      requesterId: string,
+    ) => Effect.Effect<AccessRequestEnriched[], AccessRequestRepoError>
     readonly listAll: (filters?: {
       status?: string
       applicationId?: string
       limit?: number
       offset?: number
     }) => Effect.Effect<AccessRequest[], AccessRequestRepoError>
+    readonly listAllEnriched: (filters?: {
+      status?: string
+      applicationId?: string
+      limit?: number
+      offset?: number
+    }) => Effect.Effect<AccessRequestEnriched[], AccessRequestRepoError>
+    readonly findByIdEnriched: (id: string) => Effect.Effect<AccessRequestEnriched | null, AccessRequestRepoError>
     readonly recordDecision: (
       requestId: string,
       approverId: string,
@@ -105,6 +124,37 @@ export const AccessRequestRepoLive = Layer.effect(
           "Failed to list access requests for requester",
         ),
 
+      listForRequesterEnriched: (requesterId) =>
+        withErr(
+          sql`SELECT
+                ar.*,
+                a.display_name AS application_name,
+                a.slug AS application_slug,
+                r.display_name AS role_name,
+                e.display_name AS entitlement_name
+              FROM access_requests ar
+              JOIN applications a ON a.id = ar.application_id
+              LEFT JOIN roles r ON r.id = ar.role_id
+              LEFT JOIN entitlements e ON e.id = ar.entitlement_id
+              WHERE ar.requester_id = ${requesterId}
+              ORDER BY ar.created_at DESC`.pipe(
+            Effect.map((rows) =>
+              rows.map((row) => {
+                const r = row as Record<string, unknown>
+                const base = decodeAccessRequest(r) as AccessRequest
+                return {
+                  ...base,
+                  applicationName: (r.applicationName as string) ?? "",
+                  applicationSlug: (r.applicationSlug as string) ?? "",
+                  roleName: (r.roleName as string | null) ?? null,
+                  entitlementName: (r.entitlementName as string | null) ?? null,
+                }
+              }),
+            ),
+          ),
+          "Failed to list enriched access requests for requester",
+        ),
+
       listAll: (filters) =>
         withErr(
           sql`SELECT * FROM access_requests
@@ -116,6 +166,75 @@ export const AccessRequestRepoLive = Layer.effect(
             Effect.map((rows) => rows.map((r) => decodeAccessRequest(r) as AccessRequest)),
           ),
           "Failed to list access requests",
+        ),
+
+      listAllEnriched: (filters) =>
+        withErr(
+          sql`SELECT
+                ar.*,
+                a.display_name AS application_name,
+                a.slug AS application_slug,
+                p.display_name AS requester_name,
+                r.display_name AS role_name,
+                e.display_name AS entitlement_name
+              FROM access_requests ar
+              JOIN applications a ON a.id = ar.application_id
+              JOIN principals p ON p.id = ar.requester_id
+              LEFT JOIN roles r ON r.id = ar.role_id
+              LEFT JOIN entitlements e ON e.id = ar.entitlement_id
+              WHERE (${filters?.status ?? null}::text IS NULL OR ar.status = ${filters?.status ?? null})
+                AND (${filters?.applicationId ?? null}::text IS NULL OR ar.application_id = ${filters?.applicationId ?? null})
+              ORDER BY ar.created_at DESC
+              LIMIT ${filters?.limit ?? 100}
+              OFFSET ${filters?.offset ?? 0}`.pipe(
+            Effect.map((rows) =>
+              rows.map((row) => {
+                const r = row as Record<string, unknown>
+                const base = decodeAccessRequest(r) as AccessRequest
+                return {
+                  ...base,
+                  applicationName: (r.applicationName as string) ?? "",
+                  applicationSlug: (r.applicationSlug as string) ?? "",
+                  requesterName: (r.requesterName as string | null) ?? null,
+                  roleName: (r.roleName as string | null) ?? null,
+                  entitlementName: (r.entitlementName as string | null) ?? null,
+                }
+              }),
+            ),
+          ),
+          "Failed to list enriched access requests",
+        ),
+
+      findByIdEnriched: (id) =>
+        withErr(
+          sql`SELECT
+                ar.*,
+                a.display_name AS application_name,
+                a.slug AS application_slug,
+                p.display_name AS requester_name,
+                r.display_name AS role_name,
+                e.display_name AS entitlement_name
+              FROM access_requests ar
+              JOIN applications a ON a.id = ar.application_id
+              JOIN principals p ON p.id = ar.requester_id
+              LEFT JOIN roles r ON r.id = ar.role_id
+              LEFT JOIN entitlements e ON e.id = ar.entitlement_id
+              WHERE ar.id = ${id}`.pipe(
+            Effect.map((rows) => {
+              if (rows.length === 0) return null
+              const r = rows[0] as Record<string, unknown>
+              const base = decodeAccessRequest(r) as AccessRequest
+              return {
+                ...base,
+                applicationName: (r.applicationName as string) ?? "",
+                applicationSlug: (r.applicationSlug as string) ?? "",
+                requesterName: (r.requesterName as string | null) ?? null,
+                roleName: (r.roleName as string | null) ?? null,
+                entitlementName: (r.entitlementName as string | null) ?? null,
+              }
+            }),
+          ),
+          "Failed to find enriched access request",
         ),
 
       recordDecision: (requestId, approverId, decision, comment) =>

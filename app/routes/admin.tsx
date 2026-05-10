@@ -1,11 +1,14 @@
-import { useState, useRef, useCallback, type ReactNode } from "react"
-import { Outlet, useLocation, useNavigate, useRouteLoaderData, useOutletContext } from "react-router"
+import { useEffect, useState, useRef, useCallback, type ReactNode } from "react"
+import { Effect } from "effect"
+import * as SqlClient from "@effect/sql/SqlClient"
+import { Outlet, useLocation, useNavigate, useRouteLoaderData, useOutletContext, useRevalidator } from "react-router"
 import { css, html } from "react-strict-dom"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/admin"
 import { getAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"
-import { Button, DetailPanel, Drawer, PageShell, SideNav } from "@duro-app/ui"
+import { runEffect } from "~/lib/runtime.server"
+import { Badge, Button, DetailPanel, Drawer, Inline, PageShell, SideNav } from "@duro-app/ui"
 import { Header } from "~/components/Header/Header"
 import { useMediaQuery } from "~/hooks/useMediaQuery"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
@@ -43,6 +46,18 @@ const styles = css.create({
   },
 })
 
+// Side-nav label with optional pending count chip. Co-located here because
+// it's only used for admin navigation and depends on the loader's count shape.
+function NavLabel({ label, count }: { label: string; count: number }) {
+  if (count <= 0) return <>{label}</>
+  return (
+    <Inline gap="sm" align="center" justify="between">
+      <html.span>{label}</html.span>
+      <Badge variant="warning">{count}</Badge>
+    </Inline>
+  )
+}
+
 // --- Side panel via Outlet context ---
 
 export interface AdminSidePanelContext {
@@ -68,7 +83,25 @@ export async function loader({ request }: Route.LoaderArgs) {
   const auth = await getAuth(request)
   const decision = await checkAuthDecision({ auth, application: "duro", action: "admin" })
   if (!decision.allow) throw new Response("Forbidden", { status: 403 })
-  return {}
+
+  // Pending counts surface as side-nav badges so an admin can see at a glance
+  // what's waiting for them. Use raw SQL because the repos don't expose count
+  // helpers and a row-decode round-trip would be wasteful for a single number.
+  const pendingCounts = await runEffect(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      const [accessRequests, accessInvitations] = yield* Effect.all([
+        sql`SELECT count(*)::int AS n FROM access_requests WHERE status = 'pending'`,
+        sql`SELECT count(*)::int AS n FROM access_invitations WHERE status = 'pending'`,
+      ])
+      return {
+        accessRequests: ((accessRequests[0] as { n?: number } | undefined)?.n ?? 0) as number,
+        accessInvitations: ((accessInvitations[0] as { n?: number } | undefined)?.n ?? 0) as number,
+      }
+    }),
+  ).catch(() => ({ accessRequests: 0, accessInvitations: 0 }))
+
+  return { pendingCounts }
 }
 
 function deriveActiveValue(pathname: string): string {
@@ -91,7 +124,7 @@ const navMap: Record<string, string> = {
   users: "/admin/users",
 }
 
-export default function AdminLayout() {
+export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
@@ -100,6 +133,50 @@ export default function AdminLayout() {
     user: string
     isAdmin: boolean
   }
+  const counts = loaderData?.pendingCounts ?? { accessRequests: 0, accessInvitations: 0 }
+  const revalidator = useRevalidator()
+
+  // Refresh side-nav counts every 45s while the tab is foregrounded so an
+  // admin who leaves the page open doesn't miss new pending work. Pause when
+  // the tab is hidden — background tabs shouldn't poll. The interval is
+  // re-armed on visibilitychange.
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null
+
+    const start = () => {
+      if (intervalId !== null) return
+      intervalId = setInterval(() => revalidator.revalidate(), 45_000)
+    }
+    const stop = () => {
+      if (intervalId !== null) {
+        clearInterval(intervalId)
+        intervalId = null
+      }
+    }
+
+    if (typeof document !== "undefined" && document.visibilityState === "visible") start()
+
+    const onVisibility = () => {
+      if (typeof document === "undefined") return
+      if (document.visibilityState === "visible") {
+        // Catch up immediately on focus before resuming the cadence.
+        revalidator.revalidate()
+        start()
+      } else {
+        stop()
+      }
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibility)
+    }
+    return () => {
+      stop()
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibility)
+      }
+    }
+  }, [revalidator])
 
   const [sidePanelOpen, setSidePanelOpen] = useState(false)
   const [sidePanelContent, setSidePanelContent] = useState<ReactNode | null>(null)
@@ -155,8 +232,12 @@ export default function AdminLayout() {
         <SideNav.Item value="group-mappings">{t("admin.nav.groupMappings", "Group Mappings")}</SideNav.Item>
       </SideNav.Group>
       <SideNav.Group label={t("admin.nav.workflows", "Workflows")}>
-        <SideNav.Item value="access-requests">{t("admin.nav.accessRequests", "Access Requests")}</SideNav.Item>
-        <SideNav.Item value="invitations">{t("admin.nav.invitations", "Access Invitations")}</SideNav.Item>
+        <SideNav.Item value="access-requests">
+          <NavLabel label={t("admin.nav.accessRequests", "Access Requests")} count={counts.accessRequests} />
+        </SideNav.Item>
+        <SideNav.Item value="invitations">
+          <NavLabel label={t("admin.nav.invitations", "Access Invitations")} count={counts.accessInvitations} />
+        </SideNav.Item>
       </SideNav.Group>
       <SideNav.Group label={t("admin.nav.security", "Security")}>
         <SideNav.Item value="authz-playground">{t("admin.nav.authzPlayground", "Authz Playground")}</SideNav.Item>

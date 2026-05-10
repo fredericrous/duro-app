@@ -4,6 +4,8 @@ export default [
   layout("routes/dashboard.tsx", [
     index("routes/home.tsx"),
     route("settings", "routes/settings.tsx"),
+    route("catalog", "routes/catalog.tsx"),
+    route("requests", "routes/requests.tsx"),
     route("admin", "routes/admin.tsx", [
       index("routes/admin.invites.tsx"),
       route("users", "routes/admin.users.tsx"),
@@ -36,5 +38,6 @@ export default [
   route("api/authz/check-bulk", "routes/api.authz.check-bulk.ts"),
   route("api/principals/:id/grants", "routes/api.principals.$id.grants.ts"),
   route("api/access-requests", "routes/api.access-requests.ts"),
+  route("api/catalog", "routes/api.catalog.ts"),
   route("api/invitations", "routes/api.invitations.ts"),
 ] satisfies RouteConfig

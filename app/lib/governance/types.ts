@@ -85,6 +85,7 @@ export const ApplicationRow = Schema.Struct({
   accessMode: Schema.String,
   ownerId: Coerced.NullableString,
   enabled: Coerced.Boolean,
+  url: Coerced.NullableString,
   createdAt: Coerced.DateString,
   updatedAt: Coerced.DateString,
   lastSyncedAt: Coerced.NullableDateString,
