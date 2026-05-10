@@ -24,7 +24,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Button, EmptyState, LinkButton, ScrollArea, Stack, Table } from "@duro-app/ui"
+import { Button, EmptyState, LinkButton, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
@@ -218,55 +218,62 @@ export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
         }
         action={createGrantAction}
       >
-        <ScrollArea.Root>
-          <ScrollArea.Viewport>
-            <ScrollArea.Content>
-              <Table.Root>
-                <Table.Header>
-                  {table.getHeaderGroups().map((headerGroup) => (
-                    <Table.Row key={headerGroup.id}>
-                      {headerGroup.headers.map((header) => (
-                        <Table.HeaderCell key={header.id}>
-                          {header.isPlaceholder ? null : (
-                            <>
-                              {header.column.getCanSort() ? (
-                                <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
-                                  {flexRender(header.column.columnDef.header, header.getContext())}
-                                  <Table.SortIndicator column={header.column} />
-                                </html.span>
-                              ) : (
-                                flexRender(header.column.columnDef.header, header.getContext())
-                              )}
-                            </>
-                          )}
-                        </Table.HeaderCell>
-                      ))}
-                    </Table.Row>
-                  ))}
-                </Table.Header>
-                <Table.Body>
-                  {table.getRowModel().rows.map((row) => (
-                    <Table.Row key={row.id}>
-                      {row.getVisibleCells().map((cell) => (
-                        <Table.Cell key={cell.id}>
-                          {cell.column.id === "actions" ? (
-                            <RevokeCell grantId={row.original.id} />
-                          ) : (
-                            flexRender(cell.column.columnDef.cell, cell.getContext())
-                          )}
-                        </Table.Cell>
-                      ))}
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table.Root>
-            </ScrollArea.Content>
-          </ScrollArea.Viewport>
-          <ScrollArea.Scrollbar orientation="horizontal">
-            <ScrollArea.Thumb orientation="horizontal" />
-          </ScrollArea.Scrollbar>
-        </ScrollArea.Root>
-        <Table.Pagination table={table} />
+        <Table.Container>
+          <Table.SortChip
+            options={table
+              .getAllColumns()
+              .filter((c) => c.getCanSort())
+              .map((c) => ({ id: c.id, label: String(c.columnDef.header ?? c.id) }))}
+            value={sorting[0] ? { id: sorting[0].id, desc: sorting[0].desc } : null}
+            onChange={(next) => setSorting(next ? [{ id: next.id, desc: next.desc }] : [])}
+          />
+          <Table.Root>
+            <Table.Header>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <Table.Row key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    const isActions = header.column.id === "actions"
+                    return (
+                      <Table.HeaderCell
+                        key={header.id}
+                        label={String(header.column.columnDef.header ?? "")}
+                        isActions={isActions}
+                      >
+                        {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                          <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            <Table.SortIndicator column={header.column} />
+                          </html.span>
+                        ) : (
+                          flexRender(header.column.columnDef.header, header.getContext())
+                        )}
+                      </Table.HeaderCell>
+                    )
+                  })}
+                </Table.Row>
+              ))}
+            </Table.Header>
+            <Table.Body>
+              {table.getRowModel().rows.map((row) => (
+                <Table.Row key={row.id}>
+                  {row.getVisibleCells().map((cell) => {
+                    const isActions = cell.column.id === "actions"
+                    return (
+                      <Table.Cell key={cell.id} isActions={isActions}>
+                        {isActions ? (
+                          <RevokeCell grantId={row.original.id} />
+                        ) : (
+                          flexRender(cell.column.columnDef.cell, cell.getContext())
+                        )}
+                      </Table.Cell>
+                    )
+                  })}
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table.Root>
+          <Table.Pagination table={table} />
+        </Table.Container>
       </CardSection>
     </Stack>
   )
