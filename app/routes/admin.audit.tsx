@@ -5,7 +5,10 @@ import { Effect } from "effect"
 import type { Route } from "./+types/admin.audit"
 import { runEffect } from "~/lib/runtime.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
+import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import type { AuditEvent } from "~/lib/governance/types"
+
+type AuditEventWithNames = AuditEvent & { actorName: string | null }
 import {
   useReactTable,
   getCoreRowModel,
@@ -51,22 +54,28 @@ export async function loader({ request }: Route.LoaderArgs) {
   const page = parseInt(url.searchParams.get("page") || "0", 10)
   const pageSize = 50
 
-  let events: AuditEvent[] = []
+  let events: AuditEventWithNames[] = []
   let error: string | undefined
 
   try {
     events = await runEffect(
       Effect.gen(function* () {
         const svc = yield* AuditService
-        const raw = yield* svc.query({
-          eventType,
-          actorId,
-          targetType,
-          targetId,
-          applicationId,
-          limit: source ? pageSize * 5 : pageSize,
-          offset: source ? 0 : page * pageSize,
-        })
+        const principalRepo = yield* PrincipalRepo
+
+        const [raw, principals] = [
+          yield* svc.query({
+            eventType,
+            actorId,
+            targetType,
+            targetId,
+            applicationId,
+            limit: source ? pageSize * 5 : pageSize,
+            offset: source ? 0 : page * pageSize,
+          }),
+          yield* principalRepo.list(),
+        ]
+        const actorMap = new Map(principals.map((p) => [p.id, p.displayName]))
 
         // Ensure metadata is always a plain serializable object so
         // react-router's JSON serialization doesn't blow up on weird
@@ -74,6 +83,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         const sanitized = raw.map((e) => ({
           ...e,
           metadata: safeParseMetadata(e.metadata),
+          actorName: e.actorId ? (actorMap.get(e.actorId) ?? null) : null,
         }))
 
         if (!source) return sanitized
@@ -93,7 +103,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { events, page, pageSize, source, error }
 }
 
-const columnHelper = createColumnHelper<AuditEvent>()
+const columnHelper = createColumnHelper<AuditEventWithNames>()
 
 function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string) {
   return [
@@ -104,7 +114,7 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
     }),
     columnHelper.accessor("actorId", {
       header: t("admin.cols.actor"),
-      cell: ({ getValue }) => getValue() ?? "\u2014",
+      cell: ({ row }) => row.original.actorName ?? row.original.actorId ?? "\u2014",
     }),
     columnHelper.accessor("targetType", {
       header: t("admin.cols.targetType"),

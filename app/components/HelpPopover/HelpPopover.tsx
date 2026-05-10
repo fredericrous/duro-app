@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
+import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { shadows } from "@duro-app/tokens/tokens/shadows.css"
 
 const detailsStyle: CSSProperties = {
   display: "inline-block",
@@ -35,13 +37,13 @@ const popupStyle: CSSProperties = {
   minWidth: 240,
   maxWidth: 320,
   padding: "0.75rem",
-  background: "var(--colors-bgCard)",
-  color: "var(--colors-text)",
+  background: colors.bgCard,
+  color: colors.text,
   borderWidth: 1,
   borderStyle: "solid",
-  borderColor: "var(--colors-border)",
+  borderColor: colors.border,
   borderRadius: 6,
-  boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
+  boxShadow: shadows.md,
   fontSize: "0.875rem",
   lineHeight: 1.4,
   whiteSpace: "normal",

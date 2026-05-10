@@ -7,8 +7,10 @@ import { runEffect } from "~/lib/runtime.server"
 import { isOriginAllowed } from "~/lib/config.server"
 import { getAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"
+import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
+import { RbacRepo } from "~/lib/governance/RbacRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { deactivateGrant } from "~/lib/workflows/grant-activation.server"
 import type { Grant } from "~/lib/governance/types"
@@ -28,14 +30,29 @@ import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
 type GrantWithNames = Grant & {
   principalName: string
+  roleName: string
+  grantedByName: string
 }
 
 export async function loader() {
   const data = await runEffect(
     Effect.gen(function* () {
       const principalRepo = yield* PrincipalRepo
+      const appRepo = yield* ApplicationRepo
+      const rbac = yield* RbacRepo
+
       const principals = yield* principalRepo.list()
       const principalMap = new Map(principals.map((p) => [p.id, p.displayName]))
+
+      // Build a single roleId → displayName map across all applications.
+      // Known smell: one listRoles call per app (small N today). Follow-up:
+      // collapse via RbacRepo.listAll().
+      const apps = yield* appRepo.list()
+      const roleMap = new Map<string, string>()
+      for (const app of apps) {
+        const roles = yield* rbac.listRoles(app.id)
+        for (const r of roles) roleMap.set(r.id, r.displayName)
+      }
 
       // Collect active grants for all principals
       const allGrants: GrantWithNames[] = []
@@ -46,6 +63,8 @@ export async function loader() {
           allGrants.push({
             ...grant,
             principalName: principalMap.get(grant.principalId) ?? grant.principalId,
+            roleName: grant.roleId === null ? "—" : (roleMap.get(grant.roleId) ?? grant.roleId),
+            grantedByName: principalMap.get(grant.grantedBy) ?? grant.grantedBy,
           })
         }
       }
@@ -115,9 +134,9 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
       header: t("admin.cols.principal"),
       enableSorting: true,
     }),
-    columnHelper.accessor("roleId", {
+    columnHelper.accessor("roleName", {
       header: t("admin.cols.role"),
-      cell: ({ getValue }) => getValue() ?? "\u2014",
+      enableSorting: true,
     }),
     columnHelper.accessor("entitlementId", {
       header: t("admin.cols.entitlement"),
@@ -127,7 +146,7 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
       header: t("admin.cols.resource"),
       cell: ({ getValue }) => getValue() ?? t("admin.cols.all"),
     }),
-    columnHelper.accessor("grantedBy", {
+    columnHelper.accessor("grantedByName", {
       header: t("admin.cols.grantedBy"),
       enableSorting: true,
     }),
