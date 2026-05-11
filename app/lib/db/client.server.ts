@@ -18,6 +18,7 @@ import m0011 from "./migrations/pg/0011_add_application_last_synced_at"
 import m0012 from "./migrations/pg/0012_plugin_connected_systems"
 import m0013 from "./migrations/pg/0013_access_request_dedup_index"
 import m0014 from "./migrations/pg/0014_add_application_url"
+import m0015 from "./migrations/pg/0015_reclassify_access_modes"
 
 const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
@@ -63,6 +64,7 @@ const migrations: Array<
   [12, "plugin_connected_systems", m0012],
   [13, "access_request_dedup_index", m0013],
   [14, "add_application_url", m0014],
+  [15, "reclassify_access_modes", m0015],
 ]
 
 const runMigrations = Effect.gen(function* () {
