@@ -80,8 +80,6 @@
       "inviteOnly": "Invite only"
     },
     "pendingHint": "Awaiting approval.",
-    "inviteOnlyHint": "Ask an administrator to invite you.",
-    "allRolesGrantedHint": "All available roles granted.",
     "viewRequest": "View request",
     "openLaunch": "Open"
   },

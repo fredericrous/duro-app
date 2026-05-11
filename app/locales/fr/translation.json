@@ -80,8 +80,6 @@
       "inviteOnly": "Sur invitation"
     },
     "pendingHint": "En attente d'approbation.",
-    "inviteOnlyHint": "Demandez a un administrateur de vous inviter.",
-    "allRolesGrantedHint": "Tous les roles disponibles sont accordes.",
     "viewRequest": "Voir la demande",
     "openLaunch": "Ouvrir"
   },

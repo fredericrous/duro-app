@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Effect } from "effect"
 import type { Route } from "./+types/catalog"
 import { Link, useRouteLoaderData } from "react-router"
@@ -67,6 +67,19 @@ const stateBadgeVariant: Record<AppCatalogState, "default" | "success" | "warnin
   invite_only: "default",
 }
 
+// Order rows so the user's eye lands on actionable rows first and the inert
+// "informational only" states (invite_only / granted_full) settle at the
+// bottom. This matters more than alphabetical order on a discovery surface
+// where the user is asking "what can I do right now?".
+const statePriority: Record<AppCatalogState, number> = {
+  granted_can_upgrade: 0, // partial access, can upgrade — top
+  requestable: 1, // self-request available
+  open: 2, // open-launchable app
+  pending: 3, // request already submitted, waiting
+  invite_only: 4, // admin grants, no CTA
+  granted_full: 5, // already fully granted, also on /home
+}
+
 const styles = css.create({
   iconWrap: {
     display: "flex",
@@ -93,6 +106,14 @@ export default function AppsPage({ loaderData }: Route.ComponentProps) {
     setPreselectedAppId(appId)
     setDialogOpen(true)
   }
+
+  // Sort by actionability so the rows the user can do something about float
+  // to the top. Stable sort preserves the loader's secondary order
+  // (alphabetical / category) within each priority group.
+  const sortedCatalog = useMemo(
+    () => [...appsCatalog].sort((a, b) => statePriority[a.state] - statePriority[b.state]),
+    [appsCatalog],
+  )
 
   const stateLabel = (state: AppCatalogState) => {
     switch (state) {
@@ -141,7 +162,7 @@ export default function AppsPage({ loaderData }: Route.ComponentProps) {
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {appsCatalog.map((entry) => {
+                {sortedCatalog.map((entry) => {
                   const icon = iconBySlug[entry.app.slug]
                   return (
                     <Table.Row key={entry.app.id}>
@@ -165,37 +186,36 @@ export default function AppsPage({ loaderData }: Route.ComponentProps) {
                       <Table.Cell>
                         <Badge variant={stateBadgeVariant[entry.state]}>{stateLabel(entry.state)}</Badge>
                       </Table.Cell>
+                      {/* Action cell: right-aligned by convention for BI/admin
+                          tables. States with no user-actionable affordance
+                          (granted_full, invite_only) intentionally render an
+                          empty cell — the status badge already carries the
+                          information, restating it as muted prose in the action
+                          column would just create visual noise without giving
+                          the user anything they could click. */}
                       <Table.Cell>
-                        {entry.state === "requestable" && (
-                          <Button variant="primary" onClick={() => openRequestDialog(entry.app.id)}>
-                            {t("apps.status.requestable")}
-                          </Button>
-                        )}
-                        {entry.state === "granted_can_upgrade" && (
-                          <Button variant="secondary" onClick={() => openRequestDialog(entry.app.id)}>
-                            {t("apps.status.canUpgrade")}
-                          </Button>
-                        )}
-                        {entry.state === "granted_full" && (
-                          <Text color="muted" variant="bodySm">
-                            {t("apps.allRolesGrantedHint")}
-                          </Text>
-                        )}
-                        {entry.state === "pending" && (
-                          <Link to="/requests">
-                            <Button variant="secondary">{t("apps.viewRequest")}</Button>
-                          </Link>
-                        )}
-                        {entry.state === "invite_only" && (
-                          <Text color="muted" variant="bodySm">
-                            {t("apps.inviteOnlyHint")}
-                          </Text>
-                        )}
-                        {entry.state === "open" && entry.app.url && (
-                          <a href={entry.app.url} target="_blank" rel="noopener noreferrer">
-                            <Button variant="secondary">{t("apps.openLaunch")}</Button>
-                          </a>
-                        )}
+                        <Inline justify="end">
+                          {entry.state === "requestable" && (
+                            <Button variant="primary" onClick={() => openRequestDialog(entry.app.id)}>
+                              {t("apps.status.requestable")}
+                            </Button>
+                          )}
+                          {entry.state === "granted_can_upgrade" && (
+                            <Button variant="secondary" onClick={() => openRequestDialog(entry.app.id)}>
+                              {t("apps.status.canUpgrade")}
+                            </Button>
+                          )}
+                          {entry.state === "pending" && (
+                            <Link to="/requests">
+                              <Button variant="secondary">{t("apps.viewRequest")}</Button>
+                            </Link>
+                          )}
+                          {entry.state === "open" && entry.app.url && (
+                            <a href={entry.app.url} target="_blank" rel="noopener noreferrer">
+                              <Button variant="secondary">{t("apps.openLaunch")}</Button>
+                            </a>
+                          )}
+                        </Inline>
                       </Table.Cell>
                     </Table.Row>
                   )
