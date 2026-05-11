@@ -128,15 +128,16 @@ export default function AppsPage({ loaderData }: Route.ComponentProps) {
             <Table.Root>
               <Table.Header>
                 <Table.Row>
-                  {/* Semantic column widths over equal 1fr columns:
-                      - Application: default minmax(0,1fr) — name + category subtitle
-                      - Status: max-content — sized to the badge, which is intrinsically short
-                      - Action: minmax(0,2fr) — variable CTA / hint text gets the slack so
-                        long hints fit on one line at desktop and wrap to 2 lines (not
-                        ellipsis) at narrow widths */}
+                  {/* At desktop, keep evenly-distributed minmax(0,1fr) columns
+                      so the action content doesn't sit right next to the badge.
+                      In compact mode (≤720px container) switch to a content-aware
+                      layout: status shrinks to its badge size and the action
+                      column absorbs the slack so the hint text fits on one line
+                      (or wraps to 2 lines at the narrowest end of the band, never
+                      ellipsis-truncated). */}
                   <Table.HeaderCell>{t("apps.cols.app")}</Table.HeaderCell>
-                  <Table.HeaderCell width="max-content">{t("apps.cols.status")}</Table.HeaderCell>
-                  <Table.HeaderCell width="minmax(0, 2fr)">{t("apps.cols.action")}</Table.HeaderCell>
+                  <Table.HeaderCell compactWidth="max-content">{t("apps.cols.status")}</Table.HeaderCell>
+                  <Table.HeaderCell compactWidth="minmax(0, 2fr)">{t("apps.cols.action")}</Table.HeaderCell>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
