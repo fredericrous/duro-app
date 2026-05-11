@@ -128,9 +128,15 @@ export default function AppsPage({ loaderData }: Route.ComponentProps) {
             <Table.Root>
               <Table.Header>
                 <Table.Row>
+                  {/* Semantic column widths over equal 1fr columns:
+                      - Application: default minmax(0,1fr) — name + category subtitle
+                      - Status: max-content — sized to the badge, which is intrinsically short
+                      - Action: minmax(0,2fr) — variable CTA / hint text gets the slack so
+                        long hints fit on one line at desktop and wrap to 2 lines (not
+                        ellipsis) at narrow widths */}
                   <Table.HeaderCell>{t("apps.cols.app")}</Table.HeaderCell>
-                  <Table.HeaderCell>{t("apps.cols.status")}</Table.HeaderCell>
-                  <Table.HeaderCell>{t("apps.cols.action")}</Table.HeaderCell>
+                  <Table.HeaderCell width="max-content">{t("apps.cols.status")}</Table.HeaderCell>
+                  <Table.HeaderCell width="minmax(0, 2fr)">{t("apps.cols.action")}</Table.HeaderCell>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
@@ -170,7 +176,7 @@ export default function AppsPage({ loaderData }: Route.ComponentProps) {
                           </Button>
                         )}
                         {entry.state === "granted_full" && (
-                          <Text color="muted" variant="bodySm" truncate>
+                          <Text color="muted" variant="bodySm">
                             {t("apps.allRolesGrantedHint")}
                           </Text>
                         )}
@@ -180,7 +186,7 @@ export default function AppsPage({ loaderData }: Route.ComponentProps) {
                           </Link>
                         )}
                         {entry.state === "invite_only" && (
-                          <Text color="muted" variant="bodySm" truncate>
+                          <Text color="muted" variant="bodySm">
                             {t("apps.inviteOnlyHint")}
                           </Text>
                         )}
