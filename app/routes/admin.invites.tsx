@@ -249,31 +249,21 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
 
       {failedInvites.length > 0 && (
         <CardSection title={`${t("admin.invites.failedTitle")} (${failedInvites.length})`}>
-          <Table.Container>
-            <Table.Root>
-              <Table.Header>
-                <Table.Row>
-                  <Table.HeaderCell label={t("admin.invites.cols.email")}>
-                    {t("admin.invites.cols.email")}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell label={t("admin.invites.cols.error")}>
-                    {t("admin.invites.cols.error")}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell label={t("admin.invites.cols.failedAt")}>
-                    {t("admin.invites.cols.failedAt")}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell label={t("admin.invites.cols.actions")} isActions>
-                    {t("admin.invites.cols.actions")}
-                  </Table.HeaderCell>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {failedInvites.map((i) => (
-                  <FailedInviteRow key={i.id} invite={i} />
-                ))}
-              </Table.Body>
-            </Table.Root>
-          </Table.Container>
+          <Table.Root>
+            <Table.Header>
+              <Table.Row>
+                <Table.HeaderCell>{t("admin.invites.cols.email")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.invites.cols.error")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.invites.cols.failedAt")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.invites.cols.actions")}</Table.HeaderCell>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {failedInvites.map((i) => (
+                <FailedInviteRow key={i.id} invite={i} />
+              ))}
+            </Table.Body>
+          </Table.Root>
         </CardSection>
       )}
 
@@ -283,37 +273,23 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
             {t("admin.invites.noActive")}
           </Text>
         ) : (
-          <Table.Container>
-            <Table.Root>
-              <Table.Header>
-                <Table.Row>
-                  <Table.HeaderCell label={t("admin.invites.cols.email")}>
-                    {t("admin.invites.cols.email")}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell label={t("admin.invites.cols.groups")}>
-                    {t("admin.invites.cols.groups")}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell label={t("admin.invites.cols.status")}>
-                    {t("admin.invites.cols.status")}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell label={t("admin.invites.cols.invitedBy")}>
-                    {t("admin.invites.cols.invitedBy")}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell label={t("admin.invites.cols.expires")}>
-                    {t("admin.invites.cols.expires")}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell label={t("admin.invites.cols.actions")} isActions>
-                    {t("admin.invites.cols.actions")}
-                  </Table.HeaderCell>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {pendingInvites.map((i) => (
-                  <PendingInviteRow key={i.id} invite={i} />
-                ))}
-              </Table.Body>
-            </Table.Root>
-          </Table.Container>
+          <Table.Root>
+            <Table.Header>
+              <Table.Row>
+                <Table.HeaderCell>{t("admin.invites.cols.email")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.invites.cols.groups")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.invites.cols.status")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.invites.cols.invitedBy")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.invites.cols.expires")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.invites.cols.actions")}</Table.HeaderCell>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {pendingInvites.map((i) => (
+                <PendingInviteRow key={i.id} invite={i} />
+              ))}
+            </Table.Body>
+          </Table.Root>
         )}
       </CardSection>
     </Stack>

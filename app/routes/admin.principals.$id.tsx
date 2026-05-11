@@ -108,45 +108,20 @@ export default function AdminPrincipalDetailPage({ loaderData }: Route.Component
       </html.div>
 
       <CardSection title={`Active Grants (${grants.length})`}>
-        {grants.length === 0 ? <Text color="muted">No active grants.</Text> : <DataTable table={grantsTable} />}
+        {grants.length === 0 ? (
+          <Text color="muted">No active grants.</Text>
+        ) : (
+          <Table.FromTanstack table={grantsTable} />
+        )}
       </CardSection>
 
       <CardSection title={`Groups (${groups.length})`}>
         {groups.length === 0 ? (
           <Text color="muted">Not a member of any groups.</Text>
         ) : (
-          <DataTable table={groupsTable} />
+          <Table.FromTanstack table={groupsTable} />
         )}
       </CardSection>
     </Stack>
-  )
-}
-
-function DataTable<T>({ table }: { table: ReturnType<typeof useReactTable<T>> }) {
-  return (
-    <Table.Container>
-      <Table.Root>
-        <Table.Header>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <Table.Row key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <Table.HeaderCell key={header.id} label={String(header.column.columnDef.header ?? "")}>
-                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                </Table.HeaderCell>
-              ))}
-            </Table.Row>
-          ))}
-        </Table.Header>
-        <Table.Body>
-          {table.getRowModel().rows.map((row) => (
-            <Table.Row key={row.id}>
-              {row.getVisibleCells().map((cell) => (
-                <Table.Cell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</Table.Cell>
-              ))}
-            </Table.Row>
-          ))}
-        </Table.Body>
-      </Table.Root>
-    </Table.Container>
   )
 }

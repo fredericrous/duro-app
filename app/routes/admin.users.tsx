@@ -305,74 +305,69 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
             ))}
           </Inline>
         </html.div>
-        <Table.Container>
-          <Table.SortChip
-            options={table
-              .getAllColumns()
-              .filter((c) => c.getCanSort())
-              .map((c) => ({ id: c.id, label: String(c.columnDef.header ?? c.id) }))}
-            value={sorting[0] ? { id: sorting[0].id, desc: sorting[0].desc } : null}
-            onChange={(next) => setSorting(next ? [{ id: next.id, desc: next.desc }] : [])}
-          />
-          <Table.Root>
-            <Table.Header>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <Table.Row key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
-                    const isActions = header.column.columnDef.id === "actions"
-                    return (
-                      <Table.HeaderCell
-                        key={header.id}
-                        label={String(header.column.columnDef.header ?? "")}
-                        isActions={isActions}
-                        width={
-                          isActions ? "max-content" : header.getSize() !== 150 ? `${header.getSize()}px` : undefined
-                        }
-                      >
-                        {header.isPlaceholder ? null : header.column.getCanSort() ? (
-                          <html.span
-                            style={filterBarStyles.sortHeader}
-                            onClick={header.column.getToggleSortingHandler()}
-                          >
-                            {flexRender(header.column.columnDef.header, header.getContext())}
-                            <Table.SortIndicator column={header.column} />
-                          </html.span>
-                        ) : (
-                          flexRender(header.column.columnDef.header, header.getContext())
-                        )}
-                      </Table.HeaderCell>
-                    )
-                  })}
-                </Table.Row>
-              ))}
-            </Table.Header>
-            <Table.Body>
-              {table.getRowModel().rows.map((row) => (
-                <Table.Row key={row.id}>
-                  {row.getVisibleCells().map((cell) => {
-                    const isActions = cell.column.id === "actions"
-                    return (
-                      <Table.Cell key={cell.id} isActions={isActions}>
-                        {isActions ? (
-                          <ActionCell
-                            row={row.original}
-                            certPanelUserId={certPanelUserId}
-                            onRevoke={handleRevoke}
-                            onViewCerts={toggleCertPanel}
-                            t={t}
-                          />
-                        ) : (
-                          flexRender(cell.column.columnDef.cell, cell.getContext())
-                        )}
-                      </Table.Cell>
-                    )
-                  })}
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </Table.Root>
-          <Table.Pagination table={table} />
-        </Table.Container>
+        <Table.Root
+          sortChip={
+            <Table.SortChip
+              options={table
+                .getAllColumns()
+                .filter((c) => c.getCanSort())
+                .map((c) => ({ id: c.id, label: String(c.columnDef.header ?? c.id) }))}
+              value={sorting[0] ? { id: sorting[0].id, desc: sorting[0].desc } : null}
+              onChange={(next) => setSorting(next ? [{ id: next.id, desc: next.desc }] : [])}
+            />
+          }
+          pagination={<Table.Pagination table={table} />}
+        >
+          <Table.Header>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <Table.Row key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  const isActions = header.column.columnDef.id === "actions"
+                  return (
+                    <Table.HeaderCell
+                      key={header.id}
+                      label={String(header.column.columnDef.header ?? "")}
+                      width={isActions ? "max-content" : header.getSize() !== 150 ? `${header.getSize()}px` : undefined}
+                    >
+                      {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                        <html.span style={filterBarStyles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          <Table.SortIndicator column={header.column} />
+                        </html.span>
+                      ) : (
+                        flexRender(header.column.columnDef.header, header.getContext())
+                      )}
+                    </Table.HeaderCell>
+                  )
+                })}
+              </Table.Row>
+            ))}
+          </Table.Header>
+          <Table.Body>
+            {table.getRowModel().rows.map((row) => (
+              <Table.Row key={row.id}>
+                {row.getVisibleCells().map((cell) => {
+                  const isActions = cell.column.id === "actions"
+                  return (
+                    <Table.Cell key={cell.id} isActions={isActions}>
+                      {isActions ? (
+                        <ActionCell
+                          row={row.original}
+                          certPanelUserId={certPanelUserId}
+                          onRevoke={handleRevoke}
+                          onViewCerts={toggleCertPanel}
+                          t={t}
+                        />
+                      ) : (
+                        flexRender(cell.column.columnDef.cell, cell.getContext())
+                      )}
+                    </Table.Cell>
+                  )
+                })}
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table.Root>
       </CardSection>
 
       {/* User cert revoke ActionBar */}
@@ -465,33 +460,23 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
 
       {revocations.length > 0 && (
         <CardSection title={`${t("admin.users.revokedTitle")} (${revocations.length})`}>
-          <Table.Container>
-            <Table.Root>
-              <Table.Header>
-                <Table.Row>
-                  <Table.HeaderCell label={t("admin.users.cols.email")}>{t("admin.users.cols.email")}</Table.HeaderCell>
-                  <Table.HeaderCell label={t("admin.users.cols.username")}>
-                    {t("admin.users.cols.username")}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell label={t("admin.users.cols.reason")}>
-                    {t("admin.users.cols.reason")}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell label={t("admin.users.cols.revoked")}>
-                    {t("admin.users.cols.revoked")}
-                  </Table.HeaderCell>
-                  <Table.HeaderCell label={t("admin.users.cols.by")}>{t("admin.users.cols.by")}</Table.HeaderCell>
-                  <Table.HeaderCell label={t("admin.users.cols.actions")} isActions>
-                    {t("admin.users.cols.actions")}
-                  </Table.HeaderCell>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {revocations.map((r) => (
-                  <RevokedUserRow key={r.id} revocation={r} />
-                ))}
-              </Table.Body>
-            </Table.Root>
-          </Table.Container>
+          <Table.Root>
+            <Table.Header>
+              <Table.Row>
+                <Table.HeaderCell>{t("admin.users.cols.email")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.users.cols.username")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.users.cols.reason")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.users.cols.revoked")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.users.cols.by")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.users.cols.actions")}</Table.HeaderCell>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {revocations.map((r) => (
+                <RevokedUserRow key={r.id} revocation={r} />
+              ))}
+            </Table.Body>
+          </Table.Root>
         </CardSection>
       )}
     </Stack>

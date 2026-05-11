@@ -186,62 +186,56 @@ export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentPr
           </Button>
         }
       >
-        <Table.Container>
-          <Table.SortChip
-            options={table
-              .getAllColumns()
-              .filter((c) => c.getCanSort())
-              .map((c) => ({ id: c.id, label: String(c.columnDef.header ?? c.id) }))}
-            value={sorting[0] ? { id: sorting[0].id, desc: sorting[0].desc } : null}
-            onChange={(next) => setSorting(next ? [{ id: next.id, desc: next.desc }] : [])}
-          />
-          <Table.Root>
-            <Table.Header>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <Table.Row key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
-                    const isActions = header.column.id === "actions"
-                    return (
-                      <Table.HeaderCell
-                        key={header.id}
-                        label={String(header.column.columnDef.header ?? "")}
-                        isActions={isActions}
-                      >
-                        {header.isPlaceholder ? null : header.column.getCanSort() ? (
-                          <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
-                            {flexRender(header.column.columnDef.header, header.getContext())}
-                            <Table.SortIndicator column={header.column} />
-                          </html.span>
-                        ) : (
-                          flexRender(header.column.columnDef.header, header.getContext())
-                        )}
-                      </Table.HeaderCell>
-                    )
-                  })}
-                </Table.Row>
-              ))}
-            </Table.Header>
-            <Table.Body>
-              {table.getRowModel().rows.map((row) => (
-                <Table.Row key={row.id}>
-                  {row.getVisibleCells().map((cell) => {
-                    const isActions = cell.column.id === "actions"
-                    return (
-                      <Table.Cell key={cell.id} isActions={isActions}>
-                        {isActions ? (
-                          <DeleteCell mappingId={row.original.id} />
-                        ) : (
-                          flexRender(cell.column.columnDef.cell, cell.getContext())
-                        )}
-                      </Table.Cell>
-                    )
-                  })}
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </Table.Root>
-          <Table.Pagination table={table} />
-        </Table.Container>
+        <Table.Root
+          sortChip={
+            <Table.SortChip
+              options={table
+                .getAllColumns()
+                .filter((c) => c.getCanSort())
+                .map((c) => ({ id: c.id, label: String(c.columnDef.header ?? c.id) }))}
+              value={sorting[0] ? { id: sorting[0].id, desc: sorting[0].desc } : null}
+              onChange={(next) => setSorting(next ? [{ id: next.id, desc: next.desc }] : [])}
+            />
+          }
+          pagination={<Table.Pagination table={table} />}
+        >
+          <Table.Header>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <Table.Row key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <Table.HeaderCell key={header.id} label={String(header.column.columnDef.header ?? "")}>
+                    {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                      <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        <Table.SortIndicator column={header.column} />
+                      </html.span>
+                    ) : (
+                      flexRender(header.column.columnDef.header, header.getContext())
+                    )}
+                  </Table.HeaderCell>
+                ))}
+              </Table.Row>
+            ))}
+          </Table.Header>
+          <Table.Body>
+            {table.getRowModel().rows.map((row) => (
+              <Table.Row key={row.id}>
+                {row.getVisibleCells().map((cell) => {
+                  const isActions = cell.column.id === "actions"
+                  return (
+                    <Table.Cell key={cell.id} isActions={isActions}>
+                      {isActions ? (
+                        <DeleteCell mappingId={row.original.id} />
+                      ) : (
+                        flexRender(cell.column.columnDef.cell, cell.getContext())
+                      )}
+                    </Table.Cell>
+                  )
+                })}
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table.Root>
       </CardSection>
 
       <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>

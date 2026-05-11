@@ -143,65 +143,54 @@ export default function AdminAccessRequestsPage({ loaderData }: Route.ComponentP
           </>
         }
       >
-        <Table.Container>
-          <Table.SortChip
-            options={table
-              .getAllColumns()
-              .filter((c) => c.getCanSort())
-              .map((c) => ({ id: c.id, label: String(c.columnDef.header ?? c.id) }))}
-            value={sorting[0] ? { id: sorting[0].id, desc: sorting[0].desc } : null}
-            onChange={(next) => setSorting(next ? [{ id: next.id, desc: next.desc }] : [])}
-          />
-          <Table.Root>
-            <Table.Header>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <Table.Row key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <Table.HeaderCell key={header.id} label={String(header.column.columnDef.header ?? "")}>
-                      {header.isPlaceholder ? null : header.column.getCanSort() ? (
-                        <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                          <Table.SortIndicator column={header.column} />
-                        </html.span>
-                      ) : (
-                        flexRender(header.column.columnDef.header, header.getContext())
-                      )}
-                    </Table.HeaderCell>
+        <Table.Root
+          sortChip={
+            <Table.SortChip
+              options={table
+                .getAllColumns()
+                .filter((c) => c.getCanSort())
+                .map((c) => ({ id: c.id, label: String(c.columnDef.header ?? c.id) }))}
+              value={sorting[0] ? { id: sorting[0].id, desc: sorting[0].desc } : null}
+              onChange={(next) => setSorting(next ? [{ id: next.id, desc: next.desc }] : [])}
+            />
+          }
+          pagination={<Table.Pagination table={table} />}
+        >
+          <Table.Header>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <Table.Row key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <Table.HeaderCell key={header.id} label={String(header.column.columnDef.header ?? "")}>
+                    {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                      <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        <Table.SortIndicator column={header.column} />
+                      </html.span>
+                    ) : (
+                      flexRender(header.column.columnDef.header, header.getContext())
+                    )}
+                  </Table.HeaderCell>
+                ))}
+              </Table.Row>
+            ))}
+          </Table.Header>
+          <Table.Body>
+            {table.getRowModel().rows.map((row) => {
+              const href = `/admin/access-requests/${row.original.id}`
+              return (
+                <Table.Row
+                  key={row.id}
+                  onClick={() => navigate(href)}
+                  aria-label={`${row.original.requesterName ?? row.original.requesterId} → ${row.original.applicationName || row.original.applicationId}`}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <Table.Cell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</Table.Cell>
                   ))}
                 </Table.Row>
-              ))}
-            </Table.Header>
-            <Table.Body>
-              {table.getRowModel().rows.map((row) => {
-                const href = `/admin/access-requests/${row.original.id}`
-                return (
-                  <html.div
-                    key={row.id}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`${row.original.requesterName ?? row.original.requesterId} → ${row.original.applicationName || row.original.applicationId}`}
-                    onClick={() => navigate(href)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        navigate(href)
-                      }
-                    }}
-                    style={[styles.clickableRow, styles.displayContents]}
-                  >
-                    <Table.Row>
-                      {row.getVisibleCells().map((cell) => (
-                        <Table.Cell key={cell.id}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </Table.Cell>
-                      ))}
-                    </Table.Row>
-                  </html.div>
-                )
-              })}
-            </Table.Body>
-          </Table.Root>
-          <Table.Pagination table={table} />
-        </Table.Container>
+              )
+            })}
+          </Table.Body>
+        </Table.Root>
       </CardSection>
     </Stack>
   )
@@ -215,12 +204,6 @@ const styles = css.create({
     gap: 4,
     cursor: "pointer",
     userSelect: "none",
-  },
-  clickableRow: {
-    cursor: "pointer",
-  },
-  displayContents: {
-    display: "contents",
   },
   justificationTrigger: {
     cursor: "help",

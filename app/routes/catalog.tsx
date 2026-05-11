@@ -3,13 +3,16 @@ import { Effect } from "effect"
 import type { Route } from "./+types/catalog"
 import { Link, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
-import { Badge, Button, EmptyState, PageShell, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
+import { Badge, Button, EmptyState, Inline, PageShell, Stack, Table, Text } from "@duro-app/ui"
+import { css, html } from "react-strict-dom"
 import { Header } from "~/components/Header/Header"
+import { Icon } from "~/components/Icon"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 import { RequestAccessDialog } from "~/components/RequestAccessDialog/RequestAccessDialog"
 import { runEffect } from "~/lib/runtime.server"
 import { authMode } from "~/lib/governance-mode.server"
+import { loadApps } from "~/lib/apps.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { loadAppsCatalogForPrincipal, type AppCatalogEntry, type AppCatalogState } from "~/lib/apps-catalog.server"
 
@@ -36,7 +39,21 @@ export async function loader({ request }: Route.LoaderArgs) {
       await runEffect(Effect.logWarning("catalog page load failed", { error: String(err) }))
     }
   }
-  return { appsCatalog }
+
+  // Map slug → icon SVG using the static apps.json registry. The governance
+  // applications table doesn't yet store icons; matching by slug lets us
+  // surface the same artwork the homepage AppCards use without a schema
+  // change. Empty string when no match — the row falls back to no icon.
+  const iconBySlug: Record<string, string> = {}
+  try {
+    for (const a of loadApps()) {
+      if (a.id && a.icon) iconBySlug[a.id] = a.icon
+    }
+  } catch {
+    // loadApps reads /data/apps.json — falls through to default if missing.
+  }
+
+  return { appsCatalog, iconBySlug }
 }
 
 const stateBadgeVariant: Record<AppCatalogState, "default" | "success" | "warning" | "info"> = {
@@ -50,9 +67,21 @@ const stateBadgeVariant: Record<AppCatalogState, "default" | "success" | "warnin
   invite_only: "default",
 }
 
+const styles = css.create({
+  iconWrap: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 32,
+    height: 32,
+    flexShrink: 0,
+    color: "#6aaffc",
+  },
+})
+
 export default function AppsPage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
-  const { appsCatalog } = loaderData
+  const { appsCatalog, iconBySlug } = loaderData
   const dashboardData = useRouteLoaderData("routes/dashboard") as { user?: string; isAdmin?: boolean } | undefined
   const user = dashboardData?.user ?? ""
   const isAdmin = dashboardData?.isAdmin ?? false
@@ -96,75 +125,76 @@ export default function AppsPage({ loaderData }: Route.ComponentProps) {
           {appsCatalog.length === 0 ? (
             <EmptyState message={t("apps.empty")} />
           ) : (
-            <ScrollArea.Root>
-              <ScrollArea.Viewport>
-                <ScrollArea.Content>
-                  <Table.Root>
-                    <Table.Header>
-                      <Table.Row>
-                        <Table.HeaderCell>{t("apps.cols.app")}</Table.HeaderCell>
-                        <Table.HeaderCell>{t("apps.cols.status")}</Table.HeaderCell>
-                        <Table.HeaderCell>{t("apps.cols.action")}</Table.HeaderCell>
-                      </Table.Row>
-                    </Table.Header>
-                    <Table.Body>
-                      {appsCatalog.map((entry) => (
-                        <Table.Row key={entry.app.id}>
-                          <Table.Cell>
-                            <Stack gap="xs">
-                              <Text>{entry.app.displayName}</Text>
-                              {entry.app.description && (
-                                <Text variant="bodySm" color="muted">
-                                  {entry.app.description}
-                                </Text>
-                              )}
-                            </Stack>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Badge variant={stateBadgeVariant[entry.state]}>{stateLabel(entry.state)}</Badge>
-                          </Table.Cell>
-                          <Table.Cell>
-                            {entry.state === "requestable" && (
-                              <Button variant="primary" onClick={() => openRequestDialog(entry.app.id)}>
-                                {t("apps.status.requestable")}
-                              </Button>
-                            )}
-                            {entry.state === "granted_can_upgrade" && (
-                              <Button variant="secondary" onClick={() => openRequestDialog(entry.app.id)}>
-                                {t("apps.status.canUpgrade")}
-                              </Button>
-                            )}
-                            {entry.state === "granted_full" && (
-                              <Text color="muted" variant="bodySm">
-                                {t("apps.allRolesGrantedHint")}
+            <Table.Root>
+              <Table.Header>
+                <Table.Row>
+                  <Table.HeaderCell>{t("apps.cols.app")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("apps.cols.status")}</Table.HeaderCell>
+                  <Table.HeaderCell>{t("apps.cols.action")}</Table.HeaderCell>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {appsCatalog.map((entry) => {
+                  const icon = iconBySlug[entry.app.slug]
+                  return (
+                    <Table.Row key={entry.app.id}>
+                      <Table.Cell>
+                        <Inline gap="md" align="center">
+                          {icon && (
+                            <html.div style={styles.iconWrap}>
+                              <Icon svg={icon} size={32} />
+                            </html.div>
+                          )}
+                          <Stack gap="xs">
+                            <Text>{entry.app.displayName}</Text>
+                            {entry.app.description && (
+                              <Text variant="bodySm" color="muted">
+                                {entry.app.description}
                               </Text>
                             )}
-                            {entry.state === "pending" && (
-                              <Link to="/requests">
-                                <Button variant="secondary">{t("apps.viewRequest")}</Button>
-                              </Link>
-                            )}
-                            {entry.state === "invite_only" && (
-                              <Text color="muted" variant="bodySm">
-                                {t("apps.inviteOnlyHint")}
-                              </Text>
-                            )}
-                            {entry.state === "open" && entry.app.url && (
-                              <a href={entry.app.url} target="_blank" rel="noopener noreferrer">
-                                <Button variant="secondary">{t("apps.openLaunch")}</Button>
-                              </a>
-                            )}
-                          </Table.Cell>
-                        </Table.Row>
-                      ))}
-                    </Table.Body>
-                  </Table.Root>
-                </ScrollArea.Content>
-              </ScrollArea.Viewport>
-              <ScrollArea.Scrollbar orientation="horizontal">
-                <ScrollArea.Thumb orientation="horizontal" />
-              </ScrollArea.Scrollbar>
-            </ScrollArea.Root>
+                          </Stack>
+                        </Inline>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Badge variant={stateBadgeVariant[entry.state]}>{stateLabel(entry.state)}</Badge>
+                      </Table.Cell>
+                      <Table.Cell>
+                        {entry.state === "requestable" && (
+                          <Button variant="primary" onClick={() => openRequestDialog(entry.app.id)}>
+                            {t("apps.status.requestable")}
+                          </Button>
+                        )}
+                        {entry.state === "granted_can_upgrade" && (
+                          <Button variant="secondary" onClick={() => openRequestDialog(entry.app.id)}>
+                            {t("apps.status.canUpgrade")}
+                          </Button>
+                        )}
+                        {entry.state === "granted_full" && (
+                          <Text color="muted" variant="bodySm">
+                            {t("apps.allRolesGrantedHint")}
+                          </Text>
+                        )}
+                        {entry.state === "pending" && (
+                          <Link to="/requests">
+                            <Button variant="secondary">{t("apps.viewRequest")}</Button>
+                          </Link>
+                        )}
+                        {entry.state === "invite_only" && (
+                          <Text color="muted" variant="bodySm">
+                            {t("apps.inviteOnlyHint")}
+                          </Text>
+                        )}
+                        {entry.state === "open" && entry.app.url && (
+                          <a href={entry.app.url} target="_blank" rel="noopener noreferrer">
+                            <Button variant="secondary">{t("apps.openLaunch")}</Button>
+                          </a>
+                        )}
+                      </Table.Cell>
+                    </Table.Row>
+                  )
+                })}
+              </Table.Body>
+            </Table.Root>
           )}
         </CardSection>
       </Stack>

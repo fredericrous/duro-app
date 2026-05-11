@@ -6,7 +6,6 @@ import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server
 import type { PluginAction, PluginManifest } from "~/lib/plugins/contracts"
 import { Badge, Heading, Inline, Stack, Table, Tag, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
-import { css, html } from "react-strict-dom"
 
 interface PluginRow {
   manifest: PluginManifest
@@ -35,11 +34,6 @@ export async function loader() {
   return { plugins: data }
 }
 
-const styles = css.create({
-  clickableRow: { cursor: "pointer" },
-  displayContents: { display: "contents" },
-})
-
 export default function AdminPluginsPage({ loaderData }: { loaderData: Awaited<ReturnType<typeof loader>> }) {
   const { plugins } = loaderData
   const navigate = useNavigate()
@@ -53,63 +47,59 @@ export default function AdminPluginsPage({ loaderData }: { loaderData: Awaited<R
       </Text>
 
       <CardSection title={`Plugins (${plugins.length})`}>
-        <Table.Container>
-          <Table.Root>
-            <Table.Header>
-              <Table.Row>
-                <Table.HeaderCell label="Plugin">Plugin</Table.HeaderCell>
-                <Table.HeaderCell label="Version">Version</Table.HeaderCell>
-                <Table.HeaderCell label="Mode">Mode</Table.HeaderCell>
-                <Table.HeaderCell label="Capabilities">Capabilities</Table.HeaderCell>
-                <Table.HeaderCell label="Installs">Installs</Table.HeaderCell>
-                <Table.HeaderCell label="Timeout">Timeout</Table.HeaderCell>
+        <Table.Root>
+          <Table.Header>
+            <Table.Row>
+              <Table.HeaderCell>Plugin</Table.HeaderCell>
+              <Table.HeaderCell>Version</Table.HeaderCell>
+              <Table.HeaderCell>Mode</Table.HeaderCell>
+              <Table.HeaderCell>Capabilities</Table.HeaderCell>
+              <Table.HeaderCell>Installs</Table.HeaderCell>
+              <Table.HeaderCell>Timeout</Table.HeaderCell>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {plugins.map((p: PluginRow) => (
+              <Table.Row
+                key={p.manifest.slug}
+                onClick={() => navigate(`/admin/plugins/${p.manifest.slug}`)}
+                aria-label={p.manifest.displayName}
+              >
+                <Table.Cell>
+                  <Stack gap="xs">
+                    <Text>{p.manifest.displayName}</Text>
+                    <Text color="muted" variant="caption">
+                      {p.manifest.slug}
+                    </Text>
+                  </Stack>
+                </Table.Cell>
+                <Table.Cell>
+                  <Badge variant="default">{p.manifest.version}</Badge>
+                </Table.Cell>
+                <Table.Cell>
+                  <Badge variant={p.manifest.imperative ? "warning" : "success"}>
+                    {p.manifest.imperative ? "Imperative" : "Declarative"}
+                  </Badge>
+                </Table.Cell>
+                <Table.Cell>
+                  <Inline gap="xs">
+                    {p.manifest.capabilities.map((cap: string) => (
+                      <Tag key={cap} size="sm">
+                        {cap}
+                      </Tag>
+                    ))}
+                  </Inline>
+                </Table.Cell>
+                <Table.Cell>
+                  <Text>{p.installCount}</Text>
+                </Table.Cell>
+                <Table.Cell>
+                  <Text>{p.manifest.timeoutMs / 1000}s</Text>
+                </Table.Cell>
               </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {plugins.map((p: PluginRow) => (
-                <html.div
-                  key={p.manifest.slug}
-                  onClick={() => navigate(`/admin/plugins/${p.manifest.slug}`)}
-                  style={[styles.clickableRow, styles.displayContents]}
-                >
-                  <Table.Row>
-                    <Table.Cell>
-                      <Stack gap="xs">
-                        <Text>{p.manifest.displayName}</Text>
-                        <Text color="muted" variant="caption">
-                          {p.manifest.slug}
-                        </Text>
-                      </Stack>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Badge variant="default">{p.manifest.version}</Badge>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Badge variant={p.manifest.imperative ? "warning" : "success"}>
-                        {p.manifest.imperative ? "Imperative" : "Declarative"}
-                      </Badge>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Inline gap="xs">
-                        {p.manifest.capabilities.map((cap: string) => (
-                          <Tag key={cap} size="sm">
-                            {cap}
-                          </Tag>
-                        ))}
-                      </Inline>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text>{p.installCount}</Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text>{p.manifest.timeoutMs / 1000}s</Text>
-                    </Table.Cell>
-                  </Table.Row>
-                </html.div>
-              ))}
-            </Table.Body>
-          </Table.Root>
-        </Table.Container>
+            ))}
+          </Table.Body>
+        </Table.Root>
       </CardSection>
     </Stack>
   )

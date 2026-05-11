@@ -533,7 +533,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                   }
                 />
               ) : (
-                <DataTable table={rolesTable} />
+                <Table.FromTanstack table={rolesTable} />
               )}
             </CardSection>
           )}
@@ -558,7 +558,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                   }
                 />
               ) : (
-                <DataTable table={entitlementsTable} />
+                <Table.FromTanstack table={entitlementsTable} />
               )}
             </CardSection>
           )}
@@ -583,7 +583,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                   }
                 />
               ) : (
-                <DataTable table={resourcesTable} />
+                <Table.FromTanstack table={resourcesTable} />
               )}
             </CardSection>
           )}
@@ -608,7 +608,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                   }
                 />
               ) : (
-                <DataTable table={grantsTable} />
+                <Table.FromTanstack table={grantsTable} />
               )}
             </CardSection>
           )}
@@ -621,46 +621,44 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                   message="No pending requests for this application."
                 />
               ) : (
-                <Table.Container>
-                  <Table.Root>
-                    <Table.Header>
-                      <Table.Row>
-                        <Table.HeaderCell label="Requester">Requester</Table.HeaderCell>
-                        <Table.HeaderCell label="Role">Role</Table.HeaderCell>
-                        <Table.HeaderCell label="Entitlement">Entitlement</Table.HeaderCell>
-                        <Table.HeaderCell label="Justification">Justification</Table.HeaderCell>
-                        <Table.HeaderCell label="Created">Created</Table.HeaderCell>
-                        <Table.HeaderCell label="Action">Action</Table.HeaderCell>
+                <Table.Root>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.HeaderCell>Requester</Table.HeaderCell>
+                      <Table.HeaderCell>Role</Table.HeaderCell>
+                      <Table.HeaderCell>Entitlement</Table.HeaderCell>
+                      <Table.HeaderCell>Justification</Table.HeaderCell>
+                      <Table.HeaderCell>Created</Table.HeaderCell>
+                      <Table.HeaderCell>Action</Table.HeaderCell>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {(pendingRequests as AccessRequestEnriched[]).map((r) => (
+                      <Table.Row key={r.id}>
+                        <Table.Cell>{r.requesterName ?? r.requesterId}</Table.Cell>
+                        <Table.Cell>{r.roleName ?? r.roleId ?? "—"}</Table.Cell>
+                        <Table.Cell>{r.entitlementName ?? r.entitlementId ?? "—"}</Table.Cell>
+                        <Table.Cell>
+                          {r.justification ? (
+                            <span title={r.justification}>
+                              {r.justification.length > 60 ? r.justification.slice(0, 60) + "…" : r.justification}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </Table.Cell>
+                        <Table.Cell>{new Date(r.createdAt).toLocaleDateString()}</Table.Cell>
+                        <Table.Cell isActions>
+                          <Link to={`/admin/access-requests/${r.id}`}>
+                            <Button variant="secondary" size="small">
+                              Review
+                            </Button>
+                          </Link>
+                        </Table.Cell>
                       </Table.Row>
-                    </Table.Header>
-                    <Table.Body>
-                      {(pendingRequests as AccessRequestEnriched[]).map((r) => (
-                        <Table.Row key={r.id}>
-                          <Table.Cell>{r.requesterName ?? r.requesterId}</Table.Cell>
-                          <Table.Cell>{r.roleName ?? r.roleId ?? "—"}</Table.Cell>
-                          <Table.Cell>{r.entitlementName ?? r.entitlementId ?? "—"}</Table.Cell>
-                          <Table.Cell>
-                            {r.justification ? (
-                              <span title={r.justification}>
-                                {r.justification.length > 60 ? r.justification.slice(0, 60) + "…" : r.justification}
-                              </span>
-                            ) : (
-                              "—"
-                            )}
-                          </Table.Cell>
-                          <Table.Cell>{new Date(r.createdAt).toLocaleDateString()}</Table.Cell>
-                          <Table.Cell>
-                            <Link to={`/admin/access-requests/${r.id}`}>
-                              <Button variant="secondary" size="small">
-                                Review
-                              </Button>
-                            </Link>
-                          </Table.Cell>
-                        </Table.Row>
-                      ))}
-                    </Table.Body>
-                  </Table.Root>
-                </Table.Container>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
               )}
             </CardSection>
           )}
@@ -842,36 +840,6 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
         </Dialog.Portal>
       </Dialog.Root>
     </Stack>
-  )
-}
-
-/** Reusable table renderer for any TanStack table instance */
-function DataTable<T>({ table }: { table: ReturnType<typeof useReactTable<T>> }) {
-  return (
-    <Table.Container>
-      <Table.Root>
-        <Table.Header>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <Table.Row key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <Table.HeaderCell key={header.id} label={String(header.column.columnDef.header ?? "")}>
-                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                </Table.HeaderCell>
-              ))}
-            </Table.Row>
-          ))}
-        </Table.Header>
-        <Table.Body>
-          {table.getRowModel().rows.map((row) => (
-            <Table.Row key={row.id}>
-              {row.getVisibleCells().map((cell) => (
-                <Table.Cell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</Table.Cell>
-              ))}
-            </Table.Row>
-          ))}
-        </Table.Body>
-      </Table.Root>
-    </Table.Container>
   )
 }
 
