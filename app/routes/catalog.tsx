@@ -170,7 +170,7 @@ export default function AppsPage({ loaderData }: Route.ComponentProps) {
                           </Button>
                         )}
                         {entry.state === "granted_full" && (
-                          <Text color="muted" variant="bodySm">
+                          <Text color="muted" variant="bodySm" truncate>
                             {t("apps.allRolesGrantedHint")}
                           </Text>
                         )}
@@ -180,7 +180,7 @@ export default function AppsPage({ loaderData }: Route.ComponentProps) {
                           </Link>
                         )}
                         {entry.state === "invite_only" && (
-                          <Text color="muted" variant="bodySm">
+                          <Text color="muted" variant="bodySm" truncate>
                             {t("apps.inviteOnlyHint")}
                           </Text>
                         )}
