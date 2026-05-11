@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect"
-import type { Plugin, PluginManifest, PluginCapability, ProvisioningTemplate } from "./contracts"
+import type { Plugin, PluginManifest, ProvisioningTemplate } from "./contracts"
 import { isReversible, PLUGIN_CAPABILITIES } from "./contracts"
 import { STARTER_ROLE_SLUGS, STARTER_ENTITLEMENT_SLUGS } from "~/lib/governance/defaultRbac"
 import { ManifestInvalid, PluginNotFound } from "./errors"

@@ -8,7 +8,6 @@ interface QuickGrantDialogProps {
   onOpenChange: (open: boolean) => void
   roles: ReadonlyArray<Role>
   principals: ReadonlyArray<Principal>
-  applicationSlug: string
   ldapProvisioned: boolean
   onGoToRoles: () => void
 }
@@ -18,7 +17,6 @@ export function QuickGrantDialog({
   onOpenChange,
   roles,
   principals,
-  applicationSlug,
   ldapProvisioned,
   onGoToRoles,
 }: QuickGrantDialogProps) {

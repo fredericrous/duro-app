@@ -1,5 +1,4 @@
 import { Effect } from "effect"
-import type { AuditService } from "~/lib/governance/AuditService.server"
 import type { ScopedAuditService, PluginManifest } from "../contracts"
 
 type RealAuditService = {

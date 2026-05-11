@@ -3,7 +3,7 @@ import { useNavigate } from "react-router"
 import { runEffect } from "~/lib/runtime.server"
 import { PluginRegistry } from "~/lib/plugins/PluginRegistry.server"
 import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
-import type { PluginAction, PluginManifest } from "~/lib/plugins/contracts"
+import type { PluginManifest } from "~/lib/plugins/contracts"
 import { Badge, Heading, Inline, Stack, Table, Tag, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 

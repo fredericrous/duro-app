@@ -17,7 +17,7 @@ import { ApplicationRepo, ApplicationRepoLive } from "./ApplicationRepo.server"
 import { RbacRepo, RbacRepoLive, RbacRepoError } from "./RbacRepo.server"
 import { ConnectedSystemRepo, ConnectedSystemRepoLive } from "./ConnectedSystemRepo.server"
 import { ConnectorMappingRepo, ConnectorMappingRepoLive } from "./ConnectorMappingRepo.server"
-import { PluginRegistry, PluginRegistryLive } from "~/lib/plugins/PluginRegistry.server"
+import { PluginRegistryLive } from "~/lib/plugins/PluginRegistry.server"
 import { makeTestDbLayer } from "~/lib/db/client.server"
 import { STARTER_ENTITLEMENTS, STARTER_ROLES } from "./defaultRbac"
 

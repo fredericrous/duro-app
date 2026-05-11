@@ -1,5 +1,4 @@
 import { Effect, Schedule } from "effect"
-import type { LldapClient } from "~/lib/services/LldapClient.server"
 import type { ScopedLldapClient, PluginManifest } from "../contracts"
 import { ScopeViolation } from "../errors"
 

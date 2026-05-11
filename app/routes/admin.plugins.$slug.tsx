@@ -6,7 +6,7 @@ import { AuditService } from "~/lib/governance/AuditService.server"
 import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import type { PluginAction, PluginManifest } from "~/lib/plugins/contracts"
-import type { AuditEvent, Application, ConnectedSystem } from "~/lib/governance/types"
+import type { AuditEvent, ConnectedSystem } from "~/lib/governance/types"
 import { Badge, Button, Heading, Inline, Panel, Stack, Table, Tag, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { css, html } from "react-strict-dom"
@@ -31,7 +31,6 @@ export async function loader({ params }: { params: { slug: string } }) {
       const plugin = yield* registry.get(slug)
 
       const allApps = yield* appRepo.list()
-      const appMap = new Map(allApps.map((a) => [a.id, a]))
 
       const installs: LoaderData["installs"] = []
       for (const app of allApps) {

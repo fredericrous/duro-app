@@ -12,7 +12,6 @@
 import { Effect, Layer, Schedule } from "effect"
 import * as Http from "node:http"
 import { ProvisioningService, ProvisioningServiceLive } from "~/lib/governance/ProvisioningService.server"
-import { PluginHost } from "~/lib/plugins/PluginHost.server"
 import { PluginHostLive } from "~/lib/plugins/PluginHost.server"
 import { PluginRegistryLive } from "~/lib/plugins/PluginRegistry.server"
 import { DbLive } from "~/lib/db/client.server"

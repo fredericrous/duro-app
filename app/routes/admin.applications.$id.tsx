@@ -17,7 +17,7 @@ import { AppSyncService } from "~/lib/governance/AppSyncService.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { activateGrant } from "~/lib/workflows/grant-activation.server"
 import type { Role, Entitlement, Resource, Grant, Principal } from "~/lib/governance/types"
-import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from "@tanstack/react-table"
+import { useReactTable, getCoreRowModel, createColumnHelper } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import {
@@ -735,7 +735,6 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
         onOpenChange={setQuickGrantOpen}
         roles={roles as Role[]}
         principals={principals as Principal[]}
-        applicationSlug={application.slug}
         ldapProvisioned={ldapProvisioned}
         onGoToRoles={() => setActiveTab("roles")}
       />
