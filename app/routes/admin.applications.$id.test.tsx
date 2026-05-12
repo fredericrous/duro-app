@@ -2,6 +2,10 @@ import { describe, expect, it, vi, beforeEach } from "vitest"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 
+// The dialog tests render a 3-input Dialog under createRoutesStub +
+// focus-trap; default 5s testTimeout occasionally trips. Bump per-file.
+vi.setConfig({ testTimeout: 15_000, hookTimeout: 15_000 })
+
 vi.mock("~/lib/runtime.server", async () => {
   const mod = await import("~/test/test-runtime")
   return { runEffect: mod.testRunEffect }
