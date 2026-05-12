@@ -170,10 +170,10 @@ const baseLoaderData = () => ({
       roleAssignments: [],
     },
   ],
-  resources: [],
-  grants: [],
+  resources: [] as unknown[],
+  grants: [] as unknown[],
   principals: [{ id: "p-alice", displayName: "Alice", externalId: "alice", principalType: "user" as const }],
-  pendingRequests: [],
+  pendingRequests: [] as unknown[],
   ldapProvisioned: false,
   pluginInfo: null,
 })
@@ -216,5 +216,64 @@ describe("AdminApplicationDetailPage component", () => {
     // The page wires up tab triggers for overview/roles/entitlements/etc — at
     // minimum the tab list itself renders.
     expect(screen.getByRole("tablist")).toBeInTheDocument()
+  })
+
+  it("renders tab labels with counts derived from loaderData", async () => {
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByRole("tablist")).toBeInTheDocument()
+    })
+    // The tab labels include their respective collection sizes.
+    expect(screen.getByText("Roles (2)")).toBeInTheDocument()
+    expect(screen.getByText("Entitlements (1)")).toBeInTheDocument()
+    expect(screen.getByText("Grants (0)")).toBeInTheDocument()
+  })
+
+  it("opens the roles tab when ?tab=roles is in the URL", async () => {
+    const data = baseLoaderData()
+    renderRoute({
+      parentLoaderId: "routes/dashboard",
+      parentLoader: () => ({ user: "admin", isAdmin: true }),
+      parentContext: stubSidePanel,
+      route: {
+        path: "/admin/applications/app-1",
+        Component: AdminApplicationDetailPage as never,
+        loader: () => data,
+      },
+      url: "/admin/applications/app-1?tab=roles",
+    })
+    await waitFor(() => {
+      // The Add Role button is rendered inside the roles tab content; it
+      // proves the active tab switched to roles.
+      expect(screen.getByRole("button", { name: /add role/i })).toBeInTheDocument()
+    })
+  })
+
+  it("surfaces a callout when there are pending requests", async () => {
+    renderPage({
+      pendingRequests: [
+        {
+          id: "req-1",
+          requesterId: "p-alice",
+          requesterName: "Alice",
+          applicationId: "app-1",
+          applicationName: "Jellyfin",
+          roleId: "r1",
+          roleName: "Viewer",
+          entitlementId: null,
+          entitlementName: null,
+          resourceId: null,
+          status: "pending",
+          justification: null,
+          requestedDurationHours: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          decidedAt: null,
+          decidedBy: null,
+        },
+      ],
+    })
+    await waitFor(() => {
+      expect(screen.getByText(/1 access request is awaiting/i)).toBeInTheDocument()
+    })
   })
 })

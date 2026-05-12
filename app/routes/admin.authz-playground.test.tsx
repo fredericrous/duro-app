@@ -35,3 +35,49 @@ describe("/admin/authz-playground action", () => {
     expect(expectResponse(result).status).toBe(403)
   })
 })
+
+// ===========================================================================
+// Component-render tests
+// ===========================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import AdminAuthzPlaygroundPage from "./admin.authz-playground"
+import { renderRoute } from "~/test/render-route"
+
+const renderPage = (
+  data: {
+    principals?: Array<{ id: string; displayName: string; externalId: string | null }>
+    applications?: Array<{ id: string; slug: string; displayName: string }>
+  } = {},
+) =>
+  renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    route: {
+      path: "/admin/authz-playground",
+      Component: AdminAuthzPlaygroundPage as never,
+      loader: () => ({
+        principals: data.principals ?? [{ id: "p-alice", displayName: "Alice", externalId: "alice-sub" }],
+        applications: data.applications ?? [{ id: "app-1", slug: "jellyfin", displayName: "Jellyfin" }],
+      }),
+    },
+  })
+
+describe("AdminAuthzPlaygroundPage component", () => {
+  it("renders the page header + subject/application comboboxes", async () => {
+    renderPage()
+    await waitFor(() => {
+      // Page has a Heading title.
+      expect(screen.getByRole("heading")).toBeInTheDocument()
+    })
+    // Two comboboxes (subject + application).
+    expect(screen.getAllByRole("combobox").length).toBeGreaterThanOrEqual(2)
+  })
+
+  it("survives empty principals + applications lists", async () => {
+    renderPage({ principals: [], applications: [] })
+    await waitFor(() => {
+      expect(screen.getByRole("heading")).toBeInTheDocument()
+    })
+  })
+})

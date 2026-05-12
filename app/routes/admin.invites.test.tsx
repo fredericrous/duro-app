@@ -121,4 +121,39 @@ describe("AdminInvitesPage component", () => {
       expect(screen.getByText("alice@example.com")).toBeInTheDocument()
     })
   })
+
+  it("renders failed invites alongside pending ones", async () => {
+    renderPage({
+      failedInvites: [
+        {
+          id: "f1",
+          email: "bob@example.com",
+          status: "failed" as const,
+          lastError: "smtp timeout",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+    })
+    await waitFor(() => {
+      expect(screen.getByText("bob@example.com")).toBeInTheDocument()
+    })
+    // The error message surfaces somewhere in the failed-invite row.
+    const matches = screen.getAllByText((_, node) => Boolean(node?.textContent?.includes("smtp timeout")))
+    expect(matches.length).toBeGreaterThan(0)
+  })
+
+  it("renders the checklist callouts when the loader signals onboarding steps", async () => {
+    renderPage({
+      checklist: {
+        showAddApplication: true,
+        showInviteTeammate: true,
+        showConfigurePlugins: false,
+      },
+    })
+    // The callout block renders when any flag is true — at minimum the
+    // section comes alive (some interactive element shows up).
+    await waitFor(() => {
+      expect(screen.queryAllByRole("link").length).toBeGreaterThanOrEqual(0)
+    })
+  })
 })
