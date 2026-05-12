@@ -41,6 +41,16 @@ describe("/admin/audit loader", () => {
     expect(data.events).toEqual([])
     expect(data.error).toBe("audit service down")
   })
+
+  it("threads filter params (eventType, actorId, targetType, targetId, applicationId) through to the loader output", async () => {
+    mockRunEffect.mockResolvedValueOnce([] as never)
+    const result = await callLoader(loader, {
+      url: "http://localhost/admin/audit?eventType=grant.created&actorId=p1&targetType=grant&targetId=g1&applicationId=app1&source=plugin:gitea",
+    })
+    const data = expectData<{ events: unknown[]; source?: string }>(result)
+    expect(data.events).toEqual([])
+    expect(data.source).toBe("plugin:gitea")
+  })
 })
 
 // ===========================================================================

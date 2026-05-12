@@ -67,6 +67,23 @@ describe("/admin/grants action — origin + auth gates", () => {
     const result = await callAction(action, { formData: { intent: "revoke", grantId: "g1" } })
     expect(expectResponse(result).status).toBe(403)
   })
+
+  it("returns success after revoking the grant on the happy path", async () => {
+    mockGetAuth.mockResolvedValue({ user: "admin", sub: "admin-sub" } as never)
+    mockCheckDecision.mockResolvedValue({ allow: true } as never)
+    mockRunEffect
+      .mockResolvedValueOnce({ id: "p-admin" } as never) // principal lookup
+      .mockResolvedValueOnce(undefined as never) // revoke + audit + deactivate
+    const result = await callAction(action, { formData: { intent: "revoke", grantId: "g1" } })
+    const data = expectData<{ success?: boolean }>(result)
+    expect(data.success).toBe(true)
+  })
+
+  it("returns the unknown-intent error for an unrecognized intent", async () => {
+    const result = await callAction(action, { formData: { intent: "doesNotExist" } })
+    const data = expectData<{ error?: string }>(result)
+    expect(data.error).toBe("Unknown intent")
+  })
 })
 
 // ===========================================================================
