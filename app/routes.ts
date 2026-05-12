@@ -29,6 +29,7 @@ export default [
   route("auth/callback", "routes/auth.callback.tsx"),
   route("auth/logout", "routes/auth.logout.ts"),
   route("health", "routes/health.ts"),
+  route("health/ready", "routes/health.ready.ts"),
   route("invite/:token", "routes/invite.tsx"),
   route("invite/:token/create-account", "routes/invite-create-account.tsx"),
   route("reinvite/:token", "routes/reinvite.tsx"),

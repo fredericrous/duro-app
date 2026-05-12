@@ -102,10 +102,13 @@ spec:
               command:
                 - wget
                 - -qO-
-                - http://localhost:{{ .Values.worker.port }}/
+                - http://localhost:{{ .Values.worker.port }}/health/ready
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
+            # /health/ready pings DB; allow a few transient failures
+            # before dropping the pod from Service endpoints.
+            failureThreshold: 3
           volumeMounts:
             - name: tmp
               mountPath: /tmp

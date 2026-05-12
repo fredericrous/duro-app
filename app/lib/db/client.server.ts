@@ -1,7 +1,7 @@
 import * as PgClient from "@effect/sql-pg/PgClient"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
-import { Context, Config, Effect, Layer } from "effect"
+import { Context, Config, Duration, Effect, Layer } from "effect"
 import * as crypto from "node:crypto"
 
 import m0001 from "./migrations/pg/0001_create_schema"
@@ -27,12 +27,23 @@ const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.t
 // PgClient layer (Config-driven — resolves DATABASE_URL at layer build time)
 // ---------------------------------------------------------------------------
 
+// connectionTTL bounds the lifetime of any pooled connection so a stuck
+// connection (e.g. surviving a CNPG primary failover with stale TCP state)
+// can't keep failing the pool indefinitely. Without this, pg.Pool reuses
+// connections until they error — and a half-broken pool can keep
+// surfacing ECONNREFUSED long after postgres is reachable again.
+// idleTimeout: close idle connections quickly so we don't keep stale
+// sockets around between bursts.
+// applicationName: shows up in pg_stat_activity for triage.
 const PgClientLive = Layer.unwrapEffect(
   Config.redacted("DATABASE_URL").pipe(
     Effect.map((url) =>
       PgClient.layer({
         url,
         transformResultNames: snakeToCamel,
+        applicationName: "duro-app",
+        connectionTTL: Duration.minutes(5),
+        idleTimeout: Duration.seconds(30),
       }),
     ),
   ),

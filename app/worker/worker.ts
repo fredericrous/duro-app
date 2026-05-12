@@ -111,13 +111,39 @@ const pollLoop = pollOnce.pipe(
 
 const HEALTH_PORT = parseInt(process.env.WORKER_HEALTH_PORT ?? "3001", 10)
 
-const startHealthServer = Effect.sync(() => {
-  const server = Http.createServer((_req, res) => {
-    res.writeHead(200, { "Content-Type": "text/plain" })
-    res.end("ok")
-  })
-  server.listen(HEALTH_PORT, () => {
-    console.log(`worker health server on :${HEALTH_PORT}`)
+// /health/ready hits the DB so kubelet can detect a wedged pool and
+// restart the worker. /health (and /) stay as cheap liveness checks
+// — the process being up does not imply the pool is healthy.
+const startHealthServer = Effect.gen(function* () {
+  const runtime = yield* Effect.runtime<SqlClient.SqlClient>()
+  const runFork = (eff: Effect.Effect<unknown, unknown, SqlClient.SqlClient>) =>
+    Effect.runPromise(Effect.provide(eff, runtime))
+  return yield* Effect.sync(() => {
+    const server = Http.createServer((req, res) => {
+      if (req.url === "/health/ready") {
+        runFork(
+          Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient
+            yield* sql`SELECT 1`
+          }).pipe(Effect.timeout("3 seconds")),
+        ).then(
+          () => {
+            res.writeHead(200, { "Content-Type": "application/json" })
+            res.end(JSON.stringify({ status: "ready" }))
+          },
+          (err) => {
+            res.writeHead(503, { "Content-Type": "application/json" })
+            res.end(JSON.stringify({ status: "not_ready", error: String(err) }))
+          },
+        )
+        return
+      }
+      res.writeHead(200, { "Content-Type": "text/plain" })
+      res.end("ok")
+    })
+    server.listen(HEALTH_PORT, () => {
+      console.log(`worker health server on :${HEALTH_PORT}`)
+    })
   })
 })
 
