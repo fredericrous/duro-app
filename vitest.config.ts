@@ -30,21 +30,16 @@ export default defineConfig({
         "build/**",
         "node_modules/**",
       ],
-      // Coverage floor — locks in current progress so future PRs can't drop
-      // below it. Pegged just under the present numbers (46% lines / 33% br)
-      // to leave headroom for honest refactors that temporarily dip. Ratchet
-      // these UP as more tests land — every PR should be allowed to raise
-      // the floor, never lower it.
-      //
-      // Original target was 80% lines; reaching it requires component-render
-      // tests (Header, AppOverview, dialog forms, etc.) and Live-variant
-      // service tests (EmailService SMTP, OidcClient discovery). Tracked as
-      // follow-up; the test-runtime helpers in app/test make those tractable.
+      // Coverage floor — pegged just under current numbers to lock in
+      // progress. Ratchet UP as more tests land; PRs may raise the floor,
+      // never lower it. Target is 80% lines; the remaining gap is mostly
+      // PluginHost.server.ts, ProvisioningService.server.ts, and a few
+      // route variants (admin.users dialogs, admin.applications dialogs).
       thresholds: {
-        lines: 45,
-        statements: 44,
-        functions: 38,
-        branches: 32,
+        lines: 65,
+        statements: 64,
+        functions: 60,
+        branches: 55,
       },
     },
   },
