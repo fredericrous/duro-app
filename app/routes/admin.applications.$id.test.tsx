@@ -351,3 +351,148 @@ describe("AdminApplicationDetailPage component", () => {
     })
   })
 })
+
+// =============================================================================
+// Dialog round-trip tests
+// =============================================================================
+//
+// Each dialog renders a fetcher.Form that submits to the route's action.
+// createRoutesStub provides a real data router, so userEvent.click on
+// "Add Role" → fill inputs → submit pipes through to the `action` we wire
+// into renderRoute. Asserting on the captured FormData proves the entire
+// dialog → form → action submit flow works end-to-end.
+
+import userEvent from "@testing-library/user-event"
+
+interface CapturedAction {
+  intent: string | null
+  fields: Record<string, string>
+}
+
+const renderWithAction = (
+  data: ReturnType<typeof baseLoaderData>,
+  capture: CapturedAction,
+  url = "/admin/applications/app-1?tab=roles",
+) =>
+  renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    parentContext: stubSidePanel,
+    route: {
+      path: "/admin/applications/app-1",
+      Component: AdminApplicationDetailPage as never,
+      loader: () => data,
+      action: async ({ request }) => {
+        const fd = await request.formData()
+        capture.intent = fd.get("intent") as string
+        for (const [k, v] of fd.entries()) {
+          if (typeof v === "string") capture.fields[k] = v
+        }
+        return { success: true }
+      },
+    },
+    url,
+  })
+
+describe("AdminApplicationDetailPage dialog round-trips", () => {
+  it("createRole: opens dialog → fills form → submit → action receives FormData", async () => {
+    const user = userEvent.setup()
+    const capture: CapturedAction = { intent: null, fields: {} }
+    renderWithAction(baseLoaderData(), capture, "/admin/applications/app-1?tab=roles")
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /add role/i })).toBeInTheDocument()
+    })
+    // The top-right "Add Role" button (not the empty-state CTA, which only
+    // shows when roles is empty). Both share the same accessible name but
+    // the role-list-populated state only renders the top one.
+    const addRoleButtons = screen.getAllByRole("button", { name: /add role/i })
+    await user.click(addRoleButtons[0])
+
+    // Dialog body has three inputs + submit.
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("admin")).toBeInTheDocument()
+    })
+    await user.type(screen.getByPlaceholderText("admin"), "editor")
+    await user.type(screen.getByPlaceholderText("Administrator"), "Editor Role")
+    await user.type(screen.getByPlaceholderText("Optional description"), "Edits content")
+
+    // The submit button is "Create Role" inside the dialog.
+    await user.click(screen.getByRole("button", { name: /create role/i }))
+
+    await waitFor(() => {
+      expect(capture.intent).toBe("createRole")
+    })
+    expect(capture.fields.slug).toBe("editor")
+    expect(capture.fields.displayName).toBe("Editor Role")
+    expect(capture.fields.description).toBe("Edits content")
+  })
+
+  it("createEntitlement: round-trip with intent=createEntitlement", async () => {
+    const user = userEvent.setup()
+    const capture: CapturedAction = { intent: null, fields: {} }
+    renderWithAction(baseLoaderData(), capture, "/admin/applications/app-1?tab=entitlements")
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /add entitlement/i })).toBeInTheDocument()
+    })
+    await user.click(screen.getAllByRole("button", { name: /add entitlement/i })[0])
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("read")).toBeInTheDocument()
+    })
+    await user.type(screen.getByPlaceholderText("read"), "download")
+    await user.type(screen.getByPlaceholderText("Read Access"), "Download access")
+
+    await user.click(screen.getByRole("button", { name: /create entitlement/i }))
+
+    await waitFor(() => {
+      expect(capture.intent).toBe("createEntitlement")
+    })
+    expect(capture.fields.slug).toBe("download")
+    expect(capture.fields.displayName).toBe("Download access")
+  })
+
+  it("createResource: round-trip with intent=createResource", async () => {
+    const user = userEvent.setup()
+    const capture: CapturedAction = { intent: null, fields: {} }
+    // Seed a single resource so the resources tab renders the populated
+    // branch (top "Add Resource" button only, no empty-state CTA — which
+    // would create button ambiguity that confuses userEvent's click).
+    renderWithAction(
+      {
+        ...baseLoaderData(),
+        resources: [
+          {
+            id: "res-1",
+            applicationId: "app-1",
+            resourceType: "folder",
+            displayName: "Existing",
+            externalId: null,
+            path: "/existing",
+          },
+        ],
+      },
+      capture,
+      "/admin/applications/app-1?tab=resources",
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /add resource/i })).toBeInTheDocument()
+    })
+    await user.click(screen.getByRole("button", { name: /add resource/i }))
+
+    // Dialog opens — wait for one of its inputs (matching by name attr to
+    // avoid placeholder-text races inside the focus-trap mount).
+    const folderInput = await screen.findByPlaceholderText("folder", undefined, { timeout: 3000 })
+    await user.type(folderInput, "library")
+    await user.type(await screen.findByPlaceholderText("Documents"), "Library Folder")
+    await user.click(screen.getByRole("button", { name: /create resource/i }))
+
+    await waitFor(() => {
+      expect(capture.intent).toBe("createResource")
+    })
+    expect(capture.fields.resourceType).toBe("library")
+    expect(capture.fields.displayName).toBe("Library Folder")
+  })
+})
