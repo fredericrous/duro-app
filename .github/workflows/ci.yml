@@ -57,5 +57,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Run tests
-        run: npm test
+      - name: Run tests (with coverage gate)
+        # `test:coverage` runs the suite with vitest's coverage thresholds
+        # configured in vitest.config.ts. CI fails if any threshold is
+        # breached, locking in the current floor (lines: 45%) and forcing
+        # future PRs to maintain or raise it.
+        run: npm run test:coverage
