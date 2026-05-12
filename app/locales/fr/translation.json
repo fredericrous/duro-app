@@ -81,7 +81,16 @@
     },
     "pendingHint": "En attente d'approbation.",
     "viewRequest": "Voir la demande",
-    "openLaunch": "Ouvrir"
+    "openLaunch": "Ouvrir",
+    "pendingBanner_one": "Vous avez {{count}} demande en attente",
+    "pendingBanner_other": "Vous avez {{count}} demandes en attente",
+    "viewRequests": "Voir"
+  },
+  "search": {
+    "placeholder": "Rechercher des applications…",
+    "noResults": "Aucune application trouvée",
+    "clearFilters": "Effacer les filtres",
+    "clearInput": "Effacer la recherche"
   },
   "requests": {
     "title": "Mes demandes",

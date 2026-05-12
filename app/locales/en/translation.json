@@ -81,7 +81,16 @@
     },
     "pendingHint": "Awaiting approval.",
     "viewRequest": "View request",
-    "openLaunch": "Open"
+    "openLaunch": "Open",
+    "pendingBanner_one": "You have {{count}} pending request",
+    "pendingBanner_other": "You have {{count}} pending requests",
+    "viewRequests": "View"
+  },
+  "search": {
+    "placeholder": "Search apps…",
+    "noResults": "No matching apps",
+    "clearFilters": "Clear filters",
+    "clearInput": "Clear search"
   },
   "requests": {
     "title": "My requests",
