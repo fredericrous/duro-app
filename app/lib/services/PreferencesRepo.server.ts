@@ -49,10 +49,14 @@ export const PreferencesRepoLive = Layer.effect(
       getLastCertRenewal: (username: string) =>
         sql`SELECT last_cert_renewal_at, cert_renewal_id FROM user_preferences WHERE username = ${username}`.pipe(
           Effect.map((rows) => {
-            const row = rows[0]
+            const row = rows[0] as { lastCertRenewalAt?: string | null; certRenewalId?: string | null } | undefined
             if (!row) return { at: null, renewalId: null }
-            const at = row.last_cert_renewal_at ? new Date(row.last_cert_renewal_at as string) : null
-            const renewalId = (row.cert_renewal_id as string) ?? null
+            // @effect/sql-pg camelCases column names — the old snake_case lookups
+            // here were always undefined, so this function silently returned
+            // {at:null, renewalId:null} regardless of stored data. Read the
+            // camelCased keys to surface the actual values.
+            const at = row.lastCertRenewalAt ? new Date(row.lastCertRenewalAt) : null
+            const renewalId = row.certRenewalId ?? null
             return { at, renewalId }
           }),
           Effect.catchAll(() => Effect.succeed({ at: null, renewalId: null })),
