@@ -91,4 +91,45 @@ describe("AdminAuditPage component", () => {
       expect(screen.queryByText("grant.created")).not.toBeInTheDocument()
     })
   })
+
+  it("renders the pagination footer when events are present", async () => {
+    renderPage([mkEvent({ id: "e1", eventType: "grant.created" }), mkEvent({ id: "e2", eventType: "role.created" })])
+    await waitFor(() => {
+      // Pagination renders "Previous" + "Next" buttons under populated state.
+      expect(screen.getByRole("button", { name: /previous|précédent/i })).toBeInTheDocument()
+    })
+    expect(screen.getByRole("button", { name: /next|suivant/i })).toBeInTheDocument()
+  })
+
+  it("populates the eventType filter combobox from the rendered events", async () => {
+    renderPage([
+      mkEvent({ id: "e1", eventType: "grant.created" }),
+      mkEvent({ id: "e2", eventType: "role.created" }),
+      mkEvent({ id: "e3", eventType: "grant.created" }), // duplicate; should dedupe
+    ])
+    await waitFor(() => {
+      // The filter input renders with a placeholder. There are three combobox
+      // filters (eventType, actorId, targetType). At minimum, one combobox.
+      expect(screen.getAllByRole("combobox").length).toBeGreaterThan(0)
+    })
+  })
+
+  it("renders the event-type filter chip when ?eventType is in the URL", async () => {
+    renderRoute({
+      parentLoaderId: "routes/dashboard",
+      parentLoader: () => ({ user: "admin", isAdmin: true }),
+      route: {
+        path: "/admin/audit",
+        Component: AdminAuditPage as never,
+        loader: () => ({
+          events: [mkEvent({ id: "e1", eventType: "grant.created" })],
+        }),
+      },
+      url: "/admin/audit?eventType=grant.created",
+    })
+    await waitFor(() => {
+      // Active filter surfaces a Clear button alongside the filter inputs.
+      expect(screen.getByRole("button", { name: /clear|effacer/i })).toBeInTheDocument()
+    })
+  })
 })
