@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest"
+import { describe, expect, it, vi, beforeEach, beforeAll, afterAll, afterEach } from "vitest"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 
@@ -140,5 +140,121 @@ describe("/requests action — cancel flow", () => {
     // alice tries to cancel bob's request.
     const result = await callAction(action, { formData: { intent: "cancel", requestId: "req-bob" } })
     expect(expectData<{ error?: string }>(result)).toEqual({ error: "not_owned" })
+  })
+})
+
+// ===========================================================================
+// Component-render tests — real createMemoryRouter, no react-router mocks.
+// ===========================================================================
+
+import { render, screen, waitFor } from "@testing-library/react"
+import { createMemoryRouter, Outlet, RouterProvider, useLoaderData } from "react-router"
+import { setupServer } from "msw/node"
+import type { AccessRequestEnriched } from "~/lib/governance/AccessRequestRepo.server"
+import MyRequestsPage from "./requests"
+
+const reqHttpServer = setupServer()
+beforeAll(() => reqHttpServer.listen({ onUnhandledRequest: "error" }))
+afterAll(() => reqHttpServer.close())
+afterEach(() => reqHttpServer.resetHandlers())
+
+const reqRow = (overrides: Partial<AccessRequestEnriched>): AccessRequestEnriched =>
+  ({
+    id: overrides.id ?? "req-1",
+    requesterId: "p-alice",
+    applicationId: "app-1",
+    roleId: "role-1",
+    entitlementId: null,
+    resourceId: null,
+    justification: null,
+    requestedDurationHours: null,
+    status: overrides.status ?? "pending",
+    resolvedAt: null,
+    grantId: null,
+    createdAt: "2026-01-01T00:00:00Z",
+    expiresAt: null,
+    applicationName: overrides.applicationName ?? "App 1",
+    applicationSlug: "app-1",
+    roleName: overrides.roleName ?? "Editor",
+    entitlementName: null,
+    ...overrides,
+  }) as AccessRequestEnriched
+
+const renderRequests = (
+  requests: AccessRequestEnriched[],
+  url = "/requests",
+  dashboard: { user: string; isAdmin: boolean } = { user: "alice", isAdmin: false },
+) => {
+  const router = createMemoryRouter(
+    [
+      {
+        id: "routes/dashboard",
+        path: "/",
+        loader: () => dashboard,
+        Component: () => <Outlet />,
+        children: [
+          {
+            path: "requests",
+            loader: () => ({ requests }),
+            Component: () => {
+              const data = useLoaderData()
+              const props = { loaderData: data } as unknown as Parameters<typeof MyRequestsPage>[0]
+              return <MyRequestsPage {...props} />
+            },
+          },
+        ],
+      },
+    ],
+    { initialEntries: [url] },
+  )
+  return render(<RouterProvider router={router} />)
+}
+
+describe("MyRequestsPage component", () => {
+  it("renders the empty state when the user has no requests", async () => {
+    renderRequests([])
+    await waitFor(() => {
+      // Copy from requests.empty in en/translation.json.
+      expect(screen.getByText(/haven't requested access/i)).toBeInTheDocument()
+    })
+  })
+
+  it("renders the table with one row per request", async () => {
+    renderRequests([
+      reqRow({ id: "r1", status: "pending", applicationName: "Jellyfin", roleName: "Editor" }),
+      reqRow({ id: "r2", status: "approved", applicationName: "Vault", roleName: "Admin" }),
+      reqRow({ id: "r3", status: "rejected", applicationName: "Gitea", roleName: "Viewer" }),
+    ])
+
+    await waitFor(() => {
+      expect(screen.getByText("Jellyfin")).toBeInTheDocument()
+    })
+    expect(screen.getByText("Vault")).toBeInTheDocument()
+    expect(screen.getByText("Gitea")).toBeInTheDocument()
+  })
+
+  it("shows the Cancel button only for pending rows", async () => {
+    renderRequests([
+      reqRow({ id: "r1", status: "pending", applicationName: "App 1" }),
+      reqRow({ id: "r2", status: "approved", applicationName: "App 2" }),
+    ])
+
+    await waitFor(() => {
+      // requests.cancel string from translation.json.
+      const cancelButtons = screen.getAllByRole("button", { name: /Cancel/i })
+      // Exactly one Cancel button — for the pending row only.
+      expect(cancelButtons).toHaveLength(1)
+    })
+  })
+
+  it("truncates long justification text at 60 characters with an ellipsis", async () => {
+    const longText = "x".repeat(120)
+    renderRequests([reqRow({ justification: longText })])
+
+    await waitFor(() => {
+      // The truncated text is the first 60 chars + "…"
+      const truncated = "x".repeat(60) + "…"
+      expect(screen.getByText(truncated)).toBeInTheDocument()
+    })
   })
 })
