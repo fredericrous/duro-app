@@ -54,3 +54,93 @@ describe("/admin/plugins/:slug loader", () => {
     expect(data.installs[0].applicationSlug).toBe("app-1")
   })
 })
+
+// =============================================================================
+// Component-render tests
+// =============================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import AdminPluginDetailPage from "./admin.plugins.$slug"
+import { renderRoute } from "~/test/render-route"
+
+const mkManifest = (slug: string) => ({
+  slug,
+  displayName: "Gitea Teams",
+  version: "1.2.3",
+  description: "Manages Gitea team memberships",
+  capabilities: ["gitea.team.read", "gitea.team.member.add"],
+  allowedDomains: ["gitea.internal"],
+  vaultSecrets: ["secret/gitea/token"],
+  configSchema: {},
+  permissionStrategy: {
+    byRoleSlug: {
+      editor: [{ op: "addToGroup", group: "editors" }],
+    },
+  },
+  imperative: false,
+  timeoutMs: 10_000,
+  ownedLldapGroups: [],
+})
+
+const renderPage = (
+  data: {
+    manifest?: ReturnType<typeof mkManifest>
+    installs?: unknown[]
+    recentEvents?: unknown[]
+  } = {},
+) =>
+  renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    route: {
+      path: "/admin/plugins/gitea-teams",
+      Component: AdminPluginDetailPage as never,
+      loader: () => ({
+        manifest: data.manifest ?? mkManifest("gitea-teams"),
+        installs: data.installs ?? [],
+        recentEvents: data.recentEvents ?? [],
+      }),
+    },
+  })
+
+describe("AdminPluginDetailPage component", () => {
+  it("renders manifest header + empty states", async () => {
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText("Gitea Teams")).toBeInTheDocument()
+    })
+    expect(screen.getByText("v1.2.3")).toBeInTheDocument()
+    expect(screen.getByText("gitea.team.read")).toBeInTheDocument()
+    expect(screen.getByText("Not installed on any application yet.")).toBeInTheDocument()
+    expect(screen.getByText("No recent plugin invocations.")).toBeInTheDocument()
+  })
+
+  it("renders install rows when installs are present", async () => {
+    renderPage({
+      installs: [
+        {
+          system: {
+            id: "cs-1",
+            applicationId: "app-1",
+            connectorType: "plugin",
+            config: {},
+            status: "active" as const,
+            pluginSlug: "gitea-teams",
+            pluginVersion: "1.0.0",
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+          },
+          applicationSlug: "jellyfin",
+          applicationName: "Jellyfin",
+        },
+      ],
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText("Jellyfin")).toBeInTheDocument()
+    })
+    expect(screen.getByText("jellyfin")).toBeInTheDocument()
+    // The status badge text.
+    expect(screen.getByText("active")).toBeInTheDocument()
+  })
+})

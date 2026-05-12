@@ -75,3 +75,108 @@ describe("/admin/access-requests/:id action — origin gate", () => {
     expect(expectResponse(result).status).toBe(403)
   })
 })
+
+// =============================================================================
+// Component-render tests
+// =============================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import AdminAccessRequestDetailPage from "./admin.access-requests.$id"
+import { renderRoute } from "~/test/render-route"
+
+type RequestStatus = "pending" | "approved" | "rejected" | "cancelled"
+
+interface AccessRequestFixture {
+  id: string
+  requesterId: string
+  requesterName: string
+  applicationId: string
+  applicationName: string
+  roleId: string | null
+  roleName: string | null
+  entitlementId: string | null
+  entitlementName: string | null
+  resourceId: string | null
+  status: RequestStatus
+  justification: string | null
+  requestedDurationHours: number | null
+  createdAt: string
+  decidedAt: string | null
+  decidedBy: string | null
+}
+
+const baseAccessRequest = (): AccessRequestFixture => ({
+  id: "req-1",
+  requesterId: "p-alice",
+  requesterName: "Alice",
+  applicationId: "app-1",
+  applicationName: "Jellyfin",
+  roleId: "role-1",
+  roleName: "Editor",
+  entitlementId: null,
+  entitlementName: null,
+  resourceId: null,
+  status: "pending",
+  justification: "I need media access",
+  requestedDurationHours: 24,
+  createdAt: "2026-01-01T00:00:00Z",
+  decidedAt: null,
+  decidedBy: null,
+})
+
+const renderPage = (overrides: { request?: AccessRequestFixture; approvals?: unknown[] } = {}) => {
+  const accessRequest = overrides.request ?? baseAccessRequest()
+  const approvals = overrides.approvals ?? []
+  return renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    route: {
+      path: "/admin/access-requests/req-1",
+      Component: AdminAccessRequestDetailPage as never,
+      loader: () => ({ accessRequest, approvals }),
+    },
+  })
+}
+
+describe("AdminAccessRequestDetailPage component", () => {
+  it("renders the request fields + decision form when pending", async () => {
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument()
+    })
+    expect(screen.getByText("Jellyfin")).toBeInTheDocument()
+    expect(screen.getByText("Editor")).toBeInTheDocument()
+    expect(screen.getByText("I need media access")).toBeInTheDocument()
+    expect(screen.getByText("24 hours")).toBeInTheDocument()
+    // Decision controls visible only when status === "pending".
+    expect(screen.getByRole("button", { name: /approve/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /reject/i })).toBeInTheDocument()
+  })
+
+  it("hides the decision form when the request is no longer pending", async () => {
+    renderPage({ request: { ...baseAccessRequest(), status: "approved" } })
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument()
+    })
+    expect(screen.queryByRole("button", { name: /approve/i })).not.toBeInTheDocument()
+  })
+
+  it("renders the approvals list when approvals are present", async () => {
+    renderPage({
+      approvals: [
+        {
+          id: "ap-1",
+          requestId: "req-1",
+          approverId: "p-admin",
+          decision: "approved" as const,
+          comment: "looks good",
+          decidedAt: "2026-01-02T00:00:00Z",
+        },
+      ],
+    })
+    await waitFor(() => {
+      expect(screen.getByText("looks good")).toBeInTheDocument()
+    })
+    expect(screen.getByText(/Approvals \(1\)/)).toBeInTheDocument()
+  })
+})

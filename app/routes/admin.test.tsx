@@ -43,3 +43,44 @@ describe("/admin layout loader", () => {
     expect(data.pendingCounts.accessInvitations).toBe(1)
   })
 })
+
+// =============================================================================
+// Component-render tests — the AdminLayout chrome (side nav + outlet)
+// =============================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import AdminLayout from "./admin"
+import { renderRoute } from "~/test/render-route"
+
+const renderLayout = (loaderData = { pendingCounts: { accessRequests: 0, accessInvitations: 0 } }) =>
+  renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    route: {
+      // Route at "/" of the parent stub. Use index pattern.
+      path: "/",
+      Component: AdminLayout as never,
+      loader: () => loaderData,
+    },
+  })
+
+describe("AdminLayout component", () => {
+  it("renders the SideNav with the always-visible Applications section", async () => {
+    renderLayout()
+    await waitFor(() => {
+      // The "Access Management" group is `defaultExpanded`, so its items must
+      // be visible without interaction.
+      expect(screen.getByText("Applications")).toBeInTheDocument()
+    })
+    expect(screen.getByText("Principals")).toBeInTheDocument()
+  })
+
+  it("renders the workflows group label whether or not it's expanded", async () => {
+    renderLayout({ pendingCounts: { accessRequests: 7, accessInvitations: 2 } })
+    // The Workflows group is collapsed by default; its trigger label is
+    // always in the accessible tree even when items are hidden.
+    await waitFor(() => {
+      expect(screen.getByText("Workflows")).toBeInTheDocument()
+    })
+  })
+})

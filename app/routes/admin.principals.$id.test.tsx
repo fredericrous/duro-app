@@ -46,3 +46,89 @@ describe("/admin/principals/:id loader", () => {
     if (result.kind === "response") expect(result.response.status).toBe(404)
   })
 })
+
+// =============================================================================
+// Component-render tests
+// =============================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import AdminPrincipalDetailPage from "./admin.principals.$id"
+import { renderRoute } from "~/test/render-route"
+
+const renderPage = (data: { principal?: unknown; grants?: unknown[]; groups?: unknown[] } = {}) =>
+  renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    route: {
+      path: "/admin/principals/p-alice",
+      Component: AdminPrincipalDetailPage as never,
+      loader: () => ({
+        principal: data.principal ?? {
+          id: "p-alice",
+          principalType: "user",
+          externalId: "alice-sub",
+          displayName: "Alice",
+          email: "alice@example.com",
+          enabled: true,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+        },
+        grants: data.grants ?? [],
+        groups: data.groups ?? [],
+      }),
+    },
+  })
+
+describe("AdminPrincipalDetailPage component", () => {
+  it("renders header info + empty grants/groups state", async () => {
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument()
+    })
+    // Email is concatenated with " · " separators inside the header Text node,
+    // so just assert at least one node has the text in its textContent.
+    const matches = screen.getAllByText((_, node) => Boolean(node?.textContent?.includes("alice@example.com")))
+    expect(matches.length).toBeGreaterThan(0)
+    expect(screen.getByText("No active grants.")).toBeInTheDocument()
+    expect(screen.getByText("Not a member of any groups.")).toBeInTheDocument()
+  })
+
+  it("renders grant + group rows when present", async () => {
+    renderPage({
+      grants: [
+        {
+          id: "g-12345678",
+          principalId: "p-alice",
+          roleId: "role-editor",
+          entitlementId: null,
+          resourceId: null,
+          grantedBy: "p-admin",
+          expiresAt: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          revokedAt: null,
+          revokedBy: null,
+          reason: null,
+        },
+      ],
+      groups: [
+        {
+          id: "grp-1",
+          principalType: "group" as const,
+          externalId: "media-team",
+          displayName: "Media Team",
+          email: null,
+          enabled: true,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText("role-editor")).toBeInTheDocument()
+    })
+    expect(screen.getByText("Media Team")).toBeInTheDocument()
+    expect(screen.getByText(/Active Grants \(1\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Groups \(1\)/)).toBeInTheDocument()
+  })
+})

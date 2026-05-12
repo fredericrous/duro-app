@@ -16,6 +16,24 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   } as unknown as typeof ResizeObserver
 }
 
+// jsdom doesn't ship matchMedia. `useMediaQuery` (used by the admin layout
+// for wide-vs-narrow split) calls window.matchMedia synchronously during
+// render; without this stub it throws. The stub always reports a match so
+// the admin layout renders its wide variant in tests — the narrow variant
+// is exercised explicitly via overrides where it matters.
+if (typeof window !== "undefined" && typeof window.matchMedia === "undefined") {
+  window.matchMedia = ((query: string) => ({
+    matches: true,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia
+}
+
 // Central MSW server: defaults live in msw-server.ts, tests override per
 // case via `server.use(...)`. Listening here (not per file) means individual
 // test files don't have to bootstrap MSW. `onUnhandledRequest: "error"`

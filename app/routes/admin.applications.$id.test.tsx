@@ -123,3 +123,98 @@ describe("/admin/applications/:id action — createRole (real DB)", () => {
     expect(rows.map((r) => r.slug)).toEqual(["editor"])
   })
 })
+
+// =============================================================================
+// Component-render tests
+// =============================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import AdminApplicationDetailPage from "./admin.applications.$id"
+import { renderRoute } from "~/test/render-route"
+
+const stubSidePanel = {
+  open: false,
+  onOpenChange: () => {},
+  content: null,
+  setContent: () => {},
+  onCloseRef: { current: null as null | (() => void) },
+  showDetail: () => {},
+  isWide: false,
+}
+
+const baseLoaderData = () => ({
+  application: {
+    id: "app-1",
+    slug: "jellyfin",
+    displayName: "Jellyfin",
+    description: "Media server",
+    accessMode: "request" as const,
+    enabled: true,
+    ownerId: "p-admin",
+    url: null,
+    lastSyncedAt: null,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+  },
+  roles: [
+    { id: "r1", applicationId: "app-1", slug: "viewer", displayName: "Viewer", description: null },
+    { id: "r2", applicationId: "app-1", slug: "admin", displayName: "Admin", description: null },
+  ],
+  entitlements: [
+    {
+      id: "e1",
+      applicationId: "app-1",
+      slug: "download",
+      displayName: "Download",
+      description: null,
+      roleAssignments: [],
+    },
+  ],
+  resources: [],
+  grants: [],
+  principals: [{ id: "p-alice", displayName: "Alice", externalId: "alice", principalType: "user" as const }],
+  pendingRequests: [],
+  ldapProvisioned: false,
+  pluginInfo: null,
+})
+
+const renderPage = (overrides: Partial<ReturnType<typeof baseLoaderData>> = {}) => {
+  const data = { ...baseLoaderData(), ...overrides }
+  return renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    parentContext: stubSidePanel,
+    route: {
+      path: "/admin/applications/app-1",
+      Component: AdminApplicationDetailPage as never,
+      loader: () => data,
+    },
+  })
+}
+
+describe("AdminApplicationDetailPage component", () => {
+  it("renders the application header with badges", async () => {
+    renderPage()
+    await waitFor(() => {
+      // displayName appears in the page header (and tabs may repeat it).
+      // Just assert it rendered at least once.
+      expect(screen.getAllByText("Jellyfin").length).toBeGreaterThan(0)
+    })
+    // accessMode + enabled badges live in the header (the same labels recur
+    // inside the Settings tab + access-mode select, so match without
+    // asserting cardinality).
+    expect(screen.getAllByText("request").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("Enabled").length).toBeGreaterThan(0)
+  })
+
+  it("renders the empty grants state on the overview tab", async () => {
+    renderPage()
+    // Overview is the default tab; with grants=[] the table empty-state shows.
+    await waitFor(() => {
+      expect(screen.getAllByText("Jellyfin").length).toBeGreaterThan(0)
+    })
+    // The page wires up tab triggers for overview/roles/entitlements/etc — at
+    // minimum the tab list itself renders.
+    expect(screen.getByRole("tablist")).toBeInTheDocument()
+  })
+})

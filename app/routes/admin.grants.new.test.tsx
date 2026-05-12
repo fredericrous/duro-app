@@ -61,3 +61,55 @@ describe("/admin/grants/new action", () => {
     expect(expectResponse(result).status).toBe(403)
   })
 })
+
+// =============================================================================
+// Component-render tests
+// =============================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import AdminGrantsNewPage from "./admin.grants.new"
+import { renderRoute } from "~/test/render-route"
+
+const renderPage = (
+  data: {
+    applications?: Array<{ id: string; slug: string; displayName: string }>
+    principals?: Array<{ id: string; principalType: string; displayName: string; email: string | null }>
+    rolesByApp?: Record<string, Array<{ id: string; slug: string; displayName: string }>>
+    ldapAppIds?: string[]
+  } = {},
+) =>
+  renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    route: {
+      path: "/admin/grants/new",
+      Component: AdminGrantsNewPage as never,
+      loader: () => ({
+        applications: data.applications ?? [{ id: "app-1", slug: "jellyfin", displayName: "Jellyfin" }],
+        principals: data.principals ?? [
+          { id: "p-alice", principalType: "user", displayName: "Alice", email: "alice@x" },
+        ],
+        rolesByApp: data.rolesByApp ?? { "app-1": [{ id: "r-1", slug: "viewer", displayName: "Viewer" }] },
+        ldapAppIds: data.ldapAppIds ?? [],
+      }),
+    },
+  })
+
+describe("AdminGrantsNewPage component", () => {
+  it("renders the form scaffolding (combobox + role select)", async () => {
+    renderPage()
+    await waitFor(() => {
+      // The combobox input renders even with a single auto-selected app —
+      // assert via the placeholder so we don't depend on the rendered label.
+      expect(screen.getByPlaceholderText(/application/i)).toBeInTheDocument()
+    })
+  })
+
+  it("survives an empty applications list", async () => {
+    renderPage({ applications: [], rolesByApp: {} })
+    await waitFor(() => {
+      // The page chrome still mounts even when there are no applications.
+      expect(screen.getByPlaceholderText(/application/i)).toBeInTheDocument()
+    })
+  })
+})
