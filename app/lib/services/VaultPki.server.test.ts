@@ -1,12 +1,19 @@
+// @vitest-environment node
+//
+// node-forge does Buffer/binary work in createP12. jsdom polyfills Buffer
+// inconsistently, so issueCertAndP12 occasionally hits subtle PEM-parsing
+// failures there. This is a server-only Effect Service — no DOM needed.
+//
 // Configure env BEFORE imports — VaultPkiLive reads NAS_VAULT_ADDR /
 // NAS_VAULT_TOKEN at layer-build time via Effect.Config. Base URL must
 // match VAULT_BASE in msw-server.ts so the central defaults answer.
 process.env.NAS_VAULT_ADDR = "http://vault.test:8200"
 process.env.NAS_VAULT_TOKEN = "test-vault-token"
 
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it, vi, beforeAll } from "vitest"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { FetchHttpClient } from "@effect/platform"
+import forge from "node-forge"
 import { http, HttpResponse, server, VAULT_BASE } from "~/test/msw-server"
 import { VaultPki, VaultPkiLive } from "./VaultPki.server"
 
@@ -285,6 +292,190 @@ describe("VaultPki — revokeCert", () => {
       }),
     )
     expect(result._tag).toBe("Failure")
+    await rt.dispose()
+  })
+})
+
+// ============================================================================
+// issueCertAndP12 — Vault PKI sign + forge P12 bundle
+// ============================================================================
+
+/**
+ * Build a real self-signed cert + key pair via node-forge so the test
+ * exercises the same PEM-parsing path the prod code does. Computed once
+ * via beforeAll because the keygen is expensive (~200ms).
+ */
+let realPem: { certificate: string; private_key: string }
+
+beforeAll(() => {
+  // Generate a 1024-bit RSA pair (smaller = faster; this is a test fixture).
+  const keys = forge.pki.rsa.generateKeyPair({ bits: 1024 })
+  const cert = forge.pki.createCertificate()
+  cert.publicKey = keys.publicKey
+  cert.serialNumber = "01"
+  cert.validity.notBefore = new Date()
+  cert.validity.notAfter = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+  const attrs = [
+    { name: "commonName", value: "test@example.com" },
+    { name: "organizationName", value: "Test" },
+  ]
+  cert.setSubject(attrs)
+  cert.setIssuer(attrs)
+  cert.sign(keys.privateKey, forge.md.sha256.create())
+  realPem = {
+    certificate: forge.pki.certificateToPem(cert),
+    private_key: forge.pki.privateKeyToPem(keys.privateKey),
+  }
+})
+
+describe("VaultPki — issueCertAndP12", () => {
+  it("issues a fresh cert + writes the P12 secret when none exists", async () => {
+    // No existing P12 → first GET 404, then issue cert, then POST secret.
+    const writes: Array<{ url: string; body: unknown }> = []
+    let issueCalls = 0
+    server.use(
+      http.get(`${VAULT_URL}/v1/secret/data/pki/clients/inv-fresh`, () =>
+        HttpResponse.json({ errors: ["not found"] }, { status: 404 }),
+      ),
+      http.post(`${VAULT_URL}/v1/pki-client/issue/client-cert`, async ({ request }) => {
+        issueCalls++
+        const body = (await request.json()) as { common_name: string; ttl: string }
+        expect(body.common_name).toBe("alice@example.com")
+        expect(body.ttl).toBe("2160h")
+        return HttpResponse.json({
+          data: {
+            certificate: realPem.certificate,
+            private_key: realPem.private_key,
+            ca_chain: [],
+            serial_number: "AA:BB:CC:DD",
+            not_after: "2027-01-01T00:00:00Z",
+          },
+        })
+      }),
+      http.post(`${VAULT_URL}/v1/secret/data/pki/clients/inv-fresh`, async ({ request }) => {
+        writes.push({ url: request.url, body: await request.json() })
+        return HttpResponse.json({})
+      }),
+    )
+
+    const rt = makeRuntime()
+    const out = await rt.runPromise(
+      Effect.gen(function* () {
+        const v = yield* VaultPki
+        return yield* v.issueCertAndP12("alice@example.com", "inv-fresh")
+      }),
+    )
+
+    expect(issueCalls).toBe(1)
+    expect(out.serialNumber).toBe("AA:BB:CC:DD")
+    expect(out.notAfter.toISOString()).toBe("2027-01-01T00:00:00.000Z")
+    // base64 password from 24 random bytes → 32-char string.
+    expect(out.password).toMatch(/^[A-Za-z0-9+/=]{32}$/)
+    // The P12 buffer is real PKCS#12 binary — non-empty + parseable by forge.
+    expect(out.p12Buffer.length).toBeGreaterThan(0)
+    const p12Asn1 = forge.asn1.fromDer(out.p12Buffer.toString("binary"))
+    expect(() => forge.pkcs12.pkcs12FromAsn1(p12Asn1, out.password)).not.toThrow()
+
+    // The KV2 write happened with the right shape.
+    expect(writes).toHaveLength(1)
+    const wrote = writes[0].body as { data: Record<string, string> }
+    expect(wrote.data.serial_number).toBe("AA:BB:CC:DD")
+    expect(wrote.data.password).toBe(out.password)
+    expect(wrote.data.email).toBe("alice@example.com")
+    expect(wrote.data.p12).toBe(out.p12Buffer.toString("base64"))
+    await rt.dispose()
+  })
+
+  it("short-circuits with the existing secret when one is already stored (idempotency)", async () => {
+    // Pre-existing P12 → returns stored values, never hits the PKI issue endpoint.
+    let issueCalls = 0
+    server.use(
+      http.get(`${VAULT_URL}/v1/secret/data/pki/clients/inv-cached`, () =>
+        HttpResponse.json({
+          data: {
+            data: {
+              p12: Buffer.from("cached-p12-bytes").toString("base64"),
+              password: "stored-pw",
+              email: "alice@example.com",
+              serial_number: "11:22:33",
+              not_after: "2030-06-01T00:00:00Z",
+            },
+          },
+        }),
+      ),
+      http.post(`${VAULT_URL}/v1/pki-client/issue/client-cert`, () => {
+        issueCalls++
+        return HttpResponse.json({}, { status: 500 })
+      }),
+    )
+
+    const rt = makeRuntime()
+    const out = await rt.runPromise(
+      Effect.gen(function* () {
+        const v = yield* VaultPki
+        return yield* v.issueCertAndP12("alice@example.com", "inv-cached")
+      }),
+    )
+
+    expect(issueCalls).toBe(0) // never touched PKI
+    expect(out.password).toBe("stored-pw")
+    expect(out.serialNumber).toBe("11:22:33")
+    expect(out.notAfter.toISOString()).toBe("2030-06-01T00:00:00.000Z")
+    expect(out.p12Buffer.toString()).toBe("cached-p12-bytes")
+    await rt.dispose()
+  })
+
+  it("fails with VaultPkiError when the PKI issue response is malformed", async () => {
+    server.use(
+      http.get(`${VAULT_URL}/v1/secret/data/pki/clients/inv-bad`, () =>
+        HttpResponse.json({ errors: ["nf"] }, { status: 404 }),
+      ),
+      // Missing the `certificate` and `private_key` fields → Schema decode fails.
+      http.post(`${VAULT_URL}/v1/pki-client/issue/client-cert`, () =>
+        HttpResponse.json({ data: { serial_number: "x" } }),
+      ),
+    )
+
+    const rt = makeRuntime()
+    const result = await rt.runPromiseExit(
+      Effect.gen(function* () {
+        const v = yield* VaultPki
+        return yield* v.issueCertAndP12("alice@example.com", "inv-bad")
+      }),
+    )
+    expect(result._tag).toBe("Failure")
+    await rt.dispose()
+  })
+
+  it("derives notAfter from the cert PEM when Vault didn't return one", async () => {
+    server.use(
+      http.get(`${VAULT_URL}/v1/secret/data/pki/clients/inv-noexp`, () =>
+        HttpResponse.json({ errors: ["nf"] }, { status: 404 }),
+      ),
+      http.post(`${VAULT_URL}/v1/pki-client/issue/client-cert`, () =>
+        HttpResponse.json({
+          data: {
+            certificate: realPem.certificate,
+            private_key: realPem.private_key,
+            ca_chain: [],
+            serial_number: "ZZ:99",
+            // not_after deliberately omitted — code falls back to forge.pki parsing.
+          },
+        }),
+      ),
+      http.post(`${VAULT_URL}/v1/secret/data/pki/clients/inv-noexp`, () => HttpResponse.json({})),
+    )
+
+    const rt = makeRuntime()
+    const out = await rt.runPromise(
+      Effect.gen(function* () {
+        const v = yield* VaultPki
+        return yield* v.issueCertAndP12("alice@example.com", "inv-noexp")
+      }),
+    )
+    // The fixture cert is valid for ~365 days from beforeAll() time — so
+    // notAfter must be a real future date.
+    expect(out.notAfter.getTime()).toBeGreaterThan(Date.now())
     await rt.dispose()
   })
 })
