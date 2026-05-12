@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { CertificateSection } from "./CertificateSection"
+import { t } from "~/test/test-utils"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 
 // Helper: build a cert that's N days from expiring.
@@ -22,8 +23,7 @@ describe("CertificateSection", () => {
     render(
       <CertificateSection email="alice@example.com" p12Password={null} lastCertRenewalAt={null} certificates={[]} />,
     )
-    // Translation keys: settings.cert.list.empty.
-    expect(screen.getByText(/no certificates|aucun certificat/i)).toBeInTheDocument()
+    expect(screen.getByText(t("settings.cert.list.empty"))).toBeInTheDocument()
     // Issue-new-cert button is visible (no effectivePassword and no cooldown).
     expect(screen.getByRole("button")).toBeInTheDocument()
   })
@@ -50,10 +50,13 @@ describe("CertificateSection", () => {
         certificates={[certExpiringIn(3, "EXPIRES7")]}
       />,
     )
-    // "Expires in N days" badge — translation key
-    // settings.cert.list.expiresInDays. Plurals resolve through i18next.
-    const badge = screen.getByText(/Expires in \d+ day/i)
-    expect(badge).toBeInTheDocument()
+    // The badge uses the plural-aware settings.cert.list.expiresInDays key.
+    // Day count is computed off Date.now() with Math.ceil, so we don't know
+    // the exact number — resolve the template with count=3 and match the
+    // non-numeric portion of the rendered output.
+    const sample = t("settings.cert.list.expiresInDays", undefined, { count: 3 })
+    const stableFragment = sample.replace(/\d+/, "").trim().split(/\s+/).slice(0, 2).join(" ")
+    expect(screen.getByText(new RegExp(stableFragment, "i"))).toBeInTheDocument()
   })
 
   it("disables the new-cert button when the user is in cooldown", () => {

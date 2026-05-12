@@ -51,6 +51,7 @@ describe("/admin layout loader", () => {
 import { screen, waitFor } from "@testing-library/react"
 import AdminLayout from "./admin"
 import { renderRoute } from "~/test/render-route"
+import { t } from "~/test/test-utils"
 
 const renderLayout = (loaderData = { pendingCounts: { accessRequests: 0, accessInvitations: 0 } }) =>
   renderRoute({
@@ -70,9 +71,9 @@ describe("AdminLayout component", () => {
     await waitFor(() => {
       // The "Access Management" group is `defaultExpanded`, so its items must
       // be visible without interaction.
-      expect(screen.getByText("Applications")).toBeInTheDocument()
+      expect(screen.getByText(t("admin.nav.applications", "Applications"))).toBeInTheDocument()
     })
-    expect(screen.getByText("Principals")).toBeInTheDocument()
+    expect(screen.getByText(t("admin.nav.principals", "Principals"))).toBeInTheDocument()
   })
 
   it("renders the workflows group label whether or not it's expanded", async () => {
@@ -80,7 +81,7 @@ describe("AdminLayout component", () => {
     // The Workflows group is collapsed by default; its trigger label is
     // always in the accessible tree even when items are hidden.
     await waitFor(() => {
-      expect(screen.getByText("Workflows")).toBeInTheDocument()
+      expect(screen.getByText(t("admin.nav.workflows", "Workflows"))).toBeInTheDocument()
     })
   })
 })

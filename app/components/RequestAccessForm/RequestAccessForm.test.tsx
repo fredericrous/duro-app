@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { RequestAccessForm } from "./RequestAccessForm"
+import { t } from "~/test/test-utils"
 import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
 
 // Minimal Fetcher stub — the form only reads `state` and `data` and renders
@@ -46,10 +47,8 @@ const mkApp = (
 describe("RequestAccessForm", () => {
   it("renders the application combobox + justification field by default", () => {
     render(<RequestAccessForm apps={[mkApp("app-1", "jellyfin", "Jellyfin")]} fetcher={mkFetcher() as never} />)
-    // i18n falls back to the key name in tests since no view-specific bundle
-    // is loaded — match by placeholder key fragment.
-    expect(screen.getByPlaceholderText(/pick an application/i)).toBeInTheDocument()
-    expect(screen.getByPlaceholderText(/briefly explain/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(t("noAccess.form.applicationPlaceholder"))).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(t("noAccess.form.justificationPlaceholder"))).toBeInTheDocument()
     // Two buttons: cancel + submit.
     expect(screen.getAllByRole("button")).toHaveLength(2)
   })
@@ -107,7 +106,7 @@ describe("RequestAccessForm", () => {
     )
     expect(screen.getByRole("alert")).toBeInTheDocument()
     // Form is still rendered when the error is recoverable.
-    expect(screen.getByPlaceholderText(/pick an application/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(t("noAccess.form.applicationPlaceholder"))).toBeInTheDocument()
   })
 
   it("disables submit while the fetcher is submitting", () => {
