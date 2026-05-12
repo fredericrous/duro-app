@@ -33,6 +33,31 @@ describe("/admin/invites loader", () => {
     const result = await callLoader(loader)
     expect(expectData<unknown>(result)).toBeDefined()
   })
+
+  it("composes groups + pending + failed + checklist from four parallel runEffect calls", async () => {
+    // Order in the source: groups, pendingInvites, failedInvites, checklist.
+    mockRunEffect
+      .mockResolvedValueOnce([{ id: 1, displayName: "family" }] as never) // groups
+      .mockResolvedValueOnce([{ id: "i1", email: "a@x" }] as never) // pendingInvites
+      .mockResolvedValueOnce([{ id: "f1", email: "b@x" }] as never) // failedInvites
+      .mockResolvedValueOnce({
+        showAddApplication: false,
+        showInviteTeammate: true,
+        showConfigurePlugins: false,
+      } as never)
+
+    const result = await callLoader(loader)
+    const data = expectData<{
+      groups: unknown[]
+      pendingInvites: unknown[]
+      failedInvites: unknown[]
+      checklist: { showAddApplication: boolean; showInviteTeammate: boolean; showConfigurePlugins: boolean }
+    }>(result)
+    expect(data.groups).toHaveLength(1)
+    expect(data.pendingInvites).toHaveLength(1)
+    expect(data.failedInvites).toHaveLength(1)
+    expect(data.checklist.showInviteTeammate).toBe(true)
+  })
 })
 
 describe("/admin/invites action", () => {

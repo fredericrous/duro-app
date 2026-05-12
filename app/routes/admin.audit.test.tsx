@@ -20,10 +20,26 @@ describe("/admin/audit loader", () => {
     mockRunEffect.mockResolvedValue(events as never)
 
     const result = await callLoader(loader)
-    const data = expectData<unknown>(result)
-    // The loader returns whatever runEffect resolves to; just confirm
-    // the round-trip survives without throwing.
-    expect(data).toBeDefined()
+    const data = expectData<{ events: unknown[]; page: number; pageSize: number; error?: string }>(result)
+    expect(data.events).toEqual(events)
+    expect(data.page).toBe(0)
+    expect(data.pageSize).toBe(50)
+    expect(data.error).toBeUndefined()
+  })
+
+  it("parses ?page=N as the offset", async () => {
+    mockRunEffect.mockResolvedValue([] as never)
+    const result = await callLoader(loader, { url: "http://localhost/admin/audit?page=3" })
+    const data = expectData<{ page: number }>(result)
+    expect(data.page).toBe(3)
+  })
+
+  it("surfaces an error string when runEffect throws", async () => {
+    mockRunEffect.mockRejectedValueOnce(new Error("audit service down") as never)
+    const result = await callLoader(loader)
+    const data = expectData<{ events: unknown[]; error?: string }>(result)
+    expect(data.events).toEqual([])
+    expect(data.error).toBe("audit service down")
   })
 })
 
