@@ -16,8 +16,8 @@ vi.mock("~/lib/i18n.server", () => ({
 }))
 
 import { runEffect } from "~/lib/runtime.server"
-import { loader } from "./invite"
-import { callLoader, expectData } from "~/test/route-utils"
+import { action, loader } from "./invite"
+import { callAction, callLoader, expectData } from "~/test/route-utils"
 
 const mockRunEffect = vi.mocked(runEffect)
 
@@ -74,6 +74,87 @@ describe("/invite/:token loader", () => {
     const data = expectData<{ valid: boolean; error: string }>(result)
     expect(data.valid).toBe(false)
     expect(data.error).toBe("expired")
+  })
+
+  it("returns the welcome data when the invite is fresh + unused", async () => {
+    mockRunEffect.mockResolvedValue({
+      invite: {
+        id: "i-fresh",
+        email: "alice@example.com",
+        usedAt: null,
+        expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        locale: null,
+        groups: "[1, 2]",
+        groupNames: '["family", "media"]',
+      },
+      p12Password: "ThisIsTheP12Password!",
+    } as never)
+    const result = await callLoader(loader, { params: { token: "abc" } })
+    const data = expectData<{
+      valid: boolean
+      email?: string
+      p12Password?: string
+      groupNames?: string[]
+    }>(result)
+    expect(data.valid).toBe(true)
+    expect(data.email).toBe("alice@example.com")
+    expect(data.p12Password).toBe("ThisIsTheP12Password!")
+    expect(data.groupNames).toEqual(["family", "media"])
+  })
+
+  it("returns the 'unknown' error fallback when runEffect throws", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {})
+    mockRunEffect.mockRejectedValueOnce(new Error("DB down") as never)
+    const result = await callLoader(loader, { params: { token: "abc" } })
+    const data = expectData<{ valid: boolean; error: string }>(result)
+    expect(data.valid).toBe(false)
+    expect(data.error).toBe("unknown")
+    err.mockRestore()
+  })
+})
+
+describe("/invite/:token action", () => {
+  beforeEach(async () => {
+    // isOriginAllowed leaks between tests — restore the default before each.
+    const { isOriginAllowed } = await import("~/lib/config.server")
+    vi.mocked(isOriginAllowed).mockReturnValue(true)
+  })
+
+  it("returns the 'Missing invite token' error shape when params.token is absent", async () => {
+    const result = await callAction(action, { params: {} })
+    const data = expectData<{ error?: string }>(result)
+    expect(data.error).toBe("Missing invite token")
+  })
+
+  it("returns the origin-blocked error when isOriginAllowed=false", async () => {
+    const { isOriginAllowed } = await import("~/lib/config.server")
+    vi.mocked(isOriginAllowed).mockReturnValue(false)
+
+    const result = await callAction(action, {
+      params: { token: "t1" },
+      formData: { intent: "reveal" },
+      headers: { Origin: "http://evil" },
+    })
+    const data = expectData<{ error?: string }>(result)
+    expect(data.error).toBe("Invalid request origin")
+  })
+
+  it("returns { revealed: true } for intent=reveal under a valid origin", async () => {
+    const result = await callAction(action, {
+      params: { token: "t1" },
+      formData: { intent: "reveal" },
+    })
+    const data = expectData<{ revealed?: boolean }>(result)
+    expect(data.revealed).toBe(true)
+  })
+
+  it("returns the unknown-action error shape for any other intent", async () => {
+    const result = await callAction(action, {
+      params: { token: "t1" },
+      formData: { intent: "unrecognized" },
+    })
+    const data = expectData<{ error?: string }>(result)
+    expect(data.error).toBe("Unknown action")
   })
 })
 
