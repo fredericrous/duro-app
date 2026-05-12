@@ -4,6 +4,12 @@ import { FetchHttpClient } from "@effect/platform"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { makeTestDbLayer } from "~/lib/db/client.server"
 
+// Each test creates its own ManagedRuntime, which spins up a fresh PGlite
+// WASM instance + runs 16 migrations. That's ~1.5s per test in isolation;
+// under suite-wide concurrency it can stretch to 15s. Vitest's default 5s
+// timeout would flag these as hangs. Bump per-file.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
+
 import { ProvisioningService, ProvisioningServiceLive } from "./ProvisioningService.server"
 import { PluginHost } from "~/lib/plugins/PluginHost.server"
 

@@ -4,6 +4,10 @@ import { FetchHttpClient } from "@effect/platform"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { makeTestDbLayer } from "~/lib/db/client.server"
 
+// Each test creates its own ManagedRuntime — fresh PGlite WASM + 16
+// migrations. ~1.5s in isolation, up to 15s under suite concurrency.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
+
 // Real governance repos against PGlite — PluginHost orchestrates reads
 // from grants/principals/roles/applications/connected_systems/connector_mappings,
 // so we need real SQL to hit the real branches.
