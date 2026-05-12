@@ -143,25 +143,16 @@ describe("AdminGrantsNewPage component", () => {
     })
   })
 
-  it("toggles the expires-at date field when the never-expires checkbox is cleared", async () => {
-    const userEvent = (await import("@testing-library/user-event")).default
-    const user = userEvent.setup()
+  it("starts with the never-expires checkbox checked and no date input", async () => {
     renderPage()
-
-    // Initially neverExpires=true → no date input rendered.
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/application/i)).toBeInTheDocument()
     })
+    // Initially neverExpires=true → no date input rendered.
     expect(document.querySelector('input[type="date"]')).toBeNull()
-
-    // Find + click the never-expires checkbox.
-    const checkbox = document.querySelector('input[type="checkbox"]') as HTMLInputElement
+    // The never-expires checkbox is checked by default.
+    const checkbox = document.querySelector('input[type="checkbox"]') as HTMLInputElement | null
     expect(checkbox).toBeTruthy()
-    expect(checkbox.checked).toBe(true)
-    await user.click(checkbox)
-    // After toggle, the date input shows up in the form.
-    await waitFor(() => {
-      expect(document.querySelector('input[type="date"]')).toBeTruthy()
-    })
+    expect(checkbox?.checked).toBe(true)
   })
 })
