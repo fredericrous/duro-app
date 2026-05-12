@@ -585,13 +585,28 @@ describe("AdminApplicationDetailPage dialog round-trips", () => {
     expect(capture.fields.description).toBe("Edits content")
   })
 
-  // NOTE: A createEntitlement dialog round-trip lived here but proved
-  // unreliable under suite-wide jsdom concurrency (Dialog focus-trap
-  // mount race after a preceding dialog test). The createEntitlement
-  // FormData→action→DB path is covered by the action-level test in
-  // "/admin/applications/:id action — createEntitlement (real DB)"
-  // above. The createRole + createResource round-trips below prove the
-  // pattern works at the route+dialog level.
+  it("createEntitlement: round-trip with intent=createEntitlement", async () => {
+    const capture: CapturedAction = { intent: null, fields: {} }
+    renderWithAction(baseLoaderData(), capture, "/admin/applications/app-1?tab=entitlements")
+
+    const addButton = await screen.findByRole("button", { name: /add entitlement/i }, { timeout: 5_000 })
+    fireEvent.click(addButton)
+
+    await screen.findByRole("heading", { name: /create entitlement/i }, { timeout: 5_000 })
+
+    setValue(screen.getByPlaceholderText("read"), "download")
+    setValue(screen.getByPlaceholderText("Read Access"), "Download access")
+    fireEvent.submit(screen.getByRole("button", { name: /create entitlement/i }).closest("form")!)
+
+    await waitFor(
+      () => {
+        expect(capture.intent).toBe("createEntitlement")
+      },
+      { timeout: 5_000 },
+    )
+    expect(capture.fields.slug).toBe("download")
+    expect(capture.fields.displayName).toBe("Download access")
+  })
 
   it("createResource: round-trip with intent=createResource", async () => {
     const capture: CapturedAction = { intent: null, fields: {} }

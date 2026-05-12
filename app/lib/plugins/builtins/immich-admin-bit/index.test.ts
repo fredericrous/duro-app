@@ -1,21 +1,21 @@
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import { Effect } from "effect"
 import { immichAdminBitPlugin } from "./index"
 import type { GrantContext, PluginServices } from "../../contracts"
 import { PluginError } from "../../errors"
+import { mkGrant, mkPrincipal, mkRole } from "~/test/factories"
 
 const immichConfig = { immichUrl: "https://immich.example.com" }
 
-const baseCtx = (overrides: Partial<GrantContext> = {}): GrantContext =>
-  ({
-    grant: { id: "g-1" },
-    role: { slug: "admin" },
-    principal: { id: "p-alice", externalId: "alice", email: "alice@example.com" },
-    applicationId: "app-immich",
-    applicationSlug: "immich",
-    config: immichConfig,
-    ...overrides,
-  }) as unknown as GrantContext
+const baseCtx = (overrides: Partial<GrantContext> = {}): GrantContext => ({
+  grant: mkGrant({ id: "g-1" }),
+  role: mkRole({ id: "role-1", slug: "admin", applicationId: "app-immich" }),
+  principal: mkPrincipal({ id: "p-alice", externalId: "alice", email: "alice@example.com" }),
+  applicationId: "app-immich",
+  applicationSlug: "immich",
+  config: immichConfig,
+  ...overrides,
+})
 
 // Typed noop stubs for the PluginServices the immich plugin doesn't touch.
 const noopLldap: PluginServices["lldap"] = {
@@ -70,7 +70,7 @@ describe("immich-admin-bit plugin — provision", () => {
 
   it("is a no-op for non-admin roles", async () => {
     const { services, calls } = mkServices()
-    await Effect.runPromise(immichAdminBitPlugin.provision!(baseCtx({ role: { slug: "viewer" } as never }), services))
+    await Effect.runPromise(immichAdminBitPlugin.provision!(baseCtx({ role: mkRole({ slug: "viewer" }) }), services))
     expect(calls).toEqual([]) // no GET, no PUT
   })
 
@@ -92,7 +92,7 @@ describe("immich-admin-bit plugin — provision", () => {
   it("fails when the principal has no email", async () => {
     const { services } = mkServices()
     const exit = await Effect.runPromiseExit(
-      immichAdminBitPlugin.provision!(baseCtx({ principal: { id: "p-1", email: null } as never }), services),
+      immichAdminBitPlugin.provision!(baseCtx({ principal: mkPrincipal({ id: "p-1", email: null }) }), services),
     )
     expect(exit._tag).toBe("Failure")
   })
@@ -125,7 +125,7 @@ describe("immich-admin-bit plugin — deprovision", () => {
 
   it("is a no-op for non-admin roles", async () => {
     const { services, calls } = mkServices()
-    await Effect.runPromise(immichAdminBitPlugin.deprovision!(baseCtx({ role: { slug: "viewer" } as never }), services))
+    await Effect.runPromise(immichAdminBitPlugin.deprovision!(baseCtx({ role: mkRole({ slug: "viewer" }) }), services))
     expect(calls).toEqual([])
   })
 })

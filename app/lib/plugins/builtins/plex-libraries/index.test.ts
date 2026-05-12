@@ -1,21 +1,21 @@
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import { Effect } from "effect"
 import { plexLibrariesPlugin } from "./index"
 import type { GrantContext, PluginServices } from "../../contracts"
 import { PluginError } from "../../errors"
+import { mkGrant, mkPrincipal, mkRole } from "~/test/factories"
 
 const plexConfig = { plexUrl: "https://plex.example.com" }
 
-const baseCtx = (overrides: Partial<GrantContext> = {}): GrantContext =>
-  ({
-    grant: { id: "g-1" },
-    role: { slug: "viewer" },
-    principal: { id: "p-alice", externalId: "alice", email: "alice@example.com" },
-    applicationId: "app-plex",
-    applicationSlug: "plex",
-    config: plexConfig,
-    ...overrides,
-  }) as unknown as GrantContext
+const baseCtx = (overrides: Partial<GrantContext> = {}): GrantContext => ({
+  grant: mkGrant({ id: "g-1" }),
+  role: mkRole({ id: "role-1", slug: "viewer", applicationId: "app-plex" }),
+  principal: mkPrincipal({ id: "p-alice", externalId: "alice", email: "alice@example.com" }),
+  applicationId: "app-plex",
+  applicationSlug: "plex",
+  config: plexConfig,
+  ...overrides,
+})
 
 // Typed noop stubs for the PluginServices the plex plugin doesn't touch.
 const noopLldap: PluginServices["lldap"] = {
@@ -110,7 +110,7 @@ describe("plex-libraries plugin — provision", () => {
   it("fails with PluginError when the principal has no email", async () => {
     const { services } = mkServices()
     const exit = await Effect.runPromiseExit(
-      plexLibrariesPlugin.provision!(baseCtx({ principal: { id: "p-1", email: null } as never }), services),
+      plexLibrariesPlugin.provision!(baseCtx({ principal: mkPrincipal({ id: "p-1", email: null }) }), services),
     )
     expect(exit._tag).toBe("Failure")
   })
@@ -149,7 +149,7 @@ describe("plex-libraries plugin — deprovision", () => {
   it("fails when the principal has no email", async () => {
     const { services } = mkServices()
     const exit = await Effect.runPromiseExit(
-      plexLibrariesPlugin.deprovision!(baseCtx({ principal: { id: "p-1", email: null } as never }), services),
+      plexLibrariesPlugin.deprovision!(baseCtx({ principal: mkPrincipal({ id: "p-1", email: null }) }), services),
     )
     expect(exit._tag).toBe("Failure")
   })

@@ -30,9 +30,11 @@ import { LldapClient } from "~/lib/services/LldapClient.server"
 // plugins. For PluginHost tests we want full control over the plugin shape
 // (manifest config schema, imperative flag, provision/deprovision behaviour).
 import { PluginRegistry } from "~/lib/plugins/PluginRegistry.server"
-import type { Plugin, PluginManifest } from "~/lib/plugins/contracts"
+import type { Plugin, GrantContext, PluginServices } from "~/lib/plugins/contracts"
 import { PluginHost, PluginHostLive } from "./PluginHost.server"
-import { PluginNotFound } from "./errors"
+import { PluginNotFound, PluginError } from "./errors"
+import { Context } from "effect"
+import { mkFakePlugin, makeStubService } from "~/test/factories"
 
 // Repo tags — imported for the FK-gate tests below that override the Live
 // repos with stubs returning null for findById, exercising the defensive
@@ -60,44 +62,14 @@ const LldapStub: Layer.Layer<LldapClient> = Layer.succeed(LldapClient, {
   deleteUser: () => Effect.void,
 })
 
+// fakePlugin shared with the wider test suite — see app/test/factories.ts.
+const fakePlugin = mkFakePlugin
+
 /**
- * Build a fake plugin so we control imperative vs declarative dispatch
- * without coupling to the four real built-ins' behaviour (which would
- * require LLDAP / Gitea / Plex / Immich MSW setup just to exercise the
- * host's branching logic).
+ * Typed signature for a plugin lifecycle callback. Used to type vi.fn so
+ * the `provision: provision as never` casts can drop.
  */
-const fakePlugin = (
-  overrides: {
-    slug?: string
-    imperative?: boolean
-    provision?: Plugin["provision"]
-    deprovision?: Plugin["deprovision"]
-    configSchema?: Schema.Schema<unknown, unknown>
-    permissionStrategy?: PluginManifest["permissionStrategy"]
-    timeoutMs?: number
-  } = {},
-): Plugin => ({
-  manifest: {
-    slug: overrides.slug ?? "fake-plugin",
-    version: "1.0.0",
-    displayName: "Fake Plugin",
-    description: "Test fixture",
-    capabilities: [],
-    allowedDomains: [],
-    ownedLldapGroups: [],
-    vaultSecrets: [],
-    // Schema.Any accepts anything — config validation never fails unless we
-    // pass a schema that rejects the seeded `{}` config. The PluginManifest
-    // interface declares configSchema as `Schema.Schema<unknown, unknown>`;
-    // Schema.Any's inferred type satisfies that contract.
-    configSchema: (overrides.configSchema ?? Schema.Any) as unknown as PluginManifest["configSchema"],
-    permissionStrategy: overrides.permissionStrategy ?? { byRoleSlug: { editor: [] } },
-    imperative: overrides.imperative ?? false,
-    timeoutMs: overrides.timeoutMs ?? 5000,
-  },
-  provision: overrides.provision,
-  deprovision: overrides.deprovision,
-})
+type PluginLifecycle = (ctx: GrantContext, svc: PluginServices) => ReturnType<NonNullable<Plugin["provision"]>>
 
 /** Build a Registry layer that returns the given plugin for any slug it knows about. */
 const RegistryStub = (plugins: ReadonlyArray<Plugin>) => {
@@ -291,8 +263,8 @@ describe("PluginHost.runProvision — loadGrantContext gates", () => {
 
 describe("PluginHost.runProvision — dispatch", () => {
   it("invokes the imperative plugin.provision when manifest.imperative is true", async () => {
-    const provision = vi.fn(() => Effect.void as Effect.Effect<void, never, never>)
-    const rt = makeRuntime([fakePlugin({ imperative: true, provision: provision as never })])
+    const provision = vi.fn<PluginLifecycle>(() => Effect.void)
+    const rt = makeRuntime([fakePlugin({ imperative: true, provision })])
     await rt.runPromise(seed())
 
     await rt.runPromise(
@@ -303,8 +275,9 @@ describe("PluginHost.runProvision — dispatch", () => {
     )
 
     expect(provision).toHaveBeenCalledTimes(1)
-    // First arg is GrantContext; second is the PluginServices bundle.
-    const ctx = (provision.mock.calls[0] as unknown as [{ applicationSlug: string; role: { slug: string } }])[0]
+    // First arg is GrantContext; second is the PluginServices bundle. With
+    // the typed vi.fn signature above, .mock.calls[0] is correctly typed.
+    const [ctx] = provision.mock.calls[0]
     expect(ctx.applicationSlug).toBe("app-1")
     expect(ctx.role.slug).toBe("editor")
   })
@@ -313,8 +286,8 @@ describe("PluginHost.runProvision — dispatch", () => {
     // declarative path = imperative:false, no plugin.provision called.
     // permissionStrategy with empty actions is a no-op — exercises the
     // host's dispatch + onExit audit emit without needing real scoped svcs.
-    const provision = vi.fn()
-    const rt = makeRuntime([fakePlugin({ imperative: false, provision: provision as never })])
+    const provision = vi.fn<PluginLifecycle>(() => Effect.void)
+    const rt = makeRuntime([fakePlugin({ imperative: false, provision })])
     await rt.runPromise(seed())
 
     const exit = await rt.runPromiseExit(
@@ -330,8 +303,8 @@ describe("PluginHost.runProvision — dispatch", () => {
   it("parses config when stored as JSON string in connected_systems.config", async () => {
     // Postgres jsonb is parsed by the pg driver into an object, but the host
     // also handles the legacy case where config is a raw JSON string.
-    const provision = vi.fn(() => Effect.void as Effect.Effect<void, never, never>)
-    const rt = makeRuntime([fakePlugin({ imperative: true, provision: provision as never })])
+    const provision = vi.fn<PluginLifecycle>(() => Effect.void)
+    const rt = makeRuntime([fakePlugin({ imperative: true, provision })])
     await rt.runPromise(seed({ systemConfig: '{"foo":"bar"}' }))
 
     await rt.runPromise(
@@ -341,14 +314,14 @@ describe("PluginHost.runProvision — dispatch", () => {
       }),
     )
 
-    const ctx = (provision.mock.calls[0] as unknown as [{ config: Record<string, unknown> }])[0]
+    const [ctx] = provision.mock.calls[0]
     expect(ctx.config).toEqual({ foo: "bar" })
   })
 
   it("fails when config validation against the manifest schema fails", async () => {
     // Require config.required: "yes" — the seeded config is {} → decode fails.
     const strictSchema = Schema.Struct({ required: Schema.Literal("yes") })
-    const rt = makeRuntime([fakePlugin({ configSchema: strictSchema as never })])
+    const rt = makeRuntime([fakePlugin({ configSchema: strictSchema as unknown as Schema.Schema<unknown, unknown> })])
     await rt.runPromise(seed())
 
     const exit = await rt.runPromiseExit(
@@ -361,8 +334,8 @@ describe("PluginHost.runProvision — dispatch", () => {
   })
 
   it("surfaces an imperative plugin.provision failure as PluginHostError", async () => {
-    const provision = vi.fn(() => Effect.fail(new Error("plugin boom") as never) as Effect.Effect<void, never, never>)
-    const rt = makeRuntime([fakePlugin({ imperative: true, provision: provision as never })])
+    const provision = vi.fn<PluginLifecycle>(() => Effect.fail(new PluginError({ message: "plugin boom" })))
+    const rt = makeRuntime([fakePlugin({ imperative: true, provision })])
     await rt.runPromise(seed())
 
     const exit = await rt.runPromiseExit(
@@ -381,10 +354,9 @@ describe("PluginHost.runProvision — dispatch", () => {
 
 describe("PluginHost.runDeprovision — over-revoke safety", () => {
   it("skips when another active grant maps to the same external target (hasOtherActiveMappingTo)", async () => {
-    const deprovision = vi.fn(() => Effect.void as Effect.Effect<void, never, never>)
-    const rt = makeRuntime([
-      fakePlugin({ imperative: true, deprovision: deprovision as never, provision: vi.fn() as never }),
-    ])
+    const deprovision = vi.fn<PluginLifecycle>(() => Effect.void)
+    const provision = vi.fn<PluginLifecycle>(() => Effect.void)
+    const rt = makeRuntime([fakePlugin({ imperative: true, deprovision, provision })])
 
     // Seed: two grants from p-alice to the same role-editor → both map to
     // the same external_role_identifier through connector_mappings. Revoking
@@ -413,10 +385,9 @@ describe("PluginHost.runDeprovision — over-revoke safety", () => {
   })
 
   it("runs the deprovision when no other grant maps to the same target", async () => {
-    const deprovision = vi.fn(() => Effect.void as Effect.Effect<void, never, never>)
-    const rt = makeRuntime([
-      fakePlugin({ imperative: true, deprovision: deprovision as never, provision: vi.fn() as never }),
-    ])
+    const deprovision = vi.fn<PluginLifecycle>(() => Effect.void)
+    const provision = vi.fn<PluginLifecycle>(() => Effect.void)
+    const rt = makeRuntime([fakePlugin({ imperative: true, deprovision, provision })])
     await rt.runPromise(
       seed({
         mappings: [{ connectedSystemId: "cs-1", localRoleId: "role-editor", externalRoleIdentifier: "ext-editor" }],
@@ -435,10 +406,9 @@ describe("PluginHost.runDeprovision — over-revoke safety", () => {
 
   it("falls through to deprovision when there's no mapping row at all (mapping-less app)", async () => {
     // No connector_mapping seeded → host skips the safety check + runs.
-    const deprovision = vi.fn(() => Effect.void as Effect.Effect<void, never, never>)
-    const rt = makeRuntime([
-      fakePlugin({ imperative: true, deprovision: deprovision as never, provision: vi.fn() as never }),
-    ])
+    const deprovision = vi.fn<PluginLifecycle>(() => Effect.void)
+    const provision = vi.fn<PluginLifecycle>(() => Effect.void)
+    const rt = makeRuntime([fakePlugin({ imperative: true, deprovision, provision })])
     await rt.runPromise(seed())
 
     await rt.runPromise(
@@ -475,51 +445,46 @@ interface StubOverrides {
 }
 
 function makeRuntimeWithRepoStubs(overrides: StubOverrides) {
-  // Build minimal stub repos. Each only stubs the method PluginHost actually
-  // calls (findById on the three repos involved in loadGrantContext). The
-  // grant + connected-system repos stay Live so the prior gates pass.
+  // Each repo stubs just the method PluginHost actually calls (findById on
+  // the three repos involved in loadGrantContext). `makeStubService`
+  // proxies missing methods to `Effect.die(...)` so an unexpected call
+  // surfaces with the method name. Grant + connected-system + connector-
+  // mapping repos stay Live so the prior gates pass.
+  type PrincipalSvc = Context.Tag.Service<typeof PrincipalRepo>
+  type RbacSvc = Context.Tag.Service<typeof RbacRepo>
+  type AppSvc = Context.Tag.Service<typeof ApplicationRepo>
+
   const principalStub =
     overrides.principalById !== undefined
-      ? Layer.succeed(PrincipalRepo, {
-          findById: () => overrides.principalById,
-          // Methods PluginHost doesn't call — give Effect.die() shape so a
-          // surprise call fails loudly.
-          findByExternalId: () => Effect.die("PrincipalRepo.findByExternalId not stubbed"),
-          create: () => Effect.die("not stubbed"),
-          list: () => Effect.die("not stubbed"),
-          addMembership: () => Effect.die("not stubbed"),
-          removeMembership: () => Effect.die("not stubbed"),
-          listGroupsFor: () => Effect.die("not stubbed"),
-          listMembers: () => Effect.die("not stubbed"),
-        } as never)
+      ? Layer.succeed(
+          PrincipalRepo,
+          makeStubService<PrincipalSvc>({
+            findById: () =>
+              overrides.principalById as PrincipalSvc["findById"] extends (...a: never[]) => infer R ? R : never,
+          }),
+        )
       : PrincipalRepoLiveForFkTests
 
   const rbacStub =
     overrides.roleById !== undefined
-      ? Layer.succeed(RbacRepo, {
-          findRoleById: () => overrides.roleById,
-          listRoles: () => Effect.die("not stubbed"),
-          createRole: () => Effect.die("not stubbed"),
-          createEntitlement: () => Effect.die("not stubbed"),
-          listEntitlements: () => Effect.die("not stubbed"),
-          assignEntitlementToRole: () => Effect.die("not stubbed"),
-          listResources: () => Effect.die("not stubbed"),
-          createResource: () => Effect.die("not stubbed"),
-          listRoleAssignments: () => Effect.die("not stubbed"),
-        } as never)
+      ? Layer.succeed(
+          RbacRepo,
+          makeStubService<RbacSvc>({
+            findRoleById: () =>
+              overrides.roleById as RbacSvc["findRoleById"] extends (...a: never[]) => infer R ? R : never,
+          }),
+        )
       : RbacRepoLiveForFkTests
 
   const appStub =
     overrides.applicationById !== undefined
-      ? Layer.succeed(ApplicationRepo, {
-          findById: () => overrides.applicationById,
-          findBySlug: () => Effect.die("not stubbed"),
-          list: () => Effect.die("not stubbed"),
-          create: () => Effect.die("not stubbed"),
-          update: () => Effect.die("not stubbed"),
-          deleteById: () => Effect.die("not stubbed"),
-          updateLastSyncedAt: () => Effect.die("not stubbed"),
-        } as never)
+      ? Layer.succeed(
+          ApplicationRepo,
+          makeStubService<AppSvc>({
+            findById: () =>
+              overrides.applicationById as AppSvc["findById"] extends (...a: never[]) => infer R ? R : never,
+          }),
+        )
       : ApplicationRepoLiveForFkTests
 
   // Other repos PluginHost touches are still Live — they read the seeded DB.

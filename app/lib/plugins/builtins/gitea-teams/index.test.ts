@@ -3,6 +3,7 @@ import { Effect } from "effect"
 import { giteaTeamsPlugin } from "./index"
 import type { GrantContext, PluginServices } from "../../contracts"
 import { PluginError } from "../../errors"
+import { mkRole, mkPrincipal, mkGrant } from "~/test/factories"
 
 const giteaConfig = {
   giteaUrl: "https://gitea.example.com",
@@ -12,16 +13,15 @@ const giteaConfig = {
   adminTeamName: "Owners",
 }
 
-const baseCtx = (overrides: Partial<GrantContext> = {}): GrantContext =>
-  ({
-    grant: { id: "g-1" },
-    role: { slug: "viewer" },
-    principal: { id: "p-alice", externalId: "alice" },
-    applicationId: "app-gitea",
-    applicationSlug: "gitea",
-    config: giteaConfig,
-    ...overrides,
-  }) as unknown as GrantContext
+const baseCtx = (overrides: Partial<GrantContext> = {}): GrantContext => ({
+  grant: mkGrant({ id: "g-1" }),
+  role: mkRole({ id: "role-1", slug: "viewer", applicationId: "app-gitea" }),
+  principal: mkPrincipal({ id: "p-alice", externalId: "alice", displayName: "Alice" }),
+  applicationId: "app-gitea",
+  applicationSlug: "gitea",
+  config: giteaConfig,
+  ...overrides,
+})
 
 const mkLog = () => vi.fn(() => Effect.void as Effect.Effect<void>)
 
@@ -93,7 +93,7 @@ describe("gitea-teams plugin — provision", () => {
 
   it("skips the call when the role has no team mapping (logs + returns)", async () => {
     const { services, calls, log } = mkServices()
-    await Effect.runPromise(giteaTeamsPlugin.provision!(baseCtx({ role: { slug: "unknown" } as never }), services))
+    await Effect.runPromise(giteaTeamsPlugin.provision!(baseCtx({ role: mkRole({ slug: "unknown" }) }), services))
 
     expect(calls).toEqual([])
     expect(log).toHaveBeenCalled()
@@ -102,7 +102,7 @@ describe("gitea-teams plugin — provision", () => {
   it("fails with PluginError when the principal has no externalId", async () => {
     const { services } = mkServices()
     const exit = await Effect.runPromiseExit(
-      giteaTeamsPlugin.provision!(baseCtx({ principal: { id: "p-1", externalId: null } as never }), services),
+      giteaTeamsPlugin.provision!(baseCtx({ principal: mkPrincipal({ id: "p-1", externalId: null }) }), services),
     )
     expect(exit._tag).toBe("Failure")
   })
@@ -120,7 +120,7 @@ describe("gitea-teams plugin — provision", () => {
     const { services, calls } = mkServices({
       get: () => Effect.succeed([{ id: 1, name: "Owners", permission: "owner" }]),
     })
-    await Effect.runPromise(giteaTeamsPlugin.provision!(baseCtx({ role: { slug: "admin" } as never }), services))
+    await Effect.runPromise(giteaTeamsPlugin.provision!(baseCtx({ role: mkRole({ slug: "admin" }) }), services))
     expect(calls.find((c) => c.method === "PUT")?.url).toBe("https://gitea.example.com/api/v1/teams/1/members/alice")
   })
 })
@@ -130,7 +130,7 @@ describe("gitea-teams plugin — deprovision", () => {
     const { services, calls } = mkServices({
       get: () => Effect.succeed([{ id: 5, name: "editors", permission: "write" }]),
     })
-    await Effect.runPromise(giteaTeamsPlugin.deprovision!(baseCtx({ role: { slug: "editor" } as never }), services))
+    await Effect.runPromise(giteaTeamsPlugin.deprovision!(baseCtx({ role: mkRole({ slug: "editor" }) }), services))
 
     expect(calls).toEqual([
       { method: "GET", url: "https://gitea.example.com/api/v1/orgs/homelab/teams" },
@@ -151,14 +151,14 @@ describe("gitea-teams plugin — deprovision", () => {
 
   it("is a no-op when the role has no team mapping", async () => {
     const { services, calls } = mkServices()
-    await Effect.runPromise(giteaTeamsPlugin.deprovision!(baseCtx({ role: { slug: "unmapped" } as never }), services))
+    await Effect.runPromise(giteaTeamsPlugin.deprovision!(baseCtx({ role: mkRole({ slug: "unmapped" }) }), services))
     expect(calls).toEqual([])
   })
 
   it("fails with PluginError when the principal has no externalId", async () => {
     const { services } = mkServices()
     const exit = await Effect.runPromiseExit(
-      giteaTeamsPlugin.deprovision!(baseCtx({ principal: { id: "p-1", externalId: null } as never }), services),
+      giteaTeamsPlugin.deprovision!(baseCtx({ principal: mkPrincipal({ id: "p-1", externalId: null }) }), services),
     )
     expect(exit._tag).toBe("Failure")
   })
