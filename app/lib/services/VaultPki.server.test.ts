@@ -1,24 +1,18 @@
 // Configure env BEFORE imports — VaultPkiLive reads NAS_VAULT_ADDR /
-// NAS_VAULT_TOKEN at layer-build time via Effect.Config.
+// NAS_VAULT_TOKEN at layer-build time via Effect.Config. Base URL must
+// match VAULT_BASE in msw-server.ts so the central defaults answer.
 process.env.NAS_VAULT_ADDR = "http://vault.test:8200"
 process.env.NAS_VAULT_TOKEN = "test-vault-token"
 
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { FetchHttpClient } from "@effect/platform"
-import { http, HttpResponse } from "msw"
-import { setupServer } from "msw/node"
+import { http, HttpResponse, server, VAULT_BASE } from "~/test/msw-server"
 import { VaultPki, VaultPkiLive } from "./VaultPki.server"
 
 vi.setConfig({ testTimeout: 10000 })
 
-const VAULT_URL = process.env.NAS_VAULT_ADDR!
-
-const server = setupServer()
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
-afterAll(() => server.close())
-afterEach(() => server.resetHandlers())
+const VAULT_URL = VAULT_BASE
 
 function makeRuntime() {
   return ManagedRuntime.make(VaultPkiLive.pipe(Layer.provide(FetchHttpClient.layer)))

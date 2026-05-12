@@ -1,39 +1,34 @@
 // Configure env BEFORE module imports — LldapClientLive reads these via
-// Effect.Config at layer-build time.
+// Effect.Config at layer-build time. Base URL must match LLDAP_BASE in
+// msw-server.ts so the central handlers respond to this client's requests.
 process.env.LLDAP_URL = "http://lldap.test:17170"
 process.env.LLDAP_ADMIN_USER = "admin"
 process.env.LLDAP_ADMIN_PASS = "test-password"
 
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { FetchHttpClient } from "@effect/platform"
-import { http, HttpResponse } from "msw"
-import { setupServer } from "msw/node"
+import { http, HttpResponse, LLDAP_BASE, server } from "~/test/msw-server"
 import { LldapClient, LldapClientLive } from "./LldapClient.server"
 
 vi.setConfig({ testTimeout: 15000 })
 
-const URL = process.env.LLDAP_URL!
+const URL = LLDAP_BASE
 
-// -----------------------------------------------------------------------------
-// MSW server with mutable handlers so each test can override.
-// -----------------------------------------------------------------------------
-
+// Track login calls across tests — overrides the central default with a
+// counter so we can assert "auth-once and reuse the token".
 let loginCalls = 0
-const defaultHandlers = [
-  http.post(`${URL}/auth/simple/login`, async () => {
-    loginCalls++
-    return HttpResponse.json({ token: "test-token" })
-  }),
-]
-
-const server = setupServer(...defaultHandlers)
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
-afterAll(() => server.close())
-afterEach(() => {
-  server.resetHandlers(...defaultHandlers)
+beforeEach(() => {
   loginCalls = 0
+  server.use(
+    http.post(`${URL}/auth/simple/login`, () => {
+      loginCalls++
+      return HttpResponse.json({ token: "test-token" })
+    }),
+  )
+})
+afterEach(() => {
+  // Global resetHandlers in setup.ts wipes the per-test login spy too.
 })
 
 // -----------------------------------------------------------------------------

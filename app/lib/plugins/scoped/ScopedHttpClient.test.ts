@@ -1,7 +1,6 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import { Effect } from "effect"
-import { http, HttpResponse } from "msw"
-import { setupServer } from "msw/node"
+import { http, HttpResponse, server } from "~/test/msw-server"
 import { makeScopedHttpClient } from "./ScopedHttpClient"
 import type { PluginManifest, ScopedVaultClient } from "../contracts"
 
@@ -23,10 +22,9 @@ const stubVault: ScopedVaultClient = {
     name === "secret/missing" ? Effect.fail(new Error("not found") as never) : Effect.succeed("token-abc-123"),
 } as unknown as ScopedVaultClient
 
-const server = setupServer()
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
-afterAll(() => server.close())
-afterEach(() => server.resetHandlers())
+// MSW is bootstrapped globally in app/test/setup.ts; tests below register
+// per-case handlers via `server.use(...)`, which is automatically reset
+// in the global afterEach.
 
 describe("makeScopedHttpClient — URL allow-list", () => {
   it("rejects URLs whose host isn't in allowedDomains (ScopeViolation)", async () => {

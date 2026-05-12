@@ -1,29 +1,18 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 // config.server is loaded by test/setup.ts before any test file runs, so
 // setting process.env.OPERATOR_API_URL inside this file is too late — the
 // cached `config.operatorApiUrl` is already "". Mock the module so the
-// Live layer sees the test URL we control here.
+// Live layer sees the test URL the central MSW server defaults to.
 vi.mock("~/lib/config.server", () => ({
-  config: {
-    operatorApiUrl: "http://operator.test:8080",
-  },
+  config: { operatorApiUrl: "http://operator.test:8080" },
   isOriginAllowed: () => true,
 }))
 
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { FetchHttpClient } from "@effect/platform"
-import { http, HttpResponse } from "msw"
-import { setupServer } from "msw/node"
+import { http, HttpResponse, OPERATOR_BASE, server } from "~/test/msw-server"
 import { OperatorClient, OperatorClientDev, OperatorClientLive } from "./OperatorClient.server"
-
-const OPERATOR_URL = "http://operator.test:8080"
-
-const server = setupServer()
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
-afterAll(() => server.close())
-afterEach(() => server.resetHandlers())
 
 function makeRuntime() {
   return ManagedRuntime.make(OperatorClientLive.pipe(Layer.provide(FetchHttpClient.layer)))
@@ -32,7 +21,7 @@ function makeRuntime() {
 describe("OperatorClient (Live) — listApps", () => {
   it("returns the decoded apps from the operator REST endpoint", async () => {
     server.use(
-      http.get(`${OPERATOR_URL}/api/v1/apps`, () =>
+      http.get(`${OPERATOR_BASE}/api/v1/apps`, () =>
         HttpResponse.json([
           {
             id: "jellyfin",
@@ -69,7 +58,7 @@ describe("OperatorClient (Live) — listApps", () => {
 
   it("fails with OperatorClientError when the response shape can't be decoded", async () => {
     server.use(
-      http.get(`${OPERATOR_URL}/api/v1/apps`, () => HttpResponse.json([{ id: "x" /* missing required fields */ }])),
+      http.get(`${OPERATOR_BASE}/api/v1/apps`, () => HttpResponse.json([{ id: "x" /* missing required fields */ }])),
     )
 
     const rt = makeRuntime()
@@ -84,7 +73,7 @@ describe("OperatorClient (Live) — listApps", () => {
   })
 
   it("fails with OperatorClientError when the HTTP call errors", async () => {
-    server.use(http.get(`${OPERATOR_URL}/api/v1/apps`, () => HttpResponse.json({ error: "boom" }, { status: 500 })))
+    server.use(http.get(`${OPERATOR_BASE}/api/v1/apps`, () => HttpResponse.json({ error: "boom" }, { status: 500 })))
 
     const rt = makeRuntime()
     const result = await rt.runPromiseExit(

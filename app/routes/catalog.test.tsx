@@ -121,19 +121,14 @@ describe("/catalog loader — appsCatalogPromise (real DB)", () => {
 })
 
 // ===========================================================================
-// Component-render tests — real createMemoryRouter, no react-router mocks.
+// Component-render tests via createRoutesStub. Central MSW server + global
+// setup handle the HTTP boundary; no per-file bootstrap.
 // ===========================================================================
 
-import { render, screen, waitFor } from "@testing-library/react"
-import { createMemoryRouter, Outlet, RouterProvider, useLoaderData } from "react-router"
-import { setupServer } from "msw/node"
+import { screen, waitFor } from "@testing-library/react"
 import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
 import CatalogPage from "./catalog"
-
-const httpServer = setupServer()
-beforeAll(() => httpServer.listen({ onUnhandledRequest: "error" }))
-afterAll(() => httpServer.close())
-afterEach(() => httpServer.resetHandlers())
+import { renderRoute } from "~/test/render-route"
 
 const entry = (
   overrides: Partial<{ slug: string; displayName: string; state: string; description: string | null }>,
@@ -166,29 +161,16 @@ const renderCatalog = (
   // Pre-resolve the promise ONCE so router revalidations don't re-trip
   // Suspense in a loop (same pattern as home.test.tsx).
   const appsCatalogPromise = Promise.resolve(catalog)
-  const router = createMemoryRouter(
-    [
-      {
-        id: "routes/dashboard",
-        path: "/",
-        loader: () => dashboard,
-        Component: () => <Outlet />,
-        children: [
-          {
-            path: "catalog",
-            loader: () => ({ appsCatalogPromise, iconBySlug: {} }),
-            Component: () => {
-              const data = useLoaderData()
-              const props = { loaderData: data } as unknown as Parameters<typeof CatalogPage>[0]
-              return <CatalogPage {...props} />
-            },
-          },
-        ],
-      },
-    ],
-    { initialEntries: [url] },
-  )
-  return render(<RouterProvider router={router} />)
+  return renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => dashboard,
+    route: {
+      path: "/catalog",
+      Component: CatalogPage as never,
+      loader: () => ({ appsCatalogPromise, iconBySlug: {} }),
+    },
+    url,
+  })
 }
 
 describe("CatalogPage component — empty catalog", () => {

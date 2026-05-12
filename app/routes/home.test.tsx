@@ -239,38 +239,22 @@ describe("/home action — requestAccess (real DB)", () => {
 })
 
 // ===========================================================================
-// Component-render tests for the default export.
+// Component-render tests via createRoutesStub.
 // ===========================================================================
-// HomePage wraps HomeBody in <Suspense>; HomeBody calls use(promise) to
-// resolve the deferred homeData. We render against a REAL data router
-// (createMemoryRouter), so:
+// `createRoutesStub` is React Router v7's built-in test harness — it wraps
+// a routes array in a real data router so useRouteLoaderData, useFetcher,
+// and useRevalidator all resolve natively. Smaller setup than a hand-built
+// `createMemoryRouter`, no vi.mock on react-router, no component stubs.
 //
-//   - useRouteLoaderData("routes/dashboard")  → dashboard route's loaderData
-//   - useFetcher / useRevalidator              → resolve natively
-//   - Header + NoAccess + RequestAccessDialog  → render for real
-//
-// No `vi.mock("react-router")`, no component stubs. Higher fidelity, fewer
-// brittle stubs to maintain. Anything that crosses a real HTTP boundary
-// inside the components (e.g. RequestAccessDialog's fetcher.load("/api/catalog"))
-// is intercepted via MSW, OR we expose a route in the in-memory router that
-// answers the same path — same effect, no mocks.
+// MSW is bootstrapped globally in app/test/setup.ts; tests register
+// per-case handlers via `server.use(...)` and the global afterEach resets
+// them between cases.
 
-import { render, screen, waitFor } from "@testing-library/react"
-import { createMemoryRouter, RouterProvider, Outlet, useLoaderData } from "react-router"
-import { setupServer } from "msw/node"
+import { screen, waitFor } from "@testing-library/react"
 import type { AppDefinition } from "~/lib/apps"
 import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
 import HomePage from "./home"
-
-// MSW guard: any direct fetch() these components make hits this server and
-// errors out — keeps "test surprised by a network call" from looking like a
-// silent pass. The dialog's fetcher.load("/api/catalog") is NOT a fetch() —
-// React Router resolves it via the in-memory router's catalog route below.
-const httpServer = setupServer()
-
-beforeAll(() => httpServer.listen({ onUnhandledRequest: "error" }))
-afterAll(() => httpServer.close())
-afterEach(() => httpServer.resetHandlers())
+import { renderRoute } from "~/test/render-route"
 
 const sampleApp = (overrides: Partial<AppDefinition> & Pick<AppDefinition, "id" | "category">): AppDefinition => ({
   name: overrides.id,
@@ -282,63 +266,33 @@ const sampleApp = (overrides: Partial<AppDefinition> & Pick<AppDefinition, "id" 
 })
 
 /**
- * Build a real data router mirroring the production route tree shape:
- *   /                  (id: "routes/dashboard") → returns dashboard data
- *     index            → HomePage with home loaderData
- *     api/catalog      → catalog endpoint the dialog reads via fetcher.load
+ * Render HomePage via `createRoutesStub` (wrapped in renderRoute helper).
  *
- * Pre-resolves homeDataPromise so the Suspense boundary commits on first
- * paint without races.
+ * Pre-resolves homeDataPromise ONCE outside the loader: router revalidations
+ * (e.g. search-param updates) re-invoke the loader, and returning a fresh
+ * Promise each time would re-trip Suspense in a loop.
  */
 const renderHome = (
   homeData: { visibleApps: AppDefinition[]; appsCatalog: AppCatalogEntry[] },
   url = "/",
   dashboard: { user: string; isAdmin: boolean } = { user: "alice", isAdmin: false },
 ) => {
-  // Build the homeDataPromise ONCE outside the loader. React Router will
-  // re-run loaders on revalidation (search-param changes etc.); returning a
-  // fresh Promise from each invocation would retrigger Suspense in a loop.
-  // Pre-resolving keeps the reference stable so use() commits on first read.
   const homeDataPromise = Promise.resolve(homeData)
-  const router = createMemoryRouter(
-    [
-      {
-        id: "routes/dashboard",
-        path: "/",
-        loader: () => dashboard,
-        Component: () => <Outlet />,
-        children: [
-          {
-            index: true,
-            loader: () => ({
-              homeDataPromise,
-              categoryOrder: ["media", "tools"],
-            }),
-            Component: () => {
-              // React Router v7 generated route Components receive loaderData
-              // as a prop in production. In a hand-built data router we read
-              // it with useLoaderData() and pass it through — same shape.
-              const data = useLoaderData()
-              // HomePage is typed against React Router's generated
-              // Route.ComponentProps (params + matches + loaderData); in tests
-              // we only need loaderData. Cast through the props type.
-              const props = { loaderData: data } as unknown as Parameters<typeof HomePage>[0]
-              return <HomePage {...props} />
-            },
-          },
-          {
-            path: "api/catalog",
-            // RequestAccessDialog's fetcher.load("/api/catalog") resolves via
-            // this loader. Tests that exercise the dialog can override
-            // appsCatalog via the closure-captured fixture.
-            loader: () => ({ apps: homeData.appsCatalog }),
-          },
-        ],
-      },
-    ],
-    { initialEntries: [url] },
-  )
-  return render(<RouterProvider router={router} />)
+  return renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => dashboard,
+    route: {
+      path: "/",
+      Component: HomePage as never,
+      loader: () => ({
+        homeDataPromise,
+        categoryOrder: ["media", "tools"],
+      }),
+    },
+    // RequestAccessDialog's fetcher.load("/api/catalog") resolves via this.
+    children: [{ path: "/api/catalog", loader: () => ({ apps: homeData.appsCatalog }) }],
+    url,
+  })
 }
 
 describe("HomePage component — no-access branch", () => {

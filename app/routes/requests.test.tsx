@@ -144,19 +144,14 @@ describe("/requests action — cancel flow", () => {
 })
 
 // ===========================================================================
-// Component-render tests — real createMemoryRouter, no react-router mocks.
+// Component-render tests via createRoutesStub. Central MSW server + global
+// setup handle the HTTP boundary; no per-file bootstrap.
 // ===========================================================================
 
-import { render, screen, waitFor } from "@testing-library/react"
-import { createMemoryRouter, Outlet, RouterProvider, useLoaderData } from "react-router"
-import { setupServer } from "msw/node"
+import { screen, waitFor } from "@testing-library/react"
 import type { AccessRequestEnriched } from "~/lib/governance/AccessRequestRepo.server"
 import MyRequestsPage from "./requests"
-
-const reqHttpServer = setupServer()
-beforeAll(() => reqHttpServer.listen({ onUnhandledRequest: "error" }))
-afterAll(() => reqHttpServer.close())
-afterEach(() => reqHttpServer.resetHandlers())
+import { renderRoute } from "~/test/render-route"
 
 const reqRow = (overrides: Partial<AccessRequestEnriched>): AccessRequestEnriched =>
   ({
@@ -184,31 +179,17 @@ const renderRequests = (
   requests: AccessRequestEnriched[],
   url = "/requests",
   dashboard: { user: string; isAdmin: boolean } = { user: "alice", isAdmin: false },
-) => {
-  const router = createMemoryRouter(
-    [
-      {
-        id: "routes/dashboard",
-        path: "/",
-        loader: () => dashboard,
-        Component: () => <Outlet />,
-        children: [
-          {
-            path: "requests",
-            loader: () => ({ requests }),
-            Component: () => {
-              const data = useLoaderData()
-              const props = { loaderData: data } as unknown as Parameters<typeof MyRequestsPage>[0]
-              return <MyRequestsPage {...props} />
-            },
-          },
-        ],
-      },
-    ],
-    { initialEntries: [url] },
-  )
-  return render(<RouterProvider router={router} />)
-}
+) =>
+  renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => dashboard,
+    route: {
+      path: "/requests",
+      Component: MyRequestsPage as never,
+      loader: () => ({ requests }),
+    },
+    url,
+  })
 
 describe("MyRequestsPage component", () => {
   it("renders the empty state when the user has no requests", async () => {
