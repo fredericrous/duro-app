@@ -149,4 +149,43 @@ describe("AdminGroupMappingsPage component", () => {
       expect(screen.queryByText("okta-engineers")).not.toBeInTheDocument()
     })
   })
+
+  it("renders the application name + role for an app-scoped (role) mapping", async () => {
+    renderPage({
+      mappings: [
+        {
+          id: "m2",
+          oidcGroupName: "okta-admins",
+          // app-scoped: principalGroupId is null → target column shows
+          // application + role instead of group.
+          principalGroupId: null,
+          principalGroupName: null,
+          roleId: "role-admin",
+          roleName: "Admin",
+          applicationId: "app-jellyfin",
+          applicationName: "Jellyfin",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      applications: [{ id: "app-jellyfin", slug: "jellyfin", displayName: "Jellyfin" }],
+    })
+    await waitFor(() => {
+      // Target cell joins with " / "; the same text bubbles up several
+      // ancestors, so getAllByText is more robust than expecting a single
+      // match.
+      const matches = screen.getAllByText((_, node) => Boolean(node?.textContent?.includes("Jellyfin / Admin")))
+      expect(matches.length).toBeGreaterThan(0)
+    })
+  })
+
+  it("renders the Add Group Mapping button", async () => {
+    renderPage({
+      groups: [{ id: "g-1", displayName: "Engineering" }],
+      applications: [{ id: "app-1", slug: "jellyfin", displayName: "Jellyfin" }],
+    })
+    await waitFor(() => {
+      // The button label varies by translation; match by /mapping|mappage/i.
+      expect(screen.getByRole("button", { name: /add|nouveau/i })).toBeInTheDocument()
+    })
+  })
 })
