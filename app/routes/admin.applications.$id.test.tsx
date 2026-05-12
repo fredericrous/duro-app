@@ -605,16 +605,21 @@ describe("AdminApplicationDetailPage dialog round-trips", () => {
       "/admin/applications/app-1?tab=resources",
     )
 
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /add resource/i })).toBeInTheDocument()
-    })
-    await user.click(screen.getByRole("button", { name: /add resource/i }))
+    // findAllByRole is defensive against transient mid-render duplicates that
+    // confuse getByRole. The populated-resources branch only renders the top
+    // "Add Resource" button anyway, so [0] is the right one.
+    const addButtons = await screen.findAllByRole("button", { name: /add resource/i })
+    await user.click(addButtons[0])
 
-    // Dialog opens — wait for one of its inputs (matching by name attr to
-    // avoid placeholder-text races inside the focus-trap mount).
-    const folderInput = await screen.findByPlaceholderText("folder", undefined, { timeout: 3000 })
-    await user.type(folderInput, "library")
-    await user.type(await screen.findByPlaceholderText("Documents"), "Library Folder")
+    // Gate on the dialog HEADING being visible before hunting for inputs —
+    // findByPlaceholderText alone flaked under CI's faster (uncoverage) test
+    // runner because the placeholder query polled before the dialog mounted.
+    // Waiting on a role-based selector inside the dialog tree is more
+    // robust than a placeholder string.
+    await screen.findByRole("heading", { name: /create resource/i })
+
+    await user.type(screen.getByPlaceholderText("folder"), "library")
+    await user.type(screen.getByPlaceholderText("Documents"), "Library Folder")
     await user.click(screen.getByRole("button", { name: /create resource/i }))
 
     await waitFor(() => {
