@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest"
+import { describe, expect, it, vi, beforeEach, beforeAll, afterAll, afterEach } from "vitest"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 
@@ -117,5 +117,180 @@ describe("/catalog loader — appsCatalogPromise (real DB)", () => {
     expect(catalog[0].app.slug).toBe("jellyfin")
     // App has accessMode='open' and no grants → catalog state should be 'open'.
     expect(catalog[0].state).toBe("open")
+  })
+})
+
+// ===========================================================================
+// Component-render tests — real createMemoryRouter, no react-router mocks.
+// ===========================================================================
+
+import { render, screen, waitFor } from "@testing-library/react"
+import { createMemoryRouter, Outlet, RouterProvider, useLoaderData } from "react-router"
+import { setupServer } from "msw/node"
+import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
+import CatalogPage from "./catalog"
+
+const httpServer = setupServer()
+beforeAll(() => httpServer.listen({ onUnhandledRequest: "error" }))
+afterAll(() => httpServer.close())
+afterEach(() => httpServer.resetHandlers())
+
+const entry = (
+  overrides: Partial<{ slug: string; displayName: string; state: string; description: string | null }>,
+): AppCatalogEntry =>
+  ({
+    app: {
+      id: `app-${overrides.slug ?? "x"}`,
+      slug: overrides.slug ?? "x",
+      displayName: overrides.displayName ?? overrides.slug ?? "X",
+      description: overrides.description ?? null,
+      accessMode: "request",
+      enabled: true,
+      url: null,
+      ownerId: "p-admin",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
+    state: overrides.state ?? "open",
+    grantedRoleIds: [],
+    pendingTargets: [],
+    roles: [],
+    requestableRoleIds: [],
+  }) as unknown as AppCatalogEntry
+
+const renderCatalog = (
+  catalog: AppCatalogEntry[],
+  url = "/catalog",
+  dashboard: { user: string; isAdmin: boolean } = { user: "alice", isAdmin: false },
+) => {
+  // Pre-resolve the promise ONCE so router revalidations don't re-trip
+  // Suspense in a loop (same pattern as home.test.tsx).
+  const appsCatalogPromise = Promise.resolve(catalog)
+  const router = createMemoryRouter(
+    [
+      {
+        id: "routes/dashboard",
+        path: "/",
+        loader: () => dashboard,
+        Component: () => <Outlet />,
+        children: [
+          {
+            path: "catalog",
+            loader: () => ({ appsCatalogPromise, iconBySlug: {} }),
+            Component: () => {
+              const data = useLoaderData()
+              const props = { loaderData: data } as unknown as Parameters<typeof CatalogPage>[0]
+              return <CatalogPage {...props} />
+            },
+          },
+        ],
+      },
+    ],
+    { initialEntries: [url] },
+  )
+  return render(<RouterProvider router={router} />)
+}
+
+describe("CatalogPage component — empty catalog", () => {
+  it("renders the catalog-is-empty state (no search bar)", async () => {
+    renderCatalog([])
+    await waitFor(() => {
+      expect(screen.getByText(/No apps are available/i)).toBeInTheDocument()
+    })
+    // No search bar when the catalog is empty.
+    expect(screen.queryByPlaceholderText("Search apps…")).not.toBeInTheDocument()
+  })
+})
+
+describe("CatalogPage component — populated", () => {
+  it("renders the table with one row per catalog entry + the search bar + state chips", async () => {
+    renderCatalog([
+      entry({ slug: "jellyfin", displayName: "Jellyfin", state: "open" }),
+      entry({ slug: "vault", displayName: "Vault", state: "requestable" }),
+      entry({ slug: "gitea", displayName: "Gitea", state: "pending" }),
+    ])
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Search apps…")).toBeInTheDocument()
+    })
+    expect(screen.getByText("Jellyfin")).toBeInTheDocument()
+    expect(screen.getByText("Vault")).toBeInTheDocument()
+    expect(screen.getByText("Gitea")).toBeInTheDocument()
+    // One chip per state that appears in the catalog. The chips are toggle
+    // buttons (aria-pressed), action buttons in each row are not — narrow by
+    // attribute to avoid matching the row's "Request access" / "View request"
+    // primary actions that share the chip's label.
+    const chips = screen.getAllByRole("button", { pressed: false })
+    const chipLabels = chips.map((c) => c.textContent ?? "")
+    expect(chipLabels.some((l) => l.includes("Open"))).toBe(true)
+    expect(chipLabels.some((l) => l.includes("Request access"))).toBe(true)
+    expect(chipLabels.some((l) => l.includes("Pending"))).toBe(true)
+  })
+
+  it("surfaces the pending-requests banner when at least one row is pending", async () => {
+    renderCatalog([
+      entry({ slug: "jellyfin", state: "open" }),
+      entry({ slug: "vault", state: "pending" }),
+      entry({ slug: "gitea", state: "pending" }),
+    ])
+
+    await waitFor(() => {
+      // Banner copy comes from the apps.pendingBanner_one/_other plural key.
+      expect(screen.getByText(/You have 2 pending request/i)).toBeInTheDocument()
+    })
+  })
+
+  it("hides the pending banner when no row is in 'pending'", async () => {
+    renderCatalog([entry({ slug: "jellyfin", state: "open" })])
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Search apps…")).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/pending request/i)).not.toBeInTheDocument()
+  })
+
+  it("filters to one row when ?q= matches one displayName", async () => {
+    renderCatalog(
+      [
+        entry({ slug: "jellyfin", displayName: "Jellyfin", state: "open" }),
+        entry({ slug: "vault", displayName: "Vault", state: "open" }),
+      ],
+      "/catalog?q=jelly",
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText("Jellyfin")).toBeInTheDocument()
+    })
+    expect(screen.queryByText("Vault")).not.toBeInTheDocument()
+  })
+
+  it("hydrates the selected state chip from ?state= and filters the table", async () => {
+    renderCatalog(
+      [
+        entry({ slug: "jellyfin", displayName: "Jellyfin", state: "open" }),
+        entry({ slug: "vault", displayName: "Vault", state: "requestable" }),
+      ],
+      "/catalog?state=open",
+    )
+
+    await waitFor(() => {
+      // Find the chip via aria-pressed — that disambiguates from any in-row
+      // "Open" launch button that doesn't carry pressed state.
+      const openChip = screen.getByRole("button", { name: "Open", pressed: true })
+      expect(openChip).toBeInTheDocument()
+    })
+    expect(screen.getByText("Jellyfin")).toBeInTheDocument()
+    expect(screen.queryByText("Vault")).not.toBeInTheDocument()
+  })
+
+  it("shows the no-results EmptyState when ?q= matches nothing", async () => {
+    renderCatalog(
+      [entry({ slug: "jellyfin", displayName: "Jellyfin", state: "open" })],
+      "/catalog?q=nothingmatchesthis",
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(/No matching apps/i)).toBeInTheDocument()
+    })
   })
 })
