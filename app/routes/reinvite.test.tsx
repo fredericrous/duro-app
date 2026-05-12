@@ -1,4 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
+import { Effect } from "effect"
+import * as SqlClient from "@effect/sql/SqlClient"
 
 vi.mock("~/lib/runtime.server", async () => {
   const mod = await import("~/test/test-runtime")
@@ -13,7 +15,7 @@ vi.mock("~/lib/crypto.server", () => ({
 }))
 
 import { action, loader } from "./reinvite"
-import { truncateAll } from "~/test/test-runtime"
+import { seedTestDb, truncateAll } from "~/test/test-runtime"
 import { callAction, callLoader, expectData } from "~/test/route-utils"
 
 beforeEach(async () => {
@@ -49,6 +51,57 @@ describe("/reinvite/:token action", () => {
     const result = await callAction(action, { params: { token: "no-such-token" } })
     const data = expectData<{ success: boolean; error?: string }>(result)
     expect(data.success).toBe(false)
+  })
+
+  it("returns 'already_used' when the invite is already consumed by a real user", async () => {
+    // Seed an invite with usedBy = some real user (not the __revoked__ marker).
+    await seedTestDb(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* sql`INSERT INTO invites (id, token, token_hash, email, groups, group_names, invited_by, locale, expires_at, used_at, used_by)
+                   VALUES ('inv-used', 'consumed-token', 'hashed-token', 'used@x.com',
+                           '[1]', '["family"]', 'admin', 'en',
+                           ${new Date(Date.now() + 86400_000).toISOString()},
+                           ${new Date().toISOString()}, 'real-user')`
+      }) as Effect.Effect<void, never, never>,
+    )
+
+    const result = await callAction(action, { params: { token: "consumed-token" } })
+    const data = expectData<{ success: boolean; error?: string }>(result)
+    expect(data.success).toBe(false)
+    expect(data.error).toBe("already_used")
+  })
+})
+
+describe("/reinvite/:token loader — additional branches", () => {
+  beforeEach(async () => {
+    await truncateAll()
+  })
+
+  it("returns 'invalid' when no invite matches the hashed token", async () => {
+    // Empty DB → InviteRepo.findByTokenHash returns null.
+    const result = await callLoader(loader, { params: { token: "no-match" } })
+    const data = expectData<{ canReinvite: boolean; error?: string }>(result)
+    expect(data.canReinvite).toBe(false)
+    expect(data.error).toBe("invalid")
+  })
+
+  it("returns canReinvite=true when the invite is expired (eligible for re-send)", async () => {
+    // expiresAt in the past → isExpired=true → still_valid branch skipped.
+    await seedTestDb(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* sql`INSERT INTO invites (id, token, token_hash, email, groups, group_names, invited_by, locale, expires_at)
+                   VALUES ('inv-expired', 'expired-tok', 'hashed-token', 'old@x.com',
+                           '[1]', '["family"]', 'admin', 'en',
+                           ${new Date(Date.now() - 86400_000).toISOString()})`
+      }) as Effect.Effect<void, never, never>,
+    )
+
+    const result = await callLoader(loader, { params: { token: "expired-tok" } })
+    const data = expectData<{ canReinvite: boolean; email?: string }>(result)
+    expect(data.canReinvite).toBe(true)
+    expect(data.email).toBe("old@x.com")
   })
 })
 
