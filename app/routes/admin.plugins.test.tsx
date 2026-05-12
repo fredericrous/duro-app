@@ -27,3 +27,55 @@ describe("/admin/plugins loader", () => {
     expect(loaded.plugins).toEqual(data)
   })
 })
+
+// ===========================================================================
+// Component-render tests
+// ===========================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import AdminPluginsPage from "./admin.plugins"
+import { renderRoute } from "~/test/render-route"
+
+const mkRow = (slug: string, displayName: string, capabilities: string[] = ["lldap.group.read"]) => ({
+  manifest: {
+    slug,
+    displayName,
+    version: "1.0.0",
+    description: "",
+    capabilities,
+    allowedDomains: [],
+    vaultSecrets: [],
+    configSchema: {},
+    permissionStrategy: { byRoleSlug: {} },
+    imperative: false,
+    timeoutMs: 10_000,
+  },
+  installCount: 0,
+})
+
+const renderPage = (plugins: unknown[]) =>
+  renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    route: {
+      path: "/admin/plugins",
+      Component: AdminPluginsPage as never,
+      loader: () => ({ plugins }),
+    },
+  })
+
+describe("AdminPluginsPage component", () => {
+  it("renders one row per plugin", async () => {
+    renderPage([
+      mkRow("gitea-teams", "Gitea Teams", ["gitea.team.read", "gitea.team.member.add"]),
+      mkRow("plex-libs", "Plex Libraries"),
+    ])
+
+    await waitFor(() => {
+      expect(screen.getByText("Gitea Teams")).toBeInTheDocument()
+    })
+    expect(screen.getByText("Plex Libraries")).toBeInTheDocument()
+    // Capability tags render too.
+    expect(screen.getByText("gitea.team.read")).toBeInTheDocument()
+  })
+})

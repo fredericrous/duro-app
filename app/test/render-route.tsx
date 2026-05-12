@@ -32,6 +32,10 @@ export interface RenderRouteOptions {
   /** Optional parent route — populates `useRouteLoaderData(parentLoaderId)`. */
   parentLoaderId?: string
   parentLoader?: () => unknown
+  /** Outlet context the parent passes to the child route — populates
+   *  `useOutletContext()`. Use for admin routes that consume
+   *  `useAdminSidePanel()`. */
+  parentContext?: unknown
   /** Optional child routes (e.g. `/api/catalog` for fetcher.load). */
   children?: Array<{ path: string; loader?: () => unknown; action?: (args: { request: Request }) => unknown }>
   /** Initial URL the router opens at. Defaults to the route's path. */
@@ -39,7 +43,7 @@ export interface RenderRouteOptions {
 }
 
 export function renderRoute(options: RenderRouteOptions) {
-  const { route, parentLoaderId, parentLoader, children = [], url } = options
+  const { route, parentLoaderId, parentLoader, parentContext, children = [], url } = options
 
   // Component wrapper: read loaderData via the hook and forward as a prop.
   // Mirrors React Router v7's framework-mode contract — generated route
@@ -74,8 +78,10 @@ export function renderRoute(options: RenderRouteOptions) {
       path: "/",
       loader: parentLoader,
       // Parent component must render <Outlet /> so the child (route under
-      // test) actually paints. Without this the body stays empty.
-      Component: () => <Outlet />,
+      // test) actually paints. Pass `parentContext` through so the child can
+      // read it via `useOutletContext()` (admin routes consume the
+      // AdminSidePanel context this way).
+      Component: () => <Outlet context={parentContext} />,
       children: [
         childRouteUnderTest,
         ...children.map((c) =>

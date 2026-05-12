@@ -59,3 +59,75 @@ describe("/admin/invitations action", () => {
     expect(data.error).toContain("required")
   })
 })
+
+// ===========================================================================
+// Component-render tests
+// ===========================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import AdminInvitationsPage from "./admin.invitations"
+import { renderRoute } from "~/test/render-route"
+
+const renderPage = (data: { invitations?: unknown[]; applications?: unknown[]; principals?: unknown[] } = {}) =>
+  renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    route: {
+      path: "/admin/invitations",
+      Component: AdminInvitationsPage as never,
+      loader: () => ({
+        invitations: data.invitations ?? [],
+        applications: data.applications ?? [],
+        principals: data.principals ?? [],
+      }),
+    },
+  })
+
+describe("AdminInvitationsPage component", () => {
+  it("renders one row per invitation", async () => {
+    renderPage({
+      invitations: [
+        {
+          id: "i1",
+          applicationId: "app-1",
+          invitedPrincipalId: "p-alice",
+          roleId: "role-1",
+          entitlementId: null,
+          message: "welcome!",
+          status: "pending",
+          createdAt: "2026-01-01T00:00:00Z",
+          expiresAt: null,
+        },
+        {
+          id: "i2",
+          applicationId: "app-1",
+          invitedPrincipalId: "p-bob",
+          roleId: null,
+          entitlementId: "ent-1",
+          message: null,
+          status: "accepted",
+          createdAt: "2026-01-01T00:00:00Z",
+          expiresAt: null,
+        },
+      ],
+      applications: [{ id: "app-1", slug: "j", displayName: "Jellyfin" }],
+      principals: [
+        { id: "p-alice", displayName: "Alice" },
+        { id: "p-bob", displayName: "Bob" },
+      ],
+    })
+
+    await waitFor(() => {
+      // Status badges render the literal status string.
+      expect(screen.getByText("pending")).toBeInTheDocument()
+    })
+    expect(screen.getByText("accepted")).toBeInTheDocument()
+  })
+
+  it("survives an empty invitation list", async () => {
+    renderPage({})
+    await waitFor(() => {
+      expect(screen.queryByText("pending")).not.toBeInTheDocument()
+    })
+  })
+})

@@ -31,3 +31,71 @@ describe("/admin/access-requests loader", () => {
     expect(data.requests).toEqual([])
   })
 })
+
+// ===========================================================================
+// Component-render tests
+// ===========================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import type { AccessRequestEnriched } from "~/lib/governance/AccessRequestRepo.server"
+import AdminAccessRequestsPage from "./admin.access-requests"
+import { renderRoute } from "~/test/render-route"
+
+const reqRow = (overrides: Partial<AccessRequestEnriched>): AccessRequestEnriched =>
+  ({
+    id: overrides.id ?? "r1",
+    requesterId: "p-alice",
+    applicationId: "app-1",
+    roleId: "role-1",
+    entitlementId: null,
+    resourceId: null,
+    justification: null,
+    requestedDurationHours: null,
+    status: overrides.status ?? "pending",
+    resolvedAt: null,
+    grantId: null,
+    createdAt: "2026-01-01T00:00:00Z",
+    expiresAt: null,
+    applicationName: overrides.applicationName ?? "App",
+    applicationSlug: "app",
+    roleName: overrides.roleName ?? "Editor",
+    entitlementName: null,
+    requesterName: overrides.requesterName ?? "Alice",
+    ...overrides,
+  }) as AccessRequestEnriched
+
+const renderPage = (requests: AccessRequestEnriched[]) =>
+  renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    route: {
+      path: "/admin/access-requests",
+      Component: AdminAccessRequestsPage as never,
+      loader: () => ({ requests }),
+    },
+  })
+
+describe("AdminAccessRequestsPage component", () => {
+  it("renders the empty state when no requests exist", async () => {
+    renderPage([])
+    await waitFor(() => {
+      expect(screen.getByText(/no.*access.*request|haven't|empty/i)).toBeInTheDocument()
+    })
+  })
+
+  it("renders the table with one row per request and shows the count in the title", async () => {
+    renderPage([
+      reqRow({ id: "r1", applicationName: "Jellyfin", requesterName: "Alice" }),
+      reqRow({ id: "r2", applicationName: "Vault", requesterName: "Bob" }),
+      reqRow({ id: "r3", applicationName: "Gitea", requesterName: "Carol" }),
+    ])
+
+    await waitFor(() => {
+      expect(screen.getByText("Jellyfin")).toBeInTheDocument()
+    })
+    expect(screen.getByText("Vault")).toBeInTheDocument()
+    expect(screen.getByText("Gitea")).toBeInTheDocument()
+    // The card title includes the count in parens.
+    expect(screen.getByText(/\(3\)/)).toBeInTheDocument()
+  })
+})

@@ -56,3 +56,69 @@ describe("/admin/invites action", () => {
     expect(expectData<{ success?: boolean }>(result)).toEqual({ success: true })
   })
 })
+
+// ===========================================================================
+// Component-render tests
+// ===========================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import AdminInvitesPage from "./admin.invites"
+import { renderRoute } from "~/test/render-route"
+
+const renderPage = (
+  data: {
+    groups?: Array<{ id: number; displayName: string }>
+    pendingInvites?: unknown[]
+    failedInvites?: unknown[]
+    checklist?: { showAddApplication: boolean; showInviteTeammate: boolean; showConfigurePlugins: boolean }
+  } = {},
+) =>
+  renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    route: {
+      path: "/admin/invites",
+      Component: AdminInvitesPage as never,
+      loader: () => ({
+        groups: data.groups ?? [{ id: 1, displayName: "family" }],
+        pendingInvites: data.pendingInvites ?? [],
+        failedInvites: data.failedInvites ?? [],
+        checklist: data.checklist ?? {
+          showAddApplication: false,
+          showInviteTeammate: false,
+          showConfigurePlugins: false,
+        },
+      }),
+    },
+  })
+
+describe("AdminInvitesPage component", () => {
+  it("renders the invite form even when there are no pending/failed invites", async () => {
+    renderPage({})
+    await waitFor(() => {
+      // There's always an "emails" input on the form.
+      expect(screen.queryAllByRole("textbox").length).toBeGreaterThan(0)
+    })
+  })
+
+  it("renders a pending invites section when at least one is pending", async () => {
+    renderPage({
+      pendingInvites: [
+        {
+          id: "i1",
+          email: "alice@example.com",
+          groups: "[1]",
+          groupNames: '["family"]',
+          invitedBy: "admin",
+          locale: "en",
+          createdAt: "2026-01-01T00:00:00Z",
+          expiresAt: "2026-01-08T00:00:00Z",
+          usedAt: null,
+        },
+      ],
+    })
+    await waitFor(() => {
+      expect(screen.getByText("alice@example.com")).toBeInTheDocument()
+    })
+  })
+})

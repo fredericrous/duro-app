@@ -68,3 +68,81 @@ describe("/admin/grants action — origin + auth gates", () => {
     expect(expectResponse(result).status).toBe(403)
   })
 })
+
+// ===========================================================================
+// Component-render tests
+// ===========================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import AdminGrantsPage from "./admin.grants"
+import { renderRoute } from "~/test/render-route"
+
+const renderPage = (data: { grants: unknown[] }) =>
+  renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    route: {
+      path: "/admin/grants",
+      Component: AdminGrantsPage as never,
+      loader: () => data,
+    },
+  })
+
+describe("AdminGrantsPage component", () => {
+  it("renders one row per grant", async () => {
+    renderPage({
+      grants: [
+        {
+          id: "g1",
+          principalId: "p-alice",
+          principalName: "Alice",
+          roleId: "r-editor",
+          roleName: "Editor",
+          entitlementId: null,
+          entitlementName: null,
+          applicationName: "Jellyfin",
+          applicationId: "app-jelly",
+          grantedBy: "p-admin",
+          grantedByName: "Admin",
+          reason: null,
+          expiresAt: null,
+          revokedAt: null,
+          revokedBy: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          resourceId: null,
+        },
+        {
+          id: "g2",
+          principalId: "p-bob",
+          principalName: "Bob",
+          roleId: "r-admin",
+          roleName: "Admin",
+          entitlementId: null,
+          entitlementName: null,
+          applicationName: "Vault",
+          applicationId: "app-vault",
+          grantedBy: "p-admin",
+          grantedByName: "Admin",
+          reason: null,
+          expiresAt: null,
+          revokedAt: null,
+          revokedBy: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          resourceId: null,
+        },
+      ],
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument()
+    })
+    expect(screen.getByText("Bob")).toBeInTheDocument()
+  })
+
+  it("survives an empty grants list", async () => {
+    renderPage({ grants: [] })
+    await waitFor(() => {
+      expect(screen.queryByText("Alice")).not.toBeInTheDocument()
+    })
+  })
+})

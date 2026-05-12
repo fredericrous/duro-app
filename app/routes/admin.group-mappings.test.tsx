@@ -66,3 +66,87 @@ describe("/admin/group-mappings action", () => {
     expect(data.error).toContain("Application and role")
   })
 })
+
+// ===========================================================================
+// Component-render tests
+// ===========================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import AdminGroupMappingsPage from "./admin.group-mappings"
+import { renderRoute } from "~/test/render-route"
+
+const renderPage = (
+  data: {
+    mappings?: Array<{
+      id: string
+      oidcGroupName: string
+      principalGroupId: string | null
+      principalGroupName: string | null
+      roleId: string | null
+      roleName: string | null
+      applicationId: string | null
+      applicationName: string | null
+      createdAt: string
+    }>
+    applications?: Array<{ id: string; slug: string; displayName: string }>
+    groups?: Array<{ id: string; displayName: string }>
+    rolesByApp?: Record<string, Array<{ id: string; displayName: string }>>
+  } = {},
+) =>
+  renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    route: {
+      path: "/admin/group-mappings",
+      Component: AdminGroupMappingsPage as never,
+      loader: () => ({
+        mappings: data.mappings ?? [],
+        applications: data.applications ?? [],
+        groups: data.groups ?? [],
+        rolesByApp: data.rolesByApp ?? {},
+      }),
+    },
+  })
+
+describe("AdminGroupMappingsPage component", () => {
+  it("renders each mapping row", async () => {
+    renderPage({
+      mappings: [
+        {
+          id: "m1",
+          oidcGroupName: "okta-engineers",
+          principalGroupId: "g-eng",
+          principalGroupName: "Engineering",
+          roleId: null,
+          roleName: null,
+          applicationId: null,
+          applicationName: null,
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "m2",
+          oidcGroupName: "okta-editors",
+          principalGroupId: null,
+          principalGroupName: null,
+          roleId: "r-editor",
+          roleName: "Editor",
+          applicationId: "app-1",
+          applicationName: "Jellyfin",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText("okta-engineers")).toBeInTheDocument()
+    })
+    expect(screen.getByText("okta-editors")).toBeInTheDocument()
+  })
+
+  it("survives an empty mappings list", async () => {
+    renderPage({})
+    await waitFor(() => {
+      expect(screen.queryByText("okta-engineers")).not.toBeInTheDocument()
+    })
+  })
+})
