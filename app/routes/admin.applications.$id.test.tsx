@@ -249,6 +249,80 @@ describe("AdminApplicationDetailPage component", () => {
     })
   })
 
+  it("opens the entitlements tab via ?tab=entitlements and shows the Add Entitlement button", async () => {
+    const data = baseLoaderData()
+    renderRoute({
+      parentLoaderId: "routes/dashboard",
+      parentLoader: () => ({ user: "admin", isAdmin: true }),
+      parentContext: stubSidePanel,
+      route: {
+        path: "/admin/applications/app-1",
+        Component: AdminApplicationDetailPage as never,
+        loader: () => data,
+      },
+      url: "/admin/applications/app-1?tab=entitlements",
+    })
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /add entitlement/i })).toBeInTheDocument()
+    })
+  })
+
+  it("opens the resources tab via ?tab=resources with empty-state CTA", async () => {
+    const data = baseLoaderData()
+    renderRoute({
+      parentLoaderId: "routes/dashboard",
+      parentLoader: () => ({ user: "admin", isAdmin: true }),
+      parentContext: stubSidePanel,
+      route: {
+        path: "/admin/applications/app-1",
+        Component: AdminApplicationDetailPage as never,
+        loader: () => data,
+      },
+      url: "/admin/applications/app-1?tab=resources",
+    })
+    await waitFor(() => {
+      // Two buttons: "Add Resource" + "Create your first resource"
+      expect(screen.getByRole("button", { name: /add resource/i })).toBeInTheDocument()
+    })
+  })
+
+  it("opens the grants tab via ?tab=grants with empty-state CTA", async () => {
+    const data = baseLoaderData()
+    renderRoute({
+      parentLoaderId: "routes/dashboard",
+      parentLoader: () => ({ user: "admin", isAdmin: true }),
+      parentContext: stubSidePanel,
+      route: {
+        path: "/admin/applications/app-1",
+        Component: AdminApplicationDetailPage as never,
+        loader: () => data,
+      },
+      url: "/admin/applications/app-1?tab=grants",
+    })
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /grant access/i })).toBeInTheDocument()
+    })
+  })
+
+  it("opens the settings tab via ?tab=settings", async () => {
+    const data = baseLoaderData()
+    renderRoute({
+      parentLoaderId: "routes/dashboard",
+      parentLoader: () => ({ user: "admin", isAdmin: true }),
+      parentContext: stubSidePanel,
+      route: {
+        path: "/admin/applications/app-1",
+        Component: AdminApplicationDetailPage as never,
+        loader: () => data,
+      },
+      url: "/admin/applications/app-1?tab=settings",
+    })
+    await waitFor(() => {
+      // The settings tab content renders the "Application Settings" panel.
+      expect(screen.getByText(/Application Settings/i)).toBeInTheDocument()
+    })
+  })
+
   it("surfaces a callout when there are pending requests", async () => {
     renderPage({
       pendingRequests: [
