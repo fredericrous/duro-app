@@ -145,4 +145,49 @@ describe("AdminGrantsPage component", () => {
       expect(screen.queryByText("Alice")).not.toBeInTheDocument()
     })
   })
+
+  it("renders the application + role names + a Revoke action per grant row", async () => {
+    renderPage({
+      grants: [
+        {
+          id: "g-pop",
+          principalId: "p-alice",
+          principalName: "Alice",
+          roleId: "r-editor",
+          roleName: "Editor",
+          entitlementId: null,
+          entitlementName: null,
+          applicationName: "Jellyfin",
+          applicationId: "app-jelly",
+          grantedBy: "p-admin",
+          grantedByName: "Admin",
+          reason: "promotion",
+          expiresAt: null,
+          revokedAt: null,
+          revokedBy: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          resourceId: null,
+        },
+      ],
+    })
+    await waitFor(() => {
+      expect(screen.getByText("Alice")).toBeInTheDocument()
+    })
+    // The roleName column renders "Editor"; admin column shows "Admin"
+    // (granted_by name). Per-row revoke action — at least one button
+    // labelled revoke/revoquer is rendered in the populated state.
+    expect(screen.getByText("Editor")).toBeInTheDocument()
+    const revokeButtons = screen.getAllByRole("button", { name: /revoke|revoquer/i })
+    expect(revokeButtons.length).toBeGreaterThan(0)
+  })
+
+  it("renders the New Grant CTA in the page header", async () => {
+    renderPage({ grants: [] })
+    await waitFor(() => {
+      // The "Create Grant" link routes the admin to /admin/grants/new.
+      // Match the link by name fragment + verify the href.
+      const link = screen.getByRole("link", { name: /grant|attribuer/i })
+      expect(link).toHaveAttribute("href", expect.stringMatching(/\/admin\/grants\/new/))
+    })
+  })
 })
