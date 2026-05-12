@@ -61,7 +61,14 @@ export const ApiKeyRepoLive = Layer.effect(
             Effect.map((rows) => {
               if (!rows[0]) return null
               const row = decodeApiKey(rows[0])
-              return { principalId: row.principalId, scopes: JSON.parse(row.scopes as string) as string[] }
+              // scopes is JSONB; the pg driver returns it pre-parsed as an
+              // array, so we just narrow the Unknown to string[]. The old
+              // `JSON.parse(row.scopes as string)` here double-decoded:
+              // `JSON.parse(["read","write"])` coerced via toString to
+              // `"read,write"`, which JSON.parse then rejected. That broke
+              // verification for every multi-scope key — and even the default
+              // `["*"]` would throw via `JSON.parse("*")`.
+              return { principalId: row.principalId, scopes: row.scopes as string[] }
             }),
           ),
           "Failed to verify API key",
