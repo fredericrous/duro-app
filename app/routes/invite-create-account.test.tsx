@@ -56,6 +56,39 @@ describe("/invite/:token/create-account loader", () => {
     expect(data.valid).toBe(true)
     expect(data.email).toBe("alice@example.com")
   })
+
+  it("returns 'already_used' when the invite has been consumed", async () => {
+    await seedTestDb(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* sql`INSERT INTO invites (id, token, token_hash, email, groups, group_names, invited_by, locale, expires_at, used_at)
+                   VALUES ('inv-used', 'tok-used', 'hashed-tok-used', 'used@x.com',
+                           '[1]', '["family"]', 'admin', 'en',
+                           ${new Date(Date.now() + 86400_000).toISOString()},
+                           ${new Date().toISOString()})`
+      }) as Effect.Effect<void, never, never>,
+    )
+    const result = await callLoader(loader, { params: { token: "tok-used" } })
+    const data = expectData<{ valid: boolean; error?: string }>(result)
+    expect(data.valid).toBe(false)
+    expect(data.error).toBe("already_used")
+  })
+
+  it("returns 'expired' when the invite's expiresAt is in the past", async () => {
+    await seedTestDb(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* sql`INSERT INTO invites (id, token, token_hash, email, groups, group_names, invited_by, locale, expires_at)
+                   VALUES ('inv-exp', 'tok-exp', 'hashed-tok-exp', 'exp@x.com',
+                           '[1]', '["family"]', 'admin', 'en',
+                           ${new Date(Date.now() - 86400_000).toISOString()})`
+      }) as Effect.Effect<void, never, never>,
+    )
+    const result = await callLoader(loader, { params: { token: "tok-exp" } })
+    const data = expectData<{ valid: boolean; error?: string }>(result)
+    expect(data.valid).toBe(false)
+    expect(data.error).toBe("expired")
+  })
 })
 
 describe("/invite/:token/create-account action", () => {
