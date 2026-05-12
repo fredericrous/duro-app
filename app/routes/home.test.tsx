@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest"
+import { describe, expect, it, vi, beforeEach, beforeAll, afterAll, afterEach } from "vitest"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 
@@ -235,5 +235,194 @@ describe("/home action — requestAccess (real DB)", () => {
     // The action collapses anything outside the named cases to a string error.
     expect(data.error).toBeDefined()
     err.mockRestore()
+  })
+})
+
+// ===========================================================================
+// Component-render tests for the default export.
+// ===========================================================================
+// HomePage wraps HomeBody in <Suspense>; HomeBody calls use(promise) to
+// resolve the deferred homeData. We render against a REAL data router
+// (createMemoryRouter), so:
+//
+//   - useRouteLoaderData("routes/dashboard")  → dashboard route's loaderData
+//   - useFetcher / useRevalidator              → resolve natively
+//   - Header + NoAccess + RequestAccessDialog  → render for real
+//
+// No `vi.mock("react-router")`, no component stubs. Higher fidelity, fewer
+// brittle stubs to maintain. Anything that crosses a real HTTP boundary
+// inside the components (e.g. RequestAccessDialog's fetcher.load("/api/catalog"))
+// is intercepted via MSW, OR we expose a route in the in-memory router that
+// answers the same path — same effect, no mocks.
+
+import { render, screen, waitFor } from "@testing-library/react"
+import { createMemoryRouter, RouterProvider, Outlet, useLoaderData } from "react-router"
+import { setupServer } from "msw/node"
+import type { AppDefinition } from "~/lib/apps"
+import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
+import HomePage from "./home"
+
+// MSW guard: any direct fetch() these components make hits this server and
+// errors out — keeps "test surprised by a network call" from looking like a
+// silent pass. The dialog's fetcher.load("/api/catalog") is NOT a fetch() —
+// React Router resolves it via the in-memory router's catalog route below.
+const httpServer = setupServer()
+
+beforeAll(() => httpServer.listen({ onUnhandledRequest: "error" }))
+afterAll(() => httpServer.close())
+afterEach(() => httpServer.resetHandlers())
+
+const sampleApp = (overrides: Partial<AppDefinition> & Pick<AppDefinition, "id" | "category">): AppDefinition => ({
+  name: overrides.id,
+  url: `https://${overrides.id}.example.com`,
+  icon: "<svg/>",
+  groups: [],
+  priority: 1,
+  ...overrides,
+})
+
+/**
+ * Build a real data router mirroring the production route tree shape:
+ *   /                  (id: "routes/dashboard") → returns dashboard data
+ *     index            → HomePage with home loaderData
+ *     api/catalog      → catalog endpoint the dialog reads via fetcher.load
+ *
+ * Pre-resolves homeDataPromise so the Suspense boundary commits on first
+ * paint without races.
+ */
+const renderHome = (
+  homeData: { visibleApps: AppDefinition[]; appsCatalog: AppCatalogEntry[] },
+  url = "/",
+  dashboard: { user: string; isAdmin: boolean } = { user: "alice", isAdmin: false },
+) => {
+  // Build the homeDataPromise ONCE outside the loader. React Router will
+  // re-run loaders on revalidation (search-param changes etc.); returning a
+  // fresh Promise from each invocation would retrigger Suspense in a loop.
+  // Pre-resolving keeps the reference stable so use() commits on first read.
+  const homeDataPromise = Promise.resolve(homeData)
+  const router = createMemoryRouter(
+    [
+      {
+        id: "routes/dashboard",
+        path: "/",
+        loader: () => dashboard,
+        Component: () => <Outlet />,
+        children: [
+          {
+            index: true,
+            loader: () => ({
+              homeDataPromise,
+              categoryOrder: ["media", "tools"],
+            }),
+            Component: () => {
+              // React Router v7 generated route Components receive loaderData
+              // as a prop in production. In a hand-built data router we read
+              // it with useLoaderData() and pass it through — same shape.
+              const data = useLoaderData()
+              // HomePage is typed against React Router's generated
+              // Route.ComponentProps (params + matches + loaderData); in tests
+              // we only need loaderData. Cast through the props type.
+              const props = { loaderData: data } as unknown as Parameters<typeof HomePage>[0]
+              return <HomePage {...props} />
+            },
+          },
+          {
+            path: "api/catalog",
+            // RequestAccessDialog's fetcher.load("/api/catalog") resolves via
+            // this loader. Tests that exercise the dialog can override
+            // appsCatalog via the closure-captured fixture.
+            loader: () => ({ apps: homeData.appsCatalog }),
+          },
+        ],
+      },
+    ],
+    { initialEntries: [url] },
+  )
+  return render(<RouterProvider router={router} />)
+}
+
+describe("HomePage component — no-access branch", () => {
+  it("renders the NoAccess card when the user has zero visible apps", async () => {
+    renderHome({ visibleApps: [], appsCatalog: [] })
+    await waitFor(() => {
+      // NoAccess heading from noAccess.title i18n key.
+      expect(screen.getByRole("heading", { name: /No Access/i })).toBeInTheDocument()
+    })
+  })
+})
+
+describe("HomePage component — populated grid", () => {
+  it("renders the search bar + the AppGrid sections when there are apps", async () => {
+    renderHome({
+      visibleApps: [
+        sampleApp({ id: "jellyfin", category: "media" }),
+        sampleApp({ id: "navidrome", category: "media" }),
+        sampleApp({ id: "vault", category: "tools" }),
+      ],
+      appsCatalog: [],
+    })
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Search apps…")).toBeInTheDocument()
+    })
+    expect(screen.getByText("jellyfin")).toBeInTheDocument()
+    expect(screen.getByText("vault")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /Media/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /Tools/i })).toBeInTheDocument()
+  })
+
+  // Typing-into-search tests live at the AppSearchBar component level —
+  // exercising them here would mean driving setSearchParams through a real
+  // data router on every keystroke, which fights useDeferredValue and the
+  // router's revalidation cycle (the typing+filter interaction loops in
+  // jsdom). The lower-level test in AppSearchBar.test.tsx covers the same
+  // contract without the route plumbing.
+
+  it("filters the visible apps when arriving with a pre-set ?q=", async () => {
+    renderHome(
+      {
+        visibleApps: [sampleApp({ id: "jellyfin", category: "media" }), sampleApp({ id: "vault", category: "tools" })],
+        appsCatalog: [],
+      },
+      "/?q=jelly",
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText("jellyfin")).toBeInTheDocument()
+    })
+    expect(screen.queryByText("vault")).not.toBeInTheDocument()
+  })
+
+  it("shows the no-results EmptyState when ?q= matches nothing", async () => {
+    renderHome(
+      {
+        visibleApps: [sampleApp({ id: "jellyfin", category: "media" })],
+        appsCatalog: [],
+      },
+      "/?q=nothingmatchesthis",
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(/No matching apps/i)).toBeInTheDocument()
+    })
+  })
+
+  it("hydrates the search input + selected chips from URL params", async () => {
+    renderHome(
+      {
+        visibleApps: [sampleApp({ id: "jellyfin", category: "media" }), sampleApp({ id: "vault", category: "tools" })],
+        appsCatalog: [],
+      },
+      "/?q=jelly&cat=media",
+    )
+
+    await waitFor(() => {
+      const input = screen.getByPlaceholderText("Search apps…") as HTMLInputElement
+      expect(input.value).toBe("jelly")
+    })
+    const mediaBtn = screen.getByRole("button", { name: /Media/i })
+    expect(mediaBtn).toHaveAttribute("aria-pressed", "true")
+    const toolsBtn = screen.getByRole("button", { name: /Tools/i })
+    expect(toolsBtn).toHaveAttribute("aria-pressed", "false")
   })
 })
