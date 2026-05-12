@@ -76,3 +76,79 @@ describe("/invite/:token loader", () => {
     expect(data.error).toBe("expired")
   })
 })
+
+// =============================================================================
+// Component-render tests
+// =============================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import InvitePage from "./invite"
+import { renderRoute } from "~/test/render-route"
+import { server, http, HttpResponse } from "~/test/msw-server"
+
+// InvitePage mounts a CertCheck that probes /health to detect whether the
+// browser already has the user's client cert installed. Without a handler
+// MSW errors on the unmatched GET — register a passthrough 200 so the
+// useEffect doesn't blow up the test.
+beforeEach(() => {
+  server.use(http.get("/health", () => HttpResponse.json({ ok: true })))
+})
+
+const renderInvite = (loaderData: unknown, url = "/invite/abc") =>
+  renderRoute({
+    route: {
+      path: "/invite/:token",
+      Component: InvitePage as never,
+      loader: () => loaderData,
+    },
+    url,
+  })
+
+describe("InvitePage component", () => {
+  it("renders the missing-token error card when the loader returned missing_token", async () => {
+    renderInvite({ valid: false, error: "missing_token", appName: "Duro", healthUrl: "/health" })
+    await waitFor(() => {
+      // Translation keys resolve via the i18n setup loaded in setup.ts.
+      // The ErrorCard renders a Heading with the title text.
+      expect(screen.getByRole("heading")).toBeInTheDocument()
+    })
+  })
+
+  it("renders the expired-card with reinvite link when error is `expired`", async () => {
+    renderInvite({ valid: false, error: "expired", appName: "Duro", healthUrl: "/health" }, "/invite/tok-1")
+    await waitFor(() => {
+      // The expired error card includes a "request a new invite" link
+      // pointing at /reinvite/<token>.
+      const link = screen.getByRole("link")
+      expect(link).toHaveAttribute("href", "/reinvite/tok-1")
+    })
+  })
+
+  it("renders the already-used card when error is `already_used`", async () => {
+    renderInvite({ valid: false, error: "already_used", appName: "Duro", healthUrl: "/health" })
+    await waitFor(() => {
+      // No link/CTA on already_used — just the info-tone card heading.
+      expect(screen.getByRole("heading")).toBeInTheDocument()
+    })
+    expect(screen.queryByRole("link")).not.toBeInTheDocument()
+  })
+
+  it("renders the welcome view when the invite is valid", async () => {
+    renderInvite({
+      valid: true,
+      appName: "Duro",
+      email: "alice@example.com",
+      groupNames: ["Media Team"],
+      p12Password: "ThisIsTheP12Pwd123!",
+      healthUrl: "/health",
+    })
+    await waitFor(() => {
+      // The page renders multiple headings (page title + reveal panel).
+      expect(screen.getAllByRole("heading").length).toBeGreaterThan(0)
+    })
+    // Email appears inside the subtitle <Trans> component, possibly in
+    // multiple wrappers.
+    const matches = screen.getAllByText((_, node) => Boolean(node?.textContent?.includes("alice@example.com")))
+    expect(matches.length).toBeGreaterThan(0)
+  })
+})
