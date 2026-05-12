@@ -112,6 +112,7 @@ describe("/reinvite/:token loader — additional branches", () => {
 import { screen, waitFor } from "@testing-library/react"
 import ReinvitePage from "./reinvite"
 import { renderRoute } from "~/test/render-route"
+import { t } from "~/test/test-utils"
 
 const renderReinvite = (loaderData: unknown, opts: { actionData?: unknown; url?: string } = {}) => {
   // We pre-bind actionData in a wrapper since renderRoute doesn't accept it
@@ -138,27 +139,29 @@ const renderReinvite = (loaderData: unknown, opts: { actionData?: unknown; url?:
 describe("ReinvitePage component", () => {
   it("renders the still-valid error card when canReinvite is false / still_valid", async () => {
     renderReinvite({ canReinvite: false, error: "still_valid", appName: "Duro" })
+    // Error card heading uses t("reinvite.error.title") regardless of error code.
     await waitFor(() => {
-      expect(screen.getByRole("heading")).toBeInTheDocument()
+      expect(screen.getByRole("heading", { name: t("reinvite.error.title") })).toBeInTheDocument()
     })
   })
 
   it("renders the error card when canReinvite is false / invalid", async () => {
     renderReinvite({ canReinvite: false, error: "invalid", appName: "Duro" })
     await waitFor(() => {
-      expect(screen.getByRole("heading")).toBeInTheDocument()
+      expect(screen.getByRole("heading", { name: t("reinvite.error.title") })).toBeInTheDocument()
     })
   })
 
   it("renders the submit form when canReinvite is true", async () => {
     renderReinvite({ canReinvite: true, email: "alice@example.com", appName: "Duro" })
+    // The canReinvite branch uses t("reinvite.heading") as the page title.
     await waitFor(() => {
-      expect(screen.getByRole("button")).toBeInTheDocument()
+      expect(screen.getByRole("heading", { name: t("reinvite.heading") })).toBeInTheDocument()
     })
-    // The email appears inside the body copy (possibly inside multiple
-    // wrapping text nodes — just assert at least one match).
-    const matches = screen.getAllByText((_, node) => Boolean(node?.textContent?.includes("alice@example.com")))
-    expect(matches.length).toBeGreaterThan(0)
+    // The email is interpolated into the <p> body via t("reinvite.message").
+    expect(
+      screen.getByText((_, node) => node?.tagName === "P" && Boolean(node.textContent?.includes("alice@example.com"))),
+    ).toBeInTheDocument()
   })
 
   it("renders the success view when actionData.success is true", async () => {
@@ -166,11 +169,10 @@ describe("ReinvitePage component", () => {
       { canReinvite: true, email: "alice@example.com", appName: "Duro" },
       { actionData: { success: true, email: "alice@example.com" } },
     )
+    // Success branch uses t("reinvite.success.title") + no submit button.
     await waitFor(() => {
-      // Success heading title.
-      expect(screen.getByRole("heading")).toBeInTheDocument()
+      expect(screen.getByRole("heading", { name: t("reinvite.success.title") })).toBeInTheDocument()
     })
-    // No submit button on the success branch.
     expect(screen.queryByRole("button")).not.toBeInTheDocument()
   })
 })

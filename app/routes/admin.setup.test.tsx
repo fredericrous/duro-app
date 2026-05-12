@@ -137,23 +137,9 @@ describe("AdminSetupPage component", () => {
     expect(screen.getByRole("button")).toBeInTheDocument()
   })
 
-  it("renders the success view with the invite URL when fetcher.data.ok is true", async () => {
-    // The Component reads from `useFetcher().data` — to inject we forward
-    // actionData through a wrapper. The success state is `ok: true` +
-    // `inviteToken` so the page interpolates the invite URL.
-    const FakeFetcher = (props: { loaderData: { appName: string; inviteBaseUrl: string } }) => {
-      // Re-import React Router locally so we can monkey-patch useFetcher
-      // for this single render. Actually the cleaner route is the success
-      // branch unit-tested via direct render — but Component only reads
-      // useFetcher, not actionData. So this branch requires a fetcher
-      // submission.
-      void props
-      return <p>not testable without fetcher submission</p>
-    }
-    void FakeFetcher
-    // Mark this as a known gap: the success branch is reached only after
-    // form submission; the wrapped-state pattern doesn't reach it. The
-    // overall component coverage already exercises the form branch above.
-    expect(true).toBe(true)
-  })
+  // The success branch (fetcher.data.ok === true) is only reachable via a
+  // fetcher.Form submission. Attempts to test it under createRoutesStub +
+  // jsdom hang on the fetcher's state-machine settling. The action is
+  // independently tested above; the success-view rendering is left as a
+  // known coverage gap rather than a fake assertion.
 })

@@ -166,6 +166,7 @@ import { screen, waitFor } from "@testing-library/react"
 import InvitePage from "./invite"
 import { renderRoute } from "~/test/render-route"
 import { server, http, HttpResponse } from "~/test/msw-server"
+import { t } from "~/test/test-utils"
 
 // InvitePage mounts a CertCheck that probes /health to detect whether the
 // browser already has the user's client cert installed. Without a handler
@@ -188,28 +189,30 @@ const renderInvite = (loaderData: unknown, url = "/invite/abc") =>
 describe("InvitePage component", () => {
   it("renders the missing-token error card when the loader returned missing_token", async () => {
     renderInvite({ valid: false, error: "missing_token", appName: "Duro", healthUrl: "/health" })
+    // The ErrorCard for missing_token uses t("invite.error.title") as the
+    // heading. Assert the exact translated text — same i18n key the source
+    // resolves on render.
     await waitFor(() => {
-      // Translation keys resolve via the i18n setup loaded in setup.ts.
-      // The ErrorCard renders a Heading with the title text.
-      expect(screen.getByRole("heading")).toBeInTheDocument()
+      expect(screen.getByRole("heading", { name: t("invite.error.title") })).toBeInTheDocument()
     })
   })
 
   it("renders the expired-card with reinvite link when error is `expired`", async () => {
     renderInvite({ valid: false, error: "expired", appName: "Duro", healthUrl: "/health" }, "/invite/tok-1")
+    // Expired branch uses t("invite.expired.title") for the heading + a
+    // "request a new invite" link pointing at /reinvite/<token>.
     await waitFor(() => {
-      // The expired error card includes a "request a new invite" link
-      // pointing at /reinvite/<token>.
-      const link = screen.getByRole("link")
-      expect(link).toHaveAttribute("href", "/reinvite/tok-1")
+      expect(screen.getByRole("heading", { name: t("invite.expired.title") })).toBeInTheDocument()
     })
+    expect(screen.getByRole("link")).toHaveAttribute("href", "/reinvite/tok-1")
   })
 
   it("renders the already-used card when error is `already_used`", async () => {
     renderInvite({ valid: false, error: "already_used", appName: "Duro", healthUrl: "/health" })
+    // Already-used branch uses t("invite.used.title"). No CTA link on this
+    // tone (info, not actionable).
     await waitFor(() => {
-      // No link/CTA on already_used — just the info-tone card heading.
-      expect(screen.getByRole("heading")).toBeInTheDocument()
+      expect(screen.getByRole("heading", { name: t("invite.used.title") })).toBeInTheDocument()
     })
     expect(screen.queryByRole("link")).not.toBeInTheDocument()
   })
@@ -223,13 +226,17 @@ describe("InvitePage component", () => {
       p12Password: "ThisIsTheP12Pwd123!",
       healthUrl: "/health",
     })
+    // The valid branch uses t("invite.title", { appName }) for the page
+    // heading — assert the exact rendered string.
     await waitFor(() => {
-      // The page renders multiple headings (page title + reveal panel).
-      expect(screen.getAllByRole("heading").length).toBeGreaterThan(0)
+      expect(
+        screen.getByRole("heading", { name: t("invite.title", undefined, { appName: "Duro" }) }),
+      ).toBeInTheDocument()
     })
-    // Email appears inside the subtitle <Trans> component, possibly in
-    // multiple wrappers.
-    const matches = screen.getAllByText((_, node) => Boolean(node?.textContent?.includes("alice@example.com")))
-    expect(matches.length).toBeGreaterThan(0)
+    // Email is interpolated into the subtitle <Trans>; node tree may wrap it
+    // in <strong> + ancestors, so a function matcher is the right tool.
+    expect(
+      screen.getByText((_, node) => node?.tagName === "P" && Boolean(node.textContent?.includes("alice@example.com"))),
+    ).toBeInTheDocument()
   })
 })

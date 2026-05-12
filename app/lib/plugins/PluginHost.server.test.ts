@@ -34,11 +34,21 @@ import type { Plugin, PluginManifest } from "~/lib/plugins/contracts"
 import { PluginHost, PluginHostLive } from "./PluginHost.server"
 import { PluginNotFound } from "./errors"
 
+// Repo tags — imported for the FK-gate tests below that override the Live
+// repos with stubs returning null for findById, exercising the defensive
+// branches the real DB schema prevents from firing.
+import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
+import { RbacRepo } from "~/lib/governance/RbacRepo.server"
+import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
+
 // ---------------------------------------------------------------------------
 // Stub layers
 // ---------------------------------------------------------------------------
 
-const LldapStub = Layer.succeed(LldapClient, {
+// LldapClient stub typed against the real Service tag — drop the `as never`
+// escape so a future interface change (a new method on LldapClient) breaks
+// the type-check here instead of silently passing through.
+const LldapStub: Layer.Layer<LldapClient> = Layer.succeed(LldapClient, {
   getUsers: Effect.succeed([]),
   getGroups: Effect.succeed([]),
   createUser: () => Effect.void,
@@ -48,7 +58,7 @@ const LldapStub = Layer.succeed(LldapClient, {
   createGroup: () => Effect.succeed({ id: 1, displayName: "stub" }),
   ensureGroup: () => Effect.succeed(1),
   deleteUser: () => Effect.void,
-} as never)
+})
 
 /**
  * Build a fake plugin so we control imperative vs declarative dispatch
@@ -77,8 +87,10 @@ const fakePlugin = (
     ownedLldapGroups: [],
     vaultSecrets: [],
     // Schema.Any accepts anything — config validation never fails unless we
-    // pass a schema that rejects the seeded `{}` config.
-    configSchema: (overrides.configSchema ?? Schema.Any) as Schema.Schema<unknown, unknown>,
+    // pass a schema that rejects the seeded `{}` config. The PluginManifest
+    // interface declares configSchema as `Schema.Schema<unknown, unknown>`;
+    // Schema.Any's inferred type satisfies that contract.
+    configSchema: (overrides.configSchema ?? Schema.Any) as unknown as PluginManifest["configSchema"],
     permissionStrategy: overrides.permissionStrategy ?? { byRoleSlug: { editor: [] } },
     imperative: overrides.imperative ?? false,
     timeoutMs: overrides.timeoutMs ?? 5000,
@@ -247,13 +259,6 @@ describe("PluginHost.runProvision — loadGrantContext gates", () => {
     const exit = await runProvision()
     expect(exit._tag).toBe("Failure")
   })
-
-  // NOTE: PluginHost ALSO has "principal not found" / "role not found" /
-  // "application not found" branches but each is guarded by a PG foreign-key
-  // constraint upstream — grants.principal_id, grants.role_id, and
-  // roles.application_id are all NOT NULL FKs with ON DELETE CASCADE. The
-  // branches are defensive-only and unreachable from a well-formed DB; we
-  // document them here rather than test against them.
 
   it("fails when the connected system isn't found", async () => {
     // Pass a connectedSystemId that doesn't exist — this IS reachable since
@@ -444,5 +449,143 @@ describe("PluginHost.runDeprovision — over-revoke safety", () => {
     )
 
     expect(deprovision).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests — FK-protected validation gates
+// ---------------------------------------------------------------------------
+//
+// PluginHost has three more validation gates that the real DB schema makes
+// unreachable from a healthy data plane (grants.principal_id, grants.role_id
+// and roles.application_id are all NOT NULL FKs with ON DELETE CASCADE). They
+// are application-level safety code: if a future migration relaxes one of the
+// FKs, the gate becomes load-bearing and we'd want to know its error shape
+// hasn't drifted.
+//
+// To exercise the gates we swap the Live repo whose findById matters for the
+// gate under test with a Layer.succeed stub that returns null. Everything
+// else stays Live. The grant row still exists; the host just gets `null`
+// back from the repo lookup.
+
+interface StubOverrides {
+  principalById?: Effect.Effect<unknown, never>
+  roleById?: Effect.Effect<unknown, never>
+  applicationById?: Effect.Effect<unknown, never>
+}
+
+function makeRuntimeWithRepoStubs(overrides: StubOverrides) {
+  // Build minimal stub repos. Each only stubs the method PluginHost actually
+  // calls (findById on the three repos involved in loadGrantContext). The
+  // grant + connected-system repos stay Live so the prior gates pass.
+  const principalStub =
+    overrides.principalById !== undefined
+      ? Layer.succeed(PrincipalRepo, {
+          findById: () => overrides.principalById,
+          // Methods PluginHost doesn't call — give Effect.die() shape so a
+          // surprise call fails loudly.
+          findByExternalId: () => Effect.die("PrincipalRepo.findByExternalId not stubbed"),
+          create: () => Effect.die("not stubbed"),
+          list: () => Effect.die("not stubbed"),
+          addMembership: () => Effect.die("not stubbed"),
+          removeMembership: () => Effect.die("not stubbed"),
+          listGroupsFor: () => Effect.die("not stubbed"),
+          listMembers: () => Effect.die("not stubbed"),
+        } as never)
+      : PrincipalRepoLiveForFkTests
+
+  const rbacStub =
+    overrides.roleById !== undefined
+      ? Layer.succeed(RbacRepo, {
+          findRoleById: () => overrides.roleById,
+          listRoles: () => Effect.die("not stubbed"),
+          createRole: () => Effect.die("not stubbed"),
+          createEntitlement: () => Effect.die("not stubbed"),
+          listEntitlements: () => Effect.die("not stubbed"),
+          assignEntitlementToRole: () => Effect.die("not stubbed"),
+          listResources: () => Effect.die("not stubbed"),
+          createResource: () => Effect.die("not stubbed"),
+          listRoleAssignments: () => Effect.die("not stubbed"),
+        } as never)
+      : RbacRepoLiveForFkTests
+
+  const appStub =
+    overrides.applicationById !== undefined
+      ? Layer.succeed(ApplicationRepo, {
+          findById: () => overrides.applicationById,
+          findBySlug: () => Effect.die("not stubbed"),
+          list: () => Effect.die("not stubbed"),
+          create: () => Effect.die("not stubbed"),
+          update: () => Effect.die("not stubbed"),
+          deleteById: () => Effect.die("not stubbed"),
+          updateLastSyncedAt: () => Effect.die("not stubbed"),
+        } as never)
+      : ApplicationRepoLiveForFkTests
+
+  // Other repos PluginHost touches are still Live — they read the seeded DB.
+  const layer = PluginHostLive.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        appStub,
+        principalStub,
+        rbacStub,
+        GrantRepoLiveForFkTests,
+        ConnectedSystemRepoLiveForFkTests,
+        ConnectorMappingRepoLiveForFkTests,
+        LldapStub,
+        AuditServiceDev,
+        RegistryStub([fakePlugin()]),
+      ),
+    ),
+    Layer.provideMerge(makeTestDbLayer()),
+    Layer.provide(FetchHttpClient.layer),
+  )
+  return ManagedRuntime.make(layer)
+}
+
+// Re-imports of the Live repos at module level — kept here so the override
+// helper above can fall back to Live when an override isn't supplied.
+import { PrincipalRepoLive as PrincipalRepoLiveForFkTests } from "~/lib/governance/PrincipalRepo.server"
+import { RbacRepoLive as RbacRepoLiveForFkTests } from "~/lib/governance/RbacRepo.server"
+import { ApplicationRepoLive as ApplicationRepoLiveForFkTests } from "~/lib/governance/ApplicationRepo.server"
+import { GrantRepoLive as GrantRepoLiveForFkTests } from "~/lib/governance/GrantRepo.server"
+import { ConnectedSystemRepoLive as ConnectedSystemRepoLiveForFkTests } from "~/lib/governance/ConnectedSystemRepo.server"
+import { ConnectorMappingRepoLive as ConnectorMappingRepoLiveForFkTests } from "~/lib/governance/ConnectorMappingRepo.server"
+
+describe("PluginHost.runProvision — FK-protected gates (via repo stubs)", () => {
+  it("fails PluginHostError when PrincipalRepo.findById returns null", async () => {
+    const rt = makeRuntimeWithRepoStubs({ principalById: Effect.succeed(null) })
+    await rt.runPromise(seed())
+    const exit = await rt.runPromiseExit(
+      Effect.gen(function* () {
+        const host = yield* PluginHost
+        yield* host.runProvision("fake-plugin", "g-1", "cs-1")
+      }),
+    )
+    expect(exit._tag).toBe("Failure")
+  })
+
+  it("fails PluginHostError when RbacRepo.findRoleById returns null", async () => {
+    const rt = makeRuntimeWithRepoStubs({ roleById: Effect.succeed(null) })
+    await rt.runPromise(seed())
+    const exit = await rt.runPromiseExit(
+      Effect.gen(function* () {
+        const host = yield* PluginHost
+        yield* host.runProvision("fake-plugin", "g-1", "cs-1")
+      }),
+    )
+    expect(exit._tag).toBe("Failure")
+  })
+
+  it("fails PluginHostError when ApplicationRepo.findById returns null", async () => {
+    const rt = makeRuntimeWithRepoStubs({ applicationById: Effect.succeed(null) })
+    await rt.runPromise(seed())
+    const exit = await rt.runPromiseExit(
+      Effect.gen(function* () {
+        const host = yield* PluginHost
+        yield* host.runProvision("fake-plugin", "g-1", "cs-1")
+      }),
+    )
+    expect(exit._tag).toBe("Failure")
   })
 })

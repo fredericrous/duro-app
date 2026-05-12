@@ -43,6 +43,7 @@ describe("/admin/authz-playground action", () => {
 import { screen, waitFor } from "@testing-library/react"
 import AdminAuthzPlaygroundPage from "./admin.authz-playground"
 import { renderRoute } from "~/test/render-route"
+import { t } from "~/test/test-utils"
 
 const renderPage = (
   data: {
@@ -66,9 +67,11 @@ const renderPage = (
 describe("AdminAuthzPlaygroundPage component", () => {
   it("renders the page header + subject/application comboboxes", async () => {
     renderPage()
+    // Page heading is t("admin.authz.title"). The HelpPopover trigger lives
+    // inside the heading element, so match by name fragment rather than
+    // exact text.
     await waitFor(() => {
-      // Page has a Heading title.
-      expect(screen.getByRole("heading")).toBeInTheDocument()
+      expect(screen.getByRole("heading", { name: new RegExp(t("admin.authz.title"), "i") })).toBeInTheDocument()
     })
     // Two comboboxes (subject + application).
     expect(screen.getAllByRole("combobox").length).toBeGreaterThanOrEqual(2)
@@ -77,7 +80,7 @@ describe("AdminAuthzPlaygroundPage component", () => {
   it("survives empty principals + applications lists", async () => {
     renderPage({ principals: [], applications: [] })
     await waitFor(() => {
-      expect(screen.getByRole("heading")).toBeInTheDocument()
+      expect(screen.getByRole("heading", { name: new RegExp(t("admin.authz.title"), "i") })).toBeInTheDocument()
     })
   })
 })

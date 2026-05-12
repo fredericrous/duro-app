@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
+import { t } from "~/test/test-utils"
 
 vi.mock("~/lib/i18n.server", () => ({
   resolveLocale: vi.fn((req: Request) => {
@@ -45,9 +46,11 @@ describe("root ErrorBoundary", () => {
       data: null,
       internal: false,
     })
-    // 404 message + body resolve through i18n; assert by role rather than
-    // specific copy so the test isn't tied to translation values.
-    expect(screen.getByRole("heading")).toBeInTheDocument()
+    // The 404 branch maps to t("error.404") for the heading + t("error.404msg")
+    // for the body. Match by exact translated text — same i18n keys the
+    // source code uses.
+    expect(screen.getByRole("heading", { name: t("error.404") })).toBeInTheDocument()
+    expect(screen.getByText(t("error.404msg"))).toBeInTheDocument()
   })
 
   it("renders a generic-error message for non-404 route errors", () => {
@@ -68,7 +71,9 @@ describe("root ErrorBoundary", () => {
 
   it("renders the generic fallback when error is not a Response or Error", () => {
     renderBoundary("plain string thrown")
-    // Both heading and body come from i18n fallback.
-    expect(screen.getByRole("heading")).toBeInTheDocument()
+    // Plain-string throw falls through to the i18n default — heading is
+    // t("error.title"), body is t("error.details").
+    expect(screen.getByRole("heading", { name: t("error.title") })).toBeInTheDocument()
+    expect(screen.getByText(t("error.details"))).toBeInTheDocument()
   })
 })

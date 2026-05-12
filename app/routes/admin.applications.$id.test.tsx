@@ -499,11 +499,23 @@ describe("AdminApplicationDetailPage component", () => {
 // into renderRoute. Asserting on the captured FormData proves the entire
 // dialog → form → action submit flow works end-to-end.
 
-import userEvent from "@testing-library/user-event"
+import { fireEvent } from "@testing-library/react"
 
 interface CapturedAction {
   intent: string | null
   fields: Record<string, string>
+}
+
+/**
+ * Set the value on a controlled <Input> as if the user typed it.
+ *
+ * Avoid `userEvent.type` here: under jsdom, fetcher.Form + Dialog focus-trap
+ * + sequential dialog tests races in ways that cause `userEvent` to deadlock
+ * waiting on focus to settle. `fireEvent.change` is one synchronous DOM
+ * event — no focus management, no race window.
+ */
+const setValue = (el: HTMLElement, value: string) => {
+  fireEvent.change(el, { target: { value } })
 }
 
 const renderWithAction = (
@@ -541,33 +553,33 @@ describe("AdminApplicationDetailPage dialog round-trips", () => {
   })
 
   it("createRole: opens dialog → fills form → submit → action receives FormData", async () => {
-    const user = userEvent.setup()
     const capture: CapturedAction = { intent: null, fields: {} }
     renderWithAction(baseLoaderData(), capture, "/admin/applications/app-1?tab=roles")
 
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /add role/i })).toBeInTheDocument()
-    })
     // The top-right "Add Role" button (not the empty-state CTA, which only
-    // shows when roles is empty). Both share the same accessible name but
-    // the role-list-populated state only renders the top one.
-    const addRoleButtons = screen.getAllByRole("button", { name: /add role/i })
-    await user.click(addRoleButtons[0])
+    // shows when roles is empty).
+    const addRoleButton = await screen.findByRole("button", { name: /add role/i }, { timeout: 5_000 })
+    fireEvent.click(addRoleButton)
 
-    // Dialog body has three inputs + submit.
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("admin")).toBeInTheDocument()
-    })
-    await user.type(screen.getByPlaceholderText("admin"), "editor")
-    await user.type(screen.getByPlaceholderText("Administrator"), "Editor Role")
-    await user.type(screen.getByPlaceholderText("Optional description"), "Edits content")
+    // Gate on the dialog HEADING being visible before hunting for inputs —
+    // role-based selectors inside the dialog tree are more robust than
+    // placeholder string lookups against the polling clock.
+    await screen.findByRole("heading", { name: /create role/i }, { timeout: 5_000 })
 
-    // The submit button is "Create Role" inside the dialog.
-    await user.click(screen.getByRole("button", { name: /create role/i }))
+    setValue(screen.getByPlaceholderText("admin"), "editor")
+    setValue(screen.getByPlaceholderText("Administrator"), "Editor Role")
+    setValue(screen.getByPlaceholderText("Optional description"), "Edits content")
 
-    await waitFor(() => {
-      expect(capture.intent).toBe("createRole")
-    })
+    // Submit via form submit event — avoids userEvent's focus dance on a
+    // button that lives inside a focus-trapped dialog.
+    fireEvent.submit(screen.getByRole("button", { name: /create role/i }).closest("form")!)
+
+    await waitFor(
+      () => {
+        expect(capture.intent).toBe("createRole")
+      },
+      { timeout: 5_000 },
+    )
     expect(capture.fields.slug).toBe("editor")
     expect(capture.fields.displayName).toBe("Editor Role")
     expect(capture.fields.description).toBe("Edits content")
@@ -582,11 +594,10 @@ describe("AdminApplicationDetailPage dialog round-trips", () => {
   // pattern works at the route+dialog level.
 
   it("createResource: round-trip with intent=createResource", async () => {
-    const user = userEvent.setup()
     const capture: CapturedAction = { intent: null, fields: {} }
     // Seed a single resource so the resources tab renders the populated
     // branch (top "Add Resource" button only, no empty-state CTA — which
-    // would create button ambiguity that confuses userEvent's click).
+    // creates button ambiguity).
     renderWithAction(
       {
         ...baseLoaderData(),
@@ -605,26 +616,21 @@ describe("AdminApplicationDetailPage dialog round-trips", () => {
       "/admin/applications/app-1?tab=resources",
     )
 
-    // findAllByRole is defensive against transient mid-render duplicates that
-    // confuse getByRole. The populated-resources branch only renders the top
-    // "Add Resource" button anyway, so [0] is the right one.
-    const addButtons = await screen.findAllByRole("button", { name: /add resource/i })
-    await user.click(addButtons[0])
+    const addButton = await screen.findByRole("button", { name: /add resource/i }, { timeout: 5_000 })
+    fireEvent.click(addButton)
 
-    // Gate on the dialog HEADING being visible before hunting for inputs —
-    // findByPlaceholderText alone flaked under CI's faster (uncoverage) test
-    // runner because the placeholder query polled before the dialog mounted.
-    // Waiting on a role-based selector inside the dialog tree is more
-    // robust than a placeholder string.
-    await screen.findByRole("heading", { name: /create resource/i })
+    await screen.findByRole("heading", { name: /create resource/i }, { timeout: 5_000 })
 
-    await user.type(screen.getByPlaceholderText("folder"), "library")
-    await user.type(screen.getByPlaceholderText("Documents"), "Library Folder")
-    await user.click(screen.getByRole("button", { name: /create resource/i }))
+    setValue(screen.getByPlaceholderText("folder"), "library")
+    setValue(screen.getByPlaceholderText("Documents"), "Library Folder")
+    fireEvent.submit(screen.getByRole("button", { name: /create resource/i }).closest("form")!)
 
-    await waitFor(() => {
-      expect(capture.intent).toBe("createResource")
-    })
+    await waitFor(
+      () => {
+        expect(capture.intent).toBe("createResource")
+      },
+      { timeout: 5_000 },
+    )
     expect(capture.fields.resourceType).toBe("library")
     expect(capture.fields.displayName).toBe("Library Folder")
   })

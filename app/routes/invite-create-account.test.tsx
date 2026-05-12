@@ -119,6 +119,7 @@ import { screen, waitFor } from "@testing-library/react"
 import CreateAccountPage from "./invite-create-account"
 import { renderRoute } from "~/test/render-route"
 import { server, http, HttpResponse } from "~/test/msw-server"
+import { t } from "~/test/test-utils"
 
 beforeEach(() => {
   server.use(http.get("*/health", () => HttpResponse.json({ ok: true })))
@@ -147,8 +148,10 @@ const renderCreateAccount = (loaderData: unknown, opts: { actionData?: unknown; 
 describe("CreateAccountPage component", () => {
   it("renders the InviteErrorView for missing_token", async () => {
     renderCreateAccount({ valid: false, error: "missing_token", appName: "Duro", healthUrl: "/health" })
+    // missing_token falls into the generic-error branch which uses
+    // t("invite.error.title") for the heading.
     await waitFor(() => {
-      expect(screen.getByRole("heading")).toBeInTheDocument()
+      expect(screen.getByRole("heading", { name: t("invite.error.title") })).toBeInTheDocument()
     })
   })
 
@@ -157,11 +160,11 @@ describe("CreateAccountPage component", () => {
       { valid: false, error: "expired", appName: "Duro", healthUrl: "/health" },
       { url: "/invite/tok-1/create-account" },
     )
+    // Expired heading + a reinvite link.
     await waitFor(() => {
-      // Expired branch renders a "request a new invite" link pointing at
-      // /reinvite/<token>.
-      expect(screen.getByRole("link")).toHaveAttribute("href", "/reinvite/tok-1")
+      expect(screen.getByRole("heading", { name: t("invite.expired.title") })).toBeInTheDocument()
     })
+    expect(screen.getByRole("link")).toHaveAttribute("href", "/reinvite/tok-1")
   })
 
   it("renders the success view when actionData.success is true", async () => {
@@ -169,19 +172,23 @@ describe("CreateAccountPage component", () => {
       { valid: true, email: "alice@example.com", appName: "Duro", healthUrl: "/health" },
       { actionData: { success: true, homeUrl: "https://home.duro.example.com" } },
     )
+    // Success branch uses t("createAccount.success.title") as the heading.
     await waitFor(() => {
-      // Success branch renders a primary link pointing at homeUrl.
-      expect(screen.getByRole("link")).toHaveAttribute("href", "https://home.duro.example.com")
+      expect(screen.getByRole("heading", { name: t("createAccount.success.title") })).toBeInTheDocument()
     })
+    expect(screen.getByRole("link")).toHaveAttribute("href", "https://home.duro.example.com")
   })
 
   it("renders the main form view when the invite is valid", async () => {
     renderCreateAccount({ valid: true, email: "alice@example.com", appName: "Duro", healthUrl: "/health" })
+    // Valid branch uses t("createAccount.heading") as the page title.
     await waitFor(() => {
-      expect(screen.getByRole("heading")).toBeInTheDocument()
+      expect(screen.getByRole("heading", { name: t("createAccount.heading") })).toBeInTheDocument()
     })
-    // Email surfaces in the subtitle via <Trans> — at least one node has it.
-    const matches = screen.getAllByText((_, node) => Boolean(node?.textContent?.includes("alice@example.com")))
-    expect(matches.length).toBeGreaterThan(0)
+    // Email is interpolated into the subtitle <Trans> — assert on the <p>
+    // whose textContent contains the email.
+    expect(
+      screen.getByText((_, node) => node?.tagName === "P" && Boolean(node.textContent?.includes("alice@example.com"))),
+    ).toBeInTheDocument()
   })
 })

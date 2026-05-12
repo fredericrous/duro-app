@@ -17,16 +17,29 @@ const baseCtx = (overrides: Partial<GrantContext> = {}): GrantContext =>
     ...overrides,
   }) as unknown as GrantContext
 
+// Typed noop stubs for the PluginServices the immich plugin doesn't touch.
+const noopLldap: PluginServices["lldap"] = {
+  addUserToGroup: () => Effect.die("ScopedLldapClient.addUserToGroup not stubbed"),
+  removeUserFromGroup: () => Effect.die("ScopedLldapClient.removeUserFromGroup not stubbed"),
+  findGroupByName: () => Effect.die("ScopedLldapClient.findGroupByName not stubbed"),
+}
+const noopVault: PluginServices["vault"] = {
+  readSecret: () => Effect.die("ScopedVaultClient.readSecret not stubbed"),
+}
+const noopAudit: PluginServices["audit"] = {
+  emit: () => Effect.void,
+}
+
 const mkServices = (
   getImpl: (url: string) => Effect.Effect<unknown, PluginError> = () => Effect.succeed([]),
   putImpl: (url: string, body: unknown) => Effect.Effect<unknown, PluginError> = () => Effect.succeed({}),
 ): { services: PluginServices; calls: Array<{ method: string; url: string; body?: unknown }> } => {
   const calls: Array<{ method: string; url: string; body?: unknown }> = []
-  const services = {
-    lldap: {} as never,
-    vault: {} as never,
-    audit: {} as never,
-    log: vi.fn(() => Effect.void as Effect.Effect<void>),
+  const services: PluginServices = {
+    lldap: noopLldap,
+    vault: noopVault,
+    audit: noopAudit,
+    log: () => Effect.void,
     http: {
       get: (url: string) => {
         calls.push({ method: "GET", url })
@@ -39,7 +52,7 @@ const mkServices = (
       post: () => Effect.succeed({}),
       del: () => Effect.void,
     },
-  } as unknown as PluginServices
+  }
   return { services, calls }
 }
 

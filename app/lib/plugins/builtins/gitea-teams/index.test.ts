@@ -25,6 +25,21 @@ const baseCtx = (overrides: Partial<GrantContext> = {}): GrantContext =>
 
 const mkLog = () => vi.fn(() => Effect.void as Effect.Effect<void>)
 
+// Typed noop stubs for the PluginServices fields gitea-teams doesn't touch.
+// Each method returns Effect.die("...") so a surprise call from a future
+// plugin-host change fails loudly with the call site.
+const noopLldap: PluginServices["lldap"] = {
+  addUserToGroup: () => Effect.die("ScopedLldapClient.addUserToGroup not stubbed"),
+  removeUserFromGroup: () => Effect.die("ScopedLldapClient.removeUserFromGroup not stubbed"),
+  findGroupByName: () => Effect.die("ScopedLldapClient.findGroupByName not stubbed"),
+}
+const noopVault: PluginServices["vault"] = {
+  readSecret: () => Effect.die("ScopedVaultClient.readSecret not stubbed"),
+}
+const noopAudit: PluginServices["audit"] = {
+  emit: () => Effect.void,
+}
+
 /** Build a PluginServices stub recording the calls made through `http`. */
 const mkServices = (
   httpImpl: {
@@ -39,16 +54,17 @@ const mkServices = (
 } => {
   const calls: Array<{ method: string; url: string; body?: unknown }> = []
   const log = mkLog()
-  const services = {
-    lldap: {} as never,
-    vault: {} as never,
-    audit: {} as never,
+  const services: PluginServices = {
+    lldap: noopLldap,
+    vault: noopVault,
+    audit: noopAudit,
     log,
     http: {
       get: (url: string) => {
         calls.push({ method: "GET", url })
         return httpImpl.get ? httpImpl.get(url) : Effect.succeed([])
       },
+      post: () => Effect.die("ScopedHttpClient.post not stubbed"),
       put: (url: string, body: unknown) => {
         calls.push({ method: "PUT", url, body })
         return httpImpl.put ? httpImpl.put(url, body) : Effect.succeed({})
@@ -58,7 +74,7 @@ const mkServices = (
         return httpImpl.del ? httpImpl.del(url) : Effect.void
       },
     },
-  } as unknown as PluginServices
+  }
   return { services, calls, log }
 }
 
