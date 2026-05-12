@@ -60,6 +60,41 @@ describe("/admin/grants/new action", () => {
     const result = await callAction(action, { formData: { applicationId: "app-1" } })
     expect(expectResponse(result).status).toBe(403)
   })
+
+  it("returns the required-fields error when applicationId/principalId/roleId are missing", async () => {
+    mockGetAuth.mockResolvedValue({ user: "admin", sub: "admin-sub" } as never)
+    mockCheckDecision.mockResolvedValue({ allow: true } as never)
+    const result = await callAction(action, {
+      formData: { applicationId: "", principalId: "", roleId: "" },
+    })
+    const data = expectData<{ error?: string }>(result)
+    expect(data.error).toContain("required")
+  })
+
+  it("captures runEffect errors into the error shape", async () => {
+    mockGetAuth.mockResolvedValue({ user: "admin", sub: "admin-sub" } as never)
+    mockCheckDecision.mockResolvedValue({ allow: true } as never)
+    mockRunEffect.mockRejectedValueOnce(new Error("grant rollback") as never)
+    const result = await callAction(action, {
+      formData: { applicationId: "app-1", principalId: "p-1", roleId: "r-1" },
+    })
+    const data = expectData<{ error?: string }>(result)
+    expect(data.error).toBe("grant rollback")
+  })
+
+  it("redirects to /admin/grants on success", async () => {
+    mockGetAuth.mockResolvedValue({ user: "admin", sub: "admin-sub" } as never)
+    mockCheckDecision.mockResolvedValue({ allow: true } as never)
+    mockRunEffect.mockResolvedValueOnce(undefined as never)
+    const result = await callAction(action, {
+      formData: { applicationId: "app-1", principalId: "p-1", roleId: "r-1" },
+    })
+    // redirect() RETURNS a Response (doesn't throw) — callAction wraps it
+    // as `kind: "data"`, so the Response lands in result.data.
+    const data = expectData<Response>(result)
+    expect(data).toBeInstanceOf(Response)
+    expect(data.headers.get("Location")).toBe("/admin/grants")
+  })
 })
 
 // =============================================================================
