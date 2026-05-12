@@ -178,6 +178,56 @@ describe("/admin/applications/:id action — createEntitlement (real DB)", () =>
   })
 })
 
+describe("/admin/applications/:id action — updateSettings (real DB)", () => {
+  beforeEach(() => {
+    mockGetAuth.mockResolvedValue({ user: "admin", sub: "admin-sub" } as never)
+    mockCheckDecision.mockResolvedValue({ allow: true } as never)
+  })
+
+  it("updates accessMode + enabled + ownerId on the application row", async () => {
+    await seedTestDb(seedApp)
+    const result = await callAction(action, {
+      params: { id: "app-1" },
+      formData: {
+        intent: "updateSettings",
+        accessMode: "open",
+        enabled: "false",
+        ownerId: "p-admin",
+      },
+    })
+    const data = expectData<{ success?: boolean; message?: string }>(result)
+    expect(data.success).toBe(true)
+
+    const rows = await seedTestDb(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        return yield* sql<{ accessMode: string; enabled: boolean; ownerId: string }>`
+          SELECT access_mode, enabled, owner_id FROM applications WHERE id = 'app-1'`
+      }) as Effect.Effect<Array<{ accessMode: string; enabled: boolean; ownerId: string }>, never, never>,
+    )
+    expect(rows[0].accessMode).toBe("open")
+    expect(rows[0].enabled).toBe(false)
+    expect(rows[0].ownerId).toBe("p-admin")
+  })
+})
+
+describe("/admin/applications/:id action — unknown intent", () => {
+  beforeEach(() => {
+    mockGetAuth.mockResolvedValue({ user: "admin", sub: "admin-sub" } as never)
+    mockCheckDecision.mockResolvedValue({ allow: true } as never)
+  })
+
+  it("returns the 'Unknown intent' error shape for an unrecognized intent", async () => {
+    await seedTestDb(seedApp)
+    const result = await callAction(action, {
+      params: { id: "app-1" },
+      formData: { intent: "doesNotExist" },
+    })
+    const data = expectData<{ error?: string }>(result)
+    expect(data.error).toBe("Unknown intent")
+  })
+})
+
 describe("/admin/applications/:id action — createResource (real DB)", () => {
   beforeEach(() => {
     mockGetAuth.mockResolvedValue({ user: "admin", sub: "admin-sub" } as never)

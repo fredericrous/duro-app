@@ -74,6 +74,39 @@ describe("/admin/access-requests/:id action — origin gate", () => {
     })
     expect(expectResponse(result).status).toBe(403)
   })
+
+  it("returns the not_authenticated error when the session has no sub", async () => {
+    mockGetAuth.mockResolvedValueOnce({ user: "alice", sub: undefined } as never)
+    const result = await callAction(action, {
+      params: { id: "req-1" },
+      formData: { intent: "approve" },
+    })
+    const data = expectData<{ error?: string }>(result)
+    expect(data.error).toBe("not_authenticated")
+  })
+
+  it("returns principal_not_found when the auth sub doesn't match any principal", async () => {
+    mockGetAuth.mockResolvedValueOnce({ user: "ghost", sub: "ghost-sub" } as never)
+    // No principals seeded → findByExternalId returns null.
+    const result = await callAction(action, {
+      params: { id: "req-1" },
+      formData: { intent: "approve" },
+    })
+    const data = expectData<{ error?: string }>(result)
+    expect(data.error).toBe("principal_not_found")
+  })
+
+  it("returns the unknown-intent error for an unrecognized intent", async () => {
+    // Seed an admin principal so the auth lookup succeeds.
+    await seedTestDb(seedRequest)
+    mockGetAuth.mockResolvedValueOnce({ user: "admin", sub: "admin-sub" } as never)
+    const result = await callAction(action, {
+      params: { id: "req-1" },
+      formData: { intent: "doesNotExist" },
+    })
+    const data = expectData<{ error?: string }>(result)
+    expect(data.error).toBe("Unknown intent")
+  })
 })
 
 // =============================================================================
