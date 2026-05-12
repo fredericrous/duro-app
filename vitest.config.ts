@@ -32,14 +32,15 @@ export default defineConfig({
       ],
       // Coverage floor — pegged just under current numbers to lock in
       // progress. Ratchet UP as more tests land; PRs may raise the floor,
-      // never lower it. Target is 80% lines; the remaining gap is mostly
-      // PluginHost.server.ts, ProvisioningService.server.ts, and a few
-      // route variants (admin.users dialogs, admin.applications dialogs).
+      // never lower it. The 80% line target proved out of reach without
+      // grinding ~30 small route files at diminishing ROI; planning doc
+      // tracks the realistic remaining work — see
+      // /Users/fredericrous/.claude/plans/in-duro-app-how-hashed-snowglobe.md.
       thresholds: {
-        lines: 65,
-        statements: 64,
-        functions: 60,
-        branches: 55,
+        lines: 73,
+        statements: 72,
+        functions: 66,
+        branches: 62,
       },
     },
   },
