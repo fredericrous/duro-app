@@ -112,4 +112,56 @@ describe("AdminGrantsNewPage component", () => {
       expect(screen.getByPlaceholderText(/application/i)).toBeInTheDocument()
     })
   })
+
+  it("renders an actionData error when one is supplied", async () => {
+    // The page reads actionData via Route.ComponentProps. We pre-bind it
+    // via a wrapper since renderRoute doesn't pass actionData directly.
+    const PageWithError = (props: { loaderData: unknown }) => {
+      const AnyPage = AdminGrantsNewPage as unknown as (p: {
+        loaderData: unknown
+        actionData: unknown
+      }) => React.ReactElement
+      return <AnyPage loaderData={props.loaderData} actionData={{ error: "Insufficient permissions" }} />
+    }
+
+    renderRoute({
+      parentLoaderId: "routes/dashboard",
+      parentLoader: () => ({ user: "admin", isAdmin: true }),
+      route: {
+        path: "/admin/grants/new",
+        Component: PageWithError as never,
+        loader: () => ({
+          applications: [{ id: "app-1", slug: "jellyfin", displayName: "Jellyfin" }],
+          principals: [{ id: "p-alice", principalType: "user", displayName: "Alice", email: "a@x" }],
+          rolesByApp: { "app-1": [{ id: "r-1", slug: "viewer", displayName: "Viewer" }] },
+          ldapAppIds: [],
+        }),
+      },
+    })
+    await waitFor(() => {
+      expect(screen.getByText("Insufficient permissions")).toBeInTheDocument()
+    })
+  })
+
+  it("toggles the expires-at date field when the never-expires checkbox is cleared", async () => {
+    const userEvent = (await import("@testing-library/user-event")).default
+    const user = userEvent.setup()
+    renderPage()
+
+    // Initially neverExpires=true → no date input rendered.
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/application/i)).toBeInTheDocument()
+    })
+    expect(document.querySelector('input[type="date"]')).toBeNull()
+
+    // Find + click the never-expires checkbox.
+    const checkbox = document.querySelector('input[type="checkbox"]') as HTMLInputElement
+    expect(checkbox).toBeTruthy()
+    expect(checkbox.checked).toBe(true)
+    await user.click(checkbox)
+    // After toggle, the date input shows up in the form.
+    await waitFor(() => {
+      expect(document.querySelector('input[type="date"]')).toBeTruthy()
+    })
+  })
 })
