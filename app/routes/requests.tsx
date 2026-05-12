@@ -54,23 +54,32 @@ export async function action({ request }: Route.ActionArgs) {
     const requestId = (formData.get("requestId") as string)?.trim()
     if (!requestId) return { error: "missing_request_id" as const }
 
-    try {
-      await runEffect(
-        Effect.gen(function* () {
-          const principalRepo = yield* PrincipalRepo
-          const principal = yield* principalRepo.findByExternalId(auth.sub!)
-          if (!principal) return yield* Effect.fail("principal_not_found" as const)
-          return yield* cancelOwnAccessRequest({ requestId, requesterId: principal.id })
+    // Tagged-error handling has to happen INSIDE the Effect, before runPromise
+    // turns the failure into a FiberFailure rejection. The previous code
+    // caught the rejection and read `(e as {_tag}).tag` on what is actually
+    // a FiberFailure wrapper — that match never fired in production, so every
+    // cancel error fell through to the generic "cancel_failed" outcome.
+    const result = await runEffect(
+      Effect.gen(function* () {
+        const principalRepo = yield* PrincipalRepo
+        const principal = yield* principalRepo.findByExternalId(auth.sub!)
+        if (!principal) return { _kind: "principal_not_found" as const }
+        yield* cancelOwnAccessRequest({ requestId, requesterId: principal.id })
+        return { _kind: "ok" as const }
+      }).pipe(
+        Effect.catchTag("AccessRequestNotOwnedError", () => Effect.succeed({ _kind: "not_owned" as const })),
+        Effect.catchTag("AccessRequestNotCancellableError", () =>
+          Effect.succeed({ _kind: "not_cancellable" as const }),
+        ),
+        Effect.catchAll((e) => {
+          console.error("[requests] cancel failed:", e)
+          return Effect.succeed({ _kind: "cancel_failed" as const })
         }),
-      )
-      return { success: true as const, message: "cancelled" as const }
-    } catch (e) {
-      const tag = (e as { _tag?: string } | null)?._tag
-      if (tag === "AccessRequestNotOwnedError") return { error: "not_owned" as const }
-      if (tag === "AccessRequestNotCancellableError") return { error: "not_cancellable" as const }
-      console.error("[requests] cancel failed:", e)
-      return { error: "cancel_failed" as const }
-    }
+      ),
+    )
+
+    if (result._kind === "ok") return { success: true as const, message: "cancelled" as const }
+    return { error: result._kind }
   }
 
   return { error: "unknown_intent" as const }
