@@ -1,3 +1,8 @@
+// Stays in the default jsdom env — this file spins up its own
+// setupServer() alongside the global central MSW server in setup.ts,
+// and the two-server fetch interception chain has subtle ordering
+// issues under the node env in this MSW version.
+//
 // Set operator URL before module imports read config
 process.env.OPERATOR_API_URL = "http://operator.test:9090"
 

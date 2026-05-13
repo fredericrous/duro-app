@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it, beforeEach } from "vitest"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"

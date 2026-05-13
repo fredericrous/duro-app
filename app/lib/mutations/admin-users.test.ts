@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from "vitest"
 import { Effect, Layer } from "effect"
 import { handleAdminUsersMutation, parseAdminUsersMutation, type AdminUsersMutation } from "./admin-users"

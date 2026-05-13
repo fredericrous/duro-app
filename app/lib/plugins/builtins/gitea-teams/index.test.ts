@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it, vi } from "vitest"
 import { Effect } from "effect"
 import { giteaTeamsPlugin } from "./index"

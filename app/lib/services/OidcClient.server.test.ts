@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest"
 import { Effect, ManagedRuntime } from "effect"
 import { OidcClient, OidcClientDev } from "./OidcClient.server"

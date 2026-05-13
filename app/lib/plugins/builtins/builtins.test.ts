@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest"
 import { giteaTeamsPlugin } from "./gitea-teams"
 import { immichAdminBitPlugin } from "./immich-admin-bit"

@@ -3,6 +3,11 @@ import path from "path"
 
 export default defineConfig({
   test: {
+    // jsdom is the default — every test file that touches the DOM
+    // (component renders, route tests, anything using @testing-library/react)
+    // needs it. Server-only tests under app/lib/** use the lighter `node`
+    // environment via per-file `// @vitest-environment node` pragmas
+    // (vitest 4 dropped the file-level `environmentMatchGlobs` config).
     environment: "jsdom",
     setupFiles: ["./app/test/setup.ts"],
     include: ["app/**/*.test.{ts,tsx}"],

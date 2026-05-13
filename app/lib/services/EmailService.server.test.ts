@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it, vi } from "vitest"
 import { Effect, ManagedRuntime } from "effect"
 import { EmailService, EmailServiceDev } from "./EmailService.server"

@@ -1,4 +1,5 @@
-import { describe, expect, it, vi, beforeEach } from "vitest"
+// @vitest-environment node
+import { describe, expect, it, vi, beforeEach, afterAll } from "vitest"
 import { Effect, Layer, ManagedRuntime, Schema } from "effect"
 import { FetchHttpClient } from "@effect/platform"
 import * as SqlClient from "@effect/sql/SqlClient"
@@ -71,8 +72,25 @@ const fakePlugin = mkFakePlugin
  */
 type PluginLifecycle = (ctx: GrantContext, svc: PluginServices) => ReturnType<NonNullable<Plugin["provision"]>>
 
-/** Build a Registry layer that returns the given plugin for any slug it knows about. */
-const RegistryStub = (plugins: ReadonlyArray<Plugin>) => {
+// Mutable plugin map — lets us share a single ManagedRuntime across all
+// tests in the file. Each `beforeEach` resets the map; individual tests
+// register the plugins they need. Drastic test-time win: PGlite WASM +
+// 16 migrations cost ~1.5s; sharing one runtime saves ~14 × 1.5s = 20s.
+const sharedPlugins = new Map<string, Plugin>()
+const RegistryStub = Layer.succeed(PluginRegistry, {
+  get: (slug: string) =>
+    sharedPlugins.has(slug) ? Effect.succeed(sharedPlugins.get(slug)!) : Effect.fail(new PluginNotFound({ slug })),
+  list: () => Effect.succeed([...sharedPlugins.values()].map((p) => p.manifest)),
+  getTemplatesForApp: () => [],
+  provisionedAppSlugs: () => new Set(),
+})
+
+/**
+ * Build a Registry layer for the FK-gate tests that need their own runtime
+ * (those tests provide stubbed repos which can't be hot-swapped on a
+ * shared layer). Used only by makeRuntimeWithRepoStubs below.
+ */
+const isolatedRegistryStub = (plugins: ReadonlyArray<Plugin>) => {
   const bySlug = new Map(plugins.map((p) => [p.manifest.slug, p]))
   return Layer.succeed(PluginRegistry, {
     get: (slug: string) =>
@@ -95,16 +113,51 @@ const GovernanceRepos = Layer.mergeAll(
   ConnectorMappingRepoLive,
 )
 
-function makeRuntime(plugins: ReadonlyArray<Plugin> = [fakePlugin()]) {
-  const layer = PluginHostLive.pipe(
-    Layer.provide(
-      Layer.mergeAll(ApplicationRepoLive, GovernanceRepos, LldapStub, AuditServiceDev, RegistryStub(plugins)),
-    ),
-    Layer.provideMerge(makeTestDbLayer()),
-    Layer.provide(FetchHttpClient.layer),
-  )
-  return ManagedRuntime.make(layer)
+// Single shared ManagedRuntime for the 14 tests that operate on the same
+// layer composition. Built lazily; torn down at file end via afterAll.
+// Tests register plugins via `sharedPlugins.set(...)` instead of passing
+// them to makeRuntime.
+let sharedRuntime: ManagedRuntime.ManagedRuntime<unknown, unknown> | null = null
+function makeRuntime(plugins: ReadonlyArray<Plugin> = [fakePlugin()]): ManagedRuntime.ManagedRuntime<unknown, unknown> {
+  if (!sharedRuntime) {
+    const layer = PluginHostLive.pipe(
+      Layer.provide(Layer.mergeAll(ApplicationRepoLive, GovernanceRepos, LldapStub, AuditServiceDev, RegistryStub)),
+      Layer.provideMerge(makeTestDbLayer()),
+      Layer.provide(FetchHttpClient.layer),
+    )
+    sharedRuntime = ManagedRuntime.make(layer) as ManagedRuntime.ManagedRuntime<unknown, unknown>
+  }
+  // Replace the plugins the shared registry can serve.
+  sharedPlugins.clear()
+  for (const p of plugins) sharedPlugins.set(p.manifest.slug, p)
+  return sharedRuntime
 }
+
+afterAll(async () => {
+  if (sharedRuntime) {
+    await sharedRuntime.dispose()
+    sharedRuntime = null
+  }
+})
+
+// TRUNCATE between tests so seeded data doesn't leak.
+beforeEach(async () => {
+  if (sharedRuntime) {
+    await sharedRuntime.runPromise(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* sql`TRUNCATE
+          provisioning_jobs, connector_mappings, connected_systems,
+          api_keys, audit_events, access_invitations,
+          request_approvals, access_requests, approval_policies,
+          grants, role_entitlements, entitlements, roles, resources,
+          group_mappings, applications, group_memberships, principals,
+          invites, user_revocations, user_preferences, user_certificates
+          RESTART IDENTITY CASCADE`
+      }) as Effect.Effect<void, never, never>,
+    )
+  }
+})
 
 // ---------------------------------------------------------------------------
 // Seed helpers
@@ -499,7 +552,7 @@ function makeRuntimeWithRepoStubs(overrides: StubOverrides) {
         ConnectorMappingRepoLiveForFkTests,
         LldapStub,
         AuditServiceDev,
-        RegistryStub([fakePlugin()]),
+        isolatedRegistryStub([fakePlugin()]),
       ),
     ),
     Layer.provideMerge(makeTestDbLayer()),

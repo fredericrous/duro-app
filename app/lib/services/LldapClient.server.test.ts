@@ -1,3 +1,4 @@
+// @vitest-environment node
 // Configure env BEFORE module imports — LldapClientLive reads these via
 // Effect.Config at layer-build time. Base URL must match LLDAP_BASE in
 // msw-server.ts so the central handlers respond to this client's requests.

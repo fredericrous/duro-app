@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from "vitest"
 import { groupAppsByCategory, getCategoryOrder, formatCategory } from "./apps"
 import type { AppDefinition } from "./apps"

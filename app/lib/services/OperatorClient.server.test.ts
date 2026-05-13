@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it, vi } from "vitest"
 
 // config.server is loaded by test/setup.ts before any test file runs, so

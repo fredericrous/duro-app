@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { afterEach, describe, expect } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"

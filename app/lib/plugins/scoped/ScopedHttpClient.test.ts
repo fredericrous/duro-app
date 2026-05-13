@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest"
 import { Effect } from "effect"
 import { http, HttpResponse, server } from "~/test/msw-server"

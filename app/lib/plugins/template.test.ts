@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from "vitest"
 import { resolveTemplate, resolveTemplateObject } from "./template"
 import type { GrantContext } from "./contracts"

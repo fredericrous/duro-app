@@ -1,24 +1,28 @@
-import { describe, expect, it, vi, beforeEach } from "vitest"
+// @vitest-environment node
+import { describe, expect, it, vi, beforeEach, afterAll } from "vitest"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { FetchHttpClient } from "@effect/platform"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { makeTestDbLayer } from "~/lib/db/client.server"
 
-// Each test creates its own ManagedRuntime, which spins up a fresh PGlite
-// WASM instance + runs 16 migrations. That's ~1.5s per test in isolation;
-// under suite-wide concurrency it can stretch to 15s. Vitest's default 5s
-// timeout would flag these as hangs. Bump per-file.
+// First-test PGlite + 16-migration init still costs ~5-15s under suite
+// concurrency, even though subsequent tests reuse the shared runtime.
+// Bump the file's test timeout to absorb the cold start.
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
 
 import { ProvisioningService, ProvisioningServiceLive } from "./ProvisioningService.server"
 import { PluginHost } from "~/lib/plugins/PluginHost.server"
+import { PluginHostError } from "~/lib/plugins/errors"
 
 // ---------------------------------------------------------------------------
-// PluginHost stub — ProvisioningService dispatches into PluginHost for
-// connector_type=plugin. We swap a vi.fn-backed Layer.succeed so we can
-// assert which method got called with what args, without standing up the
-// full PluginHost stack (covered in PluginHost.server.test.ts).
+// Shared mutable PluginHost stub + shared ManagedRuntime
 // ---------------------------------------------------------------------------
+//
+// Each test used to spin up its own ManagedRuntime (~1.5s PGlite + 16
+// migrations); ~11 tests × 1.5s = ~16s of overhead. We share one runtime
+// across the file by routing every PluginHost call through a mutable
+// `currentHostBehaviour` flag + a `hostCalls` array that tests reset in
+// beforeEach.
 
 interface HostCall {
   method: "runProvision" | "runDeprovision"
@@ -27,36 +31,73 @@ interface HostCall {
   connectedSystemId: string
 }
 
-function makeHostStub(opts: { fail?: boolean } = {}) {
-  const calls: HostCall[] = []
-  const failingBehaviour = opts.fail
-    ? () => Effect.fail({ _tag: "PluginHostError", message: "boom" } as never)
-    : () => Effect.void
-  const layer = Layer.succeed(PluginHost, {
-    runProvision: (pluginSlug: string, grantId: string, connectedSystemId: string) => {
-      calls.push({ method: "runProvision", pluginSlug, grantId, connectedSystemId })
-      return failingBehaviour()
-    },
-    runDeprovision: (pluginSlug: string, grantId: string, connectedSystemId: string) => {
-      calls.push({ method: "runDeprovision", pluginSlug, grantId, connectedSystemId })
-      return failingBehaviour()
-    },
-  } as never)
-  return { layer, calls }
+let currentHostShouldFail = false
+const sharedHostCalls: HostCall[] = []
+
+function makeHostStub(opts: { fail?: boolean } = {}): { layer: null; calls: HostCall[] } {
+  // Reset shared state, return a reference to the (still-shared) calls
+  // array so existing tests asserting `expect(calls).toEqual(...)` still
+  // work. The `layer` field is kept for back-compat with the previous
+  // tuple shape; it's no longer used since the SharedHostLayer is baked
+  // into the shared runtime.
+  currentHostShouldFail = opts.fail ?? false
+  sharedHostCalls.length = 0
+  return { layer: null, calls: sharedHostCalls }
 }
 
-// ---------------------------------------------------------------------------
-// Runtime factory — ProvisioningServiceLive + real DB + stub PluginHost
-// ---------------------------------------------------------------------------
+const SharedHostLayer = Layer.succeed(PluginHost, {
+  runProvision: (pluginSlug: string, grantId: string, connectedSystemId: string) => {
+    sharedHostCalls.push({ method: "runProvision", pluginSlug, grantId, connectedSystemId })
+    return currentHostShouldFail
+      ? Effect.fail(new PluginHostError({ pluginSlug, grantId, message: "boom" }))
+      : Effect.void
+  },
+  runDeprovision: (pluginSlug: string, grantId: string, connectedSystemId: string) => {
+    sharedHostCalls.push({ method: "runDeprovision", pluginSlug, grantId, connectedSystemId })
+    return currentHostShouldFail
+      ? Effect.fail(new PluginHostError({ pluginSlug, grantId, message: "boom" }))
+      : Effect.void
+  },
+})
 
-function makeRuntime(hostLayer: Layer.Layer<PluginHost, never, never>) {
-  const layer = ProvisioningServiceLive.pipe(
-    Layer.provideMerge(makeTestDbLayer()),
-    Layer.provideMerge(hostLayer),
-    Layer.provide(FetchHttpClient.layer),
-  )
-  return ManagedRuntime.make(layer)
+// Single shared ManagedRuntime — built once, torn down at file end.
+let sharedRuntime: ManagedRuntime.ManagedRuntime<unknown, unknown> | null = null
+function makeRuntime(_unused?: unknown): ManagedRuntime.ManagedRuntime<unknown, unknown> {
+  if (!sharedRuntime) {
+    const layer = ProvisioningServiceLive.pipe(
+      Layer.provideMerge(makeTestDbLayer()),
+      Layer.provideMerge(SharedHostLayer),
+      Layer.provide(FetchHttpClient.layer),
+    )
+    sharedRuntime = ManagedRuntime.make(layer) as ManagedRuntime.ManagedRuntime<unknown, unknown>
+  }
+  return sharedRuntime
 }
+
+afterAll(async () => {
+  if (sharedRuntime) {
+    await sharedRuntime.dispose()
+    sharedRuntime = null
+  }
+})
+
+beforeEach(async () => {
+  if (sharedRuntime) {
+    await sharedRuntime.runPromise(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* sql`TRUNCATE
+          provisioning_jobs, connector_mappings, connected_systems,
+          api_keys, audit_events, access_invitations,
+          request_approvals, access_requests, approval_policies,
+          grants, role_entitlements, entitlements, roles, resources,
+          group_mappings, applications, group_memberships, principals,
+          invites, user_revocations, user_preferences, user_certificates
+          RESTART IDENTITY CASCADE`
+      }) as Effect.Effect<void, never, never>,
+    )
+  }
+})
 
 // ---------------------------------------------------------------------------
 // Seed: app + role + grant + connected_system. Variants control
