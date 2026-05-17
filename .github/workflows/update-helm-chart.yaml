@@ -11,7 +11,7 @@ on:
 jobs:
   update-chart:
     name: Update Helm Chart Version
-    runs-on: ubuntu-latest
+    runs-on: duro-app
     steps:
       - name: Check required secrets
         run: |

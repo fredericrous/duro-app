@@ -9,7 +9,7 @@ on:
 jobs:
   build-and-test:
     name: Build & Test
-    runs-on: ubuntu-latest
+    runs-on: duro-app
     permissions:
       contents: read
       packages: read
