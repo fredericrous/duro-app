@@ -14,23 +14,10 @@ jobs:
       contents: read
       packages: read
 
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: duro_test
-          POSTGRES_PASSWORD: duro_test
-          POSTGRES_DB: duro_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U duro_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      DATABASE_URL: postgresql://duro_test:duro_test@localhost:5432/duro_test
+    # No `services: postgres:` — the dind-less self-hosted runner has no
+    # docker socket, and the test suite already runs against PGlite via
+    # makeTestDbLayer in app/lib/db/client.server.ts. PgClientLive (which
+    # would consume DATABASE_URL) is not built by any test layer.
 
     steps:
       - name: Checkout repository
