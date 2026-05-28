@@ -22,10 +22,15 @@ describe("ApiKeyRepo", () => {
         const repo = yield* ApiKeyRepo
         const principalId = yield* seedPrincipal
 
-        const { id, rawKey } = yield* repo.create(principalId, "ci-token", ["read"])
+        const { id, rawKey, keyPreview } = yield* repo.create({
+          principalId,
+          name: "ci-token",
+          scopes: ["read"],
+        })
 
         expect(id).toMatch(/^[0-9a-f-]{36}$/i)
         expect(rawKey).toMatch(/^duro_[0-9a-f]{64}$/)
+        expect(keyPreview).toMatch(/^duro_[0-9a-f]{4}…[0-9a-f]{4}$/)
       }),
     )
   })
@@ -40,7 +45,11 @@ describe("ApiKeyRepo", () => {
         const repo = yield* ApiKeyRepo
         const principalId = yield* seedPrincipal
 
-        const { rawKey } = yield* repo.create(principalId, "ci-token", ["read", "write", "admin"])
+        const { rawKey } = yield* repo.create({
+          principalId,
+          name: "ci-token",
+          scopes: ["read", "write", "admin"],
+        })
         const verified = yield* repo.verify(rawKey)
 
         expect(verified?.principalId).toBe(principalId)
@@ -65,7 +74,11 @@ describe("ApiKeyRepo", () => {
         const repo = yield* ApiKeyRepo
         const principalId = yield* seedPrincipal
 
-        const { id, rawKey } = yield* repo.create(principalId, "ci-token", ["read"])
+        const { id, rawKey } = yield* repo.create({
+          principalId,
+          name: "ci-token",
+          scopes: ["read"],
+        })
         yield* repo.revoke(id)
 
         const verified = yield* repo.verify(rawKey)
@@ -83,9 +96,9 @@ describe("ApiKeyRepo", () => {
         yield* sql`INSERT INTO principals (id, principal_type, external_id, display_name, email)
                    VALUES ('p-other', 'user', 'other', 'Other', 'other@example.com')`
 
-        yield* repo.create(principalId, "key-a", ["read"])
-        yield* repo.create(principalId, "key-b", ["write"])
-        yield* repo.create("p-other", "key-c", ["admin"])
+        yield* repo.create({ principalId, name: "key-a", scopes: ["read"] })
+        yield* repo.create({ principalId, name: "key-b", scopes: ["write"] })
+        yield* repo.create({ principalId: "p-other", name: "key-c", scopes: ["admin"] })
 
         const mine = yield* repo.listForPrincipal(principalId)
         expect(mine).toHaveLength(2)
@@ -103,6 +116,45 @@ describe("ApiKeyRepo", () => {
         const repo = yield* ApiKeyRepo
         yield* repo.revoke("non-existent-id")
         expect(true).toBe(true)
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("expiresInDays bounds the verify window", (it) => {
+    it.effect("a -1 day key (already expired) verifies as null", () =>
+      Effect.gen(function* () {
+        const repo = yield* ApiKeyRepo
+        const principalId = yield* seedPrincipal
+
+        // expiresInDays>0 in the public API; for the test we backdate by
+        // hand to simulate a key that just crossed its TTL.
+        const { rawKey } = yield* repo.create({
+          principalId,
+          name: "soon-expired",
+          scopes: ["read"],
+          expiresInDays: 1,
+        })
+        const sql = yield* SqlClient.SqlClient
+        yield* sql`UPDATE api_keys SET expires_at = NOW() - interval '1 day' WHERE name = 'soon-expired'`
+
+        const verified = yield* repo.verify(rawKey)
+        expect(verified).toBeNull()
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("create persists a non-empty key_preview row", (it) => {
+    it.effect("listForPrincipal returns the preview", () =>
+      Effect.gen(function* () {
+        const repo = yield* ApiKeyRepo
+        const principalId = yield* seedPrincipal
+        const { keyPreview } = yield* repo.create({
+          principalId,
+          name: "with-preview",
+          scopes: ["read"],
+        })
+        const keys = yield* repo.listForPrincipal(principalId)
+        expect(keys[0].keyPreview).toBe(keyPreview)
       }),
     )
   })

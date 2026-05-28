@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/mcp.json",
+  "mcpServers": {
+    "duro": {
+      "command": "node",
+      "args": ["./scripts/mcp/server.mjs"],
+      "env": {
+        "DURO_BASE_URL": "https://join.daddyshome.fr",
+        "DURO_API_KEY": "duro_REPLACE_ME"
+      }
+    }
+  }
+}

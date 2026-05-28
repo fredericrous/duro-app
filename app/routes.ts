@@ -41,4 +41,6 @@ export default [
   route("api/access-requests", "routes/api.access-requests.ts"),
   route("api/catalog", "routes/api.catalog.ts"),
   route("api/invitations", "routes/api.invitations.ts"),
+  route("api/admin/invites", "routes/api.admin.invites.ts"),
+  route("api/admin/groups", "routes/api.admin.groups.ts"),
 ] satisfies RouteConfig

@@ -6,15 +6,19 @@ import { runEffect } from "~/lib/runtime.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
+import { ApiKeyRepo } from "~/lib/governance/ApiKeyRepo.server"
+import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { config } from "~/lib/config.server"
 import { resolveLocale } from "~/lib/i18n.server"
 import { handleSettingsMutation, parseSettingsMutation } from "~/lib/mutations/settings"
+import { handleSettingsApiKeysMutation, parseSettingsApiKeysMutation } from "~/lib/mutations/settings-api-keys"
 import { Effect } from "effect"
 import { Alert, Button, Field, LinkButton, PageShell, Stack, Text } from "@duro-app/ui"
 import { Header } from "~/components/Header/Header"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 import { CertificateSection } from "~/components/CertificateSection/CertificateSection"
+import { ApiKeysSection } from "~/components/ApiKeysSection/ApiKeysSection"
 
 export function meta() {
   return [{ title: "Settings - Duro" }]
@@ -22,18 +26,24 @@ export function meta() {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const auth = await requireAuth(request)
-  const { locale, lastCertRenewal, p12Password, certificates } = await runEffect(
+  const { locale, lastCertRenewal, p12Password, certificates, apiKeys } = await runEffect(
     Effect.gen(function* () {
       const prefs = yield* PreferencesRepo
       const cert = yield* CertManager
       const certRepo = yield* CertificateRepo
+      const apiKeyRepo = yield* ApiKeyRepo
+      const principals = yield* PrincipalRepo
       const locale = yield* prefs.getLocale(auth.user!)
       const lastCertRenewal = yield* prefs.getLastCertRenewal(auth.user!)
       const p12Password = lastCertRenewal.renewalId
         ? yield* cert.getP12Password(lastCertRenewal.renewalId).pipe(Effect.catchAll(() => Effect.succeed(null)))
         : null
       const certificates = yield* certRepo.listValid(auth.user!).pipe(Effect.catchAll(() => Effect.succeed([])))
-      return { locale, lastCertRenewal, p12Password, certificates }
+      const principal = auth.sub ? yield* principals.findByExternalId(auth.sub) : null
+      const apiKeys = principal
+        ? yield* apiKeyRepo.listForPrincipal(principal.id).pipe(Effect.catchAll(() => Effect.succeed([])))
+        : []
+      return { locale, lastCertRenewal, p12Password, certificates, apiKeys }
     }),
   )
   return {
@@ -43,6 +53,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     lastCertRenewalAt: lastCertRenewal.at?.toISOString() ?? null,
     p12Password,
     certificates,
+    apiKeys,
     autheliaUrl: config.autheliaUrl,
   }
 }
@@ -50,6 +61,14 @@ export async function loader({ request }: Route.LoaderArgs) {
 export async function action({ request }: Route.ActionArgs) {
   const auth = await requireAuth(request)
   const formData = await request.formData()
+  const intent = formData.get("intent")
+
+  if (intent === "createApiKey" || intent === "revokeApiKey") {
+    const parsed = parseSettingsApiKeysMutation(formData as any, auth)
+    if ("error" in parsed) return { apiKeyError: parsed.error }
+    return await runEffect(handleSettingsApiKeysMutation(parsed))
+  }
+
   const parsed = parseSettingsMutation(formData as any, auth)
   if ("error" in parsed) return parsed
 
@@ -102,6 +121,10 @@ export default function SettingsPage({ loaderData }: Route.ComponentProps) {
             lastCertRenewalAt={loaderData.lastCertRenewalAt}
             certificates={loaderData.certificates}
           />
+        </CardSection>
+
+        <CardSection title={t("settings.apiKeys.heading")}>
+          <ApiKeysSection apiKeys={loaderData.apiKeys} />
         </CardSection>
 
         {loaderData.autheliaUrl && (

@@ -213,6 +213,7 @@ export const ApiKeyRow = Schema.Struct({
   id: Schema.String,
   principalId: Schema.String,
   keyHash: Schema.String,
+  keyPreview: Coerced.NullableString,
   name: Schema.String,
   scopes: Schema.Unknown, // JSONB
   expiresAt: Coerced.NullableDateString,

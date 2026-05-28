@@ -166,6 +166,58 @@
       "description": "Your password, multi-factor authentication, sessions, and email are managed by your identity provider.",
       "openPortal": "Open identity provider portal",
       "managedBy": "Opens in a new tab. After making changes, you may need to sign back in here."
+    },
+    "apiKeys": {
+      "heading": "API keys",
+      "empty": "You haven't minted any API keys yet. Use one to let a CLI or script call duro on your behalf.",
+      "created": "created {{date}}",
+      "expires": "expires {{date}}",
+      "revokedOn": "revoked {{date}}",
+      "revoke": "Revoke",
+      "status": {
+        "active": "Active",
+        "expired": "Expired",
+        "revoked": "Revoked"
+      },
+      "scopes": {
+        "wildcardChip": "Full access"
+      },
+      "create": {
+        "heading": "Mint a new key",
+        "description": "The key is only shown once. Pick least privilege; you can always mint a second key with broader scope later.",
+        "submit": "Create API key",
+        "submitting": "Creating..."
+      },
+      "fields": {
+        "name": "Name",
+        "namePlaceholder": "e.g. Claude CLI on my Mac",
+        "nameHint": "Just for you — used in the list below to identify this key. 100 characters max.",
+        "scopes": "Scopes",
+        "scopesHint": "What this key is allowed to do. Stick to the minimum the calling tool needs.",
+        "recommended": "recommended",
+        "expiry": "Expires after",
+        "expiryHint": "After this, the key stops working. You can always mint a fresh one.",
+        "expiryOption_one": "{{count}} day",
+        "expiryOption_other": "{{count}} days",
+        "wildcardLabel": "Grant full access (overrides the scopes above)",
+        "wildcardWarning": "Use only if you can't pick a tighter scope. A leak of this key gives the holder everything you can do."
+      },
+      "reveal": {
+        "title": "{{name}} created",
+        "warning": "Copy this key now. After you close this dialog it won't be shown again — only its preview.",
+        "rawKeyLabel": "Your new API key",
+        "fallbackLabel": "Trouble copying? Select the text below manually.",
+        "ackSaved": "I've saved this key in a safe place.",
+        "copy": "Copy",
+        "copied": "Copied!",
+        "done": "Done"
+      },
+      "revokeConfirm": {
+        "title": "Revoke this API key?",
+        "body": "{{name}} will stop working immediately. Calls using it will get HTTP 401.",
+        "warning": "If you're using this key in a tool right now (e.g. Claude CLI), you'll need to update its config with a fresh key.",
+        "confirm": "Yes, revoke"
+      }
     }
   },
   "welcome": {

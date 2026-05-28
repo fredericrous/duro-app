@@ -166,6 +166,58 @@
       "description": "Votre mot de passe, l'authentification multifacteur, les sessions et l'e-mail sont geres par votre fournisseur d'identite.",
       "openPortal": "Ouvrir le portail du fournisseur d'identite",
       "managedBy": "S'ouvre dans un nouvel onglet. Vous devrez peut-etre vous reconnecter ici apres modification."
+    },
+    "apiKeys": {
+      "heading": "Cles API",
+      "empty": "Vous n'avez pas encore cree de cle API. Utilisez-en une pour qu'un outil CLI ou un script appelle duro en votre nom.",
+      "created": "creee le {{date}}",
+      "expires": "expire le {{date}}",
+      "revokedOn": "revoquee le {{date}}",
+      "revoke": "Revoquer",
+      "status": {
+        "active": "Active",
+        "expired": "Expiree",
+        "revoked": "Revoquee"
+      },
+      "scopes": {
+        "wildcardChip": "Acces total"
+      },
+      "create": {
+        "heading": "Creer une nouvelle cle",
+        "description": "La cle n'est affichee qu'une seule fois. Choisissez le moindre privilege ; vous pourrez toujours creer une seconde cle avec une portee plus large.",
+        "submit": "Creer la cle API",
+        "submitting": "Creation..."
+      },
+      "fields": {
+        "name": "Nom",
+        "namePlaceholder": "ex. Claude CLI sur mon Mac",
+        "nameHint": "Pour vous uniquement — sert a identifier la cle dans la liste ci-dessous. 100 caracteres maximum.",
+        "scopes": "Portees",
+        "scopesHint": "Ce que cette cle est autorisee a faire. Tenez-vous au minimum dont l'outil appelant a besoin.",
+        "recommended": "recommande",
+        "expiry": "Expire apres",
+        "expiryHint": "Apres ce delai, la cle cesse de fonctionner. Vous pourrez toujours en creer une nouvelle.",
+        "expiryOption_one": "{{count}} jour",
+        "expiryOption_other": "{{count}} jours",
+        "wildcardLabel": "Accorder un acces total (remplace les portees ci-dessus)",
+        "wildcardWarning": "A n'utiliser que si vous ne pouvez pas choisir une portee plus stricte. Une fuite de cette cle donne au porteur tout ce que vous pouvez faire."
+      },
+      "reveal": {
+        "title": "{{name}} creee",
+        "warning": "Copiez cette cle maintenant. Apres la fermeture de cette boite de dialogue, elle ne sera plus jamais affichee — seul son apercu le sera.",
+        "rawKeyLabel": "Votre nouvelle cle API",
+        "fallbackLabel": "Probleme pour copier ? Selectionnez le texte ci-dessous manuellement.",
+        "ackSaved": "J'ai enregistre cette cle en lieu sur.",
+        "copy": "Copier",
+        "copied": "Copie !",
+        "done": "Termine"
+      },
+      "revokeConfirm": {
+        "title": "Revoquer cette cle API ?",
+        "body": "{{name}} cessera de fonctionner immediatement. Les appels qui l'utilisent renverront HTTP 401.",
+        "warning": "Si vous utilisez cette cle dans un outil en ce moment (ex. Claude CLI), vous devrez mettre a jour sa configuration avec une nouvelle cle.",
+        "confirm": "Oui, revoquer"
+      }
     }
   },
   "welcome": {

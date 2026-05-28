@@ -20,6 +20,7 @@ import m0013 from "./migrations/pg/0013_access_request_dedup_index"
 import m0014 from "./migrations/pg/0014_add_application_url"
 import m0015 from "./migrations/pg/0015_reclassify_access_modes"
 import m0016 from "./migrations/pg/0016_lock_garage_webui"
+import m0017 from "./migrations/pg/0017_add_api_key_preview"
 
 const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
@@ -78,6 +79,7 @@ const migrations: Array<
   [14, "add_application_url", m0014],
   [15, "reclassify_access_modes", m0015],
   [16, "lock_garage_webui", m0016],
+  [17, "add_api_key_preview", m0017],
 ]
 
 const runMigrations = Effect.gen(function* () {
@@ -282,7 +284,8 @@ const seedGovernanceData = (sql: SqlClient.SqlClient) =>
     // --- API key for dev testing ---
     const devApiKey = "duro_dev_test_key_0000000000000000"
     const keyHash = crypto.createHash("sha256").update(devApiKey).digest("hex")
-    yield* sql`INSERT INTO api_keys (id, principal_id, key_hash, name, scopes) VALUES ('apikey-dev', ${devId}, ${keyHash}, 'Dev Test Key', ${JSON.stringify(["*"])})`
+    const devKeyPreview = `duro_${devApiKey.slice(5, 9)}…${devApiKey.slice(-4)}`
+    yield* sql`INSERT INTO api_keys (id, principal_id, key_hash, key_preview, name, scopes) VALUES ('apikey-dev', ${devId}, ${keyHash}, ${devKeyPreview}, 'Dev Test Key', ${JSON.stringify(["*"])})`
 
     yield* Effect.log(
       "governance seed complete: 4 apps, 6 roles, 8 entitlements, 4 grants, 1 policy, 1 pending request",
