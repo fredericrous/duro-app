@@ -16,10 +16,15 @@ vi.mock("~/lib/mutations/settings", () => ({
   parseSettingsMutation: vi.fn(),
   handleSettingsMutation: vi.fn(),
 }))
+vi.mock("~/lib/mutations/settings-api-keys.server", () => ({
+  parseSettingsApiKeysMutation: vi.fn(),
+  handleSettingsApiKeysMutation: vi.fn(),
+}))
 
 import { requireAuth } from "~/lib/auth.server"
 import { runEffect } from "~/lib/runtime.server"
 import { parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
+import { parseSettingsApiKeysMutation, handleSettingsApiKeysMutation } from "~/lib/mutations/settings-api-keys.server"
 import { action, loader } from "./settings"
 import { callAction, callLoader, expectData } from "~/test/route-utils"
 
@@ -27,6 +32,8 @@ const mockRequireAuth = vi.mocked(requireAuth)
 const mockRunEffect = vi.mocked(runEffect)
 const mockParse = vi.mocked(parseSettingsMutation)
 const mockHandle = vi.mocked(handleSettingsMutation)
+const mockParseApiKeys = vi.mocked(parseSettingsApiKeysMutation)
+const mockHandleApiKeys = vi.mocked(handleSettingsApiKeysMutation)
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -118,5 +125,83 @@ describe("/settings action", () => {
     expect(res.status).toBeGreaterThanOrEqual(300)
     expect(res.headers.get("location")).toBe("/settings")
     expect(res.headers.get("set-cookie")).toContain("duro_lng=fr")
+  })
+})
+
+describe("/settings action — API keys branch", () => {
+  beforeEach(() => {
+    mockRequireAuth.mockResolvedValue({ user: "alice", email: "a@x", sub: "s" } as never)
+  })
+
+  it("routes createApiKey through the api-keys mutation and returns its result", async () => {
+    mockParseApiKeys.mockReturnValue({ intent: "createApiKey", auth: {} } as never)
+    mockHandleApiKeys.mockReturnValue("api-keys-effect" as never)
+    mockRunEffect.mockResolvedValue({ apiKeyCreated: true, id: "k1", rawKey: "raw" } as never)
+
+    const result = await callAction(action, {
+      formData: { intent: "createApiKey", name: "ci", expiresInDays: "30" },
+    })
+    const data = expectData<{ apiKeyCreated?: boolean; id?: string }>(result)
+    expect(data).toEqual({ apiKeyCreated: true, id: "k1", rawKey: "raw" })
+    // The locale mutation path must not be touched for an API-key intent.
+    expect(mockParse).not.toHaveBeenCalled()
+    expect(mockRunEffect).toHaveBeenCalledWith("api-keys-effect")
+  })
+
+  it("routes revokeApiKey through the api-keys mutation", async () => {
+    mockParseApiKeys.mockReturnValue({ intent: "revokeApiKey", auth: {}, keyId: "k1" } as never)
+    mockHandleApiKeys.mockReturnValue("revoke-effect" as never)
+    mockRunEffect.mockResolvedValue({ apiKeyRevoked: true, keyId: "k1" } as never)
+
+    const result = await callAction(action, { formData: { intent: "revokeApiKey", keyId: "k1" } })
+    const data = expectData<{ apiKeyRevoked?: boolean; keyId?: string }>(result)
+    expect(data).toEqual({ apiKeyRevoked: true, keyId: "k1" })
+  })
+
+  it("short-circuits with apiKeyError when the api-keys parser rejects", async () => {
+    mockParseApiKeys.mockReturnValue({ error: "Name is required" } as never)
+
+    const result = await callAction(action, { formData: { intent: "createApiKey", name: "" } })
+    const data = expectData<{ apiKeyError?: string }>(result)
+    expect(data).toEqual({ apiKeyError: "Name is required" })
+    expect(mockHandleApiKeys).not.toHaveBeenCalled()
+  })
+})
+
+// ===========================================================================
+// Component-render test
+// ===========================================================================
+
+import { screen, waitFor } from "@testing-library/react"
+import SettingsPage from "./settings"
+import { renderRoute } from "~/test/render-route"
+
+describe("SettingsPage component", () => {
+  it("renders the settings sections from loaderData", async () => {
+    renderRoute({
+      parentLoaderId: "routes/dashboard",
+      parentLoader: () => ({ user: "alice", isAdmin: false }),
+      route: {
+        path: "/settings",
+        Component: SettingsPage as never,
+        loader: () => ({
+          locale: "en",
+          currentLocale: "en",
+          email: "a@example.com",
+          lastCertRenewalAt: null,
+          p12Password: null,
+          certificates: [],
+          apiKeys: [],
+          autheliaUrl: "https://auth.example.com",
+        }),
+      },
+    })
+
+    // The language Save button is always present; its render exercises the
+    // page shell + the locale form. i18n keys fall back to their key string
+    // in tests, so we assert on a stable structural element instead.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /save/i })).toBeInTheDocument()
+    })
   })
 })
