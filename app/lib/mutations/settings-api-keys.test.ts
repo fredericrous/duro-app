@@ -1,11 +1,8 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest"
 import { Effect, Layer } from "effect"
-import {
-  handleSettingsApiKeysMutation,
-  parseSettingsApiKeysMutation,
-  type SettingsApiKeysResult,
-} from "./settings-api-keys"
+import { handleSettingsApiKeysMutation, parseSettingsApiKeysMutation } from "./settings-api-keys.server"
+import { type SettingsApiKeysResult } from "./settings-api-keys"
 import { ApiKeyRepo, type CreateApiKeyInput } from "~/lib/governance/ApiKeyRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
