@@ -540,6 +540,7 @@
         "email": "E-mail",
         "groups": "Groupes",
         "status": "Statut",
+        "progress": "Progression",
         "invitedBy": "Invite par",
         "expires": "Expire",
         "error": "Erreur",
@@ -551,6 +552,18 @@
         "sent": "Envoye",
         "certIssued": "Cert emis",
         "processing": "Traitement..."
+      },
+      "funnel": {
+        "sent": "Envoye",
+        "delivered": "Delivre",
+        "bounced": "Rejete",
+        "deferred": "Livraison differee — nouvelle tentative",
+        "bounceReason": "Rejet : {{reason}}",
+        "opened": "Ouvert",
+        "clicked": "Clique",
+        "installed": "Cert installe",
+        "last": "Dernier : {{stage}} · {{date}}",
+        "proxyHint": "Ouvertures/clics peuvent inclure des prechargements du proxy mail"
       },
       "action": {
         "resend": "Renvoyer",

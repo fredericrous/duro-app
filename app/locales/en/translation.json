@@ -540,6 +540,7 @@
         "email": "Email",
         "groups": "Groups",
         "status": "Status",
+        "progress": "Progress",
         "invitedBy": "Invited By",
         "expires": "Expires",
         "error": "Error",
@@ -551,6 +552,18 @@
         "sent": "Sent",
         "certIssued": "Cert issued",
         "processing": "Processing..."
+      },
+      "funnel": {
+        "sent": "Sent",
+        "delivered": "Delivered",
+        "bounced": "Bounced",
+        "deferred": "Delivery deferred — retrying",
+        "bounceReason": "Bounce: {{reason}}",
+        "opened": "Opened",
+        "clicked": "Clicked",
+        "installed": "Cert installed",
+        "last": "Last: {{stage}} · {{date}}",
+        "proxyHint": "Opened/clicked may include mail-proxy auto-loads"
       },
       "action": {
         "resend": "Resend",

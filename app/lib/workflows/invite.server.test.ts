@@ -42,6 +42,21 @@ function makeInvite(overrides: Partial<Invite> = {}): Invite {
     revertPrNumber: null,
     revertPrMerged: false,
     locale: "en",
+    openToken: "open-inv-1",
+    firstOpenedAt: null,
+    lastOpenedAt: null,
+    openCount: 0,
+    lastOpenUserAgent: null,
+    firstClickedAt: null,
+    lastClickedAt: null,
+    clickCount: 0,
+    lastClickUserAgent: null,
+    messageId: null,
+    deliveryStatus: null,
+    deliveredAt: null,
+    bouncedAt: null,
+    lastDeliveryEventAt: null,
+    deliveryDetail: null,
     ...overrides,
   }
 }
@@ -54,19 +69,67 @@ const mockInviteRepo = (store: Map<string, Invite> = new Map(), revocations: Rev
       Effect.sync(() => {
         const id = `inv-${store.size + 1}`
         const token = `tok-${id}`
+        const openToken = `open-${id}`
         const invite = makeInvite({
           id,
           token,
+          openToken,
           email: input.email,
           groups: JSON.stringify(input.groups),
           groupNames: JSON.stringify(input.groupNames),
           invitedBy: input.invitedBy,
         })
         store.set(id, invite)
-        return { id, token }
+        return { id, token, openToken }
       }),
     findById: (id) => Effect.sync(() => store.get(id) ?? null),
     findByTokenHash: (_hash) => Effect.sync(() => null),
+    recordOpen: (openToken, userAgent) =>
+      Effect.sync(() => {
+        const invite = [...store.values()].find((i) => i.openToken === openToken)
+        if (invite)
+          store.set(invite.id, {
+            ...invite,
+            firstOpenedAt: invite.firstOpenedAt ?? new Date().toISOString(),
+            lastOpenedAt: new Date().toISOString(),
+            openCount: invite.openCount + 1,
+            lastOpenUserAgent: userAgent,
+          })
+      }),
+    recordClick: (tokenHash, userAgent) =>
+      Effect.sync(() => {
+        const invite = [...store.values()].find((i) => i.tokenHash === tokenHash)
+        if (invite)
+          store.set(invite.id, {
+            ...invite,
+            firstClickedAt: invite.firstClickedAt ?? new Date().toISOString(),
+            lastClickedAt: new Date().toISOString(),
+            clickCount: invite.clickCount + 1,
+            lastClickUserAgent: userAgent,
+          })
+      }),
+    setMessageId: (id, messageId) =>
+      Effect.sync(() => {
+        const invite = store.get(id)
+        if (invite) store.set(id, { ...invite, messageId })
+      }),
+    findByMessageId: (messageId) =>
+      Effect.sync(() => [...store.values()].find((i) => i.messageId === messageId) ?? null),
+    findLatestByEmail: (email) =>
+      Effect.sync(() => [...store.values()].filter((i) => i.email === email).at(-1) ?? null),
+    recordDelivery: (id, input) =>
+      Effect.sync(() => {
+        const invite = store.get(id)
+        if (invite)
+          store.set(id, {
+            ...invite,
+            deliveryStatus: input.status,
+            deliveredAt: input.status === "delivered" ? (invite.deliveredAt ?? input.at) : invite.deliveredAt,
+            bouncedAt: input.status === "bounced" ? (invite.bouncedAt ?? input.at) : invite.bouncedAt,
+            lastDeliveryEventAt: input.at,
+            deliveryDetail: input.detail,
+          })
+      }),
     consumeByToken: (rawToken) =>
       Effect.sync(() => {
         const id = rawToken.replace("tok-", "")
@@ -279,9 +342,9 @@ const mockCertificateRepo = (calls: { method: string; args: unknown[] }[] = []) 
 
 const mockEmailService = (calls: { method: string; args: unknown[] }[] = []) =>
   Layer.succeed(EmailService, {
-    sendInviteEmail: (email, token, invitedBy, p12Buffer, locale) => {
+    sendInviteEmail: (email, token, invitedBy, p12Buffer, locale, _openToken, inviteId) => {
       calls.push({ method: "sendInviteEmail", args: [email, token, invitedBy, p12Buffer, locale] })
-      return Effect.void
+      return Effect.succeed(`<invite-${inviteId ?? "x"}@test>`)
     },
     sendCertRenewalEmail: (email, p12Buffer, locale) => {
       calls.push({ method: "sendCertRenewalEmail", args: [email, p12Buffer, locale] })
@@ -349,6 +412,7 @@ describe("queueInvite", () => {
 
     const failingEmail = Layer.succeed(EmailService, {
       sendInviteEmail: () => Effect.fail(new EmailError({ message: "SMTP down" })),
+      // (typed as Effect<string>; the failure short-circuits before the value)
       sendCertRenewalEmail: () => Effect.void,
     } as EmailService["Type"])
 

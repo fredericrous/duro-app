@@ -21,6 +21,9 @@ import m0014 from "./migrations/pg/0014_add_application_url"
 import m0015 from "./migrations/pg/0015_reclassify_access_modes"
 import m0016 from "./migrations/pg/0016_lock_garage_webui"
 import m0017 from "./migrations/pg/0017_add_api_key_preview"
+import m0018 from "./migrations/pg/0018_add_invite_open_tracking"
+import m0019 from "./migrations/pg/0019_add_invite_click_tracking"
+import m0020 from "./migrations/pg/0020_add_invite_delivery_tracking"
 
 const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
@@ -80,6 +83,9 @@ const migrations: Array<
   [15, "reclassify_access_modes", m0015],
   [16, "lock_garage_webui", m0016],
   [17, "add_api_key_preview", m0017],
+  [18, "add_invite_open_tracking", m0018],
+  [19, "add_invite_click_tracking", m0019],
+  [20, "add_invite_delivery_tracking", m0020],
 ]
 
 const runMigrations = Effect.gen(function* () {

@@ -1,6 +1,19 @@
 "use no memo"
 
-import { Body, Container, Head, Heading, Html, Link, Preview, Section, Text, Button, Hr } from "@react-email/components"
+import {
+  Body,
+  Container,
+  Head,
+  Heading,
+  Html,
+  Img,
+  Link,
+  Preview,
+  Section,
+  Text,
+  Button,
+  Hr,
+} from "@react-email/components"
 import { Trans } from "react-i18next/TransWithoutContext"
 import type { TFunction } from "i18next"
 
@@ -10,10 +23,23 @@ interface InviteEmailProps {
   invitedBy: string
   appName: string
   appDescription: string
+  /** Click-tracking redirector for the CTA. Falls back to inviteUrl when absent. */
+  clickUrl?: string
+  /** Open-tracking pixel URL. When omitted, no pixel is rendered. */
+  pixelUrl?: string
   t: TFunction
 }
 
-export function InviteEmail({ inviteUrl, reinviteUrl, invitedBy, appName, appDescription, t }: InviteEmailProps) {
+export function InviteEmail({
+  inviteUrl,
+  reinviteUrl,
+  invitedBy,
+  appName,
+  appDescription,
+  clickUrl,
+  pixelUrl,
+  t,
+}: InviteEmailProps) {
   return (
     <Html>
       <Head />
@@ -49,7 +75,7 @@ export function InviteEmail({ inviteUrl, reinviteUrl, invitedBy, appName, appDes
           </Section>
 
           <Section style={buttonContainer}>
-            <Button style={button} href={inviteUrl}>
+            <Button style={button} href={clickUrl ?? inviteUrl}>
               {t("email.invite.cta")}
             </Button>
           </Section>
@@ -65,6 +91,9 @@ export function InviteEmail({ inviteUrl, reinviteUrl, invitedBy, appName, appDes
             />
           </Text>
         </Container>
+        {/* Open-tracking pixel. A real (not display:none) 1x1 image — some
+            clients/proxies skip hidden images — kept visually inert. */}
+        {pixelUrl ? <Img src={pixelUrl} width="1" height="1" alt="" style={pixel} /> : null}
       </Body>
     </Html>
   )
@@ -148,4 +177,12 @@ const footer = {
 const footerLink = {
   color: "#3b82f6",
   textDecoration: "underline",
+}
+
+const pixel = {
+  display: "block" as const,
+  border: 0,
+  opacity: 0,
+  maxHeight: "1px",
+  maxWidth: "1px",
 }

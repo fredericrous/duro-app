@@ -31,6 +31,19 @@ describe("EmailService (Dev)", () => {
     )
   })
 
+  it("sendInviteEmail returns a deterministic Message-ID built from the invite id", async () => {
+    const debug = vi.spyOn(console, "log").mockImplementation(() => {})
+    const messageId = await rt.runPromise(
+      Effect.gen(function* () {
+        const e = yield* EmailService
+        return yield* e.sendInviteEmail("a@example.com", "tok", "admin", Buffer.from(""), "en", "open-1", "inv-42")
+      }),
+    )
+    // Webhook correlation depends on this exact shape: <invite-{id}@suffix>.
+    expect(messageId).toMatch(/^<invite-inv-42@/)
+    debug.mockRestore()
+  })
+
   it("sendCertRenewalEmail resolves without throwing", async () => {
     await rt.runPromise(
       Effect.gen(function* () {

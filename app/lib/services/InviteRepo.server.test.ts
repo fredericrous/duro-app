@@ -568,4 +568,227 @@ describe("InviteRepo", () => {
       }),
     )
   })
+
+  it.layer(TestLayer)("open tracking", (it) => {
+    it.effect("create returns a distinct openToken and stores it", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id, token, openToken } = yield* repo.create({
+          email: "open-create@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+
+        expect(openToken).toBeDefined()
+        expect(openToken.length).toBeGreaterThan(0)
+        // Must NOT reuse the invite token (which grants account creation).
+        expect(openToken).not.toBe(token)
+
+        const invite = yield* repo.findById(id)
+        expect(invite!.openToken).toBe(openToken)
+        expect(invite!.openCount).toBe(0)
+        expect(invite!.firstOpenedAt).toBeNull()
+        expect(invite!.lastOpenedAt).toBeNull()
+        expect(invite!.lastOpenUserAgent).toBeNull()
+      }),
+    )
+
+    it.effect("recordOpen sets first/last/count/UA and keeps first stable on re-open", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id, openToken } = yield* repo.create({
+          email: "open-record@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+
+        yield* repo.recordOpen(openToken, "Mozilla/5.0 (Macintosh)")
+        const first = yield* repo.findById(id)
+        expect(first!.openCount).toBe(1)
+        expect(first!.firstOpenedAt).not.toBeNull()
+        expect(first!.lastOpenedAt).not.toBeNull()
+        expect(first!.lastOpenUserAgent).toBe("Mozilla/5.0 (Macintosh)")
+
+        yield* repo.recordOpen(openToken, "GoogleImageProxy")
+        const second = yield* repo.findById(id)
+        expect(second!.openCount).toBe(2)
+        // first_opened_at must not move on subsequent opens
+        expect(second!.firstOpenedAt).toBe(first!.firstOpenedAt)
+        expect(second!.lastOpenUserAgent).toBe("GoogleImageProxy")
+      }),
+    )
+
+    it.effect("recordOpen truncates an oversized user agent to 512 chars", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id, openToken } = yield* repo.create({
+          email: "open-ua@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+
+        yield* repo.recordOpen(openToken, "x".repeat(2000))
+        const invite = yield* repo.findById(id)
+        expect(invite!.lastOpenUserAgent!.length).toBe(512)
+      }),
+    )
+
+    it.effect("recordOpen is a no-op for an unknown openToken", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id } = yield* repo.create({
+          email: "open-unknown@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+
+        // Must not throw, and must not touch any existing invite.
+        yield* repo.recordOpen("totally-unknown-token", "anything")
+        const invite = yield* repo.findById(id)
+        expect(invite!.openCount).toBe(0)
+        expect(invite!.firstOpenedAt).toBeNull()
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("click tracking", (it) => {
+    it.effect("recordClick (keyed by token hash) sets first/last/count/UA and keeps first stable", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id, token } = yield* repo.create({
+          email: "click-record@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+        const tokenHash = hashToken(token)
+
+        yield* repo.recordClick(tokenHash, "Mozilla/5.0 (iPhone)")
+        const first = yield* repo.findById(id)
+        expect(first!.clickCount).toBe(1)
+        expect(first!.firstClickedAt).not.toBeNull()
+        expect(first!.lastClickUserAgent).toBe("Mozilla/5.0 (iPhone)")
+
+        yield* repo.recordClick(tokenHash, "Outlook SafeLinks")
+        const second = yield* repo.findById(id)
+        expect(second!.clickCount).toBe(2)
+        expect(second!.firstClickedAt).toBe(first!.firstClickedAt)
+        expect(second!.lastClickUserAgent).toBe("Outlook SafeLinks")
+      }),
+    )
+
+    it.effect("recordClick truncates an oversized user agent to 512 chars", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id, token } = yield* repo.create({
+          email: "click-ua@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+
+        yield* repo.recordClick(hashToken(token), "y".repeat(2000))
+        const invite = yield* repo.findById(id)
+        expect(invite!.lastClickUserAgent!.length).toBe(512)
+      }),
+    )
+
+    it.effect("recordClick is a no-op for an unknown token hash", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id } = yield* repo.create({
+          email: "click-unknown@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+
+        yield* repo.recordClick("nonexistent-hash", "anything")
+        const invite = yield* repo.findById(id)
+        expect(invite!.clickCount).toBe(0)
+        expect(invite!.firstClickedAt).toBeNull()
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("delivery tracking", (it) => {
+    const seed = (email: string) =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const { id } = yield* repo.create({ email, groups: [1], groupNames: ["friends"], invitedBy: "admin" })
+        return { repo, id }
+      })
+
+    it.effect("setMessageId + findByMessageId round-trips", () =>
+      Effect.gen(function* () {
+        const { repo, id } = yield* seed("msg@example.com")
+        yield* repo.setMessageId(id, "<invite-mid-1@daddyshome.fr>")
+        const found = yield* repo.findByMessageId("<invite-mid-1@daddyshome.fr>")
+        expect(found?.id).toBe(id)
+        expect(yield* repo.findByMessageId("<nope@x>")).toBeNull()
+      }),
+    )
+
+    it.effect("findLatestByEmail returns the most recently created invite", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const first = yield* repo.create({ email: "dup@x.com", groups: [1], groupNames: ["f"], invitedBy: "admin" })
+        // revoke so create() allows a second live invite for the same email
+        yield* repo.revoke(first.id)
+        const second = yield* repo.create({ email: "dup@x.com", groups: [1], groupNames: ["f"], invitedBy: "admin" })
+        const latest = yield* repo.findLatestByEmail("dup@x.com")
+        expect(latest?.id).toBe(second.id)
+      }),
+    )
+
+    it.effect("recordDelivery sets status + delivered_at and is monotonic (no downgrade)", () =>
+      Effect.gen(function* () {
+        const { repo, id } = yield* seed("deliver@example.com")
+
+        yield* repo.recordDelivery(id, { status: "deferred", detail: "451 try later", at: new Date().toISOString() })
+        let inv = yield* repo.findById(id)
+        expect(inv!.deliveryStatus).toBe("deferred")
+        expect(inv!.deliveredAt).toBeNull()
+
+        const at = new Date().toISOString()
+        yield* repo.recordDelivery(id, { status: "delivered", detail: "250 OK", at })
+        inv = yield* repo.findById(id)
+        expect(inv!.deliveryStatus).toBe("delivered")
+        expect(inv!.deliveredAt).not.toBeNull()
+
+        // A late 'deferred' must NOT downgrade a delivered invite.
+        yield* repo.recordDelivery(id, { status: "deferred", detail: "late", at: new Date().toISOString() })
+        inv = yield* repo.findById(id)
+        expect(inv!.deliveryStatus).toBe("delivered")
+      }),
+    )
+
+    it.effect("recordDelivery records a bounce with reason", () =>
+      Effect.gen(function* () {
+        const { repo, id } = yield* seed("bounce@example.com")
+        yield* repo.recordDelivery(id, {
+          status: "bounced",
+          detail: "550 5.1.1 No such user",
+          at: new Date().toISOString(),
+        })
+        const inv = yield* repo.findById(id)
+        expect(inv!.deliveryStatus).toBe("bounced")
+        expect(inv!.bouncedAt).not.toBeNull()
+        expect(inv!.deliveryDetail).toBe("550 5.1.1 No such user")
+      }),
+    )
+
+    it.effect("recordDelivery truncates an oversized detail to 512 chars", () =>
+      Effect.gen(function* () {
+        const { repo, id } = yield* seed("trunc@example.com")
+        yield* repo.recordDelivery(id, { status: "bounced", detail: "z".repeat(2000), at: new Date().toISOString() })
+        const inv = yield* repo.findById(id)
+        expect(inv!.deliveryDetail!.length).toBe(512)
+      }),
+    )
+  })
 })

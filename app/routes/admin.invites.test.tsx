@@ -182,3 +182,44 @@ describe("AdminInvitesPage component", () => {
     })
   })
 })
+
+describe("InviteFunnel delivery rendering", () => {
+  const sentInvite = (overrides: Record<string, unknown>) => ({
+    id: "i1",
+    email: "alice@example.com",
+    groups: "[1]",
+    groupNames: '["family"]',
+    invitedBy: "admin",
+    locale: "en",
+    createdAt: "2026-01-01T00:00:00Z",
+    expiresAt: "2026-12-08T00:00:00Z",
+    usedAt: null,
+    emailSent: true,
+    certIssued: true,
+    failedAt: null,
+    certVerified: false,
+    openCount: 0,
+    clickCount: 0,
+    ...overrides,
+  })
+
+  it("shows a Delivered chip once Stalwart confirms delivery", async () => {
+    renderPage({ pendingInvites: [sentInvite({ deliveryStatus: "delivered", deliveredAt: "2026-01-01T01:00:00Z" })] })
+    await waitFor(() => expect(screen.getByText("Delivered")).toBeInTheDocument())
+  })
+
+  it("shows a Bounced badge with the SMTP reason on a permanent failure", async () => {
+    renderPage({
+      pendingInvites: [sentInvite({ deliveryStatus: "bounced", deliveryDetail: "550 5.1.1 No such user" })],
+    })
+    await waitFor(() => expect(screen.getByText("Bounced")).toBeInTheDocument())
+    expect(screen.getByText(/550 5\.1\.1 No such user/)).toBeInTheDocument()
+    // Bounced is terminal — it replaces the progress chips, so no "Opened" stage.
+    expect(screen.queryByText("Opened")).not.toBeInTheDocument()
+  })
+
+  it("shows a deferred hint while delivery is still retrying", async () => {
+    renderPage({ pendingInvites: [sentInvite({ deliveryStatus: "deferred" })] })
+    await waitFor(() => expect(screen.getByText(/retrying/i)).toBeInTheDocument())
+  })
+})
