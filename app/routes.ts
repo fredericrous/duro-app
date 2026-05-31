@@ -30,6 +30,8 @@ export default [
   route("auth/logout", "routes/auth.logout.ts"),
   route("health", "routes/health.ts"),
   route("health/ready", "routes/health.ready.ts"),
+  route("e/:openToken", "routes/invite.open.$openToken.ts"),
+  route("c/:token", "routes/invite.click.$token.ts"),
   route("invite/:token", "routes/invite.tsx"),
   route("invite/:token/create-account", "routes/invite-create-account.tsx"),
   route("reinvite/:token", "routes/reinvite.tsx"),
@@ -42,5 +44,6 @@ export default [
   route("api/catalog", "routes/api.catalog.ts"),
   route("api/invitations", "routes/api.invitations.ts"),
   route("api/admin/invites", "routes/api.admin.invites.ts"),
+  route("api/stalwart/delivery", "routes/api.stalwart.delivery.ts"),
   route("api/admin/groups", "routes/api.admin.groups.ts"),
 ] satisfies RouteConfig

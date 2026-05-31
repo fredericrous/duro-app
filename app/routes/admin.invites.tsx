@@ -10,6 +10,7 @@ import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
 import { handleAdminInvitesMutation, parseAdminInvitesMutation } from "~/lib/mutations/admin-invites"
+import { classifyOpenUA } from "~/lib/invite-open-ua"
 import {
   Alert,
   Badge,
@@ -92,12 +93,88 @@ export async function action({ request }: Route.ActionArgs) {
   return await runEffect(handleAdminInvitesMutation(parsed))
 }
 
-function StepBadges({ invite }: { invite: Invite }) {
+function fmtDate(ts: string | null): string | null {
+  return ts ? new Date(ts).toLocaleString() : null
+}
+
+/**
+ * The invite engagement funnel: Sent → Opened → Clicked → Cert installed.
+ *
+ * The last two stages are progressively stronger signals — Opened is noisy
+ * (mail proxies pre-fetch the pixel on delivery), Clicked is a human action,
+ * and Cert installed is ground truth. Pre-send states (processing / failed)
+ * keep their original single-badge treatment.
+ */
+function InviteFunnel({ invite }: { invite: Invite }) {
   const { t } = useTranslation()
+
   if (invite.failedAt) return <Badge variant="error">{t("admin.invites.badge.failed")}</Badge>
-  if (invite.emailSent) return <Badge variant="success">{t("admin.invites.badge.sent")}</Badge>
-  if (invite.certIssued) return <Badge variant="success">{t("admin.invites.badge.certIssued")}</Badge>
-  return <Badge variant="warning">{t("admin.invites.badge.processing")}</Badge>
+  if (!invite.emailSent) {
+    return invite.certIssued ? (
+      <Badge variant="success">{t("admin.invites.badge.certIssued")}</Badge>
+    ) : (
+      <Badge variant="warning">{t("admin.invites.badge.processing")}</Badge>
+    )
+  }
+
+  // Bounced is a terminal SMTP failure — the mail never arrived. Surface it
+  // loudly with the reason instead of the progress chips.
+  if (invite.deliveryStatus === "bounced") {
+    return (
+      <Stack gap="xs">
+        <Inline gap="xs" align="center">
+          <Badge variant="success">{t("admin.invites.funnel.sent")}</Badge>
+          <Badge variant="error">{t("admin.invites.funnel.bounced")}</Badge>
+        </Inline>
+        {invite.deliveryDetail && (
+          <Text variant="bodySm" color="error">
+            {t("admin.invites.funnel.bounceReason", { reason: invite.deliveryDetail })}
+          </Text>
+        )}
+      </Stack>
+    )
+  }
+
+  const openedProxy = invite.openCount > 0 && classifyOpenUA(invite.lastOpenUserAgent) === "proxy"
+  const clickedProxy = invite.clickCount > 0 && classifyOpenUA(invite.lastClickUserAgent) === "proxy"
+
+  const stages: Array<{ key: string; reached: boolean; at: string | null }> = [
+    { key: "sent", reached: true, at: fmtDate(invite.createdAt) },
+    { key: "delivered", reached: invite.deliveryStatus === "delivered", at: fmtDate(invite.deliveredAt) },
+    { key: "opened", reached: invite.openCount > 0, at: fmtDate(invite.firstOpenedAt) },
+    { key: "clicked", reached: invite.clickCount > 0, at: fmtDate(invite.firstClickedAt) },
+    { key: "installed", reached: invite.certVerified, at: fmtDate(invite.certVerifiedAt) },
+  ]
+
+  const reachedWithTime = stages.filter((s) => s.reached && s.at)
+  const latest = reachedWithTime[reachedWithTime.length - 1]
+
+  return (
+    <Stack gap="xs">
+      <Inline gap="xs" align="center">
+        {stages.map((s) => (
+          <Badge key={s.key} variant={s.reached ? "success" : "default"}>
+            {t(`admin.invites.funnel.${s.key}`)}
+          </Badge>
+        ))}
+      </Inline>
+      {latest && (
+        <Text variant="bodySm" color="muted">
+          {t("admin.invites.funnel.last", { stage: t(`admin.invites.funnel.${latest.key}`), date: latest.at })}
+        </Text>
+      )}
+      {invite.deliveryStatus === "deferred" && (
+        <Text variant="bodySm" color="muted">
+          {t("admin.invites.funnel.deferred")}
+        </Text>
+      )}
+      {(openedProxy || clickedProxy) && (
+        <Text variant="bodySm" color="muted">
+          {t("admin.invites.funnel.proxyHint")}
+        </Text>
+      )}
+    </Stack>
+  )
 }
 
 function GetStartedChecklist({
@@ -158,16 +235,22 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
     }
   }, [fetcher.data])
 
-  // Auto-refresh while invites are still processing
+  // Auto-refresh while there's something to watch:
+  //  - invites still processing (cert/email pipeline) → fast 5s cadence
+  //  - invites sent but funnel incomplete (cert not yet installed) → slow 30s
+  //    cadence; opens/clicks/installs aren't time-critical, and we don't want a
+  //    permanent 5s loop on the admin page. Stops once cert is verified.
   useEffect(() => {
-    const hasIncomplete = pendingInvites.some((i) => !i.emailSent)
-    if (!hasIncomplete) return
+    const hasProcessing = pendingInvites.some((i) => !i.emailSent)
+    const hasIncompleteFunnel = pendingInvites.some((i) => i.emailSent && !i.certVerified)
+    if (!hasProcessing && !hasIncompleteFunnel) return
 
+    const delay = hasProcessing ? 5000 : 30000
     const interval = setInterval(() => {
       if (revalidatorRef.current.state === "idle") {
         revalidatorRef.current.revalidate()
       }
-    }, 5000)
+    }, delay)
 
     return () => clearInterval(interval)
   }, [pendingInvites])
@@ -278,7 +361,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
               <Table.Row>
                 <Table.HeaderCell>{t("admin.invites.cols.email")}</Table.HeaderCell>
                 <Table.HeaderCell>{t("admin.invites.cols.groups")}</Table.HeaderCell>
-                <Table.HeaderCell>{t("admin.invites.cols.status")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.invites.cols.progress")}</Table.HeaderCell>
                 <Table.HeaderCell>{t("admin.invites.cols.invitedBy")}</Table.HeaderCell>
                 <Table.HeaderCell>{t("admin.invites.cols.expires")}</Table.HeaderCell>
                 <Table.HeaderCell>{t("admin.invites.cols.actions")}</Table.HeaderCell>
@@ -308,7 +391,7 @@ function PendingInviteRow({ invite }: { invite: Invite }) {
       <Table.Cell>{invite.email}</Table.Cell>
       <Table.Cell>{JSON.parse(invite.groupNames).join(", ")}</Table.Cell>
       <Table.Cell>
-        <StepBadges invite={invite} />
+        <InviteFunnel invite={invite} />
       </Table.Cell>
       <Table.Cell>{invite.invitedBy}</Table.Cell>
       <Table.Cell>{new Date(invite.expiresAt).toLocaleDateString()}</Table.Cell>

@@ -43,7 +43,25 @@ export interface Invite {
   revertPrNumber: number | null
   revertPrMerged: boolean
   locale: string
+  openToken: string | null
+  firstOpenedAt: string | null
+  lastOpenedAt: string | null
+  openCount: number
+  lastOpenUserAgent: string | null
+  firstClickedAt: string | null
+  lastClickedAt: string | null
+  clickCount: number
+  lastClickUserAgent: string | null
+  messageId: string | null
+  deliveryStatus: string | null
+  deliveredAt: string | null
+  bouncedAt: string | null
+  lastDeliveryEventAt: string | null
+  deliveryDetail: string | null
 }
+
+/** SMTP delivery outcome derived from Stalwart's outbound delivery events. */
+export type DeliveryStatus = "delivered" | "deferred" | "bounced"
 
 export interface Revocation {
   id: string
@@ -68,8 +86,17 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
       groupNames: string[]
       invitedBy: string
       locale?: string
-    }) => Effect.Effect<{ id: string; token: string }, InviteError>
+    }) => Effect.Effect<{ id: string; token: string; openToken: string }, InviteError>
     readonly findByTokenHash: (tokenHash: string) => Effect.Effect<Invite | null, InviteError>
+    readonly recordOpen: (openToken: string, userAgent: string | null) => Effect.Effect<void, InviteError>
+    readonly recordClick: (tokenHash: string, userAgent: string | null) => Effect.Effect<void, InviteError>
+    readonly setMessageId: (id: string, messageId: string) => Effect.Effect<void, InviteError>
+    readonly findByMessageId: (messageId: string) => Effect.Effect<Invite | null, InviteError>
+    readonly findLatestByEmail: (email: string) => Effect.Effect<Invite | null, InviteError>
+    readonly recordDelivery: (
+      id: string,
+      input: { status: DeliveryStatus; detail: string | null; at: string },
+    ) => Effect.Effect<void, InviteError>
     readonly consumeByToken: (rawToken: string) => Effect.Effect<Invite, InviteError>
     readonly markUsedBy: (id: string, username: string) => Effect.Effect<void, InviteError>
     readonly findPending: () => Effect.Effect<Invite[], InviteError>
@@ -151,6 +178,21 @@ const InviteRow = Schema.Struct({
   revertPrNumber: Coerced.NullableNumber,
   revertPrMerged: Coerced.Boolean,
   locale: Schema.optionalWith(Schema.String, { default: () => "en" }),
+  openToken: Coerced.NullableString,
+  firstOpenedAt: Coerced.NullableDateString,
+  lastOpenedAt: Coerced.NullableDateString,
+  openCount: Schema.optionalWith(Schema.Number, { default: () => 0 }),
+  lastOpenUserAgent: Coerced.NullableString,
+  firstClickedAt: Coerced.NullableDateString,
+  lastClickedAt: Coerced.NullableDateString,
+  clickCount: Schema.optionalWith(Schema.Number, { default: () => 0 }),
+  lastClickUserAgent: Coerced.NullableString,
+  messageId: Coerced.NullableString,
+  deliveryStatus: Coerced.NullableString,
+  deliveredAt: Coerced.NullableDateString,
+  bouncedAt: Coerced.NullableDateString,
+  lastDeliveryEventAt: Coerced.NullableDateString,
+  deliveryDetail: Coerced.NullableString,
 })
 
 const decodeInviteRow = Schema.decodeUnknownSync(InviteRow)
@@ -202,15 +244,19 @@ export const InviteRepoLive = Layer.effect(
           const id = crypto.randomUUID()
           const token = crypto.randomBytes(32).toString("base64url")
           const tokenHash = hashToken(token)
+          // Dedicated single-purpose token for the email open-tracking pixel.
+          // Never the invite token — that grants account creation and must not
+          // sit in a URL that mail proxies fetch and log.
+          const openToken = crypto.randomBytes(32).toString("base64url")
 
           const locale = input.locale ?? "en"
           yield* withErr(
-            sql`INSERT INTO invites (id, token, token_hash, email, groups, group_names, invited_by, created_at, expires_at, locale)
-                VALUES (${id}, ${token}, ${tokenHash}, ${input.email}, ${JSON.stringify(input.groups)}, ${JSON.stringify(input.groupNames)}, ${input.invitedBy}, ${ts}, ${expires}, ${locale})`,
+            sql`INSERT INTO invites (id, token, token_hash, email, groups, group_names, invited_by, created_at, expires_at, locale, open_token)
+                VALUES (${id}, ${token}, ${tokenHash}, ${input.email}, ${JSON.stringify(input.groups)}, ${JSON.stringify(input.groupNames)}, ${input.invitedBy}, ${ts}, ${expires}, ${locale}, ${openToken})`,
             "Failed to create invite",
           )
 
-          return { id, token }
+          return { id, token, openToken }
         }),
 
       findByTokenHash: (tokenHash) =>
@@ -220,6 +266,79 @@ export const InviteRepoLive = Layer.effect(
           ),
           "Failed to find invite",
         ),
+
+      recordOpen: (openToken, userAgent) => {
+        // Public endpoint: cap the UA so a tracking hit can't bloat the row.
+        const ua = userAgent ? userAgent.slice(0, 512) : null
+        // An unknown token simply matches 0 rows — never signals validity.
+        return withErr(
+          sql`UPDATE invites
+              SET first_opened_at = COALESCE(first_opened_at, ${now()}),
+                  last_opened_at = ${now()},
+                  open_count = open_count + 1,
+                  last_open_user_agent = ${ua}
+              WHERE open_token = ${openToken}`.pipe(Effect.asVoid),
+          "Failed to record invite open",
+        )
+      },
+
+      recordClick: (tokenHash, userAgent) => {
+        // Public endpoint: cap the UA so a tracking hit can't bloat the row.
+        const ua = userAgent ? userAgent.slice(0, 512) : null
+        // Keyed by token_hash — the raw token is already in the CTA URL by
+        // design. An unknown hash matches 0 rows; never signals validity.
+        return withErr(
+          sql`UPDATE invites
+              SET first_clicked_at = COALESCE(first_clicked_at, ${now()}),
+                  last_clicked_at = ${now()},
+                  click_count = click_count + 1,
+                  last_click_user_agent = ${ua}
+              WHERE token_hash = ${tokenHash}`.pipe(Effect.asVoid),
+          "Failed to record invite click",
+        )
+      },
+
+      setMessageId: (id, messageId) =>
+        withErr(
+          sql`UPDATE invites SET message_id = ${messageId} WHERE id = ${id}`.pipe(Effect.asVoid),
+          "Failed to set message id",
+        ),
+
+      findByMessageId: (messageId) =>
+        withErr(
+          sql`SELECT * FROM invites WHERE message_id = ${messageId} ORDER BY created_at DESC LIMIT 1`.pipe(
+            Effect.map((rows) => (rows.length > 0 ? rowToInvite(rows[0]) : null)),
+          ),
+          "Failed to find invite by message id",
+        ),
+
+      findLatestByEmail: (email) =>
+        withErr(
+          sql`SELECT * FROM invites WHERE email = ${email} ORDER BY created_at DESC LIMIT 1`.pipe(
+            Effect.map((rows) => (rows.length > 0 ? rowToInvite(rows[0]) : null)),
+          ),
+          "Failed to find latest invite by email",
+        ),
+
+      recordDelivery: (id, input) => {
+        const detail = input.detail ? input.detail.slice(0, 512) : null
+        // Monotonic: terminal states (delivered/bounced) are not downgraded by a
+        // later 'deferred'. A NULL or 'deferred' status accepts any update; a
+        // terminal status only accepts the same status (idempotent re-event).
+        return withErr(
+          sql`UPDATE invites
+              SET delivery_status = ${input.status},
+                  delivered_at = CASE WHEN ${input.status} = 'delivered' THEN COALESCE(delivered_at, ${input.at}) ELSE delivered_at END,
+                  bounced_at = CASE WHEN ${input.status} = 'bounced' THEN COALESCE(bounced_at, ${input.at}) ELSE bounced_at END,
+                  last_delivery_event_at = ${input.at},
+                  delivery_detail = ${detail}
+              WHERE id = ${id}
+                AND (delivery_status IS NULL OR delivery_status = 'deferred' OR delivery_status = ${input.status})`.pipe(
+            Effect.asVoid,
+          ),
+          "Failed to record delivery",
+        )
+      },
 
       consumeByToken: (rawToken) =>
         Effect.gen(function* () {

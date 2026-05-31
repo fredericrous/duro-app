@@ -64,15 +64,26 @@ export const queueInvite = (input: InviteInput) =>
 
     // Send email inline
     const locale = input.locale ?? "en"
-    yield* emailSvc.sendInviteEmail(input.email, invite.token, input.invitedBy, certResult.p12Buffer, locale).pipe(
-      Effect.tap(() => inviteRepo.markEmailSent(invite.id)),
-      Effect.catchAll((e) =>
-        Effect.gen(function* () {
-          yield* inviteRepo.markFailed(invite.id, e.message)
-          yield* Effect.fail(e)
-        }),
-      ),
-    )
+    yield* emailSvc
+      .sendInviteEmail(
+        input.email,
+        invite.token,
+        input.invitedBy,
+        certResult.p12Buffer,
+        locale,
+        invite.openToken,
+        invite.id,
+      )
+      .pipe(
+        Effect.tap((messageId) => inviteRepo.setMessageId(invite.id, messageId)),
+        Effect.tap(() => inviteRepo.markEmailSent(invite.id)),
+        Effect.catchAll((e) =>
+          Effect.gen(function* () {
+            yield* inviteRepo.markFailed(invite.id, e.message)
+            yield* Effect.fail(e)
+          }),
+        ),
+      )
 
     return {
       success: true as const,

@@ -58,9 +58,15 @@ const mockCertRepo = (certs: Map<string, UserCertificate> = new Map()) =>
 const revocations: Revocation[] = []
 
 const mockInviteRepo = Layer.succeed(InviteRepo, {
-  create: () => Effect.succeed({ id: "inv-1", token: "tok-1" }),
+  create: () => Effect.succeed({ id: "inv-1", token: "tok-1", openToken: "open-1" }),
   findById: () => Effect.succeed(null),
   findByTokenHash: () => Effect.succeed(null),
+  recordOpen: () => Effect.void,
+  recordClick: () => Effect.void,
+  setMessageId: () => Effect.void,
+  findByMessageId: () => Effect.succeed(null),
+  findLatestByEmail: () => Effect.succeed(null),
+  recordDelivery: () => Effect.void,
   consumeByToken: () => Effect.fail(new Error("not found")),
   markUsedBy: () => Effect.void,
   findPending: () => Effect.succeed([]),

@@ -1,5 +1,6 @@
 import { Context, Effect, Data, Layer, Config, Redacted } from "effect"
 import { readFileSync } from "node:fs"
+import * as crypto from "node:crypto"
 import nodemailer from "nodemailer"
 import type SMTPTransport from "nodemailer/lib/smtp-transport"
 import { render } from "@react-email/render"
@@ -22,7 +23,9 @@ export class EmailService extends Context.Tag("EmailService")<
       invitedBy: string,
       p12Buffer: Buffer,
       locale?: string,
-    ) => Effect.Effect<void, EmailError>
+      openToken?: string,
+      inviteId?: string,
+    ) => Effect.Effect<string, EmailError>
     readonly sendCertRenewalEmail: (
       email: string,
       p12Buffer: Buffer,
@@ -32,8 +35,10 @@ export class EmailService extends Context.Tag("EmailService")<
 >() {}
 
 export const EmailServiceDev = Layer.succeed(EmailService, {
-  sendInviteEmail: (email, _token, _invitedBy, _p12Buffer, locale) =>
-    Effect.log(`[DEV] Would send invite email to ${email} (locale=${locale ?? "en"})`),
+  sendInviteEmail: (email, _token, _invitedBy, _p12Buffer, locale, _openToken, inviteId) =>
+    Effect.log(`[DEV] Would send invite email to ${email} (locale=${locale ?? "en"})`).pipe(
+      Effect.as(`<invite-${inviteId ?? "dev"}@${config.allowedOriginSuffix}>`),
+    ),
   sendCertRenewalEmail: (email, _p12Buffer, locale) =>
     Effect.log(`[DEV] Would send cert renewal email to ${email} (locale=${locale ?? "en"})`),
 })
@@ -69,9 +74,20 @@ export const EmailServiceLive = Layer.scoped(
     )
 
     return {
-      sendInviteEmail: (email: string, token: string, invitedBy: string, p12Buffer: Buffer, locale?: string) =>
+      sendInviteEmail: (
+        email: string,
+        token: string,
+        invitedBy: string,
+        p12Buffer: Buffer,
+        locale?: string,
+        openToken?: string,
+        inviteId?: string,
+      ) =>
         Effect.gen(function* () {
           const lng = locale ?? "en"
+          // Deterministic Message-ID so the delivery webhook can correlate the
+          // Stalwart delivery/bounce event straight back to this invite.
+          const messageId = `<invite-${inviteId ?? crypto.randomUUID()}@${config.allowedOriginSuffix}>`
           const i18n = yield* Effect.tryPromise({
             try: () => createI18nInstance(lng),
             catch: (e) => new EmailError({ message: "Failed to create i18n instance", cause: e }),
@@ -80,6 +96,13 @@ export const EmailServiceLive = Layer.scoped(
 
           const inviteUrl = `${config.inviteBaseUrl}/invite/${token}`
           const reinviteUrl = `${config.inviteBaseUrl}/reinvite/${token}`
+          // CTA click-tracking redirector → records the click, then 302s to
+          // inviteUrl. A click is a human action, so a stronger signal than the
+          // open pixel (which proxies pre-fetch on delivery).
+          const clickUrl = `${config.inviteBaseUrl}/c/${token}`
+          // Open-tracking pixel — served from the mTLS-free join host so mail
+          // clients can fetch it. Omitted when no openToken (older invites).
+          const pixelUrl = openToken ? `${config.inviteBaseUrl}/e/${openToken}` : undefined
 
           const html = yield* Effect.tryPromise({
             try: () =>
@@ -90,6 +113,8 @@ export const EmailServiceLive = Layer.scoped(
                   invitedBy,
                   appName: config.appName,
                   appDescription: config.appDescription,
+                  clickUrl,
+                  pixelUrl,
                   t,
                 }),
               ),
@@ -105,6 +130,7 @@ export const EmailServiceLive = Layer.scoped(
               transporter.sendMail({
                 from,
                 to: email,
+                messageId,
                 subject: t("email.invite.subject", { appName: config.appName }),
                 html,
                 attachments: [
@@ -121,6 +147,8 @@ export const EmailServiceLive = Layer.scoped(
                 cause: e,
               }),
           })
+
+          return messageId
         }),
 
       sendCertRenewalEmail: (email: string, p12Buffer: Buffer, locale?: string) =>
