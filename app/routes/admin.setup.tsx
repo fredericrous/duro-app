@@ -54,8 +54,13 @@ export async function action({ request }: Route.ActionArgs) {
     return { ok: false as const, error: result.left.code as SetupErrorCode }
   }
 
+  if (result.right.resent) {
+    return { ok: true as const, resent: true as const, email: result.right.email }
+  }
+
   return {
     ok: true as const,
+    resent: false as const,
     inviteToken: result.right.token,
     email: result.right.email,
   }
@@ -70,6 +75,17 @@ export default function AdminSetupPage({ loaderData }: Route.ComponentProps) {
   const data = fetcher.data
   const succeeded = data?.ok === true
   const errorCode = data?.ok === false ? data.error : undefined
+
+  if (succeeded && data.resent) {
+    return (
+      <CenteredCardPage>
+        <Stack gap="lg">
+          <Heading level={1}>{t("admin.setup.resent.title")}</Heading>
+          <Text as="p">{t("admin.setup.resent.body", { email: data.email })}</Text>
+        </Stack>
+      </CenteredCardPage>
+    )
+  }
 
   if (succeeded) {
     const inviteUrl = `${loaderData.inviteBaseUrl}/invite/${data.inviteToken}`
