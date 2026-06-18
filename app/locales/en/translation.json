@@ -361,6 +361,10 @@
         "urlLabel": "Invite URL",
         "continue": "Continue to invite"
       },
+      "resent": {
+        "title": "Certificate re-sent",
+        "body": "A user for {{email}} already exists, so a fresh mTLS client certificate has been emailed to them. The existing admin account was kept as-is."
+      },
       "error": {
         "no_token": "No bootstrap token was found in Vault. Make sure your operator placed one at secret/data/duro/bootstrap-token before opening this page.",
         "vault_unreachable": "Could not reach Vault. Check VAULT_ADDR and the deployment's Kubernetes service account configuration.",

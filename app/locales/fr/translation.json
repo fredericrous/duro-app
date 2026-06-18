@@ -361,6 +361,10 @@
         "urlLabel": "URL d'invitation",
         "continue": "Continuer vers l'invitation"
       },
+      "resent": {
+        "title": "Certificat renvoye",
+        "body": "Un utilisateur pour {{email}} existe deja : un nouveau certificat client mTLS lui a donc ete envoye par e-mail. Le compte administrateur existant a ete conserve tel quel."
+      },
       "error": {
         "no_token": "Aucun jeton d'amorcage trouve dans Vault. Verifiez que votre operateur a place un jeton dans secret/data/duro/bootstrap-token avant d'ouvrir cette page.",
         "vault_unreachable": "Vault est injoignable. Verifiez VAULT_ADDR et la configuration du compte de service Kubernetes du deploiement.",

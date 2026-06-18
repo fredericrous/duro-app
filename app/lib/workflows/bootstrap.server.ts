@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { config } from "~/lib/config.server"
-import { queueInvite, revokeInvite } from "~/lib/workflows/invite.server"
+import { queueInvite, revokeInvite, resendCert } from "~/lib/workflows/invite.server"
 
 // ---------------------------------------------------------------------------
 // Error type — string codes are the contract surfaced to the UI/i18n layer
@@ -129,6 +129,30 @@ export const createAdminInvite = (email: string) =>
     const userMgr = yield* UserManager
     const inviteRepo = yield* InviteRepo
 
+    // If the email already maps to an existing LLDAP user, this is a
+    // re-bootstrap rather than first-time onboarding. Don't try to create a
+    // duplicate user (which is what the invite-accept flow does) — instead
+    // issue a fresh mTLS client cert and email it via the cert-renewal flow,
+    // leaving the existing account untouched.
+    const existingUsers = yield* userMgr.getUsers.pipe(
+      Effect.mapError((e) => new BootstrapError({ code: "vault_unreachable", message: "LLDAP unreachable", cause: e })),
+    )
+    const taken = existingUsers.find((u) => u.email.toLowerCase() === cleanEmail.toLowerCase())
+    if (taken) {
+      yield* Effect.logInfo(`bootstrap: ${cleanEmail} already exists (user: ${taken.id}); re-sending mTLS cert`)
+      yield* resendCert(cleanEmail, taken.id).pipe(
+        Effect.mapError(
+          (e) =>
+            new BootstrapError({
+              code: "queue_failed",
+              message: e instanceof Error ? e.message : "resendCert failed",
+              cause: e,
+            }),
+        ),
+      )
+      return { email: cleanEmail, resent: true as const }
+    }
+
     const groups = yield* userMgr.getGroups.pipe(
       Effect.mapError((e) => new BootstrapError({ code: "vault_unreachable", message: "LLDAP unreachable", cause: e })),
     )
@@ -137,17 +161,6 @@ export const createAdminInvite = (email: string) =>
       return yield* new BootstrapError({
         code: "admin_group_missing",
         message: `Admin group '${config.adminGroupName}' not found in LLDAP`,
-      })
-    }
-
-    const existingUsers = yield* userMgr.getUsers.pipe(
-      Effect.mapError((e) => new BootstrapError({ code: "vault_unreachable", message: "LLDAP unreachable", cause: e })),
-    )
-    const taken = existingUsers.find((u) => u.email.toLowerCase() === cleanEmail.toLowerCase())
-    if (taken) {
-      return yield* new BootstrapError({
-        code: "email_in_use",
-        message: `email '${cleanEmail}' already exists in LLDAP (user: ${taken.id})`,
       })
     }
 
@@ -176,7 +189,7 @@ export const createAdminInvite = (email: string) =>
       ),
     )
 
-    return { token: result.token, email: cleanEmail }
+    return { token: result.token, email: cleanEmail, resent: false as const }
   })
 
 // ---------------------------------------------------------------------------

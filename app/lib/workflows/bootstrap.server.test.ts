@@ -12,6 +12,7 @@ import { UserManager } from "~/lib/services/UserManager.server"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { EmailService, EmailError } from "~/lib/services/EmailService.server"
+import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 
 // ---------------------------------------------------------------------------
 // Lightweight mocks (mirroring invite.server.test.ts)
@@ -223,6 +224,15 @@ const mockCertificateRepo = () =>
     updateUsername: () => Effect.void,
   })
 
+const mockPreferencesRepo = () =>
+  Layer.succeed(PreferencesRepo, {
+    getLocale: () => Effect.succeed("en"),
+    setLocale: () => Effect.void,
+    getLastCertRenewal: () => Effect.succeed({ at: null, renewalId: null }),
+    setCertRenewal: () => Effect.void,
+    clearCertRenewalId: () => Effect.void,
+  })
+
 const mockEmailService = (sendShouldFail = false) =>
   Layer.succeed(EmailService, {
     sendInviteEmail: () =>
@@ -242,6 +252,7 @@ const allLayers = (store: Map<string, Invite>, opts: AllLayersOpts = {}) =>
     mockCertManager(),
     mockCertificateRepo(),
     mockEmailService(opts.sendShouldFail),
+    mockPreferencesRepo(),
   )
 
 // ---------------------------------------------------------------------------
@@ -369,7 +380,7 @@ describe("submitBootstrapInviteAuto", () => {
     )
   })
 
-  it.effect("email already in LLDAP: returns email_in_use, Vault token NOT deleted", () => {
+  it.effect("email already in LLDAP: re-sends mTLS cert, deletes Vault token, creates no invite", () => {
     __resetMutexForTests()
     const store = new Map<string, Invite>()
     const vault = makeFakeVault({ token: "vault-token", expires_at: Date.now() + 60_000 })
@@ -378,11 +389,15 @@ describe("submitBootstrapInviteAuto", () => {
       { email: "alice@example.com" },
       { vaultAddr: VAULT_ADDR, fetchImpl: vault.fetchImpl, readSaToken: vault.readSaToken },
     ).pipe(
-      Effect.flip,
-      Effect.tap((err) =>
+      Effect.tap((result) =>
         Effect.sync(() => {
-          expect(err.code).toBe("email_in_use")
-          expect(vault.state.deleteCalls).toBe(0)
+          expect(result.email).toBe("alice@example.com")
+          expect(result.resent).toBe(true)
+          // No new invite row — the existing account is kept as-is.
+          expect(store.size).toBe(0)
+          // Re-send succeeded, so the one-time Vault token is consumed.
+          expect(vault.state.deleteCalls).toBe(1)
+          expect(vault.state.secret).toBeNull()
         }),
       ),
       Effect.provide(

@@ -38,5 +38,9 @@ export async function action({ request }: Route.ActionArgs) {
     return Response.json({ error: err.message ?? err.code }, { status })
   }
 
-  return Response.json({ success: true, message: `Invite sent to ${result.right.email}` })
+  const { email: inviteEmail, resent } = result.right
+  return Response.json({
+    success: true,
+    message: resent ? `mTLS certificate re-sent to ${inviteEmail}` : `Invite sent to ${inviteEmail}`,
+  })
 }
