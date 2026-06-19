@@ -13,6 +13,10 @@ export default defineConfig({
     include: ["app/**/*.test.{ts,tsx}"],
     css: { modules: { classNameStrategy: "non-scoped" } },
     hookTimeout: 30000,
+    // Above setup.ts's `asyncUtilTimeout: 5000` so a stalled `waitFor`/`findBy`
+    // surfaces Testing Library's descriptive timeout error instead of a bare
+    // vitest test-timeout (the 5000ms default would race the async-util cap).
+    testTimeout: 15000,
     // Focused coverage scope. Infrastructure entrypoints (worker, api/auth/
     // health routes, migrations, i18n bootstrap) are excluded because they're
     // either integration-tested through other paths or contain no logic worth
