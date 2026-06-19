@@ -47,7 +47,7 @@ function handleIssueCert(auth: AuthInfo) {
       }
     }
 
-    const result = yield* resendCert(auth.email, auth.user!, true)
+    const result = yield* resendCert(auth.email, auth.user!)
 
     const cert = yield* CertManager
     const p12Password = yield* cert.getP12Password(result.renewalId).pipe(Effect.catchAll(() => Effect.succeed(null)))

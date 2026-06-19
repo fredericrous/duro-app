@@ -9,6 +9,7 @@ import { UserManagerDev } from "./UserManager.server"
 import { InviteRepoLive } from "./InviteRepo.server"
 import { PreferencesRepoLive } from "./PreferencesRepo.server"
 import { CertificateRepoLive } from "./CertificateRepo.server"
+import { CertRevealRepoLive } from "./CertRevealRepo.server"
 import { DbLive, DbDevLive } from "~/lib/db/client.server"
 import { OtelLayer } from "~/lib/telemetry.server"
 
@@ -72,6 +73,7 @@ export const AppLayer = Layer.mergeAll(
   InviteRepoLive,
   PreferencesRepoLive,
   CertificateRepoLive,
+  CertRevealRepoLive,
   // Governance services
   ApplicationRepoLive,
   GovernanceRepos,

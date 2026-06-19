@@ -11,6 +11,7 @@ import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
+import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 import { EmailService, EmailError } from "~/lib/services/EmailService.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 
@@ -240,6 +241,13 @@ const mockEmailService = (sendShouldFail = false) =>
     sendCertRenewalEmail: () => Effect.void,
   })
 
+const mockCertRevealRepo = () =>
+  Layer.succeed(CertRevealRepo, {
+    create: () => Effect.succeed({ id: "reveal-test", token: "reveal-token-test" }),
+    findByTokenHash: () => Effect.succeed(null),
+    markRevealed: () => Effect.void,
+  })
+
 type AllLayersOpts = {
   sendShouldFail?: boolean
   users?: { id: string; email: string; displayName: string; creationDate: string }[]
@@ -253,6 +261,7 @@ const allLayers = (store: Map<string, Invite>, opts: AllLayersOpts = {}) =>
     mockCertificateRepo(),
     mockEmailService(opts.sendShouldFail),
     mockPreferencesRepo(),
+    mockCertRevealRepo(),
   )
 
 // ---------------------------------------------------------------------------

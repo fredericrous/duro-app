@@ -661,6 +661,10 @@
       "preview": "Votre nouveau certificat {{appName}}",
       "heading": "Nouveau certificat",
       "body": "Un nouveau certificat de securite pour {{appName}} a ete emis. Il est joint a cet e-mail sous le nom <strong>certificate.p12</strong>.",
+      "reveal": {
+        "body": "Pour l'installer, il vous faut son mot de passe a usage unique. Revelez-le sur la page securisee ci-dessous — le lien fonctionne une seule fois et expire dans 24 heures.",
+        "cta": "Reveler le mot de passe du certificat"
+      },
       "install": {
         "title": "Installez votre nouveau certificat",
         "body": "Veuillez installer ce certificat pour continuer a acceder aux services de {{appName}}. Vous devrez peut-etre supprimer l'ancien certificat au prealable.",
@@ -668,6 +672,17 @@
         "windows": "<strong>Windows :</strong> Double-cliquez sur le fichier .p12, suivez l'assistant d'importation de certificat et entrez le mot de passe lorsqu'il est demande. Vous pouvez supprimer l'ancien certificat depuis le Gestionnaire de certificats."
       },
       "footer": "Votre compte et vos acces restent inchanges — seul le certificat a ete mis a jour. Si vous n'attendiez pas cela, veuillez contacter votre administrateur."
+    }
+  },
+  "certReveal": {
+    "title": "Le mot de passe de votre certificat",
+    "subtitle": "Grattez ci-dessous pour reveler le mot de passe a usage unique du certificat envoye a <strong>{{email}}</strong>. Vous en aurez besoin pour installer <strong>certificate.p12</strong> depuis votre e-mail.",
+    "error": {
+      "title": "Impossible de reveler le mot de passe",
+      "invalid": "Ce lien de revelation est invalide ou introuvable.",
+      "expired": "Ce lien de revelation a expire. Demandez un nouveau certificat pour obtenir un nouveau lien.",
+      "consumed": "Ce mot de passe a deja ete revele. Demandez un nouveau certificat si vous en avez encore besoin.",
+      "unknown": "Une erreur s'est produite. Reessayez ou demandez un nouveau certificat."
     }
   }
 }

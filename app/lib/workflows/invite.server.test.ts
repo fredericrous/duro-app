@@ -9,6 +9,7 @@ import { CertManager } from "~/lib/services/CertManager.server"
 import { EmailService, EmailError } from "~/lib/services/EmailService.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
+import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 
 // --- Mock helpers ---
 
@@ -346,8 +347,8 @@ const mockEmailService = (calls: { method: string; args: unknown[] }[] = []) =>
       calls.push({ method: "sendInviteEmail", args: [email, token, invitedBy, p12Buffer, locale] })
       return Effect.succeed(`<invite-${inviteId ?? "x"}@test>`)
     },
-    sendCertRenewalEmail: (email, p12Buffer, locale) => {
-      calls.push({ method: "sendCertRenewalEmail", args: [email, p12Buffer, locale] })
+    sendCertRenewalEmail: (email, p12Buffer, locale, revealToken) => {
+      calls.push({ method: "sendCertRenewalEmail", args: [email, p12Buffer, locale, revealToken] })
       return Effect.void
     },
   })
@@ -359,6 +360,22 @@ const mockPreferencesRepo = () =>
     getLastCertRenewal: () => Effect.succeed({ at: null, renewalId: null }),
     setCertRenewal: () => Effect.void,
     clearCertRenewalId: () => Effect.void,
+  })
+
+const mockCertRevealRepo = (calls: { method: string; args: unknown[] }[] = []) =>
+  Layer.succeed(CertRevealRepo, {
+    create: (...args) => {
+      calls.push({ method: "create", args })
+      return Effect.succeed({ id: "reveal-id", token: "reveal-tok" })
+    },
+    findByTokenHash: (...args) => {
+      calls.push({ method: "findByTokenHash", args })
+      return Effect.succeed(null)
+    },
+    markRevealed: (...args) => {
+      calls.push({ method: "markRevealed", args })
+      return Effect.void
+    },
   })
 
 // --- Tests ---
@@ -608,9 +625,10 @@ describe("revokeUser", () => {
 })
 
 describe("resendCert", () => {
-  it.effect("issues a fresh cert and sends renewal email", () => {
+  it.effect("issues a fresh cert, mints a reveal token, and emails the reveal link", () => {
     const certCalls: { method: string; args: unknown[] }[] = []
     const emailCalls: { method: string; args: unknown[] }[] = []
+    const revealCalls: { method: string; args: unknown[] }[] = []
 
     return resendCert("alice@example.com", "alice").pipe(
       Effect.tap((result) =>
@@ -623,13 +641,24 @@ describe("resendCert", () => {
           expect(issueCall).toBeDefined()
           expect(issueCall!.args[0]).toBe("alice@example.com")
 
-          // Renewal email sent
-          expect(
-            emailCalls.find((c) => c.method === "sendCertRenewalEmail" && c.args[0] === "alice@example.com"),
-          ).toBeDefined()
+          // A single-use reveal token was minted for this renewal
+          const createCall = revealCalls.find((c) => c.method === "create")
+          expect(createCall).toBeDefined()
+          const createArg = createCall!.args[0] as { renewalId: string; email: string; username: string }
+          expect(createArg.email).toBe("alice@example.com")
+          expect(createArg.username).toBe("alice")
+          // renewalId is the same id the cert/P12 password is keyed under
+          expect(createArg.renewalId).toBe(issueCall!.args[1])
 
-          // Temp secret cleaned up
-          expect(certCalls.find((c) => c.method === "deleteP12Secret")).toBeDefined()
+          // Renewal email sent WITH the reveal token (4th arg)
+          const emailCall = emailCalls.find(
+            (c) => c.method === "sendCertRenewalEmail" && c.args[0] === "alice@example.com",
+          )
+          expect(emailCall).toBeDefined()
+          expect(emailCall!.args[3]).toBe("reveal-tok")
+
+          // P12 secret is NOT deleted — it must survive for the reveal page
+          expect(certCalls.find((c) => c.method === "deleteP12Secret")).toBeUndefined()
         }),
       ),
       Effect.provide(
@@ -638,6 +667,7 @@ describe("resendCert", () => {
           mockEmailService(emailCalls),
           mockPreferencesRepo(),
           mockCertificateRepo(),
+          mockCertRevealRepo(revealCalls),
         ),
       ),
     )

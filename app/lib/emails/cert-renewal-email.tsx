@@ -1,15 +1,17 @@
 "use no memo"
 
-import { Body, Container, Head, Heading, Html, Preview, Section, Text, Hr } from "@react-email/components"
+import { Body, Button, Container, Head, Heading, Html, Preview, Section, Text, Hr } from "@react-email/components"
 import { Trans } from "react-i18next/TransWithoutContext"
 import type { TFunction } from "i18next"
 
 interface CertRenewalEmailProps {
   appName: string
   t: TFunction
+  /** Scratch-card reveal link for the P12 password. Omitted only for legacy/dev paths. */
+  revealUrl?: string
 }
 
-export function CertRenewalEmail({ appName, t }: CertRenewalEmailProps) {
+export function CertRenewalEmail({ appName, t, revealUrl }: CertRenewalEmailProps) {
   return (
     <Html>
       <Head />
@@ -21,6 +23,15 @@ export function CertRenewalEmail({ appName, t }: CertRenewalEmailProps) {
           <Text style={text}>
             <Trans t={t} i18nKey="email.renewal.body" values={{ appName }} components={{ strong: <strong /> }} />
           </Text>
+
+          {revealUrl ? (
+            <Section style={buttonContainer}>
+              <Text style={text}>{t("email.renewal.reveal.body")}</Text>
+              <Button style={button} href={revealUrl}>
+                {t("email.renewal.reveal.cta")}
+              </Button>
+            </Section>
+          ) : null}
 
           <Hr style={hr} />
 
@@ -92,6 +103,22 @@ const textSmall = {
 
 const section = {
   margin: "24px 0",
+}
+
+const buttonContainer = {
+  textAlign: "center" as const,
+  margin: "24px 0",
+}
+
+const button = {
+  backgroundColor: "#3b82f6",
+  borderRadius: "8px",
+  color: "#fff",
+  display: "inline-block",
+  fontSize: "14px",
+  fontWeight: "600" as const,
+  padding: "12px 32px",
+  textDecoration: "none",
 }
 
 const hr = {

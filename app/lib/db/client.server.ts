@@ -24,6 +24,7 @@ import m0017 from "./migrations/pg/0017_add_api_key_preview"
 import m0018 from "./migrations/pg/0018_add_invite_open_tracking"
 import m0019 from "./migrations/pg/0019_add_invite_click_tracking"
 import m0020 from "./migrations/pg/0020_add_invite_delivery_tracking"
+import m0021 from "./migrations/pg/0021_add_cert_reveal_tokens"
 
 const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
@@ -86,6 +87,7 @@ const migrations: Array<
   [18, "add_invite_open_tracking", m0018],
   [19, "add_invite_click_tracking", m0019],
   [20, "add_invite_delivery_tracking", m0020],
+  [21, "add_cert_reveal_tokens", m0021],
 ]
 
 const runMigrations = Effect.gen(function* () {

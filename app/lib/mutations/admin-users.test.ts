@@ -8,6 +8,7 @@ import { CertManager } from "~/lib/services/CertManager.server"
 import { EmailService } from "~/lib/services/EmailService.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepo, type UserCertificate } from "~/lib/services/CertificateRepo.server"
+import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 
 // --- Minimal mock layers ---
 
@@ -131,6 +132,12 @@ const mockPreferencesRepo = Layer.succeed(PreferencesRepo, {
   clearCertRenewalId: () => Effect.void,
 } as any)
 
+const mockCertRevealRepo = Layer.succeed(CertRevealRepo, {
+  create: () => Effect.succeed({ id: "reveal-id", token: "reveal-tok" }),
+  findByTokenHash: () => Effect.succeed(null),
+  markRevealed: () => Effect.void,
+})
+
 const TestLayer = Layer.mergeAll(
   mockCertManager,
   mockCertRepo(),
@@ -138,6 +145,7 @@ const TestLayer = Layer.mergeAll(
   mockUserManager,
   mockEmailService,
   mockPreferencesRepo,
+  mockCertRevealRepo,
 )
 
 // --- Parser tests ---
@@ -248,6 +256,7 @@ describe("handleAdminUsersMutation", () => {
       mockUserManager,
       mockEmailService,
       mockPreferencesRepo,
+      mockCertRevealRepo,
     )
 
     const mutation: AdminUsersMutation = { intent: "revokeCert", serialNumber: "sn-1" }
@@ -323,6 +332,7 @@ describe("handleAdminUsersMutation", () => {
       mockUserManager,
       mockEmailService,
       mockPreferencesRepo,
+      mockCertRevealRepo,
     )
 
     const mutation: AdminUsersMutation = { intent: "revokeCertsBatch", serialNumbers: ["sn-1", "sn-2"] }
@@ -366,6 +376,7 @@ describe("handleAdminUsersMutation", () => {
       mockUserManager,
       mockEmailService,
       mockPreferencesRepo,
+      mockCertRevealRepo,
     )
 
     const mutation: AdminUsersMutation = { intent: "revokeCertsBatch", serialNumbers: ["sn-1", "sn-2"] }
@@ -409,6 +420,7 @@ describe("handleAdminUsersMutation", () => {
       mockUserManager,
       mockEmailService,
       mockPreferencesRepo,
+      mockCertRevealRepo,
     )
 
     const mutation: AdminUsersMutation = { intent: "revokeAllCertsBatch", usernames: ["alice", "bob"] }
@@ -463,6 +475,7 @@ describe("handleAdminUsersMutation", () => {
       mockUserManager,
       mockEmailService,
       mockPreferencesRepo,
+      mockCertRevealRepo,
     )
 
     const result = await Effect.runPromise(
@@ -497,6 +510,7 @@ describe("handleAdminUsersMutation", () => {
       mockUserManager,
       mockEmailService,
       mockPreferencesRepo,
+      mockCertRevealRepo,
     )
 
     const result = await Effect.runPromise(

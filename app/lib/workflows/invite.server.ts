@@ -6,6 +6,7 @@ import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { EmailService } from "~/lib/services/EmailService.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
+import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 
 export interface InviteInput {
   email: string
@@ -264,17 +265,23 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
 
 // --- Re-send Cert for Existing User ---
 
-export const resendCert = (email: string, username: string, keepSecret = false) =>
+/** How long an emailed cert-reveal link stays valid. */
+const REVEAL_TTL_MS = 24 * 60 * 60 * 1000
+
+export const resendCert = (email: string, username: string) =>
   Effect.gen(function* () {
     const cert = yield* CertManager
     const emailService = yield* EmailService
     const prefs = yield* PreferencesRepo
     const certRepo = yield* CertificateRepo
+    const revealRepo = yield* CertRevealRepo
 
     const tempId = crypto.randomUUID()
     const locale = yield* prefs.getLocale(username)
 
-    // Issue fresh cert
+    // Issue fresh cert. The P12 password is stored in Vault keyed by tempId and
+    // is NOT deleted here — it must survive until the recipient reveals it via
+    // the emailed scratch-card link (or the settings page consumes it).
     const certResult = yield* cert.issueCertAndP12(email, tempId)
 
     // Track the certificate
@@ -290,17 +297,18 @@ export const resendCert = (email: string, username: string, keepSecret = false) 
       })
       .pipe(Effect.catchAll((e) => Effect.logWarning("resendCert: failed to store cert record", { error: String(e) })))
 
-    // Send renewal email
-    yield* emailService.sendCertRenewalEmail(email, certResult.p12Buffer, locale)
+    // Mint a single-use, short-lived reveal link for the renewal email. The
+    // renewal email carries the P12 file but not the password — the recipient
+    // scratches it open at /cert/:token (mirrors onboarding's /invite reveal).
+    const reveal = yield* revealRepo.create({
+      renewalId: tempId,
+      email,
+      username,
+      expiresAt: new Date(Date.now() + REVEAL_TTL_MS),
+    })
 
-    // Clean up temp secret unless caller needs it for password reveal
-    if (!keepSecret) {
-      yield* cert
-        .deleteP12Secret(tempId)
-        .pipe(
-          Effect.catchAll((e) => Effect.logWarning("resendCert: failed to clean up temp secret", { error: String(e) })),
-        )
-    }
+    // Send renewal email with the reveal link
+    yield* emailService.sendCertRenewalEmail(email, certResult.p12Buffer, locale, reveal.token)
 
     return { success: true as const, message: `Certificate sent to ${email}`, renewalId: tempId }
   }).pipe(Effect.withSpan("resendCert", { attributes: { email, username } }))

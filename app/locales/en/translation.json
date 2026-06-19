@@ -661,6 +661,10 @@
       "preview": "Your new {{appName}} certificate",
       "heading": "New Certificate",
       "body": "A new security certificate for {{appName}} has been issued. It is attached to this email as <strong>certificate.p12</strong>.",
+      "reveal": {
+        "body": "To install it you'll need its one-time password. Reveal it on the secure page below — the link works once and expires in 24 hours.",
+        "cta": "Reveal certificate password"
+      },
       "install": {
         "title": "Install Your New Certificate",
         "body": "Please install this certificate to continue accessing {{appName}} services. You may need to remove the old certificate first.",
@@ -668,6 +672,17 @@
         "windows": "<strong>Windows:</strong> Double-click the .p12 file, follow the Certificate Import Wizard, and enter the password when prompted. You can remove the old certificate from the Certificate Manager."
       },
       "footer": "Your account and access remain unchanged — only the certificate has been updated. If you didn't expect this, please contact your administrator."
+    }
+  },
+  "certReveal": {
+    "title": "Your certificate password",
+    "subtitle": "Scratch below to reveal the one-time password for the certificate sent to <strong>{{email}}</strong>. You'll need it to install <strong>certificate.p12</strong> from your email.",
+    "error": {
+      "title": "Cannot reveal password",
+      "invalid": "This reveal link is invalid or could not be found.",
+      "expired": "This reveal link has expired. Request a new certificate to get a fresh link.",
+      "consumed": "This password has already been revealed. Request a new certificate if you still need one.",
+      "unknown": "Something went wrong. Please try again or request a new certificate."
     }
   }
 }

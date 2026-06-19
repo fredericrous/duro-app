@@ -30,6 +30,7 @@ export class EmailService extends Context.Tag("EmailService")<
       email: string,
       p12Buffer: Buffer,
       locale?: string,
+      revealToken?: string,
     ) => Effect.Effect<void, EmailError>
   }
 >() {}
@@ -39,7 +40,7 @@ export const EmailServiceDev = Layer.succeed(EmailService, {
     Effect.log(`[DEV] Would send invite email to ${email} (locale=${locale ?? "en"})`).pipe(
       Effect.as(`<invite-${inviteId ?? "dev"}@${config.allowedOriginSuffix}>`),
     ),
-  sendCertRenewalEmail: (email, _p12Buffer, locale) =>
+  sendCertRenewalEmail: (email, _p12Buffer, locale, _revealToken) =>
     Effect.log(`[DEV] Would send cert renewal email to ${email} (locale=${locale ?? "en"})`),
 })
 
@@ -151,7 +152,7 @@ export const EmailServiceLive = Layer.scoped(
           return messageId
         }),
 
-      sendCertRenewalEmail: (email: string, p12Buffer: Buffer, locale?: string) =>
+      sendCertRenewalEmail: (email: string, p12Buffer: Buffer, locale?: string, revealToken?: string) =>
         Effect.gen(function* () {
           const lng = locale ?? "en"
           const i18n = yield* Effect.tryPromise({
@@ -160,8 +161,10 @@ export const EmailServiceLive = Layer.scoped(
           })
           const t = i18n.getFixedT(lng)
 
+          const revealUrl = revealToken ? `${config.inviteBaseUrl}/cert/${revealToken}` : undefined
+
           const html = yield* Effect.tryPromise({
-            try: () => render(CertRenewalEmail({ appName: config.appName, t })),
+            try: () => render(CertRenewalEmail({ appName: config.appName, t, revealUrl })),
             catch: (e) =>
               new EmailError({
                 message: "Failed to render cert renewal email template",
