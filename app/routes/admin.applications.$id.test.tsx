@@ -518,6 +518,30 @@ const setValue = (el: HTMLElement, value: string) => {
   fireEvent.change(el, { target: { value } })
 }
 
+/**
+ * Open a create-dialog robustly.
+ *
+ * The trigger flips page-local state — `onClick={() => setXDialogOpen(true)}`,
+ * an idempotent set-to-true, not a Radix toggle. A single cached-node
+ * `fireEvent.click` is flaky under parallel load: a re-render between the
+ * `findByRole` query and the click (effects syncing searchParams / fetcher
+ * state) detaches the captured button node, so the click lands on a stale
+ * element and the dialog never opens — surfacing later as "unable to find the
+ * heading". Re-query + re-click each poll until the heading appears; the
+ * idempotent open makes repeated clicks harmless, and a fresh query always
+ * targets the live node.
+ */
+const openCreateDialog = async (triggerName: RegExp, headingName: RegExp) => {
+  await screen.findByRole("button", { name: triggerName }, { timeout: 5_000 })
+  await waitFor(
+    () => {
+      fireEvent.click(screen.getByRole("button", { name: triggerName }))
+      expect(screen.getByRole("heading", { name: headingName })).toBeInTheDocument()
+    },
+    { timeout: 5_000 },
+  )
+}
+
 const renderWithAction = (
   data: ReturnType<typeof baseLoaderData>,
   capture: CapturedAction,
@@ -556,15 +580,9 @@ describe("AdminApplicationDetailPage dialog round-trips", () => {
     const capture: CapturedAction = { intent: null, fields: {} }
     renderWithAction(baseLoaderData(), capture, "/admin/applications/app-1?tab=roles")
 
-    // The top-right "Add Role" button (not the empty-state CTA, which only
-    // shows when roles is empty).
-    const addRoleButton = await screen.findByRole("button", { name: /add role/i }, { timeout: 5_000 })
-    fireEvent.click(addRoleButton)
-
-    // Gate on the dialog HEADING being visible before hunting for inputs —
-    // role-based selectors inside the dialog tree are more robust than
-    // placeholder string lookups against the polling clock.
-    await screen.findByRole("heading", { name: /create role/i }, { timeout: 5_000 })
+    // Opens the top-right "Add Role" dialog (baseLoaderData seeds roles, so
+    // the empty-state CTA — which would create button ambiguity — is absent).
+    await openCreateDialog(/add role/i, /create role/i)
 
     setValue(screen.getByPlaceholderText("admin"), "editor")
     setValue(screen.getByPlaceholderText("Administrator"), "Editor Role")
@@ -589,10 +607,7 @@ describe("AdminApplicationDetailPage dialog round-trips", () => {
     const capture: CapturedAction = { intent: null, fields: {} }
     renderWithAction(baseLoaderData(), capture, "/admin/applications/app-1?tab=entitlements")
 
-    const addButton = await screen.findByRole("button", { name: /add entitlement/i }, { timeout: 5_000 })
-    fireEvent.click(addButton)
-
-    await screen.findByRole("heading", { name: /create entitlement/i }, { timeout: 5_000 })
+    await openCreateDialog(/add entitlement/i, /create entitlement/i)
 
     setValue(screen.getByPlaceholderText("read"), "download")
     setValue(screen.getByPlaceholderText("Read Access"), "Download access")
@@ -631,10 +646,7 @@ describe("AdminApplicationDetailPage dialog round-trips", () => {
       "/admin/applications/app-1?tab=resources",
     )
 
-    const addButton = await screen.findByRole("button", { name: /add resource/i }, { timeout: 5_000 })
-    fireEvent.click(addButton)
-
-    await screen.findByRole("heading", { name: /create resource/i }, { timeout: 5_000 })
+    await openCreateDialog(/add resource/i, /create resource/i)
 
     setValue(screen.getByPlaceholderText("folder"), "library")
     setValue(screen.getByPlaceholderText("Documents"), "Library Folder")
