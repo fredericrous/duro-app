@@ -48,7 +48,7 @@ describe("EmailService (Dev)", () => {
     await rt.runPromise(
       Effect.gen(function* () {
         const e = yield* EmailService
-        yield* e.sendCertRenewalEmail("alice@example.com", Buffer.from(""), "fr")
+        yield* e.sendCertRenewalEmail("alice@example.com", "fr", "reveal-tok")
       }),
     )
   })

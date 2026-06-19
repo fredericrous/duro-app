@@ -14,6 +14,8 @@ export class CertManager extends Context.Tag("CertManager")<
       inviteId: string,
     ) => Effect.Effect<{ p12Buffer: Buffer; password: string; serialNumber: string; notAfter: Date }, CertManagerError>
     readonly getP12Password: (inviteId: string) => Effect.Effect<string | null, CertManagerError>
+    /** Read the stored P12 bundle (for the reveal-page download). Null if absent. */
+    readonly getP12: (inviteId: string) => Effect.Effect<Buffer | null, CertManagerError>
     readonly consumeP12Password: (inviteId: string) => Effect.Effect<string | null, CertManagerError>
     readonly deleteP12Secret: (inviteId: string) => Effect.Effect<void, CertManagerError>
     readonly checkCertProcessed: (username: string) => Effect.Effect<boolean, CertManagerError>
@@ -26,7 +28,7 @@ export class CertManager extends Context.Tag("CertManager")<
 // Dev fake — in-memory cert store, no Vault needed
 // ---------------------------------------------------------------------------
 
-const devCertStore = new Map<string, { password: string; serialNumber: string; email: string }>()
+const devCertStore = new Map<string, { password: string; serialNumber: string; email: string; p12: Buffer }>()
 const devRevokedSerials = new Set<string>()
 
 export const CertManagerDev = Layer.succeed(CertManager, {
@@ -34,9 +36,10 @@ export const CertManagerDev = Layer.succeed(CertManager, {
     const serialNumber = crypto.randomBytes(8).toString("hex").match(/.{2}/g)!.join(":")
     const password = crypto.randomBytes(12).toString("base64url")
     const notAfter = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
-    devCertStore.set(inviteId, { password, serialNumber, email })
+    const p12Buffer = Buffer.from("fake-p12-dev")
+    devCertStore.set(inviteId, { password, serialNumber, email, p12: p12Buffer })
     return Effect.succeed({
-      p12Buffer: Buffer.from("fake-p12-dev"),
+      p12Buffer,
       password,
       serialNumber,
       notAfter,
@@ -44,6 +47,8 @@ export const CertManagerDev = Layer.succeed(CertManager, {
   },
 
   getP12Password: (inviteId) => Effect.succeed(devCertStore.get(inviteId)?.password ?? null),
+
+  getP12: (inviteId) => Effect.succeed(devCertStore.get(inviteId)?.p12 ?? null),
 
   consumeP12Password: (inviteId) => Effect.succeed(devCertStore.get(inviteId)?.password ?? null),
 

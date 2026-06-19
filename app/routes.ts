@@ -36,6 +36,7 @@ export default [
   route("invite/:token/create-account", "routes/invite-create-account.tsx"),
   route("reinvite/:token", "routes/reinvite.tsx"),
   route("cert/:revealToken", "routes/cert.$revealToken.tsx"),
+  route("cert/:revealToken/download", "routes/cert.$revealToken.download.ts"),
   route("welcome", "routes/welcome.tsx"),
   route("api/bootstrap-invite", "routes/api.bootstrap-invite.ts"),
   route("api/authz/check", "routes/api.authz.check.ts"),

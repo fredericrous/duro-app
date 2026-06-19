@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react"
 import { Trans, useTranslation } from "react-i18next"
-import { useFetcher } from "react-router"
+import { useFetcher, useParams } from "react-router"
 import type { Route } from "./+types/cert.$revealToken"
 import { runEffect } from "~/lib/runtime.server"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
@@ -12,19 +12,20 @@ import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { useScratchReveal } from "~/hooks/useScratchReveal"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
-import { Heading, Input, InputGroup, Stack, Text } from "@duro-app/ui"
+import { Heading, Input, InputGroup, LinkButton, Stack, Text } from "@duro-app/ui"
 
 type CertRevealError = "invalid" | "expired" | "consumed" | "unknown"
 
 export function meta({ data }: Route.MetaArgs) {
-  return [{ title: data?.appName ? `Certificate password — ${data.appName}` : "Certificate password" }]
+  return [{ title: data?.appName ? `Your certificate — ${data.appName}` : "Your certificate" }]
 }
 
 /**
- * Resolve the reveal token to its current state. Shared by loader and action so
- * both apply the same invalid/expired/consumed gating. Reads (never consumes)
- * the P12 password — consumption happens only on the explicit reveal POST, so
- * a link-scanner's prefetch GET cannot burn the one-time secret.
+ * Resolve the reveal token to its current state. Shared by the loader, action
+ * and download route. The loader/download only READ; the password is burned
+ * (one-time) only on the explicit reveal POST, so a link-scanner's prefetch GET
+ * cannot consume it. The cert (.p12) stays downloadable for the token's 24h
+ * lifetime — it's the password that is single-use.
  */
 const resolve = (revealToken: string) =>
   Effect.gen(function* () {
@@ -32,11 +33,13 @@ const resolve = (revealToken: string) =>
     const cert = yield* CertManager
     const row = yield* revealRepo.findByTokenHash(hashToken(revealToken))
     if (!row) return { state: "invalid" as const }
-    if (row.revealedAt) return { state: "consumed" as const, row }
     if (new Date(row.expiresAt) < new Date()) return { state: "expired" as const, row }
-    const p12Password = yield* cert.getP12Password(row.renewalId)
-    if (!p12Password) return { state: "consumed" as const, row }
-    return { state: "ok" as const, row, p12Password }
+    const password = yield* cert.getP12Password(row.renewalId)
+    const p12 = yield* cert.getP12(row.renewalId)
+    if (!password && !p12) return { state: "consumed" as const, row }
+    // Password already burned but the cert is still downloadable.
+    if (!password) return { state: "revealed" as const, row }
+    return { state: "ok" as const, row, password }
   })
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -48,7 +51,16 @@ export async function loader({ params }: Route.LoaderArgs) {
   try {
     const result = await runEffect(resolve(revealToken))
     if (result.state === "ok") {
-      return { valid: true as const, email: result.row.email, p12Password: result.p12Password, appName: config.appName }
+      return {
+        valid: true as const,
+        revealed: false as const,
+        email: result.row.email,
+        password: result.password,
+        appName: config.appName,
+      }
+    }
+    if (result.state === "revealed") {
+      return { valid: true as const, revealed: true as const, email: result.row.email, appName: config.appName }
     }
     return { valid: false as const, error: result.state as CertRevealError, appName: config.appName }
   } catch (e) {
@@ -72,7 +84,8 @@ export async function action({ request, params }: Route.ActionArgs) {
         const cert = yield* CertManager
         const result = yield* resolve(revealToken)
         if (result.state !== "ok") return false
-        // Mark the link used and burn the Vault password secret — single use.
+        // One-time password: stamp the audit timestamp and strip the password
+        // from Vault. The .p12 bundle is left in place so it stays downloadable.
         yield* revealRepo.markRevealed(result.row.id)
         yield* cert.consumeP12Password(result.row.renewalId)
         return true
@@ -85,7 +98,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 }
 
-function RevealCard({ p12Password }: { p12Password: string }) {
+function PasswordCard({ password }: { password: string }) {
   const { t } = useTranslation()
   const fetcher = useFetcher()
   const { revealed, onReveal } = useScratchReveal(
@@ -96,20 +109,20 @@ function RevealCard({ p12Password }: { p12Password: string }) {
 
   const handleReveal = useCallback(() => {
     onReveal()
-    // Burn the one-time secret server-side once the user scratches it open.
+    // Burn the one-time password server-side once the user scratches it open.
     fetcher.submit({ intent: "reveal" }, { method: "post" })
   }, [fetcher, onReveal])
 
   return (
     <InputGroup.Root>
       <ScratchCard width={320} height={48} onReveal={handleReveal}>
-        <Input defaultValue={p12Password} />
+        <Input defaultValue={password} />
       </ScratchCard>
       <InputGroup.Addon
         disabled={!revealed}
         minWidth={72}
         onClick={() => {
-          navigator.clipboard.writeText(p12Password)
+          navigator.clipboard.writeText(password)
           setCopied(true)
           if (timerRef.current) clearTimeout(timerRef.current)
           timerRef.current = setTimeout(() => setCopied(false), 2000)
@@ -123,6 +136,8 @@ function RevealCard({ p12Password }: { p12Password: string }) {
 
 export default function CertRevealPage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
+  const params = useParams()
+  const downloadHref = `/cert/${params.revealToken}/download`
 
   if (!loaderData.valid) {
     const key =
@@ -138,6 +153,26 @@ export default function CertRevealPage({ loaderData }: Route.ComponentProps) {
     return <ErrorCard icon={icon} tone={tone} title={t("certReveal.error.title")} message={t(key)} />
   }
 
+  if (loaderData.revealed) {
+    return (
+      <CenteredCardPage>
+        <Stack gap="lg">
+          <Heading level={1}>{t("certReveal.revealed.title")}</Heading>
+          <Text as="p" color="muted">
+            <Trans
+              i18nKey="certReveal.revealed.note"
+              values={{ email: loaderData.email }}
+              components={{ strong: <strong /> }}
+            />
+          </Text>
+          <LinkButton href={downloadHref} variant="primary" fullWidth>
+            {t("certReveal.download")}
+          </LinkButton>
+        </Stack>
+      </CenteredCardPage>
+    )
+  }
+
   return (
     <CenteredCardPage>
       <Stack gap="lg">
@@ -151,10 +186,13 @@ export default function CertRevealPage({ loaderData }: Route.ComponentProps) {
             />
           </Text>
         </Stack>
-        <RevealCard p12Password={loaderData.p12Password} />
+        <PasswordCard password={loaderData.password} />
         <Text as="p" variant="bodySm" color="muted">
           {t("invite.password.oneTime")}
         </Text>
+        <LinkButton href={downloadHref} variant="primary" fullWidth>
+          {t("certReveal.download")}
+        </LinkButton>
       </Stack>
     </CenteredCardPage>
   )

@@ -290,6 +290,7 @@ const mockCertManager = (calls: { method: string; args: unknown[] }[] = []) =>
       })
     },
     getP12Password: () => Effect.succeed("pass"),
+    getP12: () => Effect.succeed(Buffer.from("fake")),
     consumeP12Password: () => Effect.succeed("pass"),
     deleteP12Secret: (id) => {
       calls.push({ method: "deleteP12Secret", args: [id] })
@@ -347,8 +348,8 @@ const mockEmailService = (calls: { method: string; args: unknown[] }[] = []) =>
       calls.push({ method: "sendInviteEmail", args: [email, token, invitedBy, p12Buffer, locale] })
       return Effect.succeed(`<invite-${inviteId ?? "x"}@test>`)
     },
-    sendCertRenewalEmail: (email, p12Buffer, locale, revealToken) => {
-      calls.push({ method: "sendCertRenewalEmail", args: [email, p12Buffer, locale, revealToken] })
+    sendCertRenewalEmail: (email, locale, revealToken) => {
+      calls.push({ method: "sendCertRenewalEmail", args: [email, locale, revealToken] })
       return Effect.void
     },
   })
@@ -650,14 +651,16 @@ describe("resendCert", () => {
           // renewalId is the same id the cert/P12 password is keyed under
           expect(createArg.renewalId).toBe(issueCall!.args[1])
 
-          // Renewal email sent WITH the reveal token (4th arg)
+          // Link-only renewal email sent WITH the reveal token (3rd arg) and
+          // NO P12 attachment (the buffer is no longer passed to the email).
           const emailCall = emailCalls.find(
             (c) => c.method === "sendCertRenewalEmail" && c.args[0] === "alice@example.com",
           )
           expect(emailCall).toBeDefined()
-          expect(emailCall!.args[3]).toBe("reveal-tok")
+          expect(emailCall!.args).toHaveLength(3)
+          expect(emailCall!.args[2]).toBe("reveal-tok")
 
-          // P12 secret is NOT deleted — it must survive for the reveal page
+          // P12 secret is NOT deleted — it must survive for the reveal page download
           expect(certCalls.find((c) => c.method === "deleteP12Secret")).toBeUndefined()
         }),
       ),

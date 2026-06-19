@@ -660,10 +660,10 @@
       "subject": "Your new {{appName}} certificate",
       "preview": "Your new {{appName}} certificate",
       "heading": "New Certificate",
-      "body": "A new security certificate for {{appName}} has been issued. It is attached to this email as <strong>certificate.p12</strong>.",
+      "body": "A new security certificate for {{appName}} has been issued.",
       "reveal": {
-        "body": "To install it you'll need its one-time password. Reveal it on the secure page below — the link works once and expires in 24 hours.",
-        "cta": "Reveal certificate password"
+        "body": "Reveal its one-time password and download the <strong>certificate.p12</strong> file on the secure page below. The link is valid for 24 hours.",
+        "cta": "Reveal password & download certificate"
       },
       "install": {
         "title": "Install Your New Certificate",
@@ -675,8 +675,13 @@
     }
   },
   "certReveal": {
-    "title": "Your certificate password",
-    "subtitle": "Scratch below to reveal the one-time password for the certificate sent to <strong>{{email}}</strong>. You'll need it to install <strong>certificate.p12</strong> from your email.",
+    "title": "Your certificate",
+    "subtitle": "Scratch below to reveal the one-time password for the certificate issued to <strong>{{email}}</strong>, then download it. You'll need both to install <strong>certificate.p12</strong>.",
+    "download": "Download certificate (.p12)",
+    "revealed": {
+      "title": "Password already revealed",
+      "note": "The one-time password for <strong>{{email}}</strong> has already been shown. You can still download the certificate below while this link is valid."
+    },
     "error": {
       "title": "Cannot reveal password",
       "invalid": "This reveal link is invalid or could not be found.",

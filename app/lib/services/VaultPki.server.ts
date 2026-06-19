@@ -46,6 +46,7 @@ export class VaultPki extends Context.Tag("VaultPki")<
       inviteId: string,
     ) => Effect.Effect<{ p12Buffer: Buffer; password: string; serialNumber: string; notAfter: Date }, VaultPkiError>
     readonly getP12Password: (inviteId: string) => Effect.Effect<string | null, VaultPkiError>
+    readonly getP12: (inviteId: string) => Effect.Effect<Buffer | null, VaultPkiError>
     readonly consumeP12Password: (inviteId: string) => Effect.Effect<string | null, VaultPkiError>
     readonly deleteP12Secret: (inviteId: string) => Effect.Effect<void, VaultPkiError>
     readonly checkCertProcessed: (username: string) => Effect.Effect<boolean, VaultPkiError>
@@ -161,6 +162,17 @@ export const VaultPkiLive = Layer.effect(
           return res?.data.data.password ?? null
         }),
 
+      getP12: (inviteId: string) =>
+        Effect.gen(function* () {
+          const res = yield* vault.get(`/secret/data/pki/clients/${inviteId}`).pipe(
+            Effect.flatMap(decodeKvSecret),
+            Effect.tapError((e) => Effect.logDebug("Failed to read P12 from Vault", { inviteId, error: String(e) })),
+            Effect.catchAll(() => Effect.succeed(null)),
+          )
+          const b64 = res?.data.data.p12
+          return b64 ? Buffer.from(b64, "base64") : null
+        }),
+
       consumeP12Password: (inviteId: string) =>
         Effect.gen(function* () {
           // Read current secret
@@ -241,6 +253,7 @@ export const VaultCertManagerLive = Layer.effect(
       issueCertAndP12: (email, inviteId) =>
         pipe(vault.issueCertAndP12(email, inviteId), Effect.mapError(mapVaultError)),
       getP12Password: (inviteId) => pipe(vault.getP12Password(inviteId), Effect.mapError(mapVaultError)),
+      getP12: (inviteId) => pipe(vault.getP12(inviteId), Effect.mapError(mapVaultError)),
       consumeP12Password: (inviteId) => pipe(vault.consumeP12Password(inviteId), Effect.mapError(mapVaultError)),
       deleteP12Secret: (inviteId) => pipe(vault.deleteP12Secret(inviteId), Effect.mapError(mapVaultError)),
       checkCertProcessed: (username) => pipe(vault.checkCertProcessed(username), Effect.mapError(mapVaultError)),

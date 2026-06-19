@@ -28,7 +28,6 @@ export class EmailService extends Context.Tag("EmailService")<
     ) => Effect.Effect<string, EmailError>
     readonly sendCertRenewalEmail: (
       email: string,
-      p12Buffer: Buffer,
       locale?: string,
       revealToken?: string,
     ) => Effect.Effect<void, EmailError>
@@ -40,7 +39,7 @@ export const EmailServiceDev = Layer.succeed(EmailService, {
     Effect.log(`[DEV] Would send invite email to ${email} (locale=${locale ?? "en"})`).pipe(
       Effect.as(`<invite-${inviteId ?? "dev"}@${config.allowedOriginSuffix}>`),
     ),
-  sendCertRenewalEmail: (email, _p12Buffer, locale, _revealToken) =>
+  sendCertRenewalEmail: (email, locale, _revealToken) =>
     Effect.log(`[DEV] Would send cert renewal email to ${email} (locale=${locale ?? "en"})`),
 })
 
@@ -152,7 +151,11 @@ export const EmailServiceLive = Layer.scoped(
           return messageId
         }),
 
-      sendCertRenewalEmail: (email: string, p12Buffer: Buffer, locale?: string, revealToken?: string) =>
+      // Link-only: no P12 attachment. A message carrying both an external link
+      // and a binary .p12 attachment trips Gmail's phishing heuristics (and got
+      // hard-rejected in the field). The cert is downloaded from the reveal
+      // page instead, behind the same token.
+      sendCertRenewalEmail: (email: string, locale?: string, revealToken?: string) =>
         Effect.gen(function* () {
           const lng = locale ?? "en"
           const i18n = yield* Effect.tryPromise({
@@ -179,13 +182,6 @@ export const EmailServiceLive = Layer.scoped(
                 to: email,
                 subject: t("email.renewal.subject", { appName: config.appName }),
                 html,
-                attachments: [
-                  {
-                    filename: "certificate.p12",
-                    content: p12Buffer,
-                    contentType: "application/x-pkcs12",
-                  },
-                ],
               }),
             catch: (e) =>
               new EmailError({

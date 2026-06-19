@@ -204,6 +204,7 @@ const mockCertManager = () =>
         notAfter: new Date(Date.now() + 90 * 86400_000),
       }),
     getP12Password: () => Effect.succeed("pw"),
+    getP12: () => Effect.succeed(Buffer.from("fake")),
     consumeP12Password: () => Effect.succeed("pw"),
     deleteP12Secret: () => Effect.void,
     checkCertProcessed: () => Effect.succeed(false),

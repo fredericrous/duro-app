@@ -307,8 +307,9 @@ export const resendCert = (email: string, username: string) =>
       expiresAt: new Date(Date.now() + REVEAL_TTL_MS),
     })
 
-    // Send renewal email with the reveal link
-    yield* emailService.sendCertRenewalEmail(email, certResult.p12Buffer, locale, reveal.token)
+    // Send the link-only renewal email (no P12 attachment — the cert is
+    // downloaded from the reveal page, behind the same token).
+    yield* emailService.sendCertRenewalEmail(email, locale, reveal.token)
 
     return { success: true as const, message: `Certificate sent to ${email}`, renewalId: tempId }
   }).pipe(Effect.withSpan("resendCert", { attributes: { email, username } }))
