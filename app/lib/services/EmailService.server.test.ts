@@ -16,7 +16,7 @@ describe("EmailService (Dev)", () => {
     await rt.runPromise(
       Effect.gen(function* () {
         const e = yield* EmailService
-        yield* e.sendInviteEmail("alice@example.com", "tok", "admin", Buffer.from(""), "en")
+        yield* e.sendInviteEmail("alice@example.com", "tok", "admin", "en")
       }),
     )
     debug.mockRestore()
@@ -26,7 +26,7 @@ describe("EmailService (Dev)", () => {
     await rt.runPromise(
       Effect.gen(function* () {
         const e = yield* EmailService
-        yield* e.sendInviteEmail("bob@example.com", "tok", "admin", Buffer.from(""))
+        yield* e.sendInviteEmail("bob@example.com", "tok", "admin")
       }),
     )
   })
@@ -36,7 +36,7 @@ describe("EmailService (Dev)", () => {
     const messageId = await rt.runPromise(
       Effect.gen(function* () {
         const e = yield* EmailService
-        return yield* e.sendInviteEmail("a@example.com", "tok", "admin", Buffer.from(""), "en", "open-1", "inv-42")
+        return yield* e.sendInviteEmail("a@example.com", "tok", "admin", "en", "open-1", "inv-42")
       }),
     )
     // Webhook correlation depends on this exact shape: <invite-{id}@suffix>.

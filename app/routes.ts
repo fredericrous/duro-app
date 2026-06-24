@@ -33,6 +33,7 @@ export default [
   route("e/:openToken", "routes/invite.open.$openToken.ts"),
   route("c/:token", "routes/invite.click.$token.ts"),
   route("invite/:token", "routes/invite.tsx"),
+  route("invite/:token/download", "routes/invite.$token.download.ts"),
   route("invite/:token/create-account", "routes/invite-create-account.tsx"),
   route("reinvite/:token", "routes/reinvite.tsx"),
   route("cert/:revealToken", "routes/cert.$revealToken.tsx"),

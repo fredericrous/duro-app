@@ -268,9 +268,12 @@
       "tooManyAttempts": "Too many attempts. Please contact an administrator.",
       "unknown": "Something went wrong loading this invite. Please try again, or contact your administrator if the problem persists."
     },
+    "download": {
+      "button": "Download Certificate (.p12)"
+    },
     "password": {
       "title": "Certificate Password",
-      "warning": "Scratch to reveal your certificate password. Save it — you'll need it to install the certificate from your email.",
+      "warning": "Scratch to reveal your certificate password. Save it — you'll need it to install the certificate you download above.",
       "consumed": "The certificate password has already been revealed. If you need a new invite, use the link in your original invitation email.",
       "copy": "Copy",
       "copied": "Copied!",
@@ -280,7 +283,7 @@
       "checking": "Checking certificate...",
       "detected": "Certificate detected",
       "continue": "Continue to Create Account",
-      "notInstalled": "It looks like your certificate isn't installed yet. Install the .p12 file from your email, then click the button below.",
+      "notInstalled": "It looks like your certificate isn't installed yet. Download the .p12 file above and install it, then click the button below.",
       "hint": "After installing the certificate, you may need to close and reopen your browser for it to be recognized.",
       "retry": "Check again"
     }
@@ -645,7 +648,7 @@
       "body": "{{invitedBy}} has invited you to join {{appName}}, {{appDescription}}.",
       "step1": {
         "title": "Step 1: Install Your Certificate",
-        "body": "Your security certificate is attached to this email as <strong>certificate.p12</strong>. You'll see the password to install it when you click the link below.",
+        "body": "Click the button below to open your invite page, where you can <strong>download your certificate</strong> and reveal the password to install it.",
         "macos": "<strong>macOS:</strong> Double-click the .p12 file to open Keychain Access, enter the password when prompted, then trust the certificate.",
         "windows": "<strong>Windows:</strong> Double-click the .p12 file, follow the Certificate Import Wizard, and enter the password when prompted."
       },

@@ -268,9 +268,12 @@
       "tooManyAttempts": "Trop de tentatives. Veuillez contacter un administrateur.",
       "unknown": "Une erreur s'est produite lors du chargement de cette invitation. Veuillez reessayer, ou contacter votre administrateur si le probleme persiste."
     },
+    "download": {
+      "button": "Telecharger le certificat (.p12)"
+    },
     "password": {
       "title": "Mot de passe du certificat",
-      "warning": "Grattez pour reveler le mot de passe de votre certificat. Sauvegardez-le — vous en aurez besoin pour installer le certificat joint a votre e-mail.",
+      "warning": "Grattez pour reveler le mot de passe de votre certificat. Sauvegardez-le — vous en aurez besoin pour installer le certificat que vous telechargez ci-dessus.",
       "consumed": "Le mot de passe du certificat a deja ete revele. Si vous avez besoin d'une nouvelle invitation, utilisez le lien dans votre e-mail d'invitation original.",
       "copy": "Copier",
       "copied": "Copie !",
@@ -280,7 +283,7 @@
       "checking": "Verification du certificat...",
       "detected": "Certificat detecte",
       "continue": "Continuer pour creer un compte",
-      "notInstalled": "Il semble que votre certificat ne soit pas encore installe. Installez le fichier .p12 de votre e-mail, puis cliquez sur le bouton ci-dessous.",
+      "notInstalled": "Il semble que votre certificat ne soit pas encore installe. Telechargez le fichier .p12 ci-dessus et installez-le, puis cliquez sur le bouton ci-dessous.",
       "hint": "Apres l'installation du certificat, vous devrez peut-etre fermer et rouvrir votre navigateur pour qu'il soit reconnu.",
       "retry": "Verifier a nouveau"
     }
@@ -645,7 +648,7 @@
       "body": "{{invitedBy}} vous a invite a rejoindre {{appName}}, {{appDescription}}.",
       "step1": {
         "title": "Etape 1 : Installez votre certificat",
-        "body": "Votre certificat de securite est joint a cet e-mail sous le nom <strong>certificate.p12</strong>. Vous verrez le mot de passe pour l'installer lorsque vous cliquerez sur le lien ci-dessous.",
+        "body": "Cliquez sur le bouton ci-dessous pour ouvrir votre page d'invitation, ou vous pourrez <strong>telecharger votre certificat</strong> et reveler le mot de passe pour l'installer.",
         "macos": "<strong>macOS :</strong> Double-cliquez sur le fichier .p12 pour ouvrir Trousseau d'acces, entrez le mot de passe lorsqu'il est demande, puis faites confiance au certificat.",
         "windows": "<strong>Windows :</strong> Double-cliquez sur le fichier .p12, suivez l'assistant d'importation de certificat et entrez le mot de passe lorsqu'il est demande."
       },

@@ -216,7 +216,14 @@ export default function InvitePage({ loaderData }: Route.ComponentProps) {
           )}
         </Stack>
 
-        {effectiveCertStatus !== "installed" && <InvitePasswordReveal p12Password={loaderData.p12Password} />}
+        {effectiveCertStatus !== "installed" && (
+          <Stack gap="md">
+            <LinkButton href={`/invite/${params.token}/download`} variant="primary" fullWidth>
+              {t("invite.download.button")}
+            </LinkButton>
+            <InvitePasswordReveal p12Password={loaderData.p12Password} />
+          </Stack>
+        )}
         <CertCheck status={effectiveCertStatus} onRecheck={recheck} />
       </Stack>
     </CenteredCardPage>

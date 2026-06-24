@@ -21,7 +21,6 @@ export class EmailService extends Context.Tag("EmailService")<
       email: string,
       token: string,
       invitedBy: string,
-      p12Buffer: Buffer,
       locale?: string,
       openToken?: string,
       inviteId?: string,
@@ -35,7 +34,7 @@ export class EmailService extends Context.Tag("EmailService")<
 >() {}
 
 export const EmailServiceDev = Layer.succeed(EmailService, {
-  sendInviteEmail: (email, _token, _invitedBy, _p12Buffer, locale, _openToken, inviteId) =>
+  sendInviteEmail: (email, _token, _invitedBy, locale, _openToken, inviteId) =>
     Effect.log(`[DEV] Would send invite email to ${email} (locale=${locale ?? "en"})`).pipe(
       Effect.as(`<invite-${inviteId ?? "dev"}@${config.allowedOriginSuffix}>`),
     ),
@@ -78,7 +77,6 @@ export const EmailServiceLive = Layer.scoped(
         email: string,
         token: string,
         invitedBy: string,
-        p12Buffer: Buffer,
         locale?: string,
         openToken?: string,
         inviteId?: string,
@@ -127,19 +125,16 @@ export const EmailServiceLive = Layer.scoped(
 
           yield* Effect.tryPromise({
             try: () =>
+              // Link-only: no P12 attachment. A binary .p12 attachment trips
+              // Gmail's phishing heuristics (and SES relays the file's spam
+              // signal too). The cert is downloaded from the /invite page,
+              // behind the same token — same split as the renewal email.
               transporter.sendMail({
                 from,
                 to: email,
                 messageId,
                 subject: t("email.invite.subject", { appName: config.appName }),
                 html,
-                attachments: [
-                  {
-                    filename: "certificate.p12",
-                    content: p12Buffer,
-                    contentType: "application/x-pkcs12",
-                  },
-                ],
               }),
             catch: (e) =>
               new EmailError({

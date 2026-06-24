@@ -46,7 +46,9 @@ export const queueInvite = (input: InviteInput) =>
       .toLowerCase()
     yield* inviteRepo.setCertUsername(invite.id, certUsername)
 
-    // Issue cert directly from Vault PKI
+    // Issue cert directly from Vault PKI. The P12 is kept in Vault (keyed by
+    // invite.id) so the recipient can download it from the /invite page — the
+    // email no longer carries it as an attachment (Gmail phishing heuristic).
     const certResult = yield* cert.issueCertAndP12(input.email, invite.id)
     yield* inviteRepo.markCertIssued(invite.id)
 
@@ -66,15 +68,7 @@ export const queueInvite = (input: InviteInput) =>
     // Send email inline
     const locale = input.locale ?? "en"
     yield* emailSvc
-      .sendInviteEmail(
-        input.email,
-        invite.token,
-        input.invitedBy,
-        certResult.p12Buffer,
-        locale,
-        invite.openToken,
-        invite.id,
-      )
+      .sendInviteEmail(input.email, invite.token, input.invitedBy, locale, invite.openToken, invite.id)
       .pipe(
         Effect.tap((messageId) => inviteRepo.setMessageId(invite.id, messageId)),
         Effect.tap(() => inviteRepo.markEmailSent(invite.id)),

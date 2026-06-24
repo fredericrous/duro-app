@@ -344,8 +344,8 @@ const mockCertificateRepo = (calls: { method: string; args: unknown[] }[] = []) 
 
 const mockEmailService = (calls: { method: string; args: unknown[] }[] = []) =>
   Layer.succeed(EmailService, {
-    sendInviteEmail: (email, token, invitedBy, p12Buffer, locale, _openToken, inviteId) => {
-      calls.push({ method: "sendInviteEmail", args: [email, token, invitedBy, p12Buffer, locale] })
+    sendInviteEmail: (email, token, invitedBy, locale, _openToken, inviteId) => {
+      calls.push({ method: "sendInviteEmail", args: [email, token, invitedBy, locale] })
       return Effect.succeed(`<invite-${inviteId ?? "x"}@test>`)
     },
     sendCertRenewalEmail: (email, locale, revealToken) => {
