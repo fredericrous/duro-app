@@ -1,19 +1,6 @@
 "use no memo"
 
-import {
-  Body,
-  Container,
-  Head,
-  Heading,
-  Html,
-  Img,
-  Link,
-  Preview,
-  Section,
-  Text,
-  Button,
-  Hr,
-} from "@react-email/components"
+import { EmailShell, Heading, Text, Button, Hr, Section, Link, Img } from "@duro-app/ui-email"
 import { Trans } from "react-i18next/TransWithoutContext"
 import type { TFunction } from "i18next"
 
@@ -41,148 +28,55 @@ export function InviteEmail({
   t,
 }: InviteEmailProps) {
   return (
-    <Html>
-      <Head />
-      <Preview>{t("email.invite.preview", { appName })}</Preview>
-      <Body style={main}>
-        <Container style={container}>
-          <Heading style={heading}>{t("email.invite.heading", { appName })}</Heading>
+    <EmailShell preview={t("email.invite.preview", { appName })}>
+      <Heading>{t("email.invite.heading", { appName })}</Heading>
 
-          <Text style={text}>{t("email.invite.body", { invitedBy, appName, appDescription })}</Text>
+      <Text>{t("email.invite.body", { invitedBy, appName, appDescription })}</Text>
 
-          <Hr style={hr} />
+      <Hr />
 
-          <Section style={section}>
-            <Heading as="h2" style={subheading}>
-              {t("email.invite.step1.title")}
-            </Heading>
-            <Text style={text}>
-              <Trans t={t} i18nKey="email.invite.step1.body" components={{ strong: <strong /> }} />
-            </Text>
-            <Text style={textSmall}>
-              <Trans t={t} i18nKey="email.invite.step1.macos" components={{ strong: <strong /> }} />
-            </Text>
-            <Text style={textSmall}>
-              <Trans t={t} i18nKey="email.invite.step1.windows" components={{ strong: <strong /> }} />
-            </Text>
-          </Section>
+      <Section>
+        <Heading as="h2">{t("email.invite.step1.title")}</Heading>
+        <Text>
+          <Trans t={t} i18nKey="email.invite.step1.body" components={{ strong: <strong /> }} />
+        </Text>
+        <Text variant="small">
+          <Trans t={t} i18nKey="email.invite.step1.macos" components={{ strong: <strong /> }} />
+        </Text>
+        <Text variant="small">
+          <Trans t={t} i18nKey="email.invite.step1.windows" components={{ strong: <strong /> }} />
+        </Text>
+      </Section>
 
-          <Section style={section}>
-            <Heading as="h2" style={subheading}>
-              {t("email.invite.step2.title")}
-            </Heading>
-            <Text style={text}>{t("email.invite.step2.body")}</Text>
-          </Section>
+      <Section>
+        <Heading as="h2">{t("email.invite.step2.title")}</Heading>
+        <Text>{t("email.invite.step2.body")}</Text>
+      </Section>
 
-          <Section style={buttonContainer}>
-            <Button style={button} href={clickUrl ?? inviteUrl}>
-              {t("email.invite.cta")}
-            </Button>
-          </Section>
+      <Button href={clickUrl ?? inviteUrl}>{t("email.invite.cta")}</Button>
 
-          <Hr style={hr} />
+      <Hr />
 
-          <Text style={footer}>
-            <Trans
-              t={t}
-              i18nKey="email.invite.footer"
-              values={{ reinviteUrl }}
-              components={{ a: <Link href={reinviteUrl} style={footerLink} /> }}
-            />
-          </Text>
-        </Container>
-        {/* Open-tracking pixel. A real (not display:none) 1x1 image — some
-            clients/proxies skip hidden images — kept visually inert. */}
-        {pixelUrl ? <Img src={pixelUrl} width="1" height="1" alt="" style={pixel} /> : null}
-      </Body>
-    </Html>
+      <Text variant="footer">
+        <Trans
+          t={t}
+          i18nKey="email.invite.footer"
+          values={{ reinviteUrl }}
+          components={{ a: <Link href={reinviteUrl} /> }}
+        />
+      </Text>
+
+      {/* Open-tracking pixel — a real (not display:none) 1x1 image; some
+          clients/proxies skip hidden images. Kept visually inert. */}
+      {pixelUrl ? (
+        <Img
+          src={pixelUrl}
+          width="1"
+          height="1"
+          alt=""
+          style={{ display: "block", border: 0, opacity: 0, maxHeight: "1px", maxWidth: "1px" }}
+        />
+      ) : null}
+    </EmailShell>
   )
-}
-
-const main = {
-  backgroundColor: "#0f0f0f",
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  padding: "40px 0",
-}
-
-const container = {
-  backgroundColor: "#1a1a1a",
-  border: "1px solid #333",
-  borderRadius: "12px",
-  margin: "0 auto",
-  maxWidth: "520px",
-  padding: "40px 32px",
-}
-
-const heading = {
-  color: "#e5e5e5",
-  fontSize: "24px",
-  fontWeight: "700" as const,
-  margin: "0 0 16px",
-}
-
-const subheading = {
-  color: "#e5e5e5",
-  fontSize: "16px",
-  fontWeight: "600" as const,
-  margin: "0 0 8px",
-}
-
-const text = {
-  color: "#e5e5e5",
-  fontSize: "14px",
-  lineHeight: "1.6",
-  margin: "0 0 12px",
-}
-
-const textSmall = {
-  color: "#aaa",
-  fontSize: "13px",
-  lineHeight: "1.5",
-  margin: "0 0 8px",
-}
-
-const section = {
-  margin: "24px 0",
-}
-
-const hr = {
-  borderColor: "#333",
-  margin: "24px 0",
-}
-
-const buttonContainer = {
-  textAlign: "center" as const,
-  margin: "32px 0",
-}
-
-const button = {
-  backgroundColor: "#3b82f6",
-  borderRadius: "8px",
-  color: "#fff",
-  display: "inline-block",
-  fontSize: "14px",
-  fontWeight: "600" as const,
-  padding: "12px 32px",
-  textDecoration: "none",
-}
-
-const footer = {
-  color: "#666",
-  fontSize: "12px",
-  lineHeight: "1.5",
-  margin: "0",
-}
-
-const footerLink = {
-  color: "#3b82f6",
-  textDecoration: "underline",
-}
-
-const pixel = {
-  display: "block" as const,
-  border: 0,
-  opacity: 0,
-  maxHeight: "1px",
-  maxWidth: "1px",
 }
