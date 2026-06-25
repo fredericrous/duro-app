@@ -9,6 +9,11 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/duro-app
 
+# Force bash (homelab-runner /bin/sh is dash; buildah/stable is fine either way).
+defaults:
+  run:
+    shell: bash
+
 jobs:
   ci:
     name: Build & Test
@@ -16,12 +21,8 @@ jobs:
     permissions:
       contents: read
       packages: read
-
-    # No `services: postgres:` — the dind-less self-hosted runner has no
-    # docker socket, and the test suite already runs against PGlite via
-    # makeTestDbLayer in app/lib/db/client.server.ts. PgClientLive (which
-    # would consume DATABASE_URL) is not built by any test layer.
-
+    # No `services: postgres:` — the dind-less self-hosted runner has no docker
+    # socket, and the test suite runs against PGlite via makeTestDbLayer.
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -47,55 +48,61 @@ jobs:
       - name: Run tests
         run: npm test
 
+  build:
+    name: Build & push image
+    needs: ci
+    runs-on: duro-app-ci
+    permissions:
+      contents: read
+      packages: write
+    container:
+      image: quay.io/buildah/stable
+    outputs:
+      version_img: ${{ steps.ver.outputs.version_img }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Resolve version
+        id: ver
+        run: |
+          set -euo pipefail
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version_img=${VERSION#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Buildah build + push (version, major.minor)
+        env:
+          REG_USER: ${{ github.actor }}
+          REG_PASS: ${{ secrets.GITHUB_TOKEN }}
+          # read:packages auth for private @fredericrous/* deps during npm ci.
+          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ steps.ver.outputs.version_img }}
+        run: |
+          set -euo pipefail
+          IMG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          MM=$(echo "$V" | awk -F. '{print $1"."$2}')
+          printf '%s' "$NPM_TOKEN" > /tmp/npm_token
+          buildah bud --storage-driver=vfs \
+            --secret id=npm_token,src=/tmp/npm_token \
+            -t "$IMG:$V" -t "$IMG:$MM" .
+          buildah login -u "$REG_USER" -p "$REG_PASS" ghcr.io
+          for t in "$V" "$MM"; do
+            buildah push --storage-driver=vfs "$IMG:$t"
+          done
+
   release:
     name: Release
-    needs: ci
+    needs: build
     runs-on: duro-app
     permissions:
       contents: write
-      packages: write
+      packages: read
       actions: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-
-      - name: Set up Docker Buildx (in-cluster buildkitd)
-        uses: docker/setup-buildx-action@v4
-        with:
-          driver: remote
-          endpoint: tcp://buildkitd.buildkit.svc.cluster.local:1234
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          secrets: |
-            npm_token=${{ secrets.GITHUB_TOKEN }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64
 
       - name: Generate release notes
         id: release_notes
@@ -113,7 +120,7 @@ jobs:
             COMMITS=$(git log --pretty=format:"- %s")
           fi
 
-          cat > release-notes.md << EOF
+          cat > release-notes.md << NOTES
           ## duro-app $VERSION
 
           ### Docker Image
@@ -133,7 +140,7 @@ jobs:
 
           ### Full Changelog
           ${PREV_TAG:+https://github.com/${{ github.repository }}/compare/$PREV_TAG...$VERSION}
-          EOF
+          NOTES
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
@@ -147,12 +154,6 @@ jobs:
         run: |
           VERSION="${{ steps.release_notes.outputs.VERSION_IMG }}"
           CHART_PATH="chart/duro-app/Chart.yaml"
-
-          # Switch from the tag's detached HEAD to main's tip and apply
-          # the version bump there. Retries on non-fast-forward push so
-          # a concurrent commit on main (another release, a docs PR
-          # merging) doesn't drop the chart bump. See kb-vision
-          # commit c857a53 for the incident that motivated this fix.
           set -euo pipefail
 
           git config user.name "github-actions[bot]"
@@ -208,18 +209,6 @@ jobs:
         run: |
           VERSION=${GITHUB_REF_NAME#v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Wait for image to be available
-        run: |
-          echo "Waiting for image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }} to be available..."
-          for i in {1..30}; do
-            if docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }} > /dev/null 2>&1; then
-              echo "Image is available!"
-              break
-            fi
-            echo "Attempt $i/30: Image not yet available, waiting 10 seconds..."
-            sleep 10
-          done
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
