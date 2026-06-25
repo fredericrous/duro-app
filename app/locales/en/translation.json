@@ -321,9 +321,9 @@
       "passwordMismatch": "Passwords do not match"
     },
     "success": {
-      "title": "Account Created",
-      "message": "Your account has been created successfully. You can now sign in.",
-      "goHome": "Go to Home"
+      "title": "Successfully Joined",
+      "message": "Welcome to {{appName}}! Your account is ready — head to your dashboard to get started.",
+      "goHome": "Go to Dashboard"
     }
   },
   "reinvite": {

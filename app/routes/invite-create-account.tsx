@@ -14,7 +14,7 @@ import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { CertGate } from "~/components/CertGate/CertGate"
 import { useDevOverrides } from "~/components/DevToolbar/DevToolbar"
-import { Alert, Heading, LinkButton, Text } from "@duro-app/ui"
+import { Heading, LinkButton, Stack, StatusIcon, Text } from "@duro-app/ui"
 
 type InviteErrorCode = "missing_token" | "invalid" | "already_used" | "expired" | "too_many_attempts" | "unknown"
 
@@ -185,10 +185,13 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
   if (actionData && "success" in actionData && actionData.success) {
     return (
       <CenteredCardPage>
-        <Heading level={1}>{t("createAccount.success.title")}</Heading>
-        <Alert variant="success">
-          <Text as="p">{t("createAccount.success.message")}</Text>
-        </Alert>
+        <Stack gap="lg" align="center">
+          <StatusIcon name="check-circle" size={64} variant="success" />
+          <Heading level={1}>{t("createAccount.success.title")}</Heading>
+          <Text as="p" color="muted">
+            {t("createAccount.success.message", { appName: loaderData.appName })}
+          </Text>
+        </Stack>
         <LinkButton href={actionData.homeUrl} variant="primary" fullWidth>
           {t("createAccount.success.goHome")}
         </LinkButton>

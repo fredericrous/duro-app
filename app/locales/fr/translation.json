@@ -321,9 +321,9 @@
       "passwordMismatch": "Les mots de passe ne correspondent pas"
     },
     "success": {
-      "title": "Compte créé",
-      "message": "Votre compte a été créé avec succès. Vous pouvez maintenant vous connecter.",
-      "goHome": "Aller à l'accueil"
+      "title": "Inscription réussie",
+      "message": "Bienvenue sur {{appName}} ! Votre compte est prêt — accédez à votre tableau de bord pour commencer.",
+      "goHome": "Aller au tableau de bord"
     }
   },
   "reinvite": {

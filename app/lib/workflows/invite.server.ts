@@ -29,6 +29,8 @@ export const queueInvite = (input: InviteInput) =>
     const cert = yield* CertManager
     const emailSvc = yield* EmailService
     const certRepo = yield* CertificateRepo
+    const users = yield* UserManager
+    const prefs = yield* PreferencesRepo
 
     // Revoke any existing failed invite for this email so we can re-create
     const existingFailed = yield* inviteRepo.findFailed()
@@ -65,8 +67,18 @@ export const queueInvite = (input: InviteInput) =>
       })
       .pipe(Effect.catchAll((e) => Effect.logWarning("queueInvite: failed to store cert record", { error: String(e) })))
 
+    // Respect the recipient's stored language preference when one exists (e.g.
+    // re-inviting a user who already chose their language) — it wins over the
+    // caller-provided locale so every email honours the user's saved choice.
+    // New recipients have no stored preference, so fall back to input/"en".
+    const existingUser = yield* users.getUsers.pipe(
+      Effect.map((us) => us.find((u) => u.email.toLowerCase() === input.email.toLowerCase())),
+      Effect.orElseSucceed(() => undefined),
+    )
+    const storedLocale = existingUser ? yield* prefs.getStoredLocale(existingUser.id) : null
+    const locale = storedLocale ?? input.locale ?? "en"
+
     // Send email inline
-    const locale = input.locale ?? "en"
     yield* emailSvc
       .sendInviteEmail(input.email, invite.token, input.invitedBy, locale, invite.openToken, invite.id)
       .pipe(

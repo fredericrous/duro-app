@@ -1,6 +1,6 @@
 import { use, useMemo } from "react"
 import { useTranslation } from "react-i18next"
-import { useFetcher, useParams } from "react-router"
+import { useSubmit, useNavigation, useParams } from "react-router"
 import { Schema } from "effect"
 import { Alert, Button, Field, Fieldset, Form, Heading, Input, LinkButton, Text } from "@duro-app/ui"
 
@@ -13,10 +13,14 @@ export function CertGate({
 }) {
   const { t } = useTranslation()
   const { token } = useParams()
-  const fetcher = useFetcher<{ error?: string }>()
+  // Navigation submit (not a fetcher) so the action's `{success}` lands in the
+  // route's actionData — the page renders the success view from it, which a
+  // fetcher's data could not do (and the loader revalidates to "already used").
+  const submit = useSubmit()
+  const navigation = useNavigation()
   const certInstalled = use(certPromise)
-  const isSubmitting = fetcher.state === "submitting"
-  const error = fetcher.data?.error ?? actionData?.error
+  const isSubmitting = navigation.state === "submitting"
+  const error = actionData?.error
 
   const CreateAccountSchema = useMemo(
     () =>
@@ -67,7 +71,7 @@ export function CertGate({
         schema={CreateAccountSchema}
         defaultValues={{ username: "", password: "", confirmPassword: "" }}
         onSubmit={(data) =>
-          fetcher.submit(data, {
+          submit(data, {
             method: "post",
             action: `/invite/${token}/create-account`,
           })

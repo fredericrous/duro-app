@@ -5,6 +5,9 @@ interface ScratchCardProps {
   width: number
   height: number
   revealThreshold?: number
+  /** Mount already uncovered (code visible). Use when the reveal was persisted,
+   * so "code visible" stays in sync with a copy button gated on the same state. */
+  initialRevealed?: boolean
   onReveal: () => void
   onScratchStart?: () => void
   label?: string
@@ -30,6 +33,7 @@ export function ScratchCard({
   width,
   height,
   revealThreshold = 0.5,
+  initialRevealed = false,
   onReveal,
   onScratchStart,
   label = "Scratch to reveal",
@@ -38,9 +42,9 @@ export function ScratchCard({
 }: ScratchCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const isDrawing = useRef(false)
-  const revealed = useRef(false)
+  const revealed = useRef(initialRevealed)
   const scratchStarted = useRef(false)
-  const [fadeOut, setFadeOut] = useState(false)
+  const [fadeOut, setFadeOut] = useState(initialRevealed)
 
   const canvasCallbackRef = useCallback(
     (node: HTMLCanvasElement | null) => {

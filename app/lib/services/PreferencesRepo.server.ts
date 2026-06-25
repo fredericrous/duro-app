@@ -13,6 +13,9 @@ export class PreferencesRepo extends Context.Tag("PreferencesRepo")<
   {
     /** Returns the user's locale, falling back to "en" on any error. */
     readonly getLocale: (username: string) => Effect.Effect<string>
+    /** Returns the user's stored locale, or null when none is set (so callers
+     * can tell an explicit choice apart from the "en" default). */
+    readonly getStoredLocale: (username: string) => Effect.Effect<string | null>
     readonly setLocale: (username: string, locale: string) => Effect.Effect<void, PreferencesError>
     readonly getLastCertRenewal: (username: string) => Effect.Effect<{ at: Date | null; renewalId: string | null }>
     readonly setCertRenewal: (username: string, renewalId: string) => Effect.Effect<void, PreferencesError>
@@ -37,6 +40,15 @@ export const PreferencesRepoLive = Layer.effect(
             return typeof locale === "string" ? locale : "en"
           }),
           Effect.catchAll(() => Effect.succeed("en")),
+        ),
+
+      getStoredLocale: (username: string) =>
+        sql`SELECT locale FROM user_preferences WHERE username = ${username}`.pipe(
+          Effect.map((rows) => {
+            const locale = rows[0]?.locale
+            return typeof locale === "string" ? locale : null
+          }),
+          Effect.catchAll(() => Effect.succeed(null)),
         ),
 
       setLocale: (username: string, locale: string) =>

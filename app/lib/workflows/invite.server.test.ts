@@ -4,7 +4,7 @@ import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { queueInvite, acceptInvite, revokeInvite, revokeUser, resendCert } from "./invite.server"
 import { InviteRepo, InviteError, type Invite, type Revocation } from "~/lib/services/InviteRepo.server"
-import { UserManager, UserManagerError } from "~/lib/services/UserManager.server"
+import { UserManager, UserManagerError, type ManagedUser } from "~/lib/services/UserManager.server"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { EmailService, EmailError } from "~/lib/services/EmailService.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
@@ -256,9 +256,9 @@ const mockInviteRepo = (store: Map<string, Invite> = new Map(), revocations: Rev
       ),
   })
 
-const mockUserManager = (calls: { method: string; args: unknown[] }[] = []) =>
+const mockUserManager = (calls: { method: string; args: unknown[] }[] = [], users: ManagedUser[] = []) =>
   Layer.succeed(UserManager, {
-    getUsers: Effect.succeed([]),
+    getUsers: Effect.succeed(users),
     getGroups: Effect.succeed([]),
     createUser: (input) =>
       Effect.sync(() => {
@@ -357,6 +357,7 @@ const mockEmailService = (calls: { method: string; args: unknown[] }[] = []) =>
 const mockPreferencesRepo = () =>
   Layer.succeed(PreferencesRepo, {
     getLocale: () => Effect.succeed("en"),
+    getStoredLocale: () => Effect.succeed(null),
     setLocale: () => Effect.void,
     getLastCertRenewal: () => Effect.succeed({ at: null, renewalId: null }),
     setCertRenewal: () => Effect.void,
@@ -419,6 +420,54 @@ describe("queueInvite", () => {
           mockCertManager(certCalls),
           mockEmailService(emailCalls),
           mockCertificateRepo(),
+          mockUserManager(),
+          mockPreferencesRepo(),
+        ),
+      ),
+    )
+  })
+
+  it.effect("sends in the recipient's stored locale when one exists (overriding the caller)", () => {
+    const store = new Map<string, Invite>()
+    const emailCalls: { method: string; args: unknown[] }[] = []
+    // The invited email already maps to a user who saved a French preference.
+    const existing: ManagedUser = {
+      id: "alice",
+      email: "alice@example.com",
+      displayName: "Alice",
+      creationDate: "2026-01-01",
+    }
+    const prefsFr = Layer.succeed(PreferencesRepo, {
+      getLocale: () => Effect.succeed("fr"),
+      getStoredLocale: () => Effect.succeed("fr"),
+      setLocale: () => Effect.void,
+      getLastCertRenewal: () => Effect.succeed({ at: null, renewalId: null }),
+      setCertRenewal: () => Effect.void,
+      clearCertRenewalId: () => Effect.void,
+    })
+
+    return queueInvite({
+      email: "alice@example.com",
+      groups: [1],
+      groupNames: ["friends"],
+      invitedBy: "admin",
+      locale: "en", // caller asks for English…
+    }).pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          const call = emailCalls.find((c) => c.method === "sendInviteEmail")
+          // …but the stored French preference wins.
+          expect(call!.args[3]).toBe("fr")
+        }),
+      ),
+      Effect.provide(
+        Layer.mergeAll(
+          mockInviteRepo(store),
+          mockCertManager(),
+          mockEmailService(emailCalls),
+          mockCertificateRepo(),
+          mockUserManager([], [existing]),
+          prefsFr,
         ),
       ),
     )
@@ -451,7 +500,14 @@ describe("queueInvite", () => {
         }),
       ),
       Effect.provide(
-        Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls), failingEmail, mockCertificateRepo()),
+        Layer.mergeAll(
+          mockInviteRepo(store),
+          mockCertManager(certCalls),
+          failingEmail,
+          mockCertificateRepo(),
+          mockUserManager(),
+          mockPreferencesRepo(),
+        ),
       ),
     )
   })

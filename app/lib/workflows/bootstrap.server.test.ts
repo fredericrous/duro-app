@@ -229,6 +229,7 @@ const mockCertificateRepo = () =>
 const mockPreferencesRepo = () =>
   Layer.succeed(PreferencesRepo, {
     getLocale: () => Effect.succeed("en"),
+    getStoredLocale: () => Effect.succeed(null),
     setLocale: () => Effect.void,
     getLastCertRenewal: () => Effect.succeed({ at: null, renewalId: null }),
     setCertRenewal: () => Effect.void,
