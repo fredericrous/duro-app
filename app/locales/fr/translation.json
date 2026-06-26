@@ -137,6 +137,7 @@
       "newCert": "Nouveau certificat",
       "renewing": "Envoi...",
       "issuing": "Envoi...",
+      "devicePlaceholder": "Nom de l'appareil (ex. MacBook Pro)",
       "confirm": "Un nouveau certificat sera envoye a {{email}}. Continuer ?",
       "confirmButton": "Oui, envoyer",
       "success": "Certificat envoye a votre e-mail. Grattez ci-dessous pour reveler le mot de passe d'installation.",
@@ -146,6 +147,10 @@
       "copy": "Copier",
       "copied": "Copie !",
       "list": {
+        "device": "Appareil",
+        "unnamed": "Appareil sans nom",
+        "rename": "Renommer",
+        "renamed": "Appareil renomme.",
         "serial": "N° de serie",
         "issued": "Emis le",
         "expires": "Expire le",

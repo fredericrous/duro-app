@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react"
+import { useRevalidator } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 import type { SettingsResult } from "~/lib/mutations/settings"
 import { useAction } from "~/hooks/useAction"
 import { PasswordReveal } from "~/components/PasswordReveal/PasswordReveal"
-import { Alert, Badge, Button, Inline, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
+import { Alert, Badge, Button, Inline, Input, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
@@ -24,8 +25,17 @@ const API_URL = "/settings"
 
 function CertRow({ cert }: { cert: UserCertificate }) {
   const { t } = useTranslation()
-  const action = useAction<SettingsResult>(API_URL)
   const [confirming, setConfirming] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const revalidator = useRevalidator()
+  // On success (rename/revoke), close the editor and refetch the loader so the
+  // list reflects the new label — done in a callback, not an effect.
+  const action = useAction<SettingsResult>(API_URL, {
+    onSuccess: () => {
+      setRenaming(false)
+      revalidator.revalidate()
+    },
+  })
   const isSubmitting = action.state !== "idle"
   const revoked = action.data && "certRevoked" in action.data
 
@@ -35,6 +45,41 @@ function CertRow({ cert }: { cert: UserCertificate }) {
 
   return (
     <Table.Row>
+      <Table.Cell>
+        {renaming ? (
+          <action.Form>
+            <input type="hidden" name="intent" value="renameCert" />
+            <input type="hidden" name="serialNumber" value={cert.serialNumber} />
+            <Inline gap="sm">
+              <Input
+                name="label"
+                defaultValue={cert.label ?? ""}
+                placeholder={t("settings.cert.devicePlaceholder")}
+                maxLength={64}
+              />
+              <Button type="submit" variant="primary" size="small" disabled={isSubmitting}>
+                {t("common.save")}
+              </Button>
+              <Button type="button" variant="secondary" size="small" onClick={() => setRenaming(false)}>
+                {t("common.cancel")}
+              </Button>
+            </Inline>
+          </action.Form>
+        ) : (
+          <Inline gap="sm" align="center">
+            {cert.label ? (
+              <Text as="span">{cert.label}</Text>
+            ) : (
+              <Text as="span" color="muted">
+                {t("settings.cert.list.unnamed")}
+              </Text>
+            )}
+            <Button type="button" variant="link" size="small" onClick={() => setRenaming(true)}>
+              {t("settings.cert.list.rename")}
+            </Button>
+          </Inline>
+        )}
+      </Table.Cell>
       <Table.Cell>
         <code title={cert.serialNumber} style={{ fontFamily: "monospace" }}>
           {serialShort}
@@ -180,6 +225,7 @@ export function CertificateSection({
               <Table.Root>
                 <Table.Header>
                   <Table.Row>
+                    <Table.HeaderCell>{t("settings.cert.list.device")}</Table.HeaderCell>
                     <Table.HeaderCell>{t("settings.cert.list.serial")}</Table.HeaderCell>
                     <Table.HeaderCell>{t("settings.cert.list.issued")}</Table.HeaderCell>
                     <Table.HeaderCell>{t("settings.cert.list.expires")}</Table.HeaderCell>
@@ -216,17 +262,20 @@ export function CertificateSection({
       ) : confirming ? (
         <Stack gap="sm">
           <Text as="p">{t("settings.cert.confirm", { email })}</Text>
-          <Inline gap="sm">
-            <certAction.Form>
+          <certAction.Form>
+            <Stack gap="sm">
               <input type="hidden" name="intent" value="issueCert" />
-              <Button type="submit" variant="primary" disabled={isSubmitting}>
-                {isSubmitting ? t("settings.cert.issuing") : t("settings.cert.confirmButton")}
-              </Button>
-            </certAction.Form>
-            <Button variant="secondary" onClick={() => setConfirming(false)}>
-              {t("common.cancel")}
-            </Button>
-          </Inline>
+              <Input name="label" placeholder={t("settings.cert.devicePlaceholder")} maxLength={64} />
+              <Inline gap="sm">
+                <Button type="submit" variant="primary" disabled={isSubmitting}>
+                  {isSubmitting ? t("settings.cert.issuing") : t("settings.cert.confirmButton")}
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => setConfirming(false)}>
+                  {t("common.cancel")}
+                </Button>
+              </Inline>
+            </Stack>
+          </certAction.Form>
         </Stack>
       ) : (
         !effectivePassword && (

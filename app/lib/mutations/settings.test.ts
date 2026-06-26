@@ -13,11 +13,19 @@ beforeEach(async () => {
 })
 
 describe("parseSettingsMutation", () => {
-  it("parses issueCert", () => {
+  it("parses issueCert (no label → null)", () => {
     const fd = new FormData()
     fd.append("intent", "issueCert")
     const result = parseSettingsMutation(fd, auth)
-    expect(result).toEqual({ intent: "issueCert", auth })
+    expect(result).toEqual({ intent: "issueCert", label: null, auth })
+  })
+
+  it("parses issueCert with a device label (trimmed)", () => {
+    const fd = new FormData()
+    fd.append("intent", "issueCert")
+    fd.append("label", "  MacBook Pro  ")
+    const result = parseSettingsMutation(fd, auth)
+    expect(result).toEqual({ intent: "issueCert", label: "MacBook Pro", auth })
   })
 
   it("parses consumePassword", () => {
@@ -40,6 +48,24 @@ describe("parseSettingsMutation", () => {
     fd.append("intent", "revokeCert")
     const result = parseSettingsMutation(fd, auth)
     expect(result).toEqual({ error: "Missing serial number" })
+  })
+
+  it("parses renameCert with serialNumber and label", () => {
+    const fd = new FormData()
+    fd.append("intent", "renameCert")
+    fd.append("serialNumber", "abc-123")
+    fd.append("label", "Work laptop")
+    const result = parseSettingsMutation(fd, auth)
+    expect(result).toEqual({ intent: "renameCert", serialNumber: "abc-123", label: "Work laptop", auth })
+  })
+
+  it("renameCert with a blank label clears it (null)", () => {
+    const fd = new FormData()
+    fd.append("intent", "renameCert")
+    fd.append("serialNumber", "abc-123")
+    fd.append("label", "   ")
+    const result = parseSettingsMutation(fd, auth)
+    expect(result).toEqual({ intent: "renameCert", serialNumber: "abc-123", label: null, auth })
   })
 
   it("parses saveLocale as default", () => {

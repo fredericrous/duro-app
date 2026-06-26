@@ -274,7 +274,7 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
 /** How long an emailed cert-reveal link stays valid. */
 const REVEAL_TTL_MS = 24 * 60 * 60 * 1000
 
-export const resendCert = (email: string, username: string) =>
+export const resendCert = (email: string, username: string, label?: string | null) =>
   Effect.gen(function* () {
     const cert = yield* CertManager
     const emailService = yield* EmailService
@@ -297,6 +297,7 @@ export const resendCert = (email: string, username: string) =>
         userId: username,
         username,
         email,
+        label: label ?? null,
         serialNumber: certResult.serialNumber,
         issuedAt: new Date(),
         expiresAt: certResult.notAfter,

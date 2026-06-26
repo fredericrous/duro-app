@@ -215,6 +215,7 @@ const mockCertManager = () =>
 const mockCertificateRepo = () =>
   Layer.succeed(CertificateRepo, {
     store: () => Effect.void,
+    setLabel: () => Effect.succeed(1),
     listValid: () => Effect.succeed([]),
     listAllByUsernames: () => Effect.succeed({}),
     findBySerial: () => Effect.succeed(null),

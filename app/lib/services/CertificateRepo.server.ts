@@ -14,6 +14,8 @@ export interface UserCertificate {
   userId: string | null
   username: string
   email: string
+  /** User-supplied device name; null until set (shown as "Unnamed device"). */
+  label: string | null
   serialNumber: string
   issuedAt: string
   expiresAt: string
@@ -27,6 +29,7 @@ export interface StoreCertInput {
   userId?: string | null
   username: string
   email: string
+  label?: string | null
   serialNumber: string
   issuedAt: Date
   expiresAt: Date
@@ -49,6 +52,12 @@ export class CertificateRepo extends Context.Tag("CertificateRepo")<
   CertificateRepo,
   {
     readonly store: (cert: StoreCertInput) => Effect.Effect<void, CertificateRepoError>
+    /** Set/clear a cert's device label. Ownership-enforced. Returns affected row count. */
+    readonly setLabel: (
+      serialNumber: string,
+      username: string,
+      label: string | null,
+    ) => Effect.Effect<number, CertificateRepoError>
     readonly listValid: (username: string) => Effect.Effect<UserCertificate[], CertificateRepoError>
     readonly listAllByUsernames: (
       usernames: string[],
@@ -78,6 +87,7 @@ const toRow = (r: any): UserCertificate => ({
   userId: r.userId ?? null,
   username: r.username,
   email: r.email,
+  label: r.label ?? null,
   serialNumber: r.serialNumber,
   issuedAt: r.issuedAt,
   expiresAt: r.expiresAt,
@@ -101,16 +111,27 @@ export const CertificateRepoLive = Layer.effect(
         const id = crypto.randomUUID()
         const inviteId = cert.inviteId ?? null
         const userId = cert.userId ?? null
+        const label = cert.label ?? null
         const issuedAt = cert.issuedAt.toISOString()
         const expiresAt = cert.expiresAt.toISOString()
         return withErr(
-          sql`INSERT INTO user_certificates (id, invite_id, user_id, username, email, serial_number, issued_at, expires_at)
-              VALUES (${id}, ${inviteId}, ${userId}, ${cert.username}, ${cert.email}, ${cert.serialNumber}, ${issuedAt}, ${expiresAt})`.pipe(
+          sql`INSERT INTO user_certificates (id, invite_id, user_id, username, email, label, serial_number, issued_at, expires_at)
+              VALUES (${id}, ${inviteId}, ${userId}, ${cert.username}, ${cert.email}, ${label}, ${cert.serialNumber}, ${issuedAt}, ${expiresAt})`.pipe(
             Effect.asVoid,
           ),
           "Failed to store certificate",
         )
       },
+
+      setLabel: (serialNumber: string, username: string, label: string | null) =>
+        withErr(
+          // RETURNING + rows.length is driver-agnostic (the bare affected-count
+          // property differs between pg and PGlite); ownership enforced via username.
+          sql`UPDATE user_certificates SET label = ${label}
+              WHERE serial_number = ${serialNumber} AND username = ${username} AND revoked_at IS NULL
+              RETURNING serial_number`.pipe(Effect.map((rows) => rows.length)),
+          "Failed to set certificate label",
+        ),
 
       listValid: (username: string) =>
         withErr(

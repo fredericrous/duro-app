@@ -313,6 +313,7 @@ const mockCertificateRepo = (calls: { method: string; args: unknown[] }[] = []) 
       calls.push({ method: "store", args: [cert] })
       return Effect.void
     },
+    setLabel: (_serial, _username, _label) => Effect.succeed(1),
     listValid: () => Effect.succeed([]),
     listAllByUsernames: () => Effect.succeed({}),
     findBySerial: () => Effect.succeed(null),

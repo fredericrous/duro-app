@@ -12,9 +12,10 @@ import type { AuthInfo } from "~/lib/auth.server"
 // ---------------------------------------------------------------------------
 
 export type SettingsMutation =
-  | { intent: "issueCert" | "renewCert"; auth: AuthInfo }
+  | { intent: "issueCert" | "renewCert"; label?: string | null; auth: AuthInfo }
   | { intent: "consumePassword"; auth: AuthInfo }
   | { intent: "revokeCert"; serialNumber: string; auth: AuthInfo }
+  | { intent: "renameCert"; serialNumber: string; label: string | null; auth: AuthInfo }
   | { intent: "saveLocale"; locale: string; auth: AuthInfo }
 
 export type SettingsResult =
@@ -23,13 +24,14 @@ export type SettingsResult =
   | { rateLimited: true; nextAvailable: string }
   | { consumed: true }
   | { certRevoked: true }
+  | { certRenamed: true }
   | { error: string }
 
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
 
-function handleIssueCert(auth: AuthInfo) {
+function handleIssueCert(auth: AuthInfo, label?: string | null) {
   return Effect.gen(function* () {
     if (!auth.email) {
       return { certError: "No email associated with your account." } as SettingsResult
@@ -47,7 +49,7 @@ function handleIssueCert(auth: AuthInfo) {
       }
     }
 
-    const result = yield* resendCert(auth.email, auth.user!)
+    const result = yield* resendCert(auth.email, auth.user!, label)
 
     const cert = yield* CertManager
     const p12Password = yield* cert.getP12Password(result.renewalId).pipe(Effect.catchAll(() => Effect.succeed(null)))
@@ -113,6 +115,21 @@ function handleRevokeCert(serialNumber: string, auth: AuthInfo) {
   )
 }
 
+function handleRenameCert(serialNumber: string, label: string | null, auth: AuthInfo) {
+  return Effect.gen(function* () {
+    const certRepo = yield* CertificateRepo
+    const affected = yield* certRepo.setLabel(serialNumber, auth.user!, label)
+    if (affected === 0) {
+      return { certError: "Certificate not found" } as SettingsResult
+    }
+    return { certRenamed: true as const } as SettingsResult
+  }).pipe(
+    Effect.catchAll((e) =>
+      Effect.succeed({ certError: e instanceof Error ? e.message : "Failed to rename device" } as SettingsResult),
+    ),
+  )
+}
+
 function handleSaveLocale(locale: string, auth: AuthInfo) {
   return Effect.gen(function* () {
     if (!(supportedLngs as readonly string[]).includes(locale)) {
@@ -133,11 +150,13 @@ export function handleSettingsMutation(mutation: SettingsMutation) {
   switch (mutation.intent) {
     case "issueCert":
     case "renewCert":
-      return handleIssueCert(mutation.auth)
+      return handleIssueCert(mutation.auth, mutation.label)
     case "consumePassword":
       return handleConsumePassword(mutation.auth)
     case "revokeCert":
       return handleRevokeCert(mutation.serialNumber, mutation.auth)
+    case "renameCert":
+      return handleRenameCert(mutation.serialNumber, mutation.label, mutation.auth)
     case "saveLocale":
       return handleSaveLocale(mutation.locale, mutation.auth)
   }
@@ -147,11 +166,18 @@ export function handleSettingsMutation(mutation: SettingsMutation) {
 // FormData parser
 // ---------------------------------------------------------------------------
 
+/** Trim, cap at 64 chars, and collapse empty to null. */
+function parseLabel(raw: FormDataEntryValue | null): string | null {
+  if (typeof raw !== "string") return null
+  const trimmed = raw.trim().slice(0, 64)
+  return trimmed.length > 0 ? trimmed : null
+}
+
 export function parseSettingsMutation(formData: FormData, auth: AuthInfo): SettingsMutation | { error: string } {
   const intent = formData.get("intent") as string | null
 
   if (intent === "issueCert" || intent === "renewCert") {
-    return { intent, auth }
+    return { intent, label: parseLabel(formData.get("label")), auth }
   }
   if (intent === "consumePassword") {
     return { intent, auth }
@@ -160,6 +186,11 @@ export function parseSettingsMutation(formData: FormData, auth: AuthInfo): Setti
     const serialNumber = formData.get("serialNumber") as string
     if (!serialNumber) return { error: "Missing serial number" }
     return { intent, serialNumber, auth }
+  }
+  if (intent === "renameCert") {
+    const serialNumber = formData.get("serialNumber") as string
+    if (!serialNumber) return { error: "Missing serial number" }
+    return { intent, serialNumber, label: parseLabel(formData.get("label")), auth }
   }
 
   // Default: saveLocale

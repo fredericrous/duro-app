@@ -137,6 +137,7 @@
       "newCert": "New Certificate",
       "renewing": "Sending...",
       "issuing": "Sending...",
+      "devicePlaceholder": "Device name (e.g. MacBook Pro)",
       "confirm": "A new certificate will be sent to {{email}}. Continue?",
       "confirmButton": "Yes, send it",
       "success": "Certificate sent to your email. Scratch below to reveal the install password.",
@@ -146,6 +147,10 @@
       "copy": "Copy",
       "copied": "Copied!",
       "list": {
+        "device": "Device",
+        "unnamed": "Unnamed device",
+        "rename": "Rename",
+        "renamed": "Device renamed.",
         "serial": "Serial",
         "issued": "Issued",
         "expires": "Expires",

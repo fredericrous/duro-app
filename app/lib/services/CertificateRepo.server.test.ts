@@ -230,3 +230,47 @@ describe("CertificateRepo — setUserId / updateUsername", () => {
     )
   })
 })
+
+describe("CertificateRepo — device label", () => {
+  it.layer(TestLayer)("store persists a label; setLabel renames and clears it", (it) => {
+    it.effect("label round-trip", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+
+        yield* repo.store(sample({ serialNumber: "SN-L1", username: "alice", label: "MacBook" }))
+        expect((yield* repo.findBySerial("SN-L1"))?.label).toBe("MacBook")
+
+        const renamed = yield* repo.setLabel("SN-L1", "alice", "MacBook Pro")
+        expect(renamed).toBe(1)
+        expect((yield* repo.findBySerial("SN-L1"))?.label).toBe("MacBook Pro")
+
+        yield* repo.setLabel("SN-L1", "alice", null)
+        expect((yield* repo.findBySerial("SN-L1"))?.label).toBeNull()
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("store without a label leaves it null", (it) => {
+    it.effect("defaults to null", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        yield* repo.store(sample({ serialNumber: "SN-L0", username: "alice" }))
+        expect((yield* repo.findBySerial("SN-L0"))?.label).toBeNull()
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("setLabel is ownership-enforced", (it) => {
+    it.effect("a different user cannot rename your device", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        yield* repo.store(sample({ serialNumber: "SN-L2", username: "alice", label: "Phone" }))
+
+        const affected = yield* repo.setLabel("SN-L2", "mallory", "pwned")
+
+        expect(affected).toBe(0)
+        expect((yield* repo.findBySerial("SN-L2"))?.label).toBe("Phone")
+      }),
+    )
+  })
+})

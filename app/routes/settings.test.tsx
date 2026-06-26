@@ -204,4 +204,45 @@ describe("SettingsPage component", () => {
       expect(screen.getByRole("button", { name: /save/i })).toBeInTheDocument()
     })
   })
+
+  it("renders a certificate's device label in the cert list", async () => {
+    renderRoute({
+      parentLoaderId: "routes/dashboard",
+      parentLoader: () => ({ user: "alice", isAdmin: false }),
+      route: {
+        path: "/settings",
+        Component: SettingsPage as never,
+        loader: () => ({
+          locale: "en",
+          currentLocale: "en",
+          email: "a@example.com",
+          lastCertRenewalAt: null,
+          p12Password: null,
+          certificates: [
+            {
+              id: "c1",
+              inviteId: null,
+              userId: null,
+              username: "alice",
+              email: "a@example.com",
+              label: "MacBook Pro",
+              serialNumber: "ABCDEF0123456789",
+              issuedAt: new Date().toISOString(),
+              expiresAt: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+              revokedAt: null,
+              revokeState: null,
+              revokeError: null,
+            },
+          ],
+          apiKeys: [],
+          autheliaUrl: "https://auth.example.com",
+        }),
+      },
+    })
+
+    // The device name is data (not an i18n key), so it renders verbatim.
+    await waitFor(() => {
+      expect(screen.getByText("MacBook Pro")).toBeInTheDocument()
+    })
+  })
 })
