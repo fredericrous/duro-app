@@ -242,6 +242,7 @@ const mockEmailService = (sendShouldFail = false) =>
     sendInviteEmail: () =>
       sendShouldFail ? Effect.fail(new EmailError({ message: "SMTP down" })) : Effect.succeed("<invite-test@test>"),
     sendCertRenewalEmail: () => Effect.void,
+    sendRecoveryNotificationEmail: () => Effect.void,
   })
 
 const mockCertRevealRepo = () =>

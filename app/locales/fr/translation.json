@@ -225,6 +225,20 @@
       }
     }
   },
+  "recover": {
+    "title": "Recuperer l'acces",
+    "subtitle": "Vous avez perdu l'appareil avec votre certificat ? Saisissez l'e-mail de votre compte et un administrateur examinera votre demande.",
+    "emailLabel": "E-mail du compte",
+    "emailPlaceholder": "vous@example.com",
+    "noteLabel": "Note (facultatif)",
+    "notePlaceholder": "ex. j'ai perdu mon ordinateur portable",
+    "noteHint": "Contexte pour aider l'administrateur a reconnaitre votre demande.",
+    "submit": "Demander la recuperation",
+    "sent": {
+      "title": "Demande recue",
+      "message": "Si ce compte existe, un administrateur a ete notifie. Une fois approuvee, vous recevrez un e-mail avec un lien vers un nouveau certificat."
+    }
+  },
   "welcome": {
     "title": "Bienvenue",
     "heading": "Bienvenue, {{user}} !",
@@ -353,6 +367,19 @@
   },
   "admin": {
     "title": "Admin - Duro",
+    "recovery": {
+      "heading": "Recuperation d'appareil",
+      "description": "Demandes en attente d'utilisateurs ayant perdu tous leurs appareils. L'approbation emet un nouveau certificat, envoye par e-mail au compte.",
+      "empty": "Aucune demande de recuperation en attente.",
+      "approve": "Approuver",
+      "deny": "Refuser",
+      "col": {
+        "email": "Compte",
+        "requested": "Demande le",
+        "ip": "IP",
+        "note": "Note"
+      }
+    },
     "tabs": {
       "invites": "Invitations",
       "users": "Utilisateurs"

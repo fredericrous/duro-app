@@ -24,6 +24,8 @@ import { AppSyncServiceLive } from "~/lib/governance/AppSyncService.server"
 import { InviteRepoLive } from "~/lib/services/InviteRepo.server"
 import { PreferencesRepoLive } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepoLive } from "~/lib/services/CertificateRepo.server"
+import { CertRevealRepoLive } from "~/lib/services/CertRevealRepo.server"
+import { RecoveryRepoLive } from "~/lib/services/RecoveryRepo.server"
 import { CertManagerDev } from "~/lib/services/CertManager.server"
 import { EmailServiceDev } from "~/lib/services/EmailService.server"
 import { OidcClientDev } from "~/lib/services/OidcClient.server"
@@ -62,6 +64,8 @@ export const TestAppLayer = Layer.mergeAll(
   InviteRepoLive,
   PreferencesRepoLive,
   CertificateRepoLive,
+  CertRevealRepoLive,
+  RecoveryRepoLive,
   ApplicationRepoLive,
   GovernanceRepos,
   AuthzEngineLive,
@@ -117,7 +121,8 @@ export function truncateAll(): Promise<void> {
         request_approvals, access_requests, approval_policies,
         grants, role_entitlements, entitlements, roles, resources,
         group_mappings, applications, group_memberships, principals,
-        invites, user_revocations, user_preferences, user_certificates
+        invites, user_revocations, user_preferences, user_certificates,
+        recovery_requests
         RESTART IDENTITY CASCADE`
     }) as Effect.Effect<void, never, never>,
   )

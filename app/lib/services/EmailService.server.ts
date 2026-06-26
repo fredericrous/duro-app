@@ -30,6 +30,12 @@ export class EmailService extends Context.Tag("EmailService")<
       locale?: string,
       revealToken?: string,
     ) => Effect.Effect<void, EmailError>
+    /** Plain notification to an admin that a device-recovery request is pending. */
+    readonly sendRecoveryNotificationEmail: (
+      adminEmail: string,
+      requesterEmail: string,
+      note: string | null,
+    ) => Effect.Effect<void, EmailError>
   }
 >() {}
 
@@ -40,6 +46,8 @@ export const EmailServiceDev = Layer.succeed(EmailService, {
     ),
   sendCertRenewalEmail: (email, locale, _revealToken) =>
     Effect.log(`[DEV] Would send cert renewal email to ${email} (locale=${locale ?? "en"})`),
+  sendRecoveryNotificationEmail: (adminEmail, requesterEmail) =>
+    Effect.log(`[DEV] Would notify admin ${adminEmail} of recovery request for ${requesterEmail}`),
 })
 
 export const EmailServiceLive = Layer.scoped(
@@ -185,6 +193,25 @@ export const EmailServiceLive = Layer.scoped(
               }),
           })
         }),
+
+      // Plain internal notification to an admin — no secret, no recipient-facing
+      // content. The actual review happens in the admin panel.
+      sendRecoveryNotificationEmail: (adminEmail: string, requesterEmail: string, note: string | null) =>
+        Effect.tryPromise({
+          try: () =>
+            transporter.sendMail({
+              from,
+              to: adminEmail,
+              subject: `[${config.appName}] Device recovery request from ${requesterEmail}`,
+              html:
+                `<p>A device-recovery request is pending review.</p>` +
+                `<p><strong>From:</strong> ${requesterEmail}</p>` +
+                (note ? `<p><strong>Note:</strong> ${note.replace(/[<>&]/g, "")}</p>` : "") +
+                `<p>Approve or deny it in the admin panel: ` +
+                `<a href="${config.homeUrl}/admin/recovery">${config.homeUrl}/admin/recovery</a></p>`,
+            }),
+          catch: (e) => new EmailError({ message: "Failed to send recovery notification", cause: e }),
+        }).pipe(Effect.asVoid),
     }
   }),
 )

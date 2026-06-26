@@ -225,6 +225,20 @@
       }
     }
   },
+  "recover": {
+    "title": "Recover access",
+    "subtitle": "Lost the device with your certificate? Enter your account email and an admin will review your request.",
+    "emailLabel": "Account email",
+    "emailPlaceholder": "you@example.com",
+    "noteLabel": "Note (optional)",
+    "notePlaceholder": "e.g. lost my laptop",
+    "noteHint": "Context to help the admin recognize your request.",
+    "submit": "Request recovery",
+    "sent": {
+      "title": "Request received",
+      "message": "If that account exists, an admin has been notified. Once approved, you'll get an email with a link to a new certificate."
+    }
+  },
   "welcome": {
     "title": "Welcome",
     "heading": "Welcome, {{user}}!",
@@ -353,6 +367,19 @@
   },
   "admin": {
     "title": "Admin - Duro",
+    "recovery": {
+      "heading": "Device Recovery",
+      "description": "Pending requests from users who lost all their devices. Approving issues a new certificate, emailed to the account.",
+      "empty": "No pending recovery requests.",
+      "approve": "Approve",
+      "deny": "Deny",
+      "col": {
+        "email": "Account",
+        "requested": "Requested",
+        "ip": "IP",
+        "note": "Note"
+      }
+    },
     "tabs": {
       "invites": "Invites",
       "users": "Users"

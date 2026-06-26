@@ -353,6 +353,7 @@ const mockEmailService = (calls: { method: string; args: unknown[] }[] = []) =>
       calls.push({ method: "sendCertRenewalEmail", args: [email, locale, revealToken] })
       return Effect.void
     },
+    sendRecoveryNotificationEmail: () => Effect.void,
   })
 
 const mockPreferencesRepo = () =>
@@ -482,6 +483,7 @@ describe("queueInvite", () => {
       sendInviteEmail: () => Effect.fail(new EmailError({ message: "SMTP down" })),
       // (typed as Effect<string>; the failure short-circuits before the value)
       sendCertRenewalEmail: () => Effect.void,
+      sendRecoveryNotificationEmail: () => Effect.void,
     } as EmailService["Type"])
 
     return queueInvite({

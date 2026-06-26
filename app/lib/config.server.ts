@@ -6,6 +6,10 @@ export const config = {
   homeUrl: process.env.HOME_URL ?? "https://home.daddyshome.fr",
   inviteBaseUrl: process.env.INVITE_BASE_URL ?? "https://join.daddyshome.fr",
   adminGroupName: process.env.ADMIN_GROUP_NAME ?? "lldap_admin",
+  /** Where admin notifications (e.g. device-recovery requests) are sent. */
+  adminEmail: process.env.ADMIN_EMAIL ?? null,
+  /** Self-service device recovery (admin-approval) is off unless explicitly enabled. */
+  recoveryEnabled: process.env.RECOVERY_ENABLED === "true",
   isSystemUser: (username: string) => username === "admin" || username.endsWith("-service"),
   appDescription: process.env.APP_DESCRIPTION ?? "a private platform for media, productivity, and more",
   categoryOrder: (process.env.CATEGORY_ORDER ?? "")
