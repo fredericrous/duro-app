@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react"
-import { useRevalidator } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 import type { SettingsResult } from "~/lib/mutations/settings"
@@ -27,15 +26,10 @@ function CertRow({ cert }: { cert: UserCertificate }) {
   const { t } = useTranslation()
   const [confirming, setConfirming] = useState(false)
   const [renaming, setRenaming] = useState(false)
-  const revalidator = useRevalidator()
-  // On success (rename/revoke), close the editor and refetch the loader so the
-  // list reflects the new label — done in a callback, not an effect.
-  const action = useAction<SettingsResult>(API_URL, {
-    onSuccess: () => {
-      setRenaming(false)
-      revalidator.revalidate()
-    },
-  })
+  // Optimistic device label so the row reflects a rename immediately (useAction
+  // is a plain fetch, no router revalidation); reverts on a full page reload.
+  const [label, setLabel] = useState(cert.label)
+  const action = useAction<SettingsResult>(API_URL)
   const isSubmitting = action.state !== "idle"
   const revoked = action.data && "certRevoked" in action.data
 
@@ -47,13 +41,22 @@ function CertRow({ cert }: { cert: UserCertificate }) {
     <Table.Row>
       <Table.Cell>
         {renaming ? (
-          <action.Form>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              const fd = new FormData(e.currentTarget)
+              const next = ((fd.get("label") as string) ?? "").trim() || null
+              void action.submit(fd)
+              setLabel(next)
+              setRenaming(false)
+            }}
+          >
             <input type="hidden" name="intent" value="renameCert" />
             <input type="hidden" name="serialNumber" value={cert.serialNumber} />
             <Inline gap="sm">
               <Input
                 name="label"
-                defaultValue={cert.label ?? ""}
+                defaultValue={label ?? ""}
                 placeholder={t("settings.cert.devicePlaceholder")}
                 maxLength={64}
               />
@@ -64,11 +67,11 @@ function CertRow({ cert }: { cert: UserCertificate }) {
                 {t("common.cancel")}
               </Button>
             </Inline>
-          </action.Form>
+          </form>
         ) : (
           <Inline gap="sm" align="center">
-            {cert.label ? (
-              <Text as="span">{cert.label}</Text>
+            {label ? (
+              <Text as="span">{label}</Text>
             ) : (
               <Text as="span" color="muted">
                 {t("settings.cert.list.unnamed")}
