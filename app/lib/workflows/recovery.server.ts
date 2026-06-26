@@ -1,6 +1,7 @@
 import { Data, Effect } from "effect"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { RecoveryRepo } from "~/lib/services/RecoveryRepo.server"
+import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { EmailService } from "~/lib/services/EmailService.server"
 import { DiscordNotifier } from "~/lib/services/DiscordNotifier.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
@@ -94,12 +95,34 @@ export const requestRecovery = (input: RecoveryRequestInput) =>
     }
   }).pipe(Effect.withSpan("requestRecovery"))
 
-/** Approve a pending request: issue a fresh cert (emailed reveal link) + audit. */
-export const approveRecovery = (requestId: string, adminUser: string) =>
+/**
+ * Approve a pending request: optionally revoke the user's other devices, then
+ * issue a fresh cert (emailed reveal link) + audit.
+ *
+ * When `revokeOthers` is set (the default for a true loss), every existing cert
+ * for the user is revoked FIRST so the freshly-issued one below survives — this
+ * closes the hole where a lost/stolen device's cert stays valid until expiry.
+ * Revocation completes asynchronously via the operator.
+ */
+export const approveRecovery = (requestId: string, adminUser: string, revokeOthers: boolean) =>
   Effect.gen(function* () {
     const repo = yield* RecoveryRepo
     const req = yield* repo.findById(requestId).pipe(Effect.mapError(() => new RecoveryError({ code: "db" })))
     if (!req || req.status !== "pending") return yield* new RecoveryError({ code: "not_found" })
+
+    let revokedCount = 0
+    if (revokeOthers) {
+      const certRepo = yield* CertificateRepo
+      const revoked = yield* certRepo
+        .revokeAllForUser(req.username)
+        .pipe(
+          Effect.mapError(
+            (e) =>
+              new RecoveryError({ code: "issue_failed", message: e instanceof Error ? e.message : "revoke failed" }),
+          ),
+        )
+      revokedCount = revoked.length
+    }
 
     const result = yield* resendCert(req.email, req.username).pipe(
       Effect.mapError(
@@ -119,11 +142,11 @@ export const approveRecovery = (requestId: string, adminUser: string) =>
         actorId: adminUser,
         targetType: "user",
         targetId: req.username,
-        metadata: { email: req.email, requestId },
+        metadata: { email: req.email, requestId, revokedOthers: revokeOthers, revokedCount },
       })
       .pipe(Effect.catchAll(() => Effect.void))
 
-    return { email: req.email }
+    return { email: req.email, revokedCount }
   }).pipe(Effect.withSpan("approveRecovery", { attributes: { requestId } }))
 
 /** Deny a pending request + audit. */

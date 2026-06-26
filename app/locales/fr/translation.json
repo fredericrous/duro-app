@@ -373,6 +373,7 @@
       "empty": "Aucune demande de recuperation en attente.",
       "approve": "Approuver",
       "deny": "Refuser",
+      "revokeOthers": "Revoquer les autres appareils de cet utilisateur",
       "col": {
         "email": "Compte",
         "requested": "Demande le",

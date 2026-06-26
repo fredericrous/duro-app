@@ -373,6 +373,7 @@
       "empty": "No pending recovery requests.",
       "approve": "Approve",
       "deny": "Deny",
+      "revokeOthers": "Revoke this user's other devices",
       "col": {
         "email": "Account",
         "requested": "Requested",

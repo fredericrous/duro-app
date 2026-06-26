@@ -8,7 +8,7 @@ import { config, isOriginAllowed } from "~/lib/config.server"
 import { RecoveryRepo, type RecoveryRequest } from "~/lib/services/RecoveryRepo.server"
 import { approveRecovery, denyRecovery } from "~/lib/workflows/recovery.server"
 import { CardSection } from "~/components/CardSection/CardSection"
-import { Alert, Button, Inline, Stack, Table, Text } from "@duro-app/ui"
+import { Alert, Button, Checkbox, Inline, Stack, Table, Text } from "@duro-app/ui"
 
 export async function loader() {
   const pending = await runEffect(
@@ -38,8 +38,9 @@ export async function action({ request }: Route.ActionArgs) {
 
   try {
     if (intent === "approve") {
-      const r = await runEffect(approveRecovery(requestId, auth.user ?? auth.sub ?? "admin"))
-      return { approved: true as const, email: r.email }
+      const revokeOthers = fd.get("revokeOthers") === "on"
+      const r = await runEffect(approveRecovery(requestId, auth.user ?? auth.sub ?? "admin", revokeOthers))
+      return { approved: true as const, email: r.email, revokedCount: r.revokedCount }
     }
     if (intent === "deny") {
       await runEffect(denyRecovery(requestId, auth.user ?? auth.sub ?? "admin"))
@@ -68,13 +69,18 @@ function RequestRow({ req }: { req: RecoveryRequest }) {
       </Table.Cell>
       <Table.Cell>{req.note ?? "—"}</Table.Cell>
       <Table.Cell>
-        <Inline gap="sm">
+        <Inline gap="md">
           <fetcher.Form method="post">
-            <input type="hidden" name="intent" value="approve" />
-            <input type="hidden" name="requestId" value={req.id} />
-            <Button type="submit" variant="primary" size="small" disabled={submitting}>
-              {t("admin.recovery.approve")}
-            </Button>
+            <Stack gap="xs">
+              <Checkbox name="revokeOthers" value="on" defaultChecked>
+                {t("admin.recovery.revokeOthers")}
+              </Checkbox>
+              <input type="hidden" name="intent" value="approve" />
+              <input type="hidden" name="requestId" value={req.id} />
+              <Button type="submit" variant="primary" size="small" disabled={submitting}>
+                {t("admin.recovery.approve")}
+              </Button>
+            </Stack>
           </fetcher.Form>
           <fetcher.Form method="post">
             <input type="hidden" name="intent" value="deny" />

@@ -4,6 +4,7 @@ import { Effect } from "effect"
 import { truncateAll, testRunEffect } from "~/test/test-runtime"
 import { requestRecovery, approveRecovery, denyRecovery } from "./recovery.server"
 import { RecoveryRepo } from "~/lib/services/RecoveryRepo.server"
+import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { DiscordNotifier } from "~/lib/services/DiscordNotifier.server"
 
 beforeEach(async () => {
@@ -87,15 +88,38 @@ describe("approveRecovery / denyRecovery", () => {
     return req
   }
 
-  it("approve issues a cert and marks the request approved", async () => {
+  it("approve issues a cert and marks the request approved (without revoking)", async () => {
     const req = await seedRequest()
-    const result = await run(approveRecovery(req.id, "admin"))
-    expect(result).toMatchObject({ email: "bob@example.com" })
+    const result = await run(approveRecovery(req.id, "admin", false))
+    expect(result).toMatchObject({ email: "bob@example.com", revokedCount: 0 })
 
     const after = await findById(req.id)
     expect(after?.status).toBe("approved")
     expect(after?.reviewedBy).toBe("admin")
     expect(after?.renewalId).not.toBeNull()
+  })
+
+  it("approve with revokeOthers revokes the user's existing certs first", async () => {
+    // Seed an existing ("lost") device cert for bob.
+    await run(
+      Effect.gen(function* () {
+        const certRepo = yield* CertificateRepo
+        yield* certRepo.store({
+          inviteId: null,
+          userId: "bob",
+          username: "bob",
+          email: "bob@example.com",
+          label: "old phone",
+          serialNumber: "OLD-LOST-1",
+          issuedAt: new Date(),
+          expiresAt: new Date(Date.now() + 1_000_000_000),
+        })
+      }),
+    )
+
+    const req = await seedRequest()
+    const result = await run(approveRecovery(req.id, "admin", true))
+    expect(result.revokedCount).toBe(1) // the lost cert (the fresh one is issued after)
   })
 
   it("deny marks the request denied (no cert issued)", async () => {
@@ -107,7 +131,7 @@ describe("approveRecovery / denyRecovery", () => {
   })
 
   it("approve fails for an unknown / non-pending request", async () => {
-    const exit = await run(approveRecovery("does-not-exist", "admin").pipe(Effect.either))
+    const exit = await run(approveRecovery("does-not-exist", "admin", false).pipe(Effect.either))
     expect((exit as { _tag: string })._tag).toBe("Left")
   })
 })
