@@ -2,8 +2,8 @@ apiVersion: v2
 name: duro-app
 description: A household management dashboard with invite system
 type: application
-version: 1.49.1
-appVersion: 1.49.1
+version: 1.50.2
+appVersion: 1.50.2
 kubeVersion: ">=1.28.0-0"
 home: https://github.com/fredericrous/duro-app
 sources:
