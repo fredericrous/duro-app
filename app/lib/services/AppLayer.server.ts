@@ -11,6 +11,7 @@ import { PreferencesRepoLive } from "./PreferencesRepo.server"
 import { CertificateRepoLive } from "./CertificateRepo.server"
 import { CertRevealRepoLive } from "./CertRevealRepo.server"
 import { RecoveryRepoLive } from "./RecoveryRepo.server"
+import { DiscordNotifierLive } from "./DiscordNotifier.server"
 import { DbLive, DbDevLive } from "~/lib/db/client.server"
 import { OtelLayer } from "~/lib/telemetry.server"
 
@@ -76,6 +77,7 @@ export const AppLayer = Layer.mergeAll(
   CertificateRepoLive,
   CertRevealRepoLive,
   RecoveryRepoLive,
+  DiscordNotifierLive,
   // Governance services
   ApplicationRepoLive,
   GovernanceRepos,

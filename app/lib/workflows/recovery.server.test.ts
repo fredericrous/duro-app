@@ -4,10 +4,19 @@ import { Effect } from "effect"
 import { truncateAll, testRunEffect } from "~/test/test-runtime"
 import { requestRecovery, approveRecovery, denyRecovery } from "./recovery.server"
 import { RecoveryRepo } from "~/lib/services/RecoveryRepo.server"
+import { DiscordNotifier } from "~/lib/services/DiscordNotifier.server"
 
 beforeEach(async () => {
   await truncateAll()
 })
+
+// Override the dev notifier with a capturing one for assertions.
+const withDiscord = <A, E, R>(eff: Effect.Effect<A, E, R>, calls: string[]) =>
+  eff.pipe(
+    Effect.provideService(DiscordNotifier, {
+      notify: (content: string) => Effect.sync(() => void calls.push(content)),
+    }),
+  )
 
 // All deps (RecoveryRepo, UserManagerDev with alice/bob, CertManagerDev,
 // CertRevealRepo, AuditServiceDev, EmailServiceDev) come from TestAppLayer.
@@ -53,6 +62,21 @@ describe("requestRecovery", () => {
     await run(requestRecovery({ email: "alice@example.com" }))
     await run(requestRecovery({ email: "alice@example.com" }))
     expect((await listPending()).length).toBe(1)
+  })
+
+  it("pings Discord (with the review link) when a request is created", async () => {
+    const calls: string[] = []
+    await run(withDiscord(requestRecovery({ email: "alice@example.com", note: "lost laptop" }), calls))
+    expect(calls.length).toBe(1)
+    expect(calls[0]).toContain("alice@example.com")
+    expect(calls[0]).toContain("lost laptop")
+    expect(calls[0]).toContain("/admin/recovery")
+  })
+
+  it("does not ping Discord for an unknown account", async () => {
+    const calls: string[] = []
+    await run(withDiscord(requestRecovery({ email: "nobody@example.com" }), calls))
+    expect(calls.length).toBe(0)
   })
 })
 

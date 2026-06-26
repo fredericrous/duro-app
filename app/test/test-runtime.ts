@@ -26,6 +26,7 @@ import { PreferencesRepoLive } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepoLive } from "~/lib/services/CertificateRepo.server"
 import { CertRevealRepoLive } from "~/lib/services/CertRevealRepo.server"
 import { RecoveryRepoLive } from "~/lib/services/RecoveryRepo.server"
+import { DiscordNotifierDev } from "~/lib/services/DiscordNotifier.server"
 import { CertManagerDev } from "~/lib/services/CertManager.server"
 import { EmailServiceDev } from "~/lib/services/EmailService.server"
 import { OidcClientDev } from "~/lib/services/OidcClient.server"
@@ -66,6 +67,7 @@ export const TestAppLayer = Layer.mergeAll(
   CertificateRepoLive,
   CertRevealRepoLive,
   RecoveryRepoLive,
+  DiscordNotifierDev,
   ApplicationRepoLive,
   GovernanceRepos,
   AuthzEngineLive,

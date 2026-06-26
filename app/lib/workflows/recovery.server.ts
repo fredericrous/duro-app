@@ -2,6 +2,7 @@ import { Data, Effect } from "effect"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { RecoveryRepo } from "~/lib/services/RecoveryRepo.server"
 import { EmailService } from "~/lib/services/EmailService.server"
+import { DiscordNotifier } from "~/lib/services/DiscordNotifier.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { resendCert } from "~/lib/workflows/invite.server"
 import { config } from "~/lib/config.server"
@@ -76,7 +77,15 @@ export const requestRecovery = (input: RecoveryRequestInput) =>
       })
       .pipe(Effect.catchAll(() => Effect.void))
 
-    // Best-effort admin notification; the admin panel is the authoritative list.
+    // Best-effort admin notifications; the admin panel is the authoritative
+    // list. Discord is the reliable channel (homelab email tends to land in
+    // Gmail spam); email is kept as a fallback. Neither can fail the request.
+    const discord = yield* DiscordNotifier
+    yield* discord.notify(
+      `🔐 Device recovery requested for \`${email}\`${note ? ` — “${note}”` : ""}\n` +
+        `Review: ${config.homeUrl}/admin/recovery`,
+    )
+
     if (config.adminEmail) {
       const emailSvc = yield* EmailService
       yield* emailSvc

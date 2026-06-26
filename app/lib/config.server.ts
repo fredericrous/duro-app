@@ -10,6 +10,8 @@ export const config = {
   adminEmail: process.env.ADMIN_EMAIL ?? null,
   /** Self-service device recovery (admin-approval) is off unless explicitly enabled. */
   recoveryEnabled: process.env.RECOVERY_ENABLED === "true",
+  /** Discord incoming webhook for admin notifications (recovery requests, …). */
+  discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL ?? null,
   isSystemUser: (username: string) => username === "admin" || username.endsWith("-service"),
   appDescription: process.env.APP_DESCRIPTION ?? "a private platform for media, productivity, and more",
   categoryOrder: (process.env.CATEGORY_ORDER ?? "")
