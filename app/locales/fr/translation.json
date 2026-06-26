@@ -436,6 +436,7 @@
       "security": "Securite",
       "authzPlayground": "Bac a sable Authz",
       "auditLog": "Journal d'audit",
+      "recovery": "Recuperation d'appareil",
       "system": "Systeme",
       "plugins": "Extensions",
       "invites": "Invitations utilisateur",

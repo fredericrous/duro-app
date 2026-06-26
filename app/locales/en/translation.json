@@ -436,6 +436,7 @@
       "security": "Security",
       "authzPlayground": "Authz Playground",
       "auditLog": "Audit Log",
+      "recovery": "Device Recovery",
       "system": "System",
       "plugins": "Plugins",
       "invites": "User Invites",

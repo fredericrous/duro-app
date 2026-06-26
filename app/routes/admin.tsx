@@ -119,6 +119,7 @@ const navMap: Record<string, string> = {
   "group-mappings": "/admin/group-mappings",
   "authz-playground": "/admin/authz-playground",
   audit: "/admin/audit",
+  recovery: "/admin/recovery",
   plugins: "/admin/plugins",
   invites: "/admin",
   users: "/admin/users",
@@ -242,6 +243,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
       <SideNav.Group label={t("admin.nav.security", "Security")}>
         <SideNav.Item value="authz-playground">{t("admin.nav.authzPlayground", "Authz Playground")}</SideNav.Item>
         <SideNav.Item value="audit">{t("admin.nav.auditLog", "Audit Log")}</SideNav.Item>
+        <SideNav.Item value="recovery">{t("admin.nav.recovery", "Device Recovery")}</SideNav.Item>
       </SideNav.Group>
       <SideNav.Group label={t("admin.nav.system", "System")}>
         <SideNav.Item value="plugins">{t("admin.nav.plugins", "Plugins")}</SideNav.Item>
