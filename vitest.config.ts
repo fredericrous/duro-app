@@ -13,14 +13,14 @@ export default defineConfig({
     include: ["app/**/*.test.{ts,tsx}"],
     css: { modules: { classNameStrategy: "non-scoped" } },
     // Cap worker concurrency. vitest's default reads the NODE's core count,
-    // not the CPU-limited runner pod's cgroup quota, so it over-forks: dozens
-    // of per-file PGlite instances + migrations run at once on a couple of CPUs
-    // (made worse by v8 coverage instrumentation), starving each setup hook
-    // past its timeout (flaky governance/route tests — AppSyncService "handles
-    // empty cluster", admin.applications, …). Two workers in CI keeps PGlite
-    // setup fast and the suite deterministic; locally (more CPUs) allow four.
-    // (vitest 4 replaced poolOptions.forks.maxForks with top-level maxWorkers.)
-    maxWorkers: process.env.CI ? 2 : 4,
+    // not the memory/CPU-limited runner pod's cgroup quota, so it over-forks:
+    // each fork that uses the full TestAppLayer spins up a PGlite instance +
+    // every service, and two such forks at once exceed the runner's memory
+    // limit — the pod is OOM-killed mid-suite (no test output, no conclusion).
+    // A single such fork fits, so serialize to one worker in CI; locally
+    // (more headroom) allow four. (vitest 4 replaced poolOptions.forks.maxForks
+    // with top-level maxWorkers.)
+    maxWorkers: process.env.CI ? 1 : 4,
     // PGlite migrate+truncate runs once per test file in a beforeAll-style hook;
     // under constrained CI CPU it needs well above the 30s default to settle.
     hookTimeout: 90000,
