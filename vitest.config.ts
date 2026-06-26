@@ -12,11 +12,22 @@ export default defineConfig({
     setupFiles: ["./app/test/setup.ts"],
     include: ["app/**/*.test.{ts,tsx}"],
     css: { modules: { classNameStrategy: "non-scoped" } },
-    hookTimeout: 30000,
+    // Cap worker concurrency. vitest's default reads the NODE's core count,
+    // not the CPU-limited runner pod's cgroup quota, so it over-forks: dozens
+    // of per-file PGlite instances + migrations run at once on a couple of CPUs
+    // (made worse by v8 coverage instrumentation), starving each setup hook
+    // past its timeout (flaky governance/route tests — AppSyncService "handles
+    // empty cluster", admin.applications, …). Two workers in CI keeps PGlite
+    // setup fast and the suite deterministic; locally (more CPUs) allow four.
+    // (vitest 4 replaced poolOptions.forks.maxForks with top-level maxWorkers.)
+    maxWorkers: process.env.CI ? 2 : 4,
+    // PGlite migrate+truncate runs once per test file in a beforeAll-style hook;
+    // under constrained CI CPU it needs well above the 30s default to settle.
+    hookTimeout: 90000,
     // Above setup.ts's `asyncUtilTimeout: 5000` so a stalled `waitFor`/`findBy`
     // surfaces Testing Library's descriptive timeout error instead of a bare
     // vitest test-timeout (the 5000ms default would race the async-util cap).
-    testTimeout: 15000,
+    testTimeout: 30000,
     // Focused coverage scope. Infrastructure entrypoints (worker, api/auth/
     // health routes, migrations, i18n bootstrap) are excluded because they're
     // either integration-tested through other paths or contain no logic worth
