@@ -35,6 +35,21 @@ jobs:
       - name: Build
         run: npm run build
 
+      # `npm run build` can compile green while react-router-serve (SSR) still
+      # dies at boot (bad server bundle, missing runtime export, etc.). This
+      # boots the production bundle and curls /health, which is dependency-free
+      # (returns {"status":"ok"} with no DB), so no Postgres is needed.
+      - name: Smoke — server boots & serves
+        run: |
+          npm run start & SERVER_PID=$!
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:3000/health && break
+            sleep 1
+          done
+          curl -fsS http://localhost:3000/health \
+            || { echo "::error::server did not serve /health within 30s"; kill $SERVER_PID; exit 1; }
+          kill $SERVER_PID
+
       - name: Type check
         run: npm run typecheck
 

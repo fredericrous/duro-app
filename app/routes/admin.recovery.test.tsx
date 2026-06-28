@@ -1,9 +1,103 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi, beforeEach } from "vitest"
+import { Effect } from "effect"
+
+vi.mock("~/lib/runtime.server", () => ({ runEffect: vi.fn() }))
+vi.mock("~/lib/config.server", () => ({
+  config: { adminGroupName: "lldap_admin" },
+  isOriginAllowed: vi.fn().mockReturnValue(true),
+}))
+vi.mock("~/lib/auth.server", () => ({ requireAuth: vi.fn() }))
+vi.mock("~/lib/workflows/recovery.server", () => ({
+  approveRecovery: vi.fn(() => Effect.succeed({ email: "bob@example.com", revokedCount: 2 })),
+  denyRecovery: vi.fn(() => Effect.succeed(undefined)),
+}))
+
 import { screen, waitFor } from "@testing-library/react"
-import AdminRecoveryPage from "./admin.recovery"
+import AdminRecoveryPage, { loader, action } from "./admin.recovery"
+import { runEffect } from "~/lib/runtime.server"
+import { isOriginAllowed } from "~/lib/config.server"
+import { requireAuth } from "~/lib/auth.server"
+import { approveRecovery, denyRecovery } from "~/lib/workflows/recovery.server"
+import { callLoader, callAction, expectData, expectResponse } from "~/test/route-utils"
 import { renderRoute } from "~/test/render-route"
 import { t } from "~/test/test-utils"
 import type { RecoveryRequest } from "~/lib/services/RecoveryRepo.server"
+
+const mockRunEffect = vi.mocked(runEffect)
+const mockOrigin = vi.mocked(isOriginAllowed)
+const mockAuth = vi.mocked(requireAuth)
+const mockApprove = vi.mocked(approveRecovery)
+const mockDeny = vi.mocked(denyRecovery)
+
+const adminAuth = { groups: ["lldap_admin"], user: "admin", sub: "admin-sub" } as never
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockOrigin.mockReturnValue(true)
+  mockAuth.mockResolvedValue(adminAuth)
+  mockApprove.mockImplementation(() => Effect.succeed({ email: "bob@example.com", revokedCount: 2 }) as never)
+  mockDeny.mockImplementation(() => Effect.succeed(undefined) as never)
+})
+
+describe("admin.recovery loader", () => {
+  it("returns the pending requests from the repo", async () => {
+    mockRunEffect.mockResolvedValue([{ id: "r1" }] as never)
+    const data = expectData<{ pending: unknown[] }>(await callLoader(loader))
+    expect(data.pending).toEqual([{ id: "r1" }])
+  })
+})
+
+describe("admin.recovery action", () => {
+  it("403s when the caller is not in the admin group", async () => {
+    mockAuth.mockResolvedValue({ groups: ["users"], user: "eve" } as never)
+    expect(expectResponse(await callAction(action, { formData: { intent: "deny", requestId: "r1" } })).status).toBe(403)
+  })
+
+  it("403s on a disallowed origin", async () => {
+    mockOrigin.mockReturnValue(false)
+    expect(expectResponse(await callAction(action, { formData: { intent: "deny", requestId: "r1" } })).status).toBe(403)
+  })
+
+  it("returns an error when the request id is missing", async () => {
+    const data = expectData<{ error?: string }>(await callAction(action, { formData: { intent: "approve" } }))
+    expect(data.error).toBe("Missing request id")
+  })
+
+  it("approves a request, revoking other devices when checked", async () => {
+    mockRunEffect.mockResolvedValue({ email: "bob@example.com", revokedCount: 2 } as never)
+    const data = expectData<{ approved?: boolean; email?: string; revokedCount?: number }>(
+      await callAction(action, { formData: { intent: "approve", requestId: "r1", revokeOthers: "on" } }),
+    )
+    expect(data.approved).toBe(true)
+    expect(data.email).toBe("bob@example.com")
+    expect(data.revokedCount).toBe(2)
+    expect(mockApprove).toHaveBeenCalledWith("r1", "admin", true)
+  })
+
+  it("denies a request", async () => {
+    mockRunEffect.mockResolvedValue(undefined as never)
+    const data = expectData<{ denied?: boolean }>(
+      await callAction(action, { formData: { intent: "deny", requestId: "r1" } }),
+    )
+    expect(data.denied).toBe(true)
+    expect(mockDeny).toHaveBeenCalledWith("r1", "admin")
+  })
+
+  it("rejects an unknown intent", async () => {
+    const data = expectData<{ error?: string }>(
+      await callAction(action, { formData: { intent: "frobnicate", requestId: "r1" } }),
+    )
+    expect(data.error).toBe("Unknown action")
+  })
+
+  it("surfaces a workflow failure message", async () => {
+    mockRunEffect.mockRejectedValue({ cause: { message: "issue failed" } } as never)
+    const data = expectData<{ error?: string }>(
+      await callAction(action, { formData: { intent: "approve", requestId: "r1" } }),
+    )
+    expect(data.error).toBe("issue failed")
+  })
+})
 
 const pendingReq: RecoveryRequest = {
   id: "r1",
