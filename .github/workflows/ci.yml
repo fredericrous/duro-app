@@ -65,3 +65,112 @@ jobs:
         # breached, locking in the current floor (lines: 45%) and forcing
         # future PRs to maintain or raise it.
         run: npm run test:coverage
+
+  migration-check:
+    name: Migration check (prod-data clone)
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: duro-app
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    env:
+      MC_NS: migration-check
+      MC_NAME: duro-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install kubectl
+        run: |
+          curl -fsSLo /tmp/kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          sudo install -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+          kubectl version --client
+
+      - name: Configure in-cluster kubeconfig (scoped SA)
+        run: |
+          SA=/var/run/secrets/kubernetes.io/serviceaccount
+          kubectl config set-cluster k8s \
+            --server="https://kubernetes.default.svc" \
+            --certificate-authority="$SA/ca.crt" --embed-certs=true
+          kubectl config set-credentials sa --token="$(cat $SA/token)"
+          kubectl config set-context ctx --cluster=k8s --user=sa --namespace="$MC_NS"
+          kubectl config use-context ctx
+
+      - name: Request a prod-data clone (MigrationCheck)
+        run: |
+          cat <<YAML | kubectl apply -f -
+          apiVersion: preview.homelab.io/v1
+          kind: MigrationCheck
+          metadata:
+            name: ${MC_NAME}
+            namespace: ${MC_NS}
+          spec:
+            appName: duro
+            ttlSeconds: 1800
+          YAML
+
+      - name: Wait for clone to be Ready
+        run: |
+          for i in $(seq 1 120); do   # up to ~10m for snapshot + CNPG bootstrap
+            phase=$(kubectl -n "$MC_NS" get migrationcheck "$MC_NAME" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+            echo "phase=$phase ($i)"
+            case "$phase" in
+              Ready)  exit 0 ;;
+              Failed) echo "::error::MigrationCheck failed: $(kubectl -n "$MC_NS" get migrationcheck "$MC_NAME" -o jsonpath='{.status.message}')"; exit 1 ;;
+            esac
+            sleep 5
+          done
+          echo "::error::clone did not become Ready in time"; exit 1
+
+      - name: Read clone DATABASE_URL
+        id: db
+        run: |
+          secret=$(kubectl -n "$MC_NS" get migrationcheck "$MC_NAME" -o jsonpath='{.status.connectionSecretName}')
+          url=$(kubectl -n "$MC_NS" get secret "$secret" -o jsonpath='{.data.DATABASE_URL}' | base64 -d)
+          echo "::add-mask::$url"
+          echo "database_url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # Boot against the prod-data clone: building AppLayer runs the in-process
+      # migrations (DbLive/MigratorLive in app/lib/db/client.server.ts) against
+      # real data, then /health/ready (DB-aware `SELECT 1`) proves a DB-backed
+      # request works. The dummy LLDAP/SMTP/Vault/SESSION vars satisfy the
+      # Live layers' build-time Config reads (they construct clients lazily and
+      # never connect at build), so AppLayer fully builds and /health/ready can
+      # return 200 — otherwise the layer build would fail and mask migrations.
+      - name: Run migrations + serve against clone
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.database_url }}
+          SESSION_SECRET: ci-migration-check-dummy-session-secret
+          LLDAP_ADMIN_PASS: ci-dummy
+          NAS_VAULT_ADDR: http://127.0.0.1:8200
+          NAS_VAULT_TOKEN: ci-dummy
+          SMTP_HOST: localhost
+          SMTP_USER: ci-dummy
+          SMTP_PASS: ci-dummy
+        run: |
+          npm run start & SERVER_PID=$!
+          ok=
+          for i in $(seq 1 60); do   # generous: migrations run on first boot
+            if curl -fsS http://localhost:3000/health/ready | grep -q '"status":"ready"'; then ok=1; break; fi
+            sleep 2
+          done
+          kill $SERVER_PID 2>/dev/null || true
+          [ -n "$ok" ] || { echo "::error::migrations/health failed against the prod-data clone"; exit 1; }
+          echo "migrations applied + /health/ready green against prod-data clone"
+
+      - name: Tear down the clone
+        if: always()
+        run: kubectl -n "$MC_NS" delete migrationcheck "$MC_NAME" --ignore-not-found --wait=false
