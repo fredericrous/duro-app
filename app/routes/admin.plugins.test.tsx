@@ -78,4 +78,35 @@ describe("AdminPluginsPage component", () => {
     // Capability tags render too.
     expect(screen.getByText("gitea.team.read")).toBeInTheDocument()
   })
+
+  it("flags declarative vs imperative plugins and shows version/timeout/installs", async () => {
+    const declarative = mkRow("gitea-teams", "Gitea Teams")
+    const imperative = {
+      ...mkRow("plex-libs", "Plex Libraries"),
+      manifest: {
+        ...mkRow("plex-libs", "Plex Libraries").manifest,
+        imperative: true,
+        version: "2.3.0",
+        timeoutMs: 30_000,
+      },
+      installCount: 4,
+    }
+    renderPage([declarative, imperative])
+
+    await waitFor(() => {
+      expect(screen.getByText("Declarative")).toBeInTheDocument()
+    })
+    expect(screen.getByText("Imperative")).toBeInTheDocument()
+    // Imperative plugin's metadata renders in its row.
+    expect(screen.getByText("2.3.0")).toBeInTheDocument()
+    expect(screen.getByText("30s")).toBeInTheDocument()
+    expect(screen.getByText("4")).toBeInTheDocument()
+  })
+
+  it("renders an empty table when there are no plugins", async () => {
+    renderPage([])
+    await waitFor(() => {
+      expect(screen.getByText("Plugins (0)")).toBeInTheDocument()
+    })
+  })
 })
