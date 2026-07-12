@@ -23,6 +23,7 @@ import { css, html } from "react-strict-dom"
 import { Badge, Button, Dialog, Field, Input, Select, Stack, Table } from "@duro-app/ui"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
 export async function loader() {
   const [applications, principals, roles, entitlements] = await Promise.all([
@@ -207,7 +208,12 @@ export default function AdminInvitationsPage({ loaderData }: Route.ComponentProp
   return (
     <Stack gap="md">
       <CardSection
-        title={`Access Invitations (${invitations.length})`}
+        title={
+          <>
+            Access Invitations ({invitations.length})
+            <HelpPopover termKey="glossary.invitations" />
+          </>
+        }
         action={
           <Button variant="primary" size="small" onClick={() => setDialogOpen(true)}>
             Create Invitation
