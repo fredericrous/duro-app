@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { render, screen, waitFor, fireEvent } from "@testing-library/react"
 import { createRoutesStub } from "react-router"
+import { ToastProvider } from "@duro-app/ui"
 import { ActionCell } from "./ActionCell"
 import type { UserData } from "./UserColumns"
 
@@ -23,24 +24,32 @@ function renderCell(actionResult: unknown) {
     {
       path: "/",
       action: () => actionResult,
-      Component: () => <ActionCell row={row} certPanelUserId={null} onRevoke={() => {}} onViewCerts={() => {}} t={t} />,
+      // Wrap in ToastProvider — the Send Cert outcome now surfaces as a toast
+      // (via useFetcherToast), not an inline alert.
+      Component: () => (
+        <ToastProvider>
+          <ActionCell row={row} certPanelUserId={null} onRevoke={() => {}} onViewCerts={() => {}} t={t} />
+        </ToastProvider>
+      ),
     },
   ] as never)
   return render(<Stub initialEntries={["/"]} />)
 }
 
 describe("ActionCell — Send Cert feedback", () => {
-  it("shows a success alert when the cert email was sent", async () => {
+  it("toasts success when the cert email was sent", async () => {
     renderCell({ success: true, message: "Certificate sent to daddy@example.com" })
     fireEvent.click(screen.getByRole("button", { name: "admin.users.actions.sendCert" }))
-    await waitFor(() => expect(screen.getByText("admin.users.actions.certSent")).toBeInTheDocument())
+    const toast = await waitFor(() => screen.getByRole("status"))
+    expect(toast).toHaveTextContent("admin.users.actions.certSent")
   })
 
-  it("shows an error alert when the send failed", async () => {
+  it("toasts an error when the send failed", async () => {
     renderCell({ error: "SMTP down" })
     fireEvent.click(screen.getByRole("button", { name: "admin.users.actions.sendCert" }))
     // certSendFailed carries the reason via interpolation; identity `t` returns
     // the bare key, which is enough to assert the error branch rendered.
-    await waitFor(() => expect(screen.getByText("admin.users.actions.certSendFailed")).toBeInTheDocument())
+    const toast = await waitFor(() => screen.getByRole("alert"))
+    expect(toast).toHaveTextContent("admin.users.actions.certSendFailed")
   })
 })

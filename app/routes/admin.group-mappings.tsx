@@ -21,6 +21,7 @@ import {
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
 import { Badge, Button, Dialog, Field, Input, Select, Stack, Table } from "@duro-app/ui"
+import { useFetcherToast } from "~/lib/useFetcherToast"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 export async function loader() {
@@ -155,6 +156,7 @@ const columns = [
 export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentProps) {
   const { mappings, applications, groups, rolesByApp } = loaderData
   const fetcher = useFetcher()
+  useFetcherToast(fetcher, { successMessage: "Mapping created" })
   const [dialogOpen, setDialogOpen] = useState(false)
   const [sorting, setSorting] = useState<SortingState>([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
@@ -357,6 +359,7 @@ export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentPr
 function DeleteCell({ mappingId }: { mappingId: string }) {
   const fetcher = useFetcher()
   const isDeleting = fetcher.state !== "idle"
+  useFetcherToast(fetcher, { successMessage: "Mapping deleted" })
 
   return (
     <fetcher.Form method="post">

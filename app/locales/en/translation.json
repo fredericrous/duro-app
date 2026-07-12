@@ -374,6 +374,8 @@
       "approve": "Approve",
       "deny": "Deny",
       "revokeOthers": "Revoke this user's other devices",
+      "approved": "Recovery approved — a new certificate was emailed",
+      "denied": "Recovery request denied",
       "col": {
         "email": "Account",
         "requested": "Requested",
@@ -541,6 +543,7 @@
       "createGrant": "Create Grant",
       "revoke": "Revoke",
       "revoking": "Revoking...",
+      "revoked": "Grant revoked",
       "new": {
         "title": "Create grant",
         "creating": "Creating…",
@@ -662,6 +665,7 @@
         "selected": "{{count}} certificate(s) selected",
         "revokeAllForUsers": "Revoke all certs for {{count}} user(s)",
         "revokeSelected": "Revoke {{count}} certificate(s)",
+        "certsRevoked": "{{count}} certificate(s) revoked",
         "confirmRevokeUsersTitle": "Revoke certificates for selected users?",
         "confirmRevokeCertsTitle": "Revoke selected certificates?",
         "confirmRevokeUsersBody": "All active certificates for {{count}} user(s) will be revoked. The users will lose access until a new certificate is issued.",

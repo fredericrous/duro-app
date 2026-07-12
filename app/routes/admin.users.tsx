@@ -25,6 +25,7 @@ import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { ActionBar, Button, Combobox, Dialog, EmptyState, Inline, Input, Stack, Table, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { useFetcherToast } from "~/lib/useFetcherToast"
 import { useAdminSidePanel } from "./admin"
 import { buildColumns, type UserData, type RevokeTarget } from "~/components/admin/UserColumns"
 import { ActionCell } from "~/components/admin/ActionCell"
@@ -163,6 +164,19 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
   const isRevoking = revokeFetcher.state !== "idle"
   const isRevokingCerts = certRevokeFetcher.state !== "idle"
   const isRevokingUserCerts = userCertRevokeFetcher.state !== "idle"
+
+  // revokeUser returns { success, message }; the batch cert revokes return
+  // { certsRevoked, count }. Toast all three outcomes.
+  useFetcherToast(revokeFetcher)
+  const certsRevokedToast = (data: unknown) => {
+    const d = data as { certsRevoked?: true; count?: number; error?: string }
+    if (d.error) return { variant: "error" as const, message: d.error }
+    if (d.certsRevoked)
+      return { variant: "success" as const, message: t("admin.users.certs.certsRevoked", { count: d.count ?? 0 }) }
+    return null
+  }
+  useFetcherToast(certRevokeFetcher, { render: certsRevokedToast })
+  useFetcherToast(userCertRevokeFetcher, { render: certsRevokedToast })
 
   const handleRevoke = (user: RevokeTarget) => {
     setRevokeTarget(user)
