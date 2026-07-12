@@ -215,6 +215,28 @@ describe("AdminUsersPage component", () => {
   })
 })
 
+// ===========================================================================
+// Regression note: the "Certificates" panel infinite-render loop (#185)
+// ===========================================================================
+//
+// Bug: clicking "Certificates" on a user row threw React error #185
+// ("Maximum update depth exceeded"). Root cause was in
+// app/routes/admin.users.tsx: the effect that pushes panel content depended on
+// the whole `sidePanel` outlet-context object (and on `closeCertPanel`, which
+// closed over it). The /admin layout rebuilds that context object on every
+// render, so the effect re-armed each render *and* called `sidePanel.setContent`
+// — which re-renders the layout, yields a fresh context identity, re-arms the
+// effect, ad infinitum. Fix: depend on the stable `setContent`/`onOpenChange`
+// setters (destructured from the context) instead of the context object.
+//
+// This isn't covered by an interaction test on purpose: driving the click
+// requires re-rendering the DS-heavy table, and fireEvent/userEvent on this
+// tree DEADLOCKS under the jsdom + rsd-mock + @duro-app/ui stack (same
+// limitation documented for the row-select flow further below). The fix was
+// verified by reproducing the loop against the pre-fix code with a stub layout
+// whose `setContent` re-renders it: pre-fix the effect re-fires every render so
+// setContent runs away; post-fix it fires exactly once.
+
 // =============================================================================
 // ActionBar + bulk-confirm dialog round-trip
 // =============================================================================
