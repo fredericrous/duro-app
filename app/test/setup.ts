@@ -9,13 +9,15 @@ import { server } from "./msw-server"
 // resolves asynchronously — so assertions wait for the first paint via
 // `waitFor`/`findBy`. Testing Library's default async timeout is 1000ms, which
 // is comfortably met in isolation (~hundreds of ms) but gets starved when the
-// full suite runs ~100 jsdom + PGlite workers in parallel, surfacing as flaky
+// full suite runs the jsdom + PGlite workers in parallel, surfacing as flaky
 // `waitFor` timeouts (admin.grants, admin.applications, …). Raise the cap:
 // `waitFor` still resolves the instant its condition holds, so green tests
 // aren't slowed — only the worst-case ceiling moves. The per-test timeout
-// (vitest.config.ts `testTimeout`) is kept above this so a genuine hang still
-// surfaces waitFor's descriptive error rather than a bare test-timeout.
-configure({ asyncUtilTimeout: 5000 })
+// (vitest.config.ts `testTimeout: 30000`) is kept above this so a genuine hang
+// still surfaces waitFor's descriptive error rather than a bare test-timeout.
+// Paired with a bounded CI-only `retry` (vitest.config.ts) that reruns a test
+// starved past this ceiling — the two together are the generic starvation cure.
+configure({ asyncUtilTimeout: 8000 })
 
 // jsdom doesn't ship ResizeObserver. @duro-app/ui's ScrollArea (and any DS
 // component that observes element resizes) crashes without it. A no-op

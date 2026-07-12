@@ -21,6 +21,17 @@ export default defineConfig({
     // was raised to 8Gi to hold two such forks (see homelab arc runners.yaml).
     // (vitest 4 replaced poolOptions.forks.maxForks with top-level maxWorkers.)
     maxWorkers: process.env.CI ? 2 : 4,
+    // Bounded CI-only retry. The residual flake in this suite is not app-logic
+    // races — it's Testing Library's own `waitFor`/`findBy` being starved past
+    // its async-util cap when many jsdom+PGlite forks contend for the runner's
+    // few CPUs (see app/test/setup.ts). That failure mode is transient by
+    // definition: a rerun of just the failed test on a now-quieter box passes.
+    // A retry is the right generalization here — it targets the whole *class*
+    // of starvation flakes instead of hand-tuning each symptomatic test, and it
+    // does NOT mask real bugs: a deterministic logic failure fails all attempts,
+    // so only genuinely non-deterministic timeouts are absorbed. Locally
+    // (maxWorkers 4, no contention) retries are off so a flake surfaces loudly.
+    retry: process.env.CI ? 2 : 0,
     // PGlite migrate+truncate runs once per test file in a beforeAll-style hook;
     // under constrained CI CPU it needs well above the 30s default to settle.
     hookTimeout: 90000,
