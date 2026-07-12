@@ -37,6 +37,8 @@ export class RbacRepo extends Context.Tag("RbacRepo")<
       maxDurationHours?: number,
     ) => Effect.Effect<Role, RbacRepoError>
     readonly listRoles: (appId: string) => Effect.Effect<Role[], RbacRepoError>
+    /** Every role across all applications — for id→name resolution and cross-app pickers. */
+    readonly listAllRoles: () => Effect.Effect<Role[], RbacRepoError>
     readonly findRoleById: (id: string) => Effect.Effect<Role | null, RbacRepoError>
     readonly deleteRole: (id: string) => Effect.Effect<void, RbacRepoError>
 
@@ -54,6 +56,8 @@ export class RbacRepo extends Context.Tag("RbacRepo")<
       description?: string,
     ) => Effect.Effect<Entitlement, RbacRepoError>
     readonly listEntitlements: (appId: string) => Effect.Effect<Entitlement[], RbacRepoError>
+    /** Every entitlement across all applications — for id→name resolution. */
+    readonly listAllEntitlements: () => Effect.Effect<Entitlement[], RbacRepoError>
     readonly findEntitlementById: (id: string) => Effect.Effect<Entitlement | null, RbacRepoError>
     readonly deleteEntitlement: (id: string) => Effect.Effect<void, RbacRepoError>
 
@@ -134,6 +138,12 @@ export const RbacRepoLive = Layer.effect(
           "Failed to list roles",
         ),
 
+      listAllRoles: () =>
+        withErr(
+          sql`SELECT * FROM roles ORDER BY slug`.pipe(Effect.map((rows) => rows.map((r) => decodeRole(r)))),
+          "Failed to list all roles",
+        ),
+
       findRoleById: (id) =>
         withErr(
           sql`SELECT * FROM roles WHERE id = ${id}`.pipe(
@@ -182,6 +192,14 @@ export const RbacRepoLive = Layer.effect(
             Effect.map((rows) => rows.map((r) => decodeEntitlement(r))),
           ),
           "Failed to list entitlements",
+        ),
+
+      listAllEntitlements: () =>
+        withErr(
+          sql`SELECT * FROM entitlements ORDER BY slug`.pipe(
+            Effect.map((rows) => rows.map((r) => decodeEntitlement(r))),
+          ),
+          "Failed to list all entitlements",
         ),
 
       findEntitlementById: (id) =>

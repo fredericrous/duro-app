@@ -28,10 +28,12 @@ beforeEach(() => {
 
 describe("/admin/invitations loader", () => {
   it("returns invitations + applications + principals", async () => {
-    // Order: applications, principals, then one runEffect per app.
+    // Order: applications, principals, roles, entitlements, then one runEffect per app.
     mockRunEffect
       .mockResolvedValueOnce([{ id: "app-1" }, { id: "app-2" }] as never)
       .mockResolvedValueOnce([{ id: "p-1" }] as never)
+      .mockResolvedValueOnce([] as never) // roles
+      .mockResolvedValueOnce([] as never) // entitlements
       .mockResolvedValueOnce([{ id: "inv-1" }] as never)
       .mockResolvedValueOnce([{ id: "inv-2" }] as never)
 

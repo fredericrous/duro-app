@@ -3,7 +3,9 @@ import type { Route } from "./+types/admin.principals.$id"
 import { runEffect } from "~/lib/runtime.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
-import type { Principal, Grant } from "~/lib/governance/types"
+import { RbacRepo } from "~/lib/governance/RbacRepo.server"
+import type { Principal, Grant, Role, Entitlement } from "~/lib/governance/types"
+import { useMemo } from "react"
 import { useReactTable, getCoreRowModel, createColumnHelper } from "@tanstack/react-table"
 import { html } from "react-strict-dom"
 import { Badge, Heading, Stack, Text, Table } from "@duro-app/ui"
@@ -12,7 +14,7 @@ import { CardSection } from "~/components/CardSection/CardSection"
 export async function loader({ params }: Route.LoaderArgs) {
   const principalId = params.id
 
-  const [principal, grants, groups] = await Promise.all([
+  const [principal, grants, groups, roles, entitlements, principals] = await Promise.all([
     runEffect(
       Effect.gen(function* () {
         const repo = yield* PrincipalRepo
@@ -31,28 +33,51 @@ export async function loader({ params }: Route.LoaderArgs) {
         return yield* repo.listGroupsFor(principalId)
       }),
     ),
+    runEffect(
+      Effect.gen(function* () {
+        const repo = yield* RbacRepo
+        return yield* repo.listAllRoles()
+      }),
+    ),
+    runEffect(
+      Effect.gen(function* () {
+        const repo = yield* RbacRepo
+        return yield* repo.listAllEntitlements()
+      }),
+    ),
+    runEffect(
+      Effect.gen(function* () {
+        const repo = yield* PrincipalRepo
+        return yield* repo.list()
+      }),
+    ),
   ])
 
   if (!principal) {
     throw new Response("Principal not found", { status: 404 })
   }
 
-  return { principal, grants, groups }
+  return { principal, grants, groups, roles, entitlements, principals }
 }
 
 const grantColumnHelper = createColumnHelper<Grant>()
-const grantColumns = [
+interface GrantNameResolvers {
+  role: (id: string | null) => string
+  entitlement: (id: string | null) => string
+  principal: (id: string) => string
+}
+const buildGrantColumns = (r: GrantNameResolvers) => [
   grantColumnHelper.accessor("id", {
     header: "Grant ID",
     cell: ({ getValue }) => getValue().slice(0, 8) + "...",
   }),
   grantColumnHelper.accessor("roleId", {
     header: "Role",
-    cell: ({ getValue }) => getValue() ?? "\u2014",
+    cell: ({ getValue }) => r.role(getValue()),
   }),
   grantColumnHelper.accessor("entitlementId", {
     header: "Entitlement",
-    cell: ({ getValue }) => getValue() ?? "\u2014",
+    cell: ({ getValue }) => r.entitlement(getValue()),
   }),
   grantColumnHelper.accessor("resourceId", {
     header: "Resource",
@@ -60,6 +85,7 @@ const grantColumns = [
   }),
   grantColumnHelper.accessor("grantedBy", {
     header: "Granted By",
+    cell: ({ getValue }) => r.principal(getValue()),
   }),
   grantColumnHelper.accessor("expiresAt", {
     header: "Expires",
@@ -80,7 +106,18 @@ const groupColumns = [
 ]
 
 export default function AdminPrincipalDetailPage({ loaderData }: Route.ComponentProps) {
-  const { principal, grants, groups } = loaderData
+  const { principal, grants, groups, roles = [], entitlements = [], principals = [] } = loaderData
+
+  const grantColumns = useMemo(() => {
+    const roleName = new Map((roles as Role[]).map((x) => [x.id, x.displayName]))
+    const entName = new Map((entitlements as Entitlement[]).map((x) => [x.id, x.displayName]))
+    const principalName = new Map((principals as Principal[]).map((p) => [p.id, p.displayName]))
+    return buildGrantColumns({
+      role: (id) => (id ? (roleName.get(id) ?? id) : "—"),
+      entitlement: (id) => (id ? (entName.get(id) ?? id) : "—"),
+      principal: (id) => principalName.get(id) ?? id,
+    })
+  }, [roles, entitlements, principals])
 
   const grantsTable = useReactTable({
     data: grants,
