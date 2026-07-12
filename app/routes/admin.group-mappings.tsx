@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useFetcher } from "react-router"
+import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.group-mappings"
 import { runEffect } from "~/lib/runtime.server"
@@ -20,9 +21,12 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Badge, Button, ConfirmDialog, Dialog, Field, Input, Select, Stack, Table } from "@duro-app/ui"
+import { Badge, Button, ConfirmDialog, Dialog, EmptyState, Field, Input, Select, Stack, Table } from "@duro-app/ui"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
+
+type TFunc = (key: string, opts?: Record<string, unknown>) => string
 
 export async function loader() {
   const [mappings, applications, principals] = await Promise.all([
@@ -118,20 +122,24 @@ export async function action({ request }: Route.ActionArgs) {
 
 const columnHelper = createColumnHelper<GroupMappingWithNames>()
 
-const columns = [
+const buildColumns = (t: TFunc) => [
   columnHelper.accessor("oidcGroupName", {
-    header: "OIDC Group",
+    header: t("admin.groupMappings.cols.oidcGroup"),
     enableSorting: true,
   }),
   columnHelper.display({
     id: "type",
-    header: "Type",
+    header: t("admin.groupMappings.cols.type"),
     cell: ({ row }) =>
-      row.original.principalGroupId ? <Badge variant="info">Group</Badge> : <Badge variant="default">Role</Badge>,
+      row.original.principalGroupId ? (
+        <Badge variant="info">{t("admin.groupMappings.typeGroup")}</Badge>
+      ) : (
+        <Badge variant="default">{t("admin.groupMappings.typeRole")}</Badge>
+      ),
   }),
   columnHelper.display({
     id: "target",
-    header: "Target",
+    header: t("admin.groupMappings.cols.target"),
     cell: ({ row }) => {
       const m = row.original
       if (m.principalGroupId) {
@@ -142,7 +150,7 @@ const columns = [
     },
   }),
   columnHelper.accessor("createdAt", {
-    header: "Created",
+    header: t("admin.groupMappings.cols.created"),
     enableSorting: true,
     cell: ({ getValue }) => new Date(getValue()).toLocaleDateString(),
   }),
@@ -154,9 +162,11 @@ const columns = [
 ]
 
 export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation()
   const { mappings, applications, groups, rolesByApp } = loaderData
   const fetcher = useFetcher()
-  useFetcherToast(fetcher, { successMessage: "Mapping created" })
+  useFetcherToast(fetcher, { successMessage: t("admin.groupMappings.created") })
+  const columns = useMemo(() => buildColumns(t), [t])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [sorting, setSorting] = useState<SortingState>([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
@@ -181,69 +191,78 @@ export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentPr
   return (
     <Stack gap="md">
       <CardSection
-        title={`Group Mappings (${mappings.length})`}
+        title={
+          <>
+            {t("admin.groupMappings.title", { count: mappings.length })}
+            <HelpPopover termKey="glossary.groupMappings" />
+          </>
+        }
         action={
           <Button variant="primary" size="small" onClick={() => setDialogOpen(true)}>
-            Add Mapping
+            {t("admin.groupMappings.add")}
           </Button>
         }
       >
-        <Table.Root
-          sortChip={
-            <Table.SortChip
-              options={table
-                .getAllColumns()
-                .filter((c) => c.getCanSort())
-                .map((c) => ({ id: c.id, label: String(c.columnDef.header ?? c.id) }))}
-              value={sorting[0] ? { id: sorting[0].id, desc: sorting[0].desc } : null}
-              onChange={(next) => setSorting(next ? [{ id: next.id, desc: next.desc }] : [])}
-            />
-          }
-          pagination={<Table.Pagination table={table} />}
-        >
-          <Table.Header>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <Table.Row key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <Table.HeaderCell key={header.id} label={String(header.column.columnDef.header ?? "")}>
-                    {header.isPlaceholder ? null : header.column.getCanSort() ? (
-                      <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        <Table.SortIndicator column={header.column} />
-                      </html.span>
-                    ) : (
-                      flexRender(header.column.columnDef.header, header.getContext())
-                    )}
-                  </Table.HeaderCell>
-                ))}
-              </Table.Row>
-            ))}
-          </Table.Header>
-          <Table.Body>
-            {table.getRowModel().rows.map((row) => (
-              <Table.Row key={row.id}>
-                {row.getVisibleCells().map((cell) => {
-                  const isActions = cell.column.id === "actions"
-                  return (
-                    <Table.Cell key={cell.id} isActions={isActions}>
-                      {isActions ? (
-                        <DeleteCell mappingId={row.original.id} />
+        {mappings.length === 0 ? (
+          <EmptyState message={t("admin.groupMappings.empty")} />
+        ) : (
+          <Table.Root
+            sortChip={
+              <Table.SortChip
+                options={table
+                  .getAllColumns()
+                  .filter((c) => c.getCanSort())
+                  .map((c) => ({ id: c.id, label: String(c.columnDef.header ?? c.id) }))}
+                value={sorting[0] ? { id: sorting[0].id, desc: sorting[0].desc } : null}
+                onChange={(next) => setSorting(next ? [{ id: next.id, desc: next.desc }] : [])}
+              />
+            }
+            pagination={<Table.Pagination table={table} />}
+          >
+            <Table.Header>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <Table.Row key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <Table.HeaderCell key={header.id} label={String(header.column.columnDef.header ?? "")}>
+                      {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                        <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          <Table.SortIndicator column={header.column} />
+                        </html.span>
                       ) : (
-                        flexRender(cell.column.columnDef.cell, cell.getContext())
+                        flexRender(header.column.columnDef.header, header.getContext())
                       )}
-                    </Table.Cell>
-                  )
-                })}
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
+                    </Table.HeaderCell>
+                  ))}
+                </Table.Row>
+              ))}
+            </Table.Header>
+            <Table.Body>
+              {table.getRowModel().rows.map((row) => (
+                <Table.Row key={row.id}>
+                  {row.getVisibleCells().map((cell) => {
+                    const isActions = cell.column.id === "actions"
+                    return (
+                      <Table.Cell key={cell.id} isActions={isActions}>
+                        {isActions ? (
+                          <DeleteCell mappingId={row.original.id} />
+                        ) : (
+                          flexRender(cell.column.columnDef.cell, cell.getContext())
+                        )}
+                      </Table.Cell>
+                    )
+                  })}
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table.Root>
+        )}
       </CardSection>
 
       <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
         <Dialog.Portal>
           <Dialog.Header>
-            <Dialog.Title>Add Group Mapping</Dialog.Title>
+            <Dialog.Title>{t("admin.groupMappings.addDialogTitle")}</Dialog.Title>
             <Dialog.Close />
           </Dialog.Header>
           <Dialog.Body>
@@ -252,13 +271,13 @@ export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentPr
               <input type="hidden" name="mappingType" value={mappingType} />
               <Stack gap="md">
                 <Field.Root>
-                  <Field.Label>OIDC Group Name</Field.Label>
-                  <Input name="oidcGroupName" placeholder="e.g. media_users" required />
-                  <Field.Description>The group name as it appears in OIDC claims</Field.Description>
+                  <Field.Label>{t("admin.groupMappings.oidcGroupName")}</Field.Label>
+                  <Input name="oidcGroupName" placeholder={t("admin.groupMappings.oidcGroupPlaceholder")} required />
+                  <Field.Description>{t("admin.groupMappings.oidcGroupDesc")}</Field.Description>
                 </Field.Root>
 
                 <Field.Root>
-                  <Field.Label>Mapping Type</Field.Label>
+                  <Field.Label>{t("admin.groupMappings.mappingType")}</Field.Label>
                   <Select.Root
                     value={mappingType}
                     onValueChange={(v: string | null) => {
@@ -268,16 +287,16 @@ export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentPr
                       }
                     }}
                   >
-                    <Select.Trigger aria-label="Mapping type">
+                    <Select.Trigger aria-label={t("admin.groupMappings.mappingType")}>
                       <Select.Value />
                       <Select.Icon />
                     </Select.Trigger>
                     <Select.Popup>
                       <Select.Item value="group">
-                        <Select.ItemText>Principal Group</Select.ItemText>
+                        <Select.ItemText>{t("admin.groupMappings.principalGroup")}</Select.ItemText>
                       </Select.Item>
                       <Select.Item value="role">
-                        <Select.ItemText>Application Role</Select.ItemText>
+                        <Select.ItemText>{t("admin.groupMappings.applicationRole")}</Select.ItemText>
                       </Select.Item>
                     </Select.Popup>
                   </Select.Root>
@@ -285,10 +304,10 @@ export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentPr
 
                 {mappingType === "group" && (
                   <Field.Root>
-                    <Field.Label>Principal Group</Field.Label>
+                    <Field.Label>{t("admin.groupMappings.principalGroup")}</Field.Label>
                     <Select.Root name="principalGroupId">
-                      <Select.Trigger aria-label="Principal group">
-                        <Select.Value placeholder="Select group" />
+                      <Select.Trigger aria-label={t("admin.groupMappings.principalGroup")}>
+                        <Select.Value placeholder={t("admin.groupMappings.selectGroup")} />
                         <Select.Icon />
                       </Select.Trigger>
                       <Select.Popup>
@@ -305,14 +324,14 @@ export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentPr
                 {mappingType === "role" && (
                   <>
                     <Field.Root>
-                      <Field.Label>Application</Field.Label>
+                      <Field.Label>{t("admin.groupMappings.application")}</Field.Label>
                       <Select.Root
                         name="applicationId"
                         value={selectedAppId}
                         onValueChange={(v: string | null) => setSelectedAppId(v ?? "")}
                       >
-                        <Select.Trigger aria-label="Application">
-                          <Select.Value placeholder="Select application" />
+                        <Select.Trigger aria-label={t("admin.groupMappings.application")}>
+                          <Select.Value placeholder={t("admin.groupMappings.selectApplication")} />
                           <Select.Icon />
                         </Select.Trigger>
                         <Select.Popup>
@@ -326,10 +345,16 @@ export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentPr
                     </Field.Root>
 
                     <Field.Root>
-                      <Field.Label>Role</Field.Label>
+                      <Field.Label>{t("admin.groupMappings.role")}</Field.Label>
                       <Select.Root name="roleId">
-                        <Select.Trigger aria-label="Role">
-                          <Select.Value placeholder={selectedAppId ? "Select role" : "Select an application first"} />
+                        <Select.Trigger aria-label={t("admin.groupMappings.role")}>
+                          <Select.Value
+                            placeholder={
+                              selectedAppId
+                                ? t("admin.groupMappings.selectRole")
+                                : t("admin.groupMappings.selectAppFirst")
+                            }
+                          />
                           <Select.Icon />
                         </Select.Trigger>
                         <Select.Popup>
@@ -345,7 +370,7 @@ export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentPr
                 )}
 
                 <Button type="submit" variant="primary" disabled={isCreating}>
-                  {isCreating ? "Creating..." : "Add Mapping"}
+                  {isCreating ? t("admin.groupMappings.creating") : t("admin.groupMappings.add")}
                 </Button>
               </Stack>
             </fetcher.Form>
@@ -357,31 +382,32 @@ export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentPr
 }
 
 function DeleteCell({ mappingId }: { mappingId: string }) {
+  const { t } = useTranslation()
   const fetcher = useFetcher()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const isDeleting = fetcher.state !== "idle"
-  useFetcherToast(fetcher, { successMessage: "Mapping deleted" })
+  useFetcherToast(fetcher, { successMessage: t("admin.groupMappings.deleted") })
 
   return (
     <>
       <Button type="button" variant="danger" size="small" disabled={isDeleting} onClick={() => setConfirmOpen(true)}>
-        {isDeleting ? "Deleting..." : "Delete"}
+        {isDeleting ? t("admin.groupMappings.deleting") : t("admin.groupMappings.delete")}
       </Button>
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="Delete this group mapping?"
+        title={t("admin.groupMappings.confirmDeleteTitle")}
         confirmSlot={() => (
           <fetcher.Form method="post" onSubmit={() => setConfirmOpen(false)}>
             <input type="hidden" name="intent" value="delete" />
             <input type="hidden" name="id" value={mappingId} />
             <Button type="submit" variant="danger">
-              Delete
+              {t("admin.groupMappings.delete")}
             </Button>
           </fetcher.Form>
         )}
       >
-        Members of this OIDC group will stop receiving the mapped access on their next login. This cannot be undone.
+        {t("admin.groupMappings.confirmDeleteBody")}
       </ConfirmDialog>
     </>
   )

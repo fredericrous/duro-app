@@ -106,9 +106,10 @@ describe("AdminAuditPage component", () => {
     ])
 
     await waitFor(() => {
-      expect(screen.getByText("grant.created")).toBeInTheDocument()
+      // eventType badge renders humanized ("grant.created" → "Grant created").
+      expect(screen.getByText("Grant created")).toBeInTheDocument()
     })
-    expect(screen.getByText("grant.revoked")).toBeInTheDocument()
+    expect(screen.getByText("Grant revoked")).toBeInTheDocument()
   })
 
   it("survives an empty event list", async () => {

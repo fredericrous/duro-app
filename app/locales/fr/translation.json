@@ -9,7 +9,30 @@
     "settings": "Parametres",
     "save": "Enregistrer",
     "language": "Langue",
-    "actions": "Actions"
+    "actions": "Actions",
+    "enums": {
+      "principalType": {
+        "user": "Utilisateur",
+        "group": "Groupe",
+        "service_account": "Compte de service",
+        "device": "Appareil"
+      },
+      "accessMode": {
+        "open": "Ouvert",
+        "request": "Sur demande",
+        "invite_only": "Sur invitation"
+      },
+      "requestStatus": {
+        "pending": "En attente",
+        "approved": "Approuvée",
+        "rejected": "Refusée"
+      },
+      "invitationStatus": {
+        "pending": "En attente",
+        "accepted": "Acceptée",
+        "declined": "Refusée"
+      }
+    }
   },
   "header": {
     "welcome": "Bienvenue, {{user}}",
@@ -265,6 +288,8 @@
     "appsCatalog": "Toutes les applications gouvernees par Duro. Les badges indiquent votre statut sur chacune : Accorde (vous avez un role), Acces partiel (vous avez un role mais d'autres sont disponibles), En attente (demande en attente d'approbation), Ouvert (aucune permission necessaire), Sur invitation (un admin doit vous inviter), Demander l'acces (vous pouvez demander un role).",
     "myRequests": "Vos demandes d'acces sur toutes les applications. Les demandes en attente peuvent etre annulees ici ; les lignes approuvees/rejetees/annulees sont conservees comme historique.",
     "invitations": "Une invitation d'acces pre-cree les octrois qu'une personne recevra a l'acceptation. A distinguer du flux Invitations utilisateur qui provisionne un compte dans le fournisseur d'identite.",
+    "groupMappings": "Une correspondance de groupe relie un groupe OIDC à un groupe de principaux Duro ou à un rôle d'application : les membres de ce groupe dans votre fournisseur d'identité obtiennent automatiquement l'accès associé à la connexion.",
+    "plugins": "Un plugin étend une application avec un comportement personnalisé (provisionnement, synchronisation, notifications). Cette page affiche le manifeste d'un plugin, ses installations et son activité récente.",
     "bootstrap": "Sur un deploiement neuf, le tout premier admin est cree a partir d'un jeton d'amorcage a usage unique que votre operateur a place dans Vault. Cet assistant lit le jeton cote serveur et met en file d'attente une invitation pour l'adresse e-mail saisie. Une fois l'invitation consommee, cette page se verrouille."
   },
   "invite": {
@@ -367,6 +392,66 @@
   },
   "admin": {
     "title": "Admin - Duro",
+    "groupMappings": {
+      "title": "Correspondances de groupes ({{count}})",
+      "add": "Ajouter une correspondance",
+      "addDialogTitle": "Ajouter une correspondance de groupe",
+      "empty": "Aucune correspondance de groupe. Ajoutez-en une pour associer un groupe OIDC à un groupe Duro ou à un rôle d'application.",
+      "cols": {
+        "oidcGroup": "Groupe OIDC",
+        "type": "Type",
+        "target": "Cible",
+        "created": "Créée le"
+      },
+      "typeGroup": "Groupe",
+      "typeRole": "Rôle",
+      "oidcGroupName": "Nom du groupe OIDC",
+      "oidcGroupPlaceholder": "ex. media_users",
+      "oidcGroupDesc": "Le nom du groupe tel qu'il apparaît dans les revendications OIDC",
+      "mappingType": "Type de correspondance",
+      "principalGroup": "Groupe de principaux",
+      "applicationRole": "Rôle d'application",
+      "selectGroup": "Sélectionner un groupe",
+      "application": "Application",
+      "selectApplication": "Sélectionner une application",
+      "role": "Rôle",
+      "selectRole": "Sélectionner un rôle",
+      "selectAppFirst": "Sélectionnez d'abord une application",
+      "creating": "Création...",
+      "delete": "Supprimer",
+      "deleting": "Suppression...",
+      "created": "Correspondance créée",
+      "deleted": "Correspondance supprimée",
+      "confirmDeleteTitle": "Supprimer cette correspondance de groupe ?",
+      "confirmDeleteBody": "Les membres de ce groupe OIDC cesseront de recevoir l'accès associé à leur prochaine connexion. Cette action est irréversible."
+    },
+    "pluginDetail": {
+      "back": "Retour aux plugins",
+      "imperative": "Impératif",
+      "declarative": "Déclaratif",
+      "manifest": "Manifeste",
+      "capabilities": "Capacités",
+      "allowedDomains": "Domaines autorisés",
+      "vaultSecrets": "Secrets Vault",
+      "timeout": "Délai d'expiration",
+      "lldapPatterns": "Motifs de groupes LLDAP",
+      "none": "Aucun",
+      "permissionStrategy": "Stratégie de permissions",
+      "installedOn": "Installé sur ({{count}} applications)",
+      "notInstalled": "Installé sur aucune application pour le moment.",
+      "recentActivity": "Activité récente ({{count}})",
+      "noActivity": "Aucune invocation de plugin récente.",
+      "viewAuditLog": "Voir le journal d'audit complet",
+      "cols": {
+        "application": "Application",
+        "status": "Statut",
+        "version": "Version",
+        "event": "Événement",
+        "operation": "Opération",
+        "grant": "Octroi",
+        "time": "Heure"
+      }
+    },
     "recovery": {
       "heading": "Recuperation d'appareil",
       "description": "Demandes en attente d'utilisateurs ayant perdu tous leurs appareils. L'approbation emet un nouveau certificat, envoye par e-mail au compte.",

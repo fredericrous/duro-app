@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { useSearchParams } from "react-router"
 import { useTranslation } from "react-i18next"
+import { enumLabel } from "~/lib/enum-labels"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.audit"
 import { runEffect } from "~/lib/runtime.server"
@@ -110,7 +111,7 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
     columnHelper.accessor("eventType", {
       header: t("admin.cols.eventType"),
       enableSorting: true,
-      cell: ({ getValue }) => <Badge>{getValue()}</Badge>,
+      cell: ({ getValue }) => <Badge>{enumLabel(t, "eventType", getValue())}</Badge>,
     }),
     columnHelper.accessor("actorId", {
       header: t("admin.cols.actor"),

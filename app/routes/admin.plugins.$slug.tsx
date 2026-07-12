@@ -1,5 +1,6 @@
 import { Effect } from "effect"
 import { useNavigate } from "react-router"
+import { useTranslation } from "react-i18next"
 import { runEffect } from "~/lib/runtime.server"
 import { PluginRegistry } from "~/lib/plugins/PluginRegistry.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
@@ -7,8 +8,9 @@ import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import type { PluginAction, PluginManifest } from "~/lib/plugins/contracts"
 import type { AuditEvent, ConnectedSystem } from "~/lib/governance/types"
-import { Badge, Button, Heading, Inline, Panel, Stack, Table, Tag, Text } from "@duro-app/ui"
+import { Badge, Button, EmptyState, Heading, Inline, Panel, Stack, Table, Tag, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
@@ -72,24 +74,29 @@ const styles = css.create({
 })
 
 export default function AdminPluginDetailPage({ loaderData }: { loaderData: Awaited<ReturnType<typeof loader>> }) {
+  const { t } = useTranslation()
   const { manifest, installs, recentEvents } = loaderData
   const navigate = useNavigate()
+  const none = t("admin.pluginDetail.none")
 
   return (
     <Stack gap="md">
       <Inline justify="between" align="center">
         <Stack gap="xs">
-          <Heading level={2}>{manifest.displayName}</Heading>
+          <Heading level={2}>
+            {manifest.displayName}
+            <HelpPopover termKey="glossary.plugins" />
+          </Heading>
           <Inline gap="sm">
             <Badge variant="default">{manifest.slug}</Badge>
             <Badge variant="default">v{manifest.version}</Badge>
             <Badge variant={manifest.imperative ? "warning" : "success"}>
-              {manifest.imperative ? "Imperative" : "Declarative"}
+              {manifest.imperative ? t("admin.pluginDetail.imperative") : t("admin.pluginDetail.declarative")}
             </Badge>
           </Inline>
         </Stack>
         <Button variant="secondary" onClick={() => navigate("/admin/plugins")}>
-          Back to plugins
+          {t("admin.pluginDetail.back")}
         </Button>
       </Inline>
 
@@ -97,11 +104,11 @@ export default function AdminPluginDetailPage({ loaderData }: { loaderData: Awai
 
       <Panel.Root bordered>
         <Panel.Header>
-          <Heading level={4}>Manifest</Heading>
+          <Heading level={4}>{t("admin.pluginDetail.manifest")}</Heading>
         </Panel.Header>
         <Panel.Body padded={false}>
           <html.div style={styles.detailsGrid}>
-            <Text color="muted">Capabilities</Text>
+            <Text color="muted">{t("admin.pluginDetail.capabilities")}</Text>
             <Inline gap="xs">
               {manifest.capabilities.map((cap: string) => (
                 <Tag key={cap} size="sm">
@@ -110,23 +117,23 @@ export default function AdminPluginDetailPage({ loaderData }: { loaderData: Awai
               ))}
             </Inline>
 
-            <Text color="muted">Allowed domains</Text>
-            <Text>{manifest.allowedDomains.length > 0 ? manifest.allowedDomains.join(", ") : "None"}</Text>
+            <Text color="muted">{t("admin.pluginDetail.allowedDomains")}</Text>
+            <Text>{manifest.allowedDomains.length > 0 ? manifest.allowedDomains.join(", ") : none}</Text>
 
-            <Text color="muted">Vault secrets</Text>
-            <Text>{manifest.vaultSecrets.length > 0 ? manifest.vaultSecrets.join(", ") : "None"}</Text>
+            <Text color="muted">{t("admin.pluginDetail.vaultSecrets")}</Text>
+            <Text>{manifest.vaultSecrets.length > 0 ? manifest.vaultSecrets.join(", ") : none}</Text>
 
-            <Text color="muted">Timeout</Text>
+            <Text color="muted">{t("admin.pluginDetail.timeout")}</Text>
             <Text>{manifest.timeoutMs / 1000}s</Text>
 
-            <Text color="muted">LLDAP group patterns</Text>
-            <Text>{manifest.ownedLldapGroups.length > 0 ? manifest.ownedLldapGroups.join(", ") : "None"}</Text>
+            <Text color="muted">{t("admin.pluginDetail.lldapPatterns")}</Text>
+            <Text>{manifest.ownedLldapGroups.length > 0 ? manifest.ownedLldapGroups.join(", ") : none}</Text>
           </html.div>
         </Panel.Body>
       </Panel.Root>
 
       {Object.keys(manifest.permissionStrategy.byRoleSlug).length > 0 && (
-        <CardSection title="Permission Strategy">
+        <CardSection title={t("admin.pluginDetail.permissionStrategy")}>
           <Stack gap="sm">
             {Object.entries(manifest.permissionStrategy.byRoleSlug).map(
               ([roleSlug, actions]: [string, readonly PluginAction[]]) => (
@@ -145,16 +152,16 @@ export default function AdminPluginDetailPage({ loaderData }: { loaderData: Awai
         </CardSection>
       )}
 
-      <CardSection title={`Installed on (${installs.length} apps)`}>
+      <CardSection title={t("admin.pluginDetail.installedOn", { count: installs.length })}>
         {installs.length === 0 ? (
-          <Text color="muted">Not installed on any application yet.</Text>
+          <EmptyState message={t("admin.pluginDetail.notInstalled")} />
         ) : (
           <Table.Root>
             <Table.Header>
               <Table.Row>
-                <Table.HeaderCell>Application</Table.HeaderCell>
-                <Table.HeaderCell>Status</Table.HeaderCell>
-                <Table.HeaderCell>Version</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.pluginDetail.cols.application")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.pluginDetail.cols.status")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.pluginDetail.cols.version")}</Table.HeaderCell>
               </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -181,17 +188,17 @@ export default function AdminPluginDetailPage({ loaderData }: { loaderData: Awai
         )}
       </CardSection>
 
-      <CardSection title={`Recent activity (${recentEvents.length})`}>
+      <CardSection title={t("admin.pluginDetail.recentActivity", { count: recentEvents.length })}>
         {recentEvents.length === 0 ? (
-          <Text color="muted">No recent plugin invocations.</Text>
+          <EmptyState message={t("admin.pluginDetail.noActivity")} />
         ) : (
           <Table.Root>
             <Table.Header>
               <Table.Row>
-                <Table.HeaderCell>Event</Table.HeaderCell>
-                <Table.HeaderCell>Operation</Table.HeaderCell>
-                <Table.HeaderCell>Grant</Table.HeaderCell>
-                <Table.HeaderCell>Time</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.pluginDetail.cols.event")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.pluginDetail.cols.operation")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.pluginDetail.cols.grant")}</Table.HeaderCell>
+                <Table.HeaderCell>{t("admin.pluginDetail.cols.time")}</Table.HeaderCell>
               </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -233,7 +240,7 @@ export default function AdminPluginDetailPage({ loaderData }: { loaderData: Awai
 
       <Inline gap="sm">
         <a href={`/admin/audit?source=plugin:${manifest.slug}`}>
-          <Button variant="secondary">View full audit log</Button>
+          <Button variant="secondary">{t("admin.pluginDetail.viewAuditLog")}</Button>
         </a>
       </Inline>
     </Stack>

@@ -114,8 +114,9 @@ describe("AdminApplicationsPage component", () => {
     })
     expect(screen.getByText("Vault")).toBeInTheDocument()
     // accessMode badge text
-    expect(screen.getByText("open")).toBeInTheDocument()
-    expect(screen.getByText("invite_only")).toBeInTheDocument()
+    // accessMode enum renders humanized ("open" → "Open").
+    expect(screen.getByText("Open")).toBeInTheDocument()
+    expect(screen.getByText("Invite only")).toBeInTheDocument()
   })
 
   it("survives an empty applications list", async () => {

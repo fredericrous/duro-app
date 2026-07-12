@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router"
 import { useTranslation } from "react-i18next"
+import { enumLabel } from "~/lib/enum-labels"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.access-requests"
 import { runEffect } from "~/lib/runtime.server"
@@ -47,7 +48,7 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
               : status === "rejected"
                 ? "error"
                 : "default"
-        return <Badge variant={variant}>{status}</Badge>
+        return <Badge variant={variant}>{enumLabel(t, "requestStatus", status)}</Badge>
       },
     }),
     columnHelper.accessor((row) => row.requesterName ?? row.requesterId, {

@@ -9,7 +9,30 @@
     "settings": "Settings",
     "save": "Save",
     "language": "Language",
-    "actions": "Actions"
+    "actions": "Actions",
+    "enums": {
+      "principalType": {
+        "user": "User",
+        "group": "Group",
+        "service_account": "Service account",
+        "device": "Device"
+      },
+      "accessMode": {
+        "open": "Open",
+        "request": "By request",
+        "invite_only": "Invite only"
+      },
+      "requestStatus": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected"
+      },
+      "invitationStatus": {
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "declined": "Declined"
+      }
+    }
   },
   "header": {
     "welcome": "Welcome, {{user}}",
@@ -265,6 +288,8 @@
     "appsCatalog": "Every application Duro governs. Badges show your status per app: Granted (you have a role), Partial access (you have a role but more are available), Pending (request awaiting approval), Open (no permission needed), Invite only (admin must invite you), Request access (you can ask for a role).",
     "myRequests": "Your access requests across all applications. Pending ones can be cancelled here; approved/rejected/cancelled rows are kept as a record.",
     "invitations": "An access invitation pre-creates the grants a person should receive when they accept. Distinct from the system-level User Invites flow which provisions an account in the identity provider.",
+    "groupMappings": "A group mapping links an OIDC group claim to either a Duro principal group or an application role, so people who belong to that group in your identity provider automatically get the mapped access when they log in.",
+    "plugins": "A plugin extends an application with custom behaviour (provisioning, sync, notifications). This page shows a plugin's manifest, where it's installed, and its recent activity.",
     "bootstrap": "On a fresh deployment, the very first admin is created from a single-use bootstrap token your operator placed in Vault. This wizard reads that token server-side and queues an invite for the email you enter. After the invite is consumed, this page locks itself."
   },
   "invite": {
@@ -367,6 +392,66 @@
   },
   "admin": {
     "title": "Admin - Duro",
+    "groupMappings": {
+      "title": "Group Mappings ({{count}})",
+      "add": "Add Mapping",
+      "addDialogTitle": "Add Group Mapping",
+      "empty": "No group mappings yet. Add one to map an OIDC group claim to a Duro group or an application role.",
+      "cols": {
+        "oidcGroup": "OIDC Group",
+        "type": "Type",
+        "target": "Target",
+        "created": "Created"
+      },
+      "typeGroup": "Group",
+      "typeRole": "Role",
+      "oidcGroupName": "OIDC Group Name",
+      "oidcGroupPlaceholder": "e.g. media_users",
+      "oidcGroupDesc": "The group name as it appears in OIDC claims",
+      "mappingType": "Mapping Type",
+      "principalGroup": "Principal Group",
+      "applicationRole": "Application Role",
+      "selectGroup": "Select group",
+      "application": "Application",
+      "selectApplication": "Select application",
+      "role": "Role",
+      "selectRole": "Select role",
+      "selectAppFirst": "Select an application first",
+      "creating": "Creating...",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "created": "Mapping created",
+      "deleted": "Mapping deleted",
+      "confirmDeleteTitle": "Delete this group mapping?",
+      "confirmDeleteBody": "Members of this OIDC group will stop receiving the mapped access on their next login. This cannot be undone."
+    },
+    "pluginDetail": {
+      "back": "Back to plugins",
+      "imperative": "Imperative",
+      "declarative": "Declarative",
+      "manifest": "Manifest",
+      "capabilities": "Capabilities",
+      "allowedDomains": "Allowed domains",
+      "vaultSecrets": "Vault secrets",
+      "timeout": "Timeout",
+      "lldapPatterns": "LLDAP group patterns",
+      "none": "None",
+      "permissionStrategy": "Permission Strategy",
+      "installedOn": "Installed on ({{count}} apps)",
+      "notInstalled": "Not installed on any application yet.",
+      "recentActivity": "Recent activity ({{count}})",
+      "noActivity": "No recent plugin invocations.",
+      "viewAuditLog": "View full audit log",
+      "cols": {
+        "application": "Application",
+        "status": "Status",
+        "version": "Version",
+        "event": "Event",
+        "operation": "Operation",
+        "grant": "Grant",
+        "time": "Time"
+      }
+    },
     "recovery": {
       "heading": "Device Recovery",
       "description": "Pending requests from users who lost all their devices. Approving issues a new certificate, emailed to the account.",
