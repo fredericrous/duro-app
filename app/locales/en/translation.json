@@ -9,7 +9,30 @@
     "settings": "Settings",
     "save": "Save",
     "language": "Language",
-    "actions": "Actions"
+    "actions": "Actions",
+    "enums": {
+      "principalType": {
+        "user": "User",
+        "group": "Group",
+        "service_account": "Service account",
+        "device": "Device"
+      },
+      "accessMode": {
+        "open": "Open",
+        "request": "By request",
+        "invite_only": "Invite only"
+      },
+      "requestStatus": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected"
+      },
+      "invitationStatus": {
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "declined": "Declined"
+      }
+    }
   },
   "header": {
     "welcome": "Welcome, {{user}}",

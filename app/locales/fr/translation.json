@@ -9,7 +9,30 @@
     "settings": "Parametres",
     "save": "Enregistrer",
     "language": "Langue",
-    "actions": "Actions"
+    "actions": "Actions",
+    "enums": {
+      "principalType": {
+        "user": "Utilisateur",
+        "group": "Groupe",
+        "service_account": "Compte de service",
+        "device": "Appareil"
+      },
+      "accessMode": {
+        "open": "Ouvert",
+        "request": "Sur demande",
+        "invite_only": "Sur invitation"
+      },
+      "requestStatus": {
+        "pending": "En attente",
+        "approved": "Approuvée",
+        "rejected": "Refusée"
+      },
+      "invitationStatus": {
+        "pending": "En attente",
+        "accepted": "Acceptée",
+        "declined": "Refusée"
+      }
+    }
   },
   "header": {
     "welcome": "Bienvenue, {{user}}",

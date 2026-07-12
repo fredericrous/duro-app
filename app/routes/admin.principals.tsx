@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react"
 import { useNavigate } from "react-router"
 import { useTranslation } from "react-i18next"
+import { enumLabel } from "~/lib/enum-labels"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.principals"
 import { runEffect } from "~/lib/runtime.server"
@@ -48,7 +49,7 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
         const type = getValue()
         const variant =
           type === "user" ? "default" : type === "group" ? "info" : type === "service_account" ? "warning" : "default"
-        return <Badge variant={variant}>{type}</Badge>
+        return <Badge variant={variant}>{enumLabel(t, "principalType", type)}</Badge>
       },
     }),
     columnHelper.accessor("email", {

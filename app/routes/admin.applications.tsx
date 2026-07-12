@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { useFetcher, useNavigate } from "react-router"
 import { useTranslation } from "react-i18next"
+import { enumLabel } from "~/lib/enum-labels"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.applications"
 import { runEffect } from "~/lib/runtime.server"
@@ -63,7 +64,7 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
       cell: ({ getValue }) => {
         const mode = getValue()
         const variant = mode === "open" ? "success" : mode === "request" ? "warning" : "default"
-        return <Badge variant={variant}>{mode}</Badge>
+        return <Badge variant={variant}>{enumLabel(t, "accessMode", mode)}</Badge>
       },
     }),
     columnHelper.accessor("enabled", {

@@ -8,7 +8,7 @@ import type { Principal, Grant, Role, Entitlement } from "~/lib/governance/types
 import { useMemo } from "react"
 import { useReactTable, getCoreRowModel, createColumnHelper } from "@tanstack/react-table"
 import { html } from "react-strict-dom"
-import { Badge, Heading, Stack, Text, Table } from "@duro-app/ui"
+import { Badge, EmptyState, Heading, Stack, Text, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -145,16 +145,12 @@ export default function AdminPrincipalDetailPage({ loaderData }: Route.Component
       </html.div>
 
       <CardSection title={`Active Grants (${grants.length})`}>
-        {grants.length === 0 ? (
-          <Text color="muted">No active grants.</Text>
-        ) : (
-          <Table.FromTanstack table={grantsTable} />
-        )}
+        {grants.length === 0 ? <EmptyState message="No active grants." /> : <Table.FromTanstack table={grantsTable} />}
       </CardSection>
 
       <CardSection title={`Groups (${groups.length})`}>
         {groups.length === 0 ? (
-          <Text color="muted">Not a member of any groups.</Text>
+          <EmptyState message="Not a member of any groups." />
         ) : (
           <Table.FromTanstack table={groupsTable} />
         )}

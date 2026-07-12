@@ -7,7 +7,7 @@ import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import type { PluginAction, PluginManifest } from "~/lib/plugins/contracts"
 import type { AuditEvent, ConnectedSystem } from "~/lib/governance/types"
-import { Badge, Button, Heading, Inline, Panel, Stack, Table, Tag, Text } from "@duro-app/ui"
+import { Badge, Button, EmptyState, Heading, Inline, Panel, Stack, Table, Tag, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
@@ -147,7 +147,7 @@ export default function AdminPluginDetailPage({ loaderData }: { loaderData: Awai
 
       <CardSection title={`Installed on (${installs.length} apps)`}>
         {installs.length === 0 ? (
-          <Text color="muted">Not installed on any application yet.</Text>
+          <EmptyState message="Not installed on any application yet." />
         ) : (
           <Table.Root>
             <Table.Header>
@@ -183,7 +183,7 @@ export default function AdminPluginDetailPage({ loaderData }: { loaderData: Awai
 
       <CardSection title={`Recent activity (${recentEvents.length})`}>
         {recentEvents.length === 0 ? (
-          <Text color="muted">No recent plugin invocations.</Text>
+          <EmptyState message="No recent plugin invocations." />
         ) : (
           <Table.Root>
             <Table.Header>
