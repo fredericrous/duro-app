@@ -12,7 +12,7 @@ vi.mock("~/lib/workflows/recovery.server", () => ({
   denyRecovery: vi.fn(() => Effect.succeed(undefined)),
 }))
 
-import { screen, waitFor } from "@testing-library/react"
+import { screen, waitFor, fireEvent } from "@testing-library/react"
 import AdminRecoveryPage, { loader, action } from "./admin.recovery"
 import { runEffect } from "~/lib/runtime.server"
 import { isOriginAllowed } from "~/lib/config.server"
@@ -129,6 +129,24 @@ describe("AdminRecoveryPage", () => {
     expect(screen.getByText("lost phone")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: t("admin.recovery.approve") })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: t("admin.recovery.deny") })).toBeInTheDocument()
+  })
+
+  it("confirms before approving or denying", async () => {
+    renderRoute({
+      route: {
+        path: "/admin/recovery",
+        Component: AdminRecoveryPage as never,
+        loader: () => ({ pending: [pendingReq] }),
+        action: () => ({ approved: true }),
+      },
+    })
+    await waitFor(() => expect(screen.getByText("bob@example.com")).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole("button", { name: t("admin.recovery.approve") }))
+    await waitFor(() => expect(screen.getByText(t("admin.recovery.confirmApproveTitle"))).toBeInTheDocument())
+    // The "revoke other devices" opt-in is present and unchecked by default.
+    const revokeOthers = screen.getByRole("checkbox", { name: t("admin.recovery.revokeOthers") }) as HTMLInputElement
+    expect(revokeOthers.checked).toBe(false)
   })
 
   it("shows the empty state with no pending requests", async () => {

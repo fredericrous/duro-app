@@ -376,6 +376,10 @@
       "revokeOthers": "Revoquer les autres appareils de cet utilisateur",
       "approved": "Récupération approuvée — un nouveau certificat a été envoyé",
       "denied": "Demande de récupération refusée",
+      "confirmApproveTitle": "Approuver la récupération d'appareil ?",
+      "confirmApproveBody": "Cela émet un nouveau certificat et l'envoie par e-mail à {{email}}. Cochez la case ci-dessous uniquement si vous voulez aussi révoquer ses appareils existants.",
+      "confirmDenyTitle": "Refuser la demande de récupération ?",
+      "confirmDenyBody": "La demande est rejetée et aucun certificat n'est émis. L'utilisateur devra soumettre une nouvelle demande.",
       "col": {
         "email": "Compte",
         "requested": "Demande le",
@@ -544,6 +548,8 @@
       "revoke": "Revoquer",
       "revoking": "Revocation...",
       "revoked": "Octroi révoqué",
+      "confirmRevokeTitle": "Révoquer cet octroi ?",
+      "confirmRevokeBody": "Cela retire l'accès immédiatement. Le principal perd ce rôle jusqu'à ce qu'il soit ré-octroyé.",
       "new": {
         "title": "Creer un octroi",
         "creating": "Creation…",
@@ -644,7 +650,9 @@
         "reinvite": "Reinviter",
         "processing": "Traitement...",
         "viewCerts": "Certificats",
-        "revokeLabel": "Révoquer {{user}}"
+        "revokeLabel": "Révoquer {{user}}",
+        "confirmRevokeUserTitle": "Révoquer cet utilisateur ?",
+        "confirmRevokeUserBody": "Révoquer {{user}} désactive son compte et révoque ses certificats. L'accès est perdu immédiatement et l'utilisateur devra être réinvité."
       },
       "certs": {
         "serial": "N° de serie",

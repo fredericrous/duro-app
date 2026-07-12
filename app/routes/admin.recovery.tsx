@@ -1,3 +1,4 @@
+import { useState } from "react"
 import type { Route } from "./+types/admin.recovery"
 import { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
@@ -8,7 +9,7 @@ import { config, isOriginAllowed } from "~/lib/config.server"
 import { RecoveryRepo, type RecoveryRequest } from "~/lib/services/RecoveryRepo.server"
 import { approveRecovery, denyRecovery } from "~/lib/workflows/recovery.server"
 import { CardSection } from "~/components/CardSection/CardSection"
-import { Button, Checkbox, Inline, Stack, Table, Text } from "@duro-app/ui"
+import { Button, Checkbox, ConfirmDialog, Inline, Stack, Table, Text } from "@duro-app/ui"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 
 export async function loader() {
@@ -67,6 +68,8 @@ function RequestRow({ req }: { req: RecoveryRequest }) {
       return null
     },
   })
+  const [approveOpen, setApproveOpen] = useState(false)
+  const [denyOpen, setDenyOpen] = useState(false)
   const resolved = fetcher.data && (fetcher.data.approved || fetcher.data.denied)
   if (resolved) return null
   const submitting = fetcher.state !== "idle"
@@ -80,27 +83,60 @@ function RequestRow({ req }: { req: RecoveryRequest }) {
       </Table.Cell>
       <Table.Cell>{req.note ?? "—"}</Table.Cell>
       <Table.Cell>
-        <Inline gap="md">
-          <fetcher.Form method="post">
-            <Stack gap="xs">
-              <Checkbox name="revokeOthers" value="on" defaultChecked>
-                {t("admin.recovery.revokeOthers")}
-              </Checkbox>
-              <input type="hidden" name="intent" value="approve" />
-              <input type="hidden" name="requestId" value={req.id} />
-              <Button type="submit" variant="primary" size="small" disabled={submitting}>
-                {t("admin.recovery.approve")}
-              </Button>
-            </Stack>
-          </fetcher.Form>
-          <fetcher.Form method="post">
-            <input type="hidden" name="intent" value="deny" />
-            <input type="hidden" name="requestId" value={req.id} />
-            <Button type="submit" variant="danger" size="small" disabled={submitting}>
-              {t("admin.recovery.deny")}
-            </Button>
-          </fetcher.Form>
+        <Inline gap="sm">
+          <Button
+            type="button"
+            variant="primary"
+            size="small"
+            disabled={submitting}
+            onClick={() => setApproveOpen(true)}
+          >
+            {t("admin.recovery.approve")}
+          </Button>
+          <Button type="button" variant="danger" size="small" disabled={submitting} onClick={() => setDenyOpen(true)}>
+            {t("admin.recovery.deny")}
+          </Button>
         </Inline>
+
+        <ConfirmDialog
+          open={approveOpen}
+          onOpenChange={setApproveOpen}
+          title={t("admin.recovery.confirmApproveTitle")}
+          confirmSlot={() => (
+            <fetcher.Form method="post" onSubmit={() => setApproveOpen(false)}>
+              <Stack gap="sm">
+                {/* Opt-in (unchecked by default): revoking other devices is destructive. */}
+                <Checkbox name="revokeOthers" value="on">
+                  {t("admin.recovery.revokeOthers")}
+                </Checkbox>
+                <input type="hidden" name="intent" value="approve" />
+                <input type="hidden" name="requestId" value={req.id} />
+                <Button type="submit" variant="primary">
+                  {t("admin.recovery.approve")}
+                </Button>
+              </Stack>
+            </fetcher.Form>
+          )}
+        >
+          {t("admin.recovery.confirmApproveBody", { email: req.email })}
+        </ConfirmDialog>
+
+        <ConfirmDialog
+          open={denyOpen}
+          onOpenChange={setDenyOpen}
+          title={t("admin.recovery.confirmDenyTitle")}
+          confirmSlot={() => (
+            <fetcher.Form method="post" onSubmit={() => setDenyOpen(false)}>
+              <input type="hidden" name="intent" value="deny" />
+              <input type="hidden" name="requestId" value={req.id} />
+              <Button type="submit" variant="danger">
+                {t("admin.recovery.deny")}
+              </Button>
+            </fetcher.Form>
+          )}
+        >
+          {t("admin.recovery.confirmDenyBody")}
+        </ConfirmDialog>
       </Table.Cell>
     </Table.Row>
   )

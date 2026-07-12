@@ -20,7 +20,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Badge, Button, Dialog, Field, Input, Select, Stack, Table } from "@duro-app/ui"
+import { Badge, Button, ConfirmDialog, Dialog, Field, Input, Select, Stack, Table } from "@duro-app/ui"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 import { CardSection } from "~/components/CardSection/CardSection"
 
@@ -358,17 +358,32 @@ export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentPr
 
 function DeleteCell({ mappingId }: { mappingId: string }) {
   const fetcher = useFetcher()
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const isDeleting = fetcher.state !== "idle"
   useFetcherToast(fetcher, { successMessage: "Mapping deleted" })
 
   return (
-    <fetcher.Form method="post">
-      <input type="hidden" name="intent" value="delete" />
-      <input type="hidden" name="id" value={mappingId} />
-      <Button type="submit" variant="danger" size="small" disabled={isDeleting}>
+    <>
+      <Button type="button" variant="danger" size="small" disabled={isDeleting} onClick={() => setConfirmOpen(true)}>
         {isDeleting ? "Deleting..." : "Delete"}
       </Button>
-    </fetcher.Form>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete this group mapping?"
+        confirmSlot={() => (
+          <fetcher.Form method="post" onSubmit={() => setConfirmOpen(false)}>
+            <input type="hidden" name="intent" value="delete" />
+            <input type="hidden" name="id" value={mappingId} />
+            <Button type="submit" variant="danger">
+              Delete
+            </Button>
+          </fetcher.Form>
+        )}
+      >
+        Members of this OIDC group will stop receiving the mapped access on their next login. This cannot be undone.
+      </ConfirmDialog>
+    </>
   )
 }
 

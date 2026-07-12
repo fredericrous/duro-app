@@ -24,7 +24,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Button, EmptyState, LinkButton, Stack, Table } from "@duro-app/ui"
+import { Button, ConfirmDialog, EmptyState, LinkButton, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
@@ -277,17 +277,32 @@ export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
 function RevokeCell({ grantId }: { grantId: string }) {
   const { t } = useTranslation()
   const fetcher = useFetcher()
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const isRevoking = fetcher.state !== "idle"
   useFetcherToast(fetcher, { successMessage: t("admin.grants.revoked") })
 
   return (
-    <fetcher.Form method="post">
-      <input type="hidden" name="intent" value="revoke" />
-      <input type="hidden" name="grantId" value={grantId} />
-      <Button type="submit" variant="danger" size="small" disabled={isRevoking}>
+    <>
+      <Button type="button" variant="danger" size="small" disabled={isRevoking} onClick={() => setConfirmOpen(true)}>
         {isRevoking ? t("admin.grants.revoking") : t("admin.grants.revoke")}
       </Button>
-    </fetcher.Form>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={t("admin.grants.confirmRevokeTitle")}
+        confirmSlot={() => (
+          <fetcher.Form method="post" onSubmit={() => setConfirmOpen(false)}>
+            <input type="hidden" name="intent" value="revoke" />
+            <input type="hidden" name="grantId" value={grantId} />
+            <Button type="submit" variant="danger">
+              {t("admin.grants.revoke")}
+            </Button>
+          </fetcher.Form>
+        )}
+      >
+        {t("admin.grants.confirmRevokeBody")}
+      </ConfirmDialog>
+    </>
   )
 }
 
