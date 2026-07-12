@@ -23,7 +23,19 @@ import { certStatus } from "~/lib/cert-status"
 
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { ActionBar, Button, Combobox, Dialog, EmptyState, Inline, Input, Stack, Table, Text } from "@duro-app/ui"
+import {
+  ActionBar,
+  Button,
+  Combobox,
+  ConfirmDialog,
+  Dialog,
+  EmptyState,
+  Inline,
+  Input,
+  Stack,
+  Table,
+  Text,
+} from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 import { useAdminSidePanel } from "./admin"
@@ -96,6 +108,7 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
   const [selectedCerts, setSelectedCerts] = useState<Set<string>>(new Set())
   const [certPanelUserId, setCertPanelUserId] = useState<string | null>(null)
   const [confirmBulk, setConfirmBulk] = useState<"users" | "certs" | null>(null)
+  const [userRevokeConfirm, setUserRevokeConfirm] = useState(false)
   const sidePanel = useAdminSidePanel()
   // Destructure the stable setters. The `sidePanel` context object itself is
   // rebuilt on every /admin layout render, so depending on it (or on callbacks
@@ -475,10 +488,25 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
           onChange={(e) => setRevokeReason((e.target as HTMLInputElement).value)}
           placeholder={t("admin.users.actions.reasonPlaceholder")}
         />
-        <Button variant="danger" size="small" disabled={isRevoking} onClick={handleConfirmRevoke}>
+        <Button variant="danger" size="small" disabled={isRevoking} onClick={() => setUserRevokeConfirm(true)}>
           {isRevoking ? t("admin.users.actions.revoking") : t("admin.users.actions.confirmRevoke")}
         </Button>
       </ActionBar>
+
+      <ConfirmDialog
+        open={userRevokeConfirm}
+        onOpenChange={setUserRevokeConfirm}
+        title={t("admin.users.actions.confirmRevokeUserTitle")}
+        confirmLabel={t("admin.users.actions.confirmRevoke")}
+        onConfirm={() => {
+          handleConfirmRevoke()
+          setUserRevokeConfirm(false)
+        }}
+      >
+        {t("admin.users.actions.confirmRevokeUserBody", {
+          user: revokeTarget?.displayName ?? revokeTarget?.id,
+        })}
+      </ConfirmDialog>
 
       {revocations.length > 0 && (
         <CardSection title={`${t("admin.users.revokedTitle")} (${revocations.length})`}>

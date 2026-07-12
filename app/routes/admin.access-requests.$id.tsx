@@ -11,7 +11,19 @@ import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { handleAdminAccessRequestsMutation } from "~/lib/mutations/admin-access-requests"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { Alert, Badge, Button, ButtonGroup, Field, Heading, Panel, Stack, Text, Textarea } from "@duro-app/ui"
+import {
+  Alert,
+  Badge,
+  Button,
+  ButtonGroup,
+  ConfirmDialog,
+  Field,
+  Heading,
+  Panel,
+  Stack,
+  Text,
+  Textarea,
+} from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -79,6 +91,7 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
   const { accessRequest, approvals } = loaderData
   const fetcher = useFetcher<typeof action>()
   const [comment, setComment] = useState("")
+  const [rejectOpen, setRejectOpen] = useState(false)
 
   const isSubmitting = fetcher.state !== "idle"
   const isPending = accessRequest.status === "pending"
@@ -194,13 +207,9 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
                     {isSubmitting ? "Processing..." : "Approve"}
                   </Button>
                 </fetcher.Form>
-                <fetcher.Form method="post">
-                  <input type="hidden" name="intent" value="reject" />
-                  <input type="hidden" name="comment" value={comment} />
-                  <Button type="submit" variant="danger" disabled={isSubmitting}>
-                    {isSubmitting ? "Processing..." : "Reject"}
-                  </Button>
-                </fetcher.Form>
+                <Button type="button" variant="danger" disabled={isSubmitting} onClick={() => setRejectOpen(true)}>
+                  {isSubmitting ? "Processing..." : "Reject"}
+                </Button>
                 <fetcher.Form method="post">
                   <input type="hidden" name="intent" value="cancel" />
                   <Button type="submit" variant="secondary" disabled={isSubmitting}>
@@ -208,6 +217,23 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
                   </Button>
                 </fetcher.Form>
               </ButtonGroup>
+              <ConfirmDialog
+                open={rejectOpen}
+                onOpenChange={setRejectOpen}
+                title="Reject this access request?"
+                confirmSlot={() => (
+                  <fetcher.Form method="post" onSubmit={() => setRejectOpen(false)}>
+                    <input type="hidden" name="intent" value="reject" />
+                    <input type="hidden" name="comment" value={comment} />
+                    <Button type="submit" variant="danger">
+                      Reject
+                    </Button>
+                  </fetcher.Form>
+                )}
+              >
+                Rejecting permanently denies the request — the requester is not granted access and must submit a new
+                request. Your comment (if any) is recorded with the decision.
+              </ConfirmDialog>
               <Text variant="bodySm" color="muted">
                 {t("admin.accessRequests.decisionHint")}
               </Text>

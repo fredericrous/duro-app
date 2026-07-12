@@ -376,6 +376,10 @@
       "revokeOthers": "Revoke this user's other devices",
       "approved": "Recovery approved — a new certificate was emailed",
       "denied": "Recovery request denied",
+      "confirmApproveTitle": "Approve device recovery?",
+      "confirmApproveBody": "This issues a new certificate and emails it to {{email}}. Tick the box below only if you also want to revoke their existing devices.",
+      "confirmDenyTitle": "Deny recovery request?",
+      "confirmDenyBody": "The request is dismissed and no certificate is issued. The user would need to submit a new request.",
       "col": {
         "email": "Account",
         "requested": "Requested",
@@ -544,6 +548,8 @@
       "revoke": "Revoke",
       "revoking": "Revoking...",
       "revoked": "Grant revoked",
+      "confirmRevokeTitle": "Revoke this grant?",
+      "confirmRevokeBody": "This removes the granted access immediately. The principal loses this role until it is granted again.",
       "new": {
         "title": "Create grant",
         "creating": "Creating…",
@@ -644,7 +650,9 @@
         "reinvite": "Re-invite",
         "processing": "Processing...",
         "viewCerts": "Certificates",
-        "revokeLabel": "Revoke {{user}}"
+        "revokeLabel": "Revoke {{user}}",
+        "confirmRevokeUserTitle": "Revoke this user?",
+        "confirmRevokeUserBody": "Revoking {{user}} disables their account and revokes their certificates. They lose access immediately and must be re-invited to return."
       },
       "certs": {
         "serial": "Serial",
