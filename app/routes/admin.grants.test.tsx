@@ -90,7 +90,7 @@ describe("/admin/grants action — origin + auth gates", () => {
 // Component-render tests
 // ===========================================================================
 
-import { screen, waitFor } from "@testing-library/react"
+import { screen, waitFor, fireEvent } from "@testing-library/react"
 import AdminGrantsPage from "./admin.grants"
 import { renderRoute } from "~/test/render-route"
 
@@ -196,6 +196,37 @@ describe("AdminGrantsPage component", () => {
     expect(screen.getByText("Editor")).toBeInTheDocument()
     const revokeButtons = screen.getAllByRole("button", { name: /revoke|revoquer/i })
     expect(revokeButtons.length).toBeGreaterThan(0)
+  })
+
+  it("asks for confirmation before revoking a grant", async () => {
+    renderPage({
+      grants: [
+        {
+          id: "g-confirm",
+          principalId: "p-alice",
+          principalName: "Alice",
+          roleId: "r-editor",
+          roleName: "Editor",
+          entitlementId: null,
+          entitlementName: null,
+          applicationName: "Jellyfin",
+          applicationId: "app-jelly",
+          grantedBy: "p-admin",
+          grantedByName: "Admin",
+          reason: null,
+          expiresAt: null,
+          revokedAt: null,
+          revokedBy: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          resourceId: null,
+        },
+      ],
+    })
+    await waitFor(() => expect(screen.getByText("Alice")).toBeInTheDocument())
+    fireEvent.click(screen.getAllByRole("button", { name: /revoke|revoquer/i })[0])
+    // The revoke no longer fires immediately — a confirmation dialog with the
+    // blast-radius copy appears first.
+    await waitFor(() => expect(screen.getByText("Revoke this grant?")).toBeInTheDocument())
   })
 
   it("renders the New Grant CTA in the page header", async () => {

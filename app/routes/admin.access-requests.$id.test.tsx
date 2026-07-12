@@ -113,7 +113,7 @@ describe("/admin/access-requests/:id action — origin gate", () => {
 // Component-render tests
 // =============================================================================
 
-import { screen, waitFor } from "@testing-library/react"
+import { screen, waitFor, fireEvent } from "@testing-library/react"
 import AdminAccessRequestDetailPage from "./admin.access-requests.$id"
 import { renderRoute } from "~/test/render-route"
 
@@ -184,6 +184,13 @@ describe("AdminAccessRequestDetailPage component", () => {
     // Decision controls visible only when status === "pending".
     expect(screen.getByRole("button", { name: /approve/i })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /reject/i })).toBeInTheDocument()
+  })
+
+  it("confirms before rejecting the request", async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText("Alice")).toBeInTheDocument())
+    fireEvent.click(screen.getByRole("button", { name: /reject/i }))
+    await waitFor(() => expect(screen.getByText("Reject this access request?")).toBeInTheDocument())
   })
 
   it("hides the decision form when the request is no longer pending", async () => {
