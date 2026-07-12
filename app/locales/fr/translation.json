@@ -632,6 +632,8 @@
       "actions": {
         "sendCert": "Envoyer cert",
         "sendingCert": "Envoi...",
+        "certSent": "Certificat envoyé par e-mail",
+        "certSendFailed": "Échec de l'envoi du certificat : {{error}}",
         "revoke": "Revoquer",
         "confirmRevoke": "Confirmer la revocation",
         "revoking": "Revocation...",
