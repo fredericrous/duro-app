@@ -66,6 +66,20 @@ describe("RbacRepo — roles", () => {
     )
   })
 
+  it.layer(TestLayer)("listAllRoles returns every role ORDER BY slug", (it) => {
+    it.effect("all roles", () =>
+      Effect.gen(function* () {
+        const repo = yield* RbacRepo
+        const appId = yield* seedApp
+        yield* repo.createRole(appId, "zeta", "Zeta")
+        yield* repo.createRole(appId, "alpha", "Alpha")
+
+        const all = yield* repo.listAllRoles()
+        expect(all.map((r) => r.slug)).toEqual(["alpha", "zeta"])
+      }),
+    )
+  })
+
   it.layer(TestLayer)("findRoleById returns null when missing", (it) => {
     it.effect("missing → null", () =>
       Effect.gen(function* () {
@@ -141,6 +155,20 @@ describe("RbacRepo — entitlements", () => {
         yield* repo.deleteEntitlement(e1.id)
         const afterDel = yield* repo.findEntitlementById(e1.id)
         expect(afterDel).toBeNull()
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("listAllEntitlements returns every entitlement ORDER BY slug", (it) => {
+    it.effect("all entitlements", () =>
+      Effect.gen(function* () {
+        const repo = yield* RbacRepo
+        const appId = yield* seedApp
+        yield* repo.createEntitlement(appId, "write", "Write")
+        yield* repo.createEntitlement(appId, "read", "Read")
+
+        const all = yield* repo.listAllEntitlements()
+        expect(all.map((e) => e.slug)).toEqual(["read", "write"])
       }),
     )
   })

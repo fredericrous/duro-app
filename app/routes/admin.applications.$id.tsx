@@ -718,7 +718,19 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                   </Field.Root>
                   <Field.Root>
                     <Field.Label>Owner</Field.Label>
-                    <Input name="ownerId" defaultValue={application.ownerId ?? ""} placeholder="Principal ID" />
+                    <Select.Root name="ownerId" defaultValue={application.ownerId ?? ""}>
+                      <Select.Trigger aria-label="Owner">
+                        <Select.Value placeholder="Select a principal" />
+                        <Select.Icon />
+                      </Select.Trigger>
+                      <Select.Popup>
+                        {(principals as Principal[]).map((p) => (
+                          <Select.Item key={p.id} value={p.id}>
+                            <Select.ItemText>{p.displayName}</Select.ItemText>
+                          </Select.Item>
+                        ))}
+                      </Select.Popup>
+                    </Select.Root>
                   </Field.Root>
                   <Button type="submit" variant="primary" disabled={settingsFetcher.state !== "idle"}>
                     {settingsFetcher.state !== "idle" ? "Saving..." : "Save Settings"}
