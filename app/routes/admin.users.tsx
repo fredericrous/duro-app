@@ -96,29 +96,37 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
   const [certPanelUserId, setCertPanelUserId] = useState<string | null>(null)
   const [confirmBulk, setConfirmBulk] = useState<"users" | "certs" | null>(null)
   const sidePanel = useAdminSidePanel()
+  // Destructure the stable setters. The `sidePanel` context object itself is
+  // rebuilt on every /admin layout render, so depending on it (or on callbacks
+  // that close over it) makes the effect below re-run every render — and since
+  // that effect calls `setContent`, which re-renders the layout, the two feed
+  // each other into an infinite loop (React error #185). The setters are
+  // useState/useRef references and never change identity, so closing over them
+  // instead breaks the cycle.
+  const { onOpenChange, setContent, onCloseRef } = sidePanel
 
   const closeCertPanel = useCallback(() => {
     setCertPanelUserId(null)
-    sidePanel.onOpenChange(false)
-    sidePanel.setContent(null)
-  }, [sidePanel])
+    onOpenChange(false)
+    setContent(null)
+  }, [onOpenChange, setContent])
 
   // Register close callback so ESC/close button syncs local state
-  sidePanel.onCloseRef.current = closeCertPanel
+  onCloseRef.current = closeCertPanel
 
   const toggleCertPanel = useCallback(
     (userId: string) => {
       setCertPanelUserId((prev) => {
         if (prev === userId) {
-          sidePanel.onOpenChange(false)
-          sidePanel.setContent(null)
+          onOpenChange(false)
+          setContent(null)
           return null
         }
-        sidePanel.onOpenChange(true)
+        onOpenChange(true)
         return userId
       })
     },
-    [sidePanel],
+    [onOpenChange, setContent],
   )
 
   const toggleCert = useCallback((serialNumber: string) => {
@@ -135,7 +143,7 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
     if (certPanelUserId) {
       const user = users.find((u) => u.id === certPanelUserId)
       const certs = (certsByUser as Record<string, UserCertificate[]>)[certPanelUserId] ?? []
-      sidePanel.setContent(
+      setContent(
         <CertPanelContent
           t={t}
           certPanelUser={user}
@@ -147,7 +155,7 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
         />,
       )
     }
-  }, [certPanelUserId, selectedCerts, users, certsByUser, sidePanel, t, toggleCert, closeCertPanel])
+  }, [certPanelUserId, selectedCerts, users, certsByUser, setContent, t, toggleCert, closeCertPanel])
 
   const revokeFetcher = useFetcher()
   const certRevokeFetcher = useFetcher()
