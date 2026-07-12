@@ -7,6 +7,28 @@ on:
     branches: [main]
 
 jobs:
+  # Detect whether this PR actually changes DB migrations. The prod-data-clone
+  # migration check spins up a fresh Ceph-snapshot CNPG clone (~7-10 min, and
+  # flaky when the clone provisioning brushes the timeout), so we only pay for
+  # it when the schema could actually be affected.
+  changes:
+    name: Detect changes
+    runs-on: duro-app
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      migrations: ${{ steps.filter.outputs.migrations }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            migrations:
+              - 'app/lib/db/migrations/**'
+              - 'app/lib/db/client.server.ts'
+
   build-and-test:
     name: Build & Test
     runs-on: duro-app
@@ -68,9 +90,12 @@ jobs:
 
   migration-check:
     name: Migration check (prod-data clone)
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: changes
+    # Only run when migrations (or the DB client) actually change — most PRs
+    # don't, and the clone is slow + flaky. Guards schema-changing PRs only.
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.migrations == 'true' }}
     runs-on: duro-app
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: read
@@ -118,7 +143,7 @@ jobs:
 
       - name: Wait for clone to be Ready
         run: |
-          for i in $(seq 1 120); do   # up to ~10m for snapshot + CNPG bootstrap
+          for i in $(seq 1 180); do   # up to ~15m — Ceph snapshot + CNPG bootstrap is ~7m but spikes past 10m
             phase=$(kubectl -n "$MC_NS" get migrationcheck "$MC_NAME" -o jsonpath='{.status.phase}' 2>/dev/null || true)
             echo "phase=$phase ($i)"
             case "$phase" in
