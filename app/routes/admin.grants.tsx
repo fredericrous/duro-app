@@ -26,6 +26,7 @@ import {
 import { css, html } from "react-strict-dom"
 import { Button, EmptyState, LinkButton, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { useFetcherToast } from "~/lib/useFetcherToast"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
 type GrantWithNames = Grant & {
@@ -277,6 +278,7 @@ function RevokeCell({ grantId }: { grantId: string }) {
   const { t } = useTranslation()
   const fetcher = useFetcher()
   const isRevoking = fetcher.state !== "idle"
+  useFetcherToast(fetcher, { successMessage: t("admin.grants.revoked") })
 
   return (
     <fetcher.Form method="post">

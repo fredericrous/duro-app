@@ -1,5 +1,6 @@
 import { render } from "@testing-library/react"
 import { createRoutesStub, Outlet, useLoaderData } from "react-router"
+import { ToastProvider } from "@duro-app/ui"
 
 /**
  * Component-render harness using React Router v7's `createRoutesStub`.
@@ -93,5 +94,11 @@ export function renderRoute(options: RenderRouteOptions) {
     },
   ] as never)
 
-  return render(<Stub initialEntries={[url ?? route.path]} />)
+  // Provide ToastProvider like the app root does — routes now surface action
+  // results via useToast()/useFetcherToast.
+  return render(
+    <ToastProvider>
+      <Stub initialEntries={[url ?? route.path]} />
+    </ToastProvider>,
+  )
 }

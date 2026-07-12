@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
-import { ActionBarProvider, ThemeProvider } from "@duro-app/ui"
+import { ActionBarProvider, ThemeProvider, ToastProvider } from "@duro-app/ui"
 import { DevToolbar } from "~/components/DevToolbar/DevToolbar"
 import type { Route } from "./+types/root"
 import { resolveLocale } from "~/lib/i18n.server"
@@ -36,9 +36,11 @@ export function Layout({ children }: { children: ReactNode }) {
       </head>
       <body>
         <ThemeProvider theme="dark">
-          <ActionBarProvider>
-            <MaybeDevToolbar>{children}</MaybeDevToolbar>
-          </ActionBarProvider>
+          <ToastProvider>
+            <ActionBarProvider>
+              <MaybeDevToolbar>{children}</MaybeDevToolbar>
+            </ActionBarProvider>
+          </ToastProvider>
         </ThemeProvider>
         <ScrollRestoration />
         <Scripts />

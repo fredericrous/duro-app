@@ -8,7 +8,8 @@ import { config, isOriginAllowed } from "~/lib/config.server"
 import { RecoveryRepo, type RecoveryRequest } from "~/lib/services/RecoveryRepo.server"
 import { approveRecovery, denyRecovery } from "~/lib/workflows/recovery.server"
 import { CardSection } from "~/components/CardSection/CardSection"
-import { Alert, Button, Checkbox, Inline, Stack, Table, Text } from "@duro-app/ui"
+import { Button, Checkbox, Inline, Stack, Table, Text } from "@duro-app/ui"
+import { useFetcherToast } from "~/lib/useFetcherToast"
 
 export async function loader() {
   const pending = await runEffect(
@@ -55,7 +56,17 @@ export async function action({ request }: Route.ActionArgs) {
 
 function RequestRow({ req }: { req: RecoveryRequest }) {
   const { t } = useTranslation()
-  const fetcher = useFetcher<{ approved?: true; denied?: true; error?: string }>()
+  const fetcher = useFetcher<{ approved?: true; denied?: true; revokedCount?: number; error?: string }>()
+  useFetcherToast(fetcher, {
+    render: (data) => {
+      const d = data as { approved?: true; denied?: true; revokedCount?: number; error?: string }
+      if (d.error) return { variant: "error", message: d.error }
+      if (d.approved)
+        return { variant: "success", message: t("admin.recovery.approved", { count: d.revokedCount ?? 0 }) }
+      if (d.denied) return { variant: "success", message: t("admin.recovery.denied") }
+      return null
+    },
+  })
   const resolved = fetcher.data && (fetcher.data.approved || fetcher.data.denied)
   if (resolved) return null
   const submitting = fetcher.state !== "idle"

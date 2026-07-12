@@ -374,6 +374,8 @@
       "approve": "Approuver",
       "deny": "Refuser",
       "revokeOthers": "Revoquer les autres appareils de cet utilisateur",
+      "approved": "Récupération approuvée — un nouveau certificat a été envoyé",
+      "denied": "Demande de récupération refusée",
       "col": {
         "email": "Compte",
         "requested": "Demande le",
@@ -541,6 +543,7 @@
       "createGrant": "Creer un octroi",
       "revoke": "Revoquer",
       "revoking": "Revocation...",
+      "revoked": "Octroi révoqué",
       "new": {
         "title": "Creer un octroi",
         "creating": "Creation…",
@@ -662,6 +665,7 @@
         "selected": "{{count}} certificat(s) sélectionné(s)",
         "revokeAllForUsers": "Révoquer les certs de {{count}} utilisateur(s)",
         "revokeSelected": "Révoquer {{count}} certificat(s)",
+        "certsRevoked": "{{count}} certificat(s) révoqué(s)",
         "confirmRevokeUsersTitle": "Revoquer les certificats des utilisateurs selectionnes ?",
         "confirmRevokeCertsTitle": "Revoquer les certificats selectionnes ?",
         "confirmRevokeUsersBody": "Tous les certificats actifs de {{count}} utilisateur(s) seront revoques. Les utilisateurs perdront l'acces jusqu'a l'emission d'un nouveau certificat.",

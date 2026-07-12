@@ -20,6 +20,7 @@ import {
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
 import { Badge, Button, Dialog, Field, Input, Select, Stack, Table } from "@duro-app/ui"
+import { useFetcherToast } from "~/lib/useFetcherToast"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 export async function loader() {
@@ -141,6 +142,7 @@ const columns = [
 export default function AdminInvitationsPage({ loaderData }: Route.ComponentProps) {
   const { invitations, applications, principals } = loaderData
   const fetcher = useFetcher()
+  useFetcherToast(fetcher, { successMessage: "Invitation created" })
   const [dialogOpen, setDialogOpen] = useState(false)
   const [sorting, setSorting] = useState<SortingState>([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
