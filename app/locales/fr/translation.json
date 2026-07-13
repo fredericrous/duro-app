@@ -517,6 +517,10 @@
     "nav": {
       "title": "Navigation",
       "menu": "Menu",
+      "peopleAccess": "Personnes et acces",
+      "requestsInvites": "Demandes et invitations",
+      "auditRecovery": "Audit et recuperation",
+      "advanced": "Avance",
       "accessManagement": "Gestion des acces",
       "applications": "Applications",
       "principals": "Principaux",

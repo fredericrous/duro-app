@@ -66,22 +66,27 @@ const renderLayout = (loaderData = { pendingCounts: { accessRequests: 0, accessI
   })
 
 describe("AdminLayout component", () => {
-  it("renders the SideNav with the always-visible Applications section", async () => {
+  it("renders every job-based section expanded with its items visible", async () => {
     renderLayout()
     await waitFor(() => {
-      // The "Access Management" group is `defaultExpanded`, so its items must
-      // be visible without interaction.
-      expect(screen.getByText(t("admin.nav.applications", "Applications"))).toBeInTheDocument()
+      // People & access is defaultExpanded, so its first item is visible with
+      // no interaction — this is the regression guard for the DS double-toggle
+      // (a defaultExpanded group holding the active item used to collapse).
+      expect(screen.getByText(t("admin.nav.users", "Users"))).toBeInTheDocument()
     })
-    expect(screen.getByText(t("admin.nav.principals", "Principals"))).toBeInTheDocument()
+    // Applications is a top-level item (no group wrapper).
+    expect(screen.getByText(t("admin.nav.applications", "Applications"))).toBeInTheDocument()
+    // Advanced section items are visible too (all groups defaultExpanded).
+    expect(screen.getByText(t("admin.nav.groupMappings", "Group Mappings"))).toBeInTheDocument()
+    // Its own section holding the active item stays open (regression guard).
+    expect(screen.getByText(t("admin.nav.invites", "User Invites"))).toBeInTheDocument()
   })
 
-  it("renders the workflows group label whether or not it's expanded", async () => {
+  it("marks the active item for the current route", async () => {
+    // At "/", the derived active value is "invites" (User Invites).
     renderLayout({ pendingCounts: { accessRequests: 7, accessInvitations: 2 } })
-    // The Workflows group is collapsed by default; its trigger label is
-    // always in the accessible tree even when items are hidden.
     await waitFor(() => {
-      expect(screen.getByText(t("admin.nav.workflows", "Workflows"))).toBeInTheDocument()
+      expect(screen.getByText(t("admin.nav.invites", "User Invites"))).toHaveAttribute("aria-current", "page")
     })
   })
 })
