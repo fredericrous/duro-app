@@ -517,6 +517,10 @@
     "nav": {
       "title": "Navigation",
       "menu": "Menu",
+      "peopleAccess": "People & access",
+      "requestsInvites": "Requests & invites",
+      "auditRecovery": "Audit & recovery",
+      "advanced": "Advanced",
       "accessManagement": "Access Management",
       "applications": "Applications",
       "principals": "Principals",

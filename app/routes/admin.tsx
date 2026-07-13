@@ -226,29 +226,40 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
 
   const navContent = (
     <SideNav.Root value={activeValue} onValueChange={handleValueChange}>
-      <SideNav.Group label={t("admin.nav.accessManagement", "Access Management")} defaultExpanded>
-        <SideNav.Item value="applications">{t("admin.nav.applications", "Applications")}</SideNav.Item>
+      {/* Grouped by the admin's job, not the data model: who + their access,
+          then apps, then pending work, then oversight, then rarely-touched
+          power tools. Item values (and thus navMap/URLs) are unchanged. Every
+          group is `defaultExpanded` so all sections are visible at a glance and
+          the active item always shows (SideNav only renders an expanded group's
+          items); the admin can still collapse a section. Requires @duro-app/ui
+          ≥ the idempotent-expand fix so a defaultExpanded group holding the
+          active item isn't double-toggled closed. */}
+      <SideNav.Group label={t("admin.nav.peopleAccess", "People & access")} defaultExpanded>
+        <SideNav.Item value="users">{t("admin.nav.users", "Users")}</SideNav.Item>
         <SideNav.Item value="principals">{t("admin.nav.principals", "Principals")}</SideNav.Item>
         <SideNav.Item value="grants">{t("admin.nav.grants", "Grants")}</SideNav.Item>
-        <SideNav.Item value="group-mappings">{t("admin.nav.groupMappings", "Group Mappings")}</SideNav.Item>
       </SideNav.Group>
-      <SideNav.Group label={t("admin.nav.workflows", "Workflows")}>
+      {/* Applications is a single destination — a top-level item, not a
+          one-entry group (Item reads SideNav.Root context, so no Group wrapper
+          is needed). */}
+      <SideNav.Item value="applications">{t("admin.nav.applications", "Applications")}</SideNav.Item>
+      <SideNav.Group label={t("admin.nav.requestsInvites", "Requests & invites")} defaultExpanded>
         <SideNav.Item value="access-requests">
           <NavLabel label={t("admin.nav.accessRequests", "Access Requests")} count={counts.accessRequests} />
         </SideNav.Item>
         <SideNav.Item value="invitations">
           <NavLabel label={t("admin.nav.invitations", "Access Invitations")} count={counts.accessInvitations} />
         </SideNav.Item>
+        <SideNav.Item value="invites">{t("admin.nav.invites", "User Invites")}</SideNav.Item>
       </SideNav.Group>
-      <SideNav.Group label={t("admin.nav.security", "Security")}>
-        <SideNav.Item value="authz-playground">{t("admin.nav.authzPlayground", "Authz Playground")}</SideNav.Item>
+      <SideNav.Group label={t("admin.nav.auditRecovery", "Audit & recovery")} defaultExpanded>
         <SideNav.Item value="audit">{t("admin.nav.auditLog", "Audit Log")}</SideNav.Item>
         <SideNav.Item value="recovery">{t("admin.nav.recovery", "Device Recovery")}</SideNav.Item>
       </SideNav.Group>
-      <SideNav.Group label={t("admin.nav.system", "System")}>
+      <SideNav.Group label={t("admin.nav.advanced", "Advanced")} defaultExpanded>
+        <SideNav.Item value="group-mappings">{t("admin.nav.groupMappings", "Group Mappings")}</SideNav.Item>
+        <SideNav.Item value="authz-playground">{t("admin.nav.authzPlayground", "Authz Playground")}</SideNav.Item>
         <SideNav.Item value="plugins">{t("admin.nav.plugins", "Plugins")}</SideNav.Item>
-        <SideNav.Item value="invites">{t("admin.nav.invites", "User Invites")}</SideNav.Item>
-        <SideNav.Item value="users">{t("admin.nav.users", "Users")}</SideNav.Item>
       </SideNav.Group>
     </SideNav.Root>
   )
