@@ -107,12 +107,15 @@ export async function loader({ request }: Route.LoaderArgs) {
 function deriveActiveValue(pathname: string): string {
   if (pathname === "/admin" || pathname === "/admin/") return "invites"
   const segment = pathname.replace("/admin/", "").split("/")[0]
+  // Users + Principals merged into Identities; their old paths keep the
+  // Identities nav item highlighted (principals/:id detail included).
+  if (segment === "users" || segment === "principals") return "identities"
   return segment || "invites"
 }
 
 const navMap: Record<string, string> = {
+  identities: "/admin/identities",
   applications: "/admin/applications",
-  principals: "/admin/principals",
   grants: "/admin/grants",
   "access-requests": "/admin/access-requests",
   invitations: "/admin/invitations",
@@ -122,7 +125,6 @@ const navMap: Record<string, string> = {
   recovery: "/admin/recovery",
   plugins: "/admin/plugins",
   invites: "/admin",
-  users: "/admin/users",
 }
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
@@ -235,8 +237,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
           ≥ the idempotent-expand fix so a defaultExpanded group holding the
           active item isn't double-toggled closed. */}
       <SideNav.Group label={t("admin.nav.peopleAccess", "People & access")} defaultExpanded>
-        <SideNav.Item value="users">{t("admin.nav.users", "Users")}</SideNav.Item>
-        <SideNav.Item value="principals">{t("admin.nav.principals", "Principals")}</SideNav.Item>
+        <SideNav.Item value="identities">{t("admin.nav.identities", "Identities")}</SideNav.Item>
         <SideNav.Item value="grants">{t("admin.nav.grants", "Grants")}</SideNav.Item>
       </SideNav.Group>
       {/* Applications is a single destination — a top-level item, not a

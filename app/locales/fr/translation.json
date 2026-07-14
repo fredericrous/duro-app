@@ -290,7 +290,8 @@
     "invitations": "Une invitation d'acces pre-cree les octrois qu'une personne recevra a l'acceptation. A distinguer du flux Invitations utilisateur qui provisionne un compte dans le fournisseur d'identite.",
     "groupMappings": "Une correspondance de groupe relie un groupe OIDC à un groupe de principaux Duro ou à un rôle d'application : les membres de ce groupe dans votre fournisseur d'identité obtiennent automatiquement l'accès associé à la connexion.",
     "plugins": "Un plugin étend une application avec un comportement personnalisé (provisionnement, synchronisation, notifications). Cette page affiche le manifeste d'un plugin, ses installations et son activité récente.",
-    "bootstrap": "Sur un deploiement neuf, le tout premier admin est cree a partir d'un jeton d'amorcage a usage unique que votre operateur a place dans Vault. Cet assistant lit le jeton cote serveur et met en file d'attente une invitation pour l'adresse e-mail saisie. Une fois l'invitation consommee, cette page se verrouille."
+    "bootstrap": "Sur un deploiement neuf, le tout premier admin est cree a partir d'un jeton d'amorcage a usage unique que votre operateur a place dans Vault. Cet assistant lit le jeton cote serveur et met en file d'attente une invitation pour l'adresse e-mail saisie. Une fois l'invitation consommee, cette page se verrouille.",
+    "identities": "Les identités humaines et machines — utilisateurs et leurs certificats mTLS, groupes, comptes de service et appareils — et les accès de chacune."
   },
   "invite": {
     "title": "Rejoindre {{appName}}",
@@ -536,7 +537,8 @@
       "system": "Systeme",
       "plugins": "Extensions",
       "invites": "Invitations utilisateur",
-      "users": "Utilisateurs"
+      "users": "Utilisateurs",
+      "identities": "Identités"
     },
     "cols": {
       "name": "Nom",
@@ -769,12 +771,24 @@
         "confirmRevokeCertsBody": "{{count}} certificat(s) seront revoques. Les appareils utilisant ces certificats perdront immediatement l'acces.",
         "confirmRevokeWarning": "Cette action est irreversible. De nouveaux certificats devront etre emis pour restaurer l'acces."
       }
+    },
+    "identities": {
+      "title": "Identités",
+      "empty": "Aucune identité pour le moment.",
+      "notProvisioned": "Non provisionné",
+      "disabled": "Désactivé",
+      "activeCerts": "{{count}} actif(s)",
+      "noCerts": "Aucun certificat",
+      "view": "Voir",
+      "facet": {
+        "all": "Tous"
+      }
     }
   },
   "error": {
+    "404": "404",
     "title": "Oups !",
     "details": "Une erreur inattendue s'est produite.",
-    "404": "404",
     "404msg": "La page demandee n'a pas pu etre trouvee."
   },
   "email": {

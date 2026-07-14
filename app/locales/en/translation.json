@@ -290,7 +290,8 @@
     "invitations": "An access invitation pre-creates the grants a person should receive when they accept. Distinct from the system-level User Invites flow which provisions an account in the identity provider.",
     "groupMappings": "A group mapping links an OIDC group claim to either a Duro principal group or an application role, so people who belong to that group in your identity provider automatically get the mapped access when they log in.",
     "plugins": "A plugin extends an application with custom behaviour (provisioning, sync, notifications). This page shows a plugin's manifest, where it's installed, and its recent activity.",
-    "bootstrap": "On a fresh deployment, the very first admin is created from a single-use bootstrap token your operator placed in Vault. This wizard reads that token server-side and queues an invite for the email you enter. After the invite is consumed, this page locks itself."
+    "bootstrap": "On a fresh deployment, the very first admin is created from a single-use bootstrap token your operator placed in Vault. This wizard reads that token server-side and queues an invite for the email you enter. After the invite is consumed, this page locks itself.",
+    "identities": "People and machine identities — human users with their mTLS certificates, plus groups, service accounts, and devices — and the access each one holds."
   },
   "invite": {
     "title": "Join {{appName}}",
@@ -536,7 +537,8 @@
       "system": "System",
       "plugins": "Plugins",
       "invites": "User Invites",
-      "users": "Users"
+      "users": "Users",
+      "identities": "Identities"
     },
     "cols": {
       "name": "Name",
@@ -769,12 +771,24 @@
         "confirmRevokeCertsBody": "{{count}} certificate(s) will be revoked. Devices using these certificates will lose access immediately.",
         "confirmRevokeWarning": "This action cannot be undone. New certificates must be issued to restore access."
       }
+    },
+    "identities": {
+      "title": "Identities",
+      "empty": "No identities yet.",
+      "notProvisioned": "Not provisioned",
+      "disabled": "Disabled",
+      "activeCerts": "{{count}} active",
+      "noCerts": "No certs",
+      "view": "View",
+      "facet": {
+        "all": "All"
+      }
     }
   },
   "error": {
+    "404": "404",
     "title": "Oops!",
     "details": "An unexpected error occurred.",
-    "404": "404",
     "404msg": "The requested page could not be found."
   },
   "email": {
