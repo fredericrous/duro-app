@@ -38,7 +38,6 @@ import {
   Button,
   Checkbox,
   Combobox,
-  ConfirmDialog,
   Dialog,
   EmptyState,
   Inline,
@@ -248,7 +247,6 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
   const [selectedCerts, setSelectedCerts] = useState<Set<string>>(new Set())
   const [certPanelUserId, setCertPanelUserId] = useState<string | null>(null)
   const [confirmBulk, setConfirmBulk] = useState<"users" | "certs" | null>(null)
-  const [userRevokeConfirm, setUserRevokeConfirm] = useState(false)
   const sidePanel = useAdminSidePanel()
   // Depend on the stable setters, never the outlet-context object (rebuilt each
   // /admin render), to avoid the setContent→re-render feedback loop (React #185).
@@ -299,6 +297,7 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
           selectedCerts={selectedCerts}
           toggleCert={toggleCert}
           onClose={closeCertPanel}
+          onRevokeSelected={() => setConfirmBulk("certs")}
         />,
       )
     }
@@ -308,7 +307,6 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
   const certRevokeFetcher = useFetcher()
   const userCertRevokeFetcher = useFetcher()
   const isRevoking = revokeFetcher.state !== "idle"
-  const isRevokingCerts = certRevokeFetcher.state !== "idle"
   const isRevokingUserCerts = userCertRevokeFetcher.state !== "idle"
 
   useFetcherToast(revokeFetcher)
@@ -376,9 +374,6 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
   const selectedUserIds = Object.keys(table.getState().rowSelection)
     .map((idx) => table.getRowModel().rows[Number(idx)]?.original.uid)
     .filter(Boolean)
-
-  const activeBar =
-    selectedUserIds.length > 0 ? "users" : selectedCerts.size > 0 ? "certs" : revokeTarget ? "revoke" : null
 
   // Type facet drives the `type` column filter. Counts per type for the chips.
   const typeCounts = useMemo(() => {
@@ -523,9 +518,11 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
         </Table.Root>
       </CardSection>
 
-      {/* Bulk: revoke all certs for the selected users */}
+      {/* Single contextual bar: driven by row selection. Cert-level revoke now
+          lives inside the identity's cert detail panel, and single-user revoke
+          is a row action → dialog — so this is the only page-level ActionBar. */}
       <ActionBar
-        selectedItemCount={activeBar === "users" ? selectedUserIds.length : 0}
+        selectedItemCount={selectedUserIds.length}
         selectedLabel={(count) => t("admin.users.certs.usersSelected", { count: Number(count) })}
         onClearSelection={() => table.resetRowSelection()}
       >
@@ -533,19 +530,6 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
           {isRevokingUserCerts
             ? t("admin.users.actions.revoking")
             : t("admin.users.certs.revokeAllForUsers", { count: selectedUserIds.length })}
-        </Button>
-      </ActionBar>
-
-      {/* Cert selection (from the detail panel) */}
-      <ActionBar
-        selectedItemCount={activeBar === "certs" ? selectedCerts.size : 0}
-        selectedLabel={(count) => t("admin.users.certs.selected", { count: Number(count) })}
-        onClearSelection={() => setSelectedCerts(new Set())}
-      >
-        <Button variant="danger" size="small" disabled={isRevokingCerts} onClick={() => setConfirmBulk("certs")}>
-          {isRevokingCerts
-            ? t("admin.users.actions.revoking")
-            : t("admin.users.certs.revokeSelected", { count: selectedCerts.size })}
         </Button>
       </ActionBar>
 
@@ -591,40 +575,42 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* Single-user revoke */}
-      <ActionBar
-        selectedItemCount={activeBar === "revoke" ? 1 : 0}
-        selectedLabel={() =>
-          t("admin.users.actions.revokeLabel", { user: revokeTarget?.displayName ?? revokeTarget?.id })
-        }
-        onClearSelection={() => setRevokeTarget(null)}
-      >
-        <Input
-          name="reason"
-          type="text"
-          value={revokeReason}
-          onChange={(e) => setRevokeReason((e.target as HTMLInputElement).value)}
-          placeholder={t("admin.users.actions.reasonPlaceholder")}
-        />
-        <Button variant="danger" size="small" disabled={isRevoking} onClick={() => setUserRevokeConfirm(true)}>
-          {isRevoking ? t("admin.users.actions.revoking") : t("admin.users.actions.confirmRevoke")}
-        </Button>
-      </ActionBar>
-
-      <ConfirmDialog
-        open={userRevokeConfirm}
-        onOpenChange={setUserRevokeConfirm}
-        title={t("admin.users.actions.confirmRevokeUserTitle")}
-        confirmLabel={t("admin.users.actions.confirmRevoke")}
-        onConfirm={() => {
-          handleConfirmRevoke()
-          setUserRevokeConfirm(false)
-        }}
-      >
-        {t("admin.users.actions.confirmRevokeUserBody", {
-          user: revokeTarget?.displayName ?? revokeTarget?.id,
-        })}
-      </ConfirmDialog>
+      {/* Single-user revoke — a row action opens this dialog with the reason
+          field inside it (replacing the old swapping revoke ActionBar). */}
+      <Dialog.Root open={revokeTarget !== null} onOpenChange={(o) => !o && setRevokeTarget(null)}>
+        <Dialog.Portal size="sm">
+          <Dialog.Header>
+            <Dialog.Title>{t("admin.users.actions.confirmRevokeUserTitle")}</Dialog.Title>
+            <Dialog.Close />
+          </Dialog.Header>
+          <Dialog.Body>
+            <Stack gap="md">
+              <Text as="p">
+                {t("admin.users.actions.confirmRevokeUserBody", {
+                  user: revokeTarget?.displayName ?? revokeTarget?.id,
+                })}
+              </Text>
+              <Input
+                name="reason"
+                type="text"
+                value={revokeReason}
+                onChange={(e) => setRevokeReason((e.target as HTMLInputElement).value)}
+                placeholder={t("admin.users.actions.reasonPlaceholder")}
+              />
+            </Stack>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <Inline gap="sm">
+              <Button variant="secondary" onClick={() => setRevokeTarget(null)}>
+                {t("common.cancel")}
+              </Button>
+              <Button variant="danger" disabled={isRevoking} onClick={() => handleConfirmRevoke()}>
+                {isRevoking ? t("admin.users.actions.revoking") : t("admin.users.actions.confirmRevoke")}
+              </Button>
+            </Inline>
+          </Dialog.Footer>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       {revocations.length > 0 && (
         <CardSection title={`${t("admin.users.revokedTitle")} (${revocations.length})`}>
