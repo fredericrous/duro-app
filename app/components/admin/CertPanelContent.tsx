@@ -25,6 +25,7 @@ export function CertPanelContent({
   certPanelCerts,
   selectedCerts,
   toggleCert,
+  onRevokeSelected,
 }: {
   t: (key: string, opts?: Record<string, unknown>) => string
   certPanelUser: { displayName: string } | undefined
@@ -33,6 +34,10 @@ export function CertPanelContent({
   selectedCerts: Set<string>
   toggleCert: (serialNumber: string) => void
   onClose: () => void
+  /** Revoke the currently-selected certs (batch). When set, a footer button
+   *  appears once one or more certs are selected — this keeps cert management
+   *  inside the identity's detail facet instead of a page-level ActionBar. */
+  onRevokeSelected?: () => void
 }) {
   return (
     <>
@@ -80,6 +85,13 @@ export function CertPanelContent({
           {certPanelCerts.length === 0 && <List.Empty>{t("admin.users.certs.empty")}</List.Empty>}
         </List.Root>
       </DetailPanel.Body>
+      {onRevokeSelected && selectedCerts.size > 0 && (
+        <DetailPanel.Footer>
+          <Button variant="danger" size="small" onClick={onRevokeSelected}>
+            {t("admin.users.certs.revokeSelected", { count: selectedCerts.size })}
+          </Button>
+        </DetailPanel.Footer>
+      )}
     </>
   )
 }
