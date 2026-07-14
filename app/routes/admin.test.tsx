@@ -72,7 +72,7 @@ describe("AdminLayout component", () => {
       // People & access is defaultExpanded, so its first item is visible with
       // no interaction — this is the regression guard for the DS double-toggle
       // (a defaultExpanded group holding the active item used to collapse).
-      expect(screen.getByText(t("admin.nav.users", "Users"))).toBeInTheDocument()
+      expect(screen.getByText(t("admin.nav.identities", "Identities"))).toBeInTheDocument()
     })
     // Applications is a top-level item (no group wrapper).
     expect(screen.getByText(t("admin.nav.applications", "Applications"))).toBeInTheDocument()
