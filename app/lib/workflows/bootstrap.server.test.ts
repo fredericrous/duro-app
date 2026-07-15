@@ -14,6 +14,12 @@ import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 import { EmailService, EmailError } from "~/lib/services/EmailService.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
+import { AuditService } from "~/lib/governance/AuditService.server"
+
+const mockAudit = Layer.succeed(AuditService, {
+  emit: () => Effect.void,
+  query: () => Effect.succeed([]),
+} as any)
 
 // ---------------------------------------------------------------------------
 // Lightweight mocks (mirroring invite.server.test.ts)
@@ -267,6 +273,7 @@ const allLayers = (store: Map<string, Invite>, opts: AllLayersOpts = {}) =>
     mockEmailService(opts.sendShouldFail),
     mockPreferencesRepo(),
     mockCertRevealRepo(),
+    mockAudit,
   )
 
 // ---------------------------------------------------------------------------

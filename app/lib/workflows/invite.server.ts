@@ -7,6 +7,7 @@ import { EmailService } from "~/lib/services/EmailService.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
+import { AuditService } from "~/lib/governance/AuditService.server"
 
 export interface InviteInput {
   email: string
@@ -41,6 +42,7 @@ export const queueInvite = (input: InviteInput) =>
     const certRepo = yield* CertificateRepo
     const users = yield* UserManager
     const prefs = yield* PreferencesRepo
+    const audit = yield* AuditService
 
     // Fully revoke any existing failed invite for this email before re-creating.
     // Use the revokeInvite workflow (not the bare inviteRepo.revoke, which only
@@ -63,6 +65,15 @@ export const queueInvite = (input: InviteInput) =>
     // email no longer carries it as an attachment (Gmail phishing heuristic).
     const certResult = yield* cert.issueCertAndP12(input.email, invite.id)
     yield* inviteRepo.markCertIssued(invite.id)
+
+    yield* audit
+      .emit({
+        eventType: "cert.issued",
+        targetType: "user_certificate",
+        targetId: certResult.serialNumber,
+        metadata: { email: input.email, username: certUsername, inviteId: invite.id },
+      })
+      .pipe(Effect.catchAll(() => Effect.void))
 
     // Track the certificate
     yield* certRepo
@@ -196,6 +207,7 @@ export const revokeInvite = (inviteId: string) =>
     const inviteRepo = yield* InviteRepo
     const cert = yield* CertManager
     const certRepo = yield* CertificateRepo
+    const audit = yield* AuditService
 
     const invite = yield* inviteRepo.findById(inviteId)
     if (!invite) return
@@ -224,6 +236,16 @@ export const revokeInvite = (inviteId: string) =>
     for (const serial of serials) {
       yield* cert.revokeCert(serial).pipe(
         Effect.tap(() => certRepo.markRevokeCompleted(serial)),
+        Effect.tap(() =>
+          audit
+            .emit({
+              eventType: "cert.revoked",
+              targetType: "user_certificate",
+              targetId: serial,
+              metadata: { username: certUsername },
+            })
+            .pipe(Effect.catchAll(() => Effect.void)),
+        ),
         Effect.catchAll((e) => certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void))),
       )
     }
@@ -239,11 +261,21 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
     const cert = yield* CertManager
     const inviteRepo = yield* InviteRepo
     const certRepo = yield* CertificateRepo
+    const audit = yield* AuditService
 
     // Remove from user directory
     yield* users
       .deleteUser(username)
       .pipe(Effect.catchAll((e) => Effect.logWarning("revokeUser: failed to delete user", { error: String(e) })))
+
+    yield* audit
+      .emit({
+        eventType: "user.revoked",
+        targetType: "user",
+        targetId: username,
+        metadata: { email, reason, revokedBy },
+      })
+      .pipe(Effect.catchAll(() => Effect.void))
 
     const certUsername = certUsernameFromEmail(email)
 
@@ -259,6 +291,16 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
     for (const serial of serials) {
       yield* cert.revokeCert(serial).pipe(
         Effect.tap(() => certRepo.markRevokeCompleted(serial)),
+        Effect.tap(() =>
+          audit
+            .emit({
+              eventType: "cert.revoked",
+              targetType: "user_certificate",
+              targetId: serial,
+              metadata: { username: certUsername },
+            })
+            .pipe(Effect.catchAll(() => Effect.void)),
+        ),
         Effect.catchAll((e) => certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void))),
       )
     }
@@ -279,6 +321,7 @@ export const resendCert = (email: string, username: string, label?: string | nul
     const prefs = yield* PreferencesRepo
     const certRepo = yield* CertificateRepo
     const revealRepo = yield* CertRevealRepo
+    const audit = yield* AuditService
 
     const tempId = crypto.randomUUID()
     const locale = yield* prefs.getLocale(username)
@@ -287,6 +330,15 @@ export const resendCert = (email: string, username: string, label?: string | nul
     // is NOT deleted here — it must survive until the recipient reveals it via
     // the emailed scratch-card link (or the settings page consumes it).
     const certResult = yield* cert.issueCertAndP12(email, tempId)
+
+    yield* audit
+      .emit({
+        eventType: "cert.issued",
+        targetType: "user_certificate",
+        targetId: certResult.serialNumber,
+        metadata: { email, username },
+      })
+      .pipe(Effect.catchAll(() => Effect.void))
 
     // Track the certificate
     yield* certRepo
