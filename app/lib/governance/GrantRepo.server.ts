@@ -31,7 +31,7 @@ export class GrantRepo extends Context.Tag("GrantRepo")<
       reason?: string
       expiresAt?: string
     }) => Effect.Effect<Grant, GrantRepoError>
-    readonly revoke: (id: string, revokedBy: string) => Effect.Effect<void, GrantRepoError>
+    readonly revoke: (id: string, revokedBy: string | null) => Effect.Effect<void, GrantRepoError>
     readonly findById: (id: string) => Effect.Effect<Grant | null, GrantRepoError>
     readonly findActiveForPrincipal: (principalId: string) => Effect.Effect<Grant[], GrantRepoError>
     readonly findActiveForPrincipalAndApp: (

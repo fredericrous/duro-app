@@ -12,6 +12,7 @@
 import { Effect, Layer, Schedule } from "effect"
 import * as Http from "node:http"
 import { ProvisioningService, ProvisioningServiceLive } from "~/lib/governance/ProvisioningService.server"
+import { expireGrants } from "~/lib/workflows/grant-activation.server"
 import { PluginHostLive } from "~/lib/plugins/PluginHost.server"
 import { PluginRegistryLive } from "~/lib/plugins/PluginRegistry.server"
 import { DbLive } from "~/lib/db/client.server"
@@ -88,13 +89,26 @@ const pollOnce = Effect.gen(function* () {
     )
   }
 
-  // 3. Recover stale 'running' jobs (stuck > 5 min, likely from a crashed pod)
+  // 3. Recover stale 'running' jobs — only genuinely-dead ones (crashed pod /
+  //    interrupted fiber). External calls are now individually timeout-bounded,
+  //    so a live job completes or fails in well under this window; a 15-min
+  //    threshold ensures we never reset a job whose fiber is still running (that
+  //    would let the atomic claim hand it to a second dispatcher → duplicate).
   yield* sql`
     UPDATE provisioning_jobs
     SET status = 'pending', last_error = 'recovered from stale running state'
     WHERE status = 'running'
-      AND started_at < NOW() - INTERVAL '300 seconds'
+      AND started_at < NOW() - INTERVAL '900 seconds'
   `.pipe(Effect.catchAll(() => Effect.void))
+
+  // 4. Expire + deprovision grants whose expires_at has passed, so an expired
+  //    grant doesn't leave real downstream access live.
+  yield* expireGrants.pipe(
+    Effect.tapErrorCause((cause) =>
+      Effect.logError("worker: expireGrants failed").pipe(Effect.annotateLogs({ cause: String(cause) })),
+    ),
+    Effect.catchAll(() => Effect.void),
+  )
 })
 
 const pollLoop = pollOnce.pipe(

@@ -187,6 +187,30 @@ describe("submitAccessRequest", () => {
     )
   })
 
+  it.layer(TestLayer)("a requested duration is turned into a concrete grant expiry", (it) => {
+    it.effect("the auto-approved grant has expires_at ≈ now + requestedDurationHours", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        yield* submitAccessRequest({
+          requesterId: ids.requesterId,
+          applicationId: ids.appId,
+          roleId: ids.roleId,
+          requestedDurationHours: 2,
+        })
+
+        const rows = yield* sql<{ expiresAt: string | null }>`
+          SELECT expires_at FROM grants WHERE principal_id = ${ids.requesterId} AND role_id = ${ids.roleId}`
+        expect(rows[0]?.expiresAt).not.toBeNull()
+        const ms = new Date(rows[0]!.expiresAt as string).getTime() - Date.now()
+        // ~2h, allowing generous slack for test runtime.
+        expect(ms).toBeGreaterThan(1.5 * 3_600_000)
+        expect(ms).toBeLessThan(2.5 * 3_600_000)
+      }),
+    )
+  })
+
   it.layer(TestLayer)("creates pending request when approval policy exists with mode one_of", (it) => {
     it.effect("returns pending status", () =>
       Effect.gen(function* () {

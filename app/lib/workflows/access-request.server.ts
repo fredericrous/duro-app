@@ -79,6 +79,14 @@ export function evaluatePolicy(
 // submitAccessRequest
 // ---------------------------------------------------------------------------
 
+/**
+ * A requested duration (hours) becomes a concrete grant expiry; the worker's
+ * expireGrants sweep then revokes + deprovisions the grant when it lapses.
+ * Without this, an approved "4 hours of access" silently became permanent.
+ */
+const expiresAtForHours = (hours: number | null | undefined): string | undefined =>
+  hours && hours > 0 ? new Date(Date.now() + hours * 3_600_000).toISOString() : undefined
+
 export interface SubmitRequestInput {
   requesterId: string
   applicationId: string
@@ -174,6 +182,7 @@ export const submitAccessRequest = (input: SubmitRequestInput) =>
               resourceId: input.resourceId,
               grantedBy: input.requesterId,
               reason: "auto-approved",
+              expiresAt: expiresAtForHours(input.requestedDurationHours),
             })
           : yield* grantRepo.grantEntitlement({
               principalId: input.requesterId,
@@ -181,6 +190,7 @@ export const submitAccessRequest = (input: SubmitRequestInput) =>
               resourceId: input.resourceId,
               grantedBy: input.requesterId,
               reason: "auto-approved",
+              expiresAt: expiresAtForHours(input.requestedDurationHours),
             })
         yield* requestRepo.updateStatus(created.id, "approved")
         yield* requestRepo.linkGrant(created.id, grant.id)
@@ -296,6 +306,7 @@ export const decideApproval = (input: DecideInput) =>
                 resourceId: request.resourceId ?? undefined,
                 grantedBy: input.approverId,
                 reason: `Approved by ${input.approverId}`,
+                expiresAt: expiresAtForHours(request.requestedDurationHours),
               })
             : yield* grantRepo.grantEntitlement({
                 principalId: request.requesterId,
@@ -303,6 +314,7 @@ export const decideApproval = (input: DecideInput) =>
                 resourceId: request.resourceId ?? undefined,
                 grantedBy: input.approverId,
                 reason: `Approved by ${input.approverId}`,
+                expiresAt: expiresAtForHours(request.requestedDurationHours),
               })
           yield* requestRepo.updateStatus(input.requestId, "approved")
           yield* requestRepo.linkGrant(input.requestId, grant.id)
