@@ -111,13 +111,26 @@ const runMigrations = Effect.gen(function* () {
   const appliedIds = new Set(applied.map((r: any) => r.id))
 
   yield* Effect.log(`migrations: discovered ${migrations.length}, already applied ${appliedIds.size}`)
+  // Also emit to stdout directly: the app's Effect logger ships to OTLP, which
+  // is not captured in some environments (e.g. the CI prod-clone check, whose
+  // ephemeral runner never flushes the exporter). A raw console write is the
+  // only channel guaranteed to reach stdout/stderr, so a migration that hangs
+  // or fails is diagnosable from plain logs instead of silently wedging boot.
+  console.log(`[migrations] discovered ${migrations.length}, already applied ${appliedIds.size}`)
 
   let newCount = 0
   for (const [id, name, migration] of migrations) {
     if (appliedIds.has(id)) continue
-    yield* migration.pipe(Effect.tapError((e) => Effect.logError(`migration ${id}_${name} failed`, e)))
+    console.log(`[migrations] applying ${id}_${name}...`)
+    yield* migration.pipe(
+      Effect.tapError((e) =>
+        Effect.sync(() => console.error(`[migrations] ${id}_${name} FAILED:`, e instanceof Error ? e.stack : e)),
+      ),
+      Effect.tapError((e) => Effect.logError(`migration ${id}_${name} failed`, e)),
+    )
     yield* sql`INSERT INTO _migrations (id, name) VALUES (${id}, ${name})`
     yield* Effect.log(`migration ${id}_${name} applied`)
+    console.log(`[migrations] ${id}_${name} applied`)
     newCount++
   }
 
