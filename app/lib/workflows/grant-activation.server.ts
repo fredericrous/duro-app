@@ -1,5 +1,7 @@
 import { Cause, Context, Effect } from "effect"
 import { ProvisioningService, type ProvisioningError } from "~/lib/governance/ProvisioningService.server"
+import { GrantRepo } from "~/lib/governance/GrantRepo.server"
+import { AuditService } from "~/lib/governance/AuditService.server"
 import type { PluginHost } from "~/lib/plugins/PluginHost.server"
 
 type ActivationDeps = ProvisioningService | PluginHost
@@ -57,3 +59,42 @@ export const deactivateGrant = (grantId: string): Effect.Effect<void, Provisioni
       yield* forkProcessJob(provisioning, jobId)
     }
   })
+
+/**
+ * Expire and DEPROVISION grants whose expires_at has passed. The AuthzEngine
+ * already stops honoring an expired grant at check-time, but the downstream
+ * side-effects (LLDAP membership, connected-system access) are only reversed on
+ * revoke — so without this sweep an expired grant leaves real access live. Runs
+ * periodically from the worker. Best-effort per grant so one failure doesn't
+ * stall the rest. Returns the number of grants expired.
+ */
+export const expireGrants = Effect.gen(function* () {
+  const grantRepo = yield* GrantRepo
+  const audit = yield* AuditService
+  const expired = yield* grantRepo.findExpired()
+  for (const grant of expired) {
+    // System expiry has no human actor — revoked_by = NULL (it's FK-constrained
+    // to principals, so a sentinel string would violate the FK and be swallowed).
+    yield* grantRepo
+      .revoke(grant.id, null)
+      .pipe(
+        Effect.catchAll((e) =>
+          Effect.logWarning("expireGrants: revoke failed").pipe(
+            Effect.annotateLogs({ grantId: grant.id, error: String(e) }),
+          ),
+        ),
+      )
+    yield* audit
+      .emit({ eventType: "grant.expired", targetType: "grant", targetId: grant.id })
+      .pipe(Effect.catchAll(() => Effect.void))
+    // Deprovision downstream so the external access is actually removed.
+    yield* deactivateGrant(grant.id).pipe(
+      Effect.catchAll((e) =>
+        Effect.logWarning("expireGrants: deprovision failed").pipe(
+          Effect.annotateLogs({ grantId: grant.id, error: String(e) }),
+        ),
+      ),
+    )
+  }
+  return expired.length
+})

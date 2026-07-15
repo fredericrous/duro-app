@@ -409,6 +409,34 @@ describe("ProvisioningService — idempotency + processNextPending", () => {
     expect(calls).toHaveLength(0) // PluginHost never invoked
   })
 
+  it("does not re-dispatch a job already claimed as 'running' (atomic-claim guard)", async () => {
+    const { calls } = makeHostStub()
+    const rt = makeRuntime()
+    await rt.runPromise(seed())
+
+    // A job another dispatcher already claimed (running). The conditional claim
+    // (UPDATE ... WHERE status='pending') must fail, so PluginHost is never hit
+    // — this is what prevents the web fast-path + worker from double-processing.
+    const jobId = await rt.runPromise(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        const rows = yield* sql<{ id: string }>`
+          INSERT INTO provisioning_jobs (connected_system_id, grant_id, operation, status, started_at)
+          VALUES ('cs-1', 'g-1', 'provision', 'running', NOW()) RETURNING id`
+        return rows[0].id
+      }) as Effect.Effect<string, never, never>,
+    )
+
+    await rt.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* ProvisioningService
+        return yield* svc.processJob(jobId)
+      }),
+    )
+
+    expect(calls).toHaveLength(0) // claim failed → no duplicate dispatch
+  })
+
   it("processNextPending picks up the oldest pending job", async () => {
     const { layer, calls } = makeHostStub()
     const rt = makeRuntime(layer)

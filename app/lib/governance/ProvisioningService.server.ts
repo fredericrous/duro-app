@@ -76,6 +76,11 @@ const insertJob = (
   )
 
 /** Execute the HTTP connector for a provisioning job. */
+// Bound the raw-fetch connector so a hung endpoint can't strand the job in
+// 'running' forever (which the worker's stale-sweep would then re-dispatch as
+// a duplicate). AbortSignal.timeout aborts the request; fetch then rejects.
+const HTTP_CONNECTOR_TIMEOUT_MS = 15_000
+
 const executeHttpConnector = (config: ConnectedSystemConfig, operation: string, body: Record<string, unknown>) =>
   Effect.tryPromise({
     try: () => {
@@ -85,6 +90,7 @@ const executeHttpConnector = (config: ConnectedSystemConfig, operation: string, 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(HTTP_CONNECTOR_TIMEOUT_MS),
       })
     },
     catch: (e) => new ProvisioningError({ message: `HTTP connector failed (${operation})`, cause: e }),
@@ -100,14 +106,21 @@ const executeHttpConnector = (config: ConnectedSystemConfig, operation: string, 
     ),
   )
 
-const markRunning = (sql: SqlClient.SqlClient, jobId: string) =>
+/**
+ * Atomically claim a pending job (pending → running). Conditional on
+ * status='pending' so that when two dispatchers race the same row — the web
+ * pod's post-enqueue fast-path and the worker's poll — only one wins. Returns
+ * the affected-row count (1 = claimed by us, 0 = someone else already has it).
+ */
+const claimJob = (sql: SqlClient.SqlClient, jobId: string) =>
   withErr(
     sql`
       UPDATE provisioning_jobs
       SET status = 'running', started_at = NOW(), attempts = attempts + 1
-      WHERE id = ${jobId}
-    `.pipe(Effect.asVoid),
-    "Failed to mark job as running",
+      WHERE id = ${jobId} AND status = 'pending'
+      RETURNING id
+    `.pipe(Effect.map((rows) => rows.length)),
+    "Failed to claim job",
   )
 
 const markCompleted = (sql: SqlClient.SqlClient, jobId: string) =>
@@ -138,7 +151,15 @@ const processJobInternal = (sql: SqlClient.SqlClient, job: ProvisioningJob) =>
       return
     }
 
-    yield* markRunning(sql, job.id)
+    // Atomically claim it. 0 rows updated means another dispatcher already
+    // owns this job — bail rather than run the downstream operation twice.
+    const claimed = yield* claimJob(sql, job.id)
+    if (claimed === 0) {
+      yield* Effect.logDebug("provisioning: job already claimed by another dispatcher, skipping").pipe(
+        Effect.annotateLogs({ jobId: job.id }),
+      )
+      return
+    }
 
     // 2. Load connected system
     const systems = yield* withErr(
