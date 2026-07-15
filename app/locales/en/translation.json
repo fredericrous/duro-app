@@ -870,7 +870,9 @@
     "404": "404",
     "title": "Oops!",
     "details": "An unexpected error occurred.",
-    "404msg": "The requested page could not be found."
+    "404msg": "The requested page could not be found.",
+    "generic": "Something went wrong",
+    "goHome": "Go to home"
   },
   "email": {
     "invite": {
@@ -924,5 +926,10 @@
       "consumed": "This password has already been revealed. Request a new certificate if you still need one.",
       "unknown": "Something went wrong. Please try again or request a new certificate."
     }
+  },
+  "authError": {
+    "title": "Sign-in couldn't be completed",
+    "message": "Something went wrong while finishing your sign-in. This can happen if the page sat too long. Please try signing in again.",
+    "retry": "Try signing in again"
   }
 }

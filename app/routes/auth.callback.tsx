@@ -1,5 +1,8 @@
 import { redirect } from "react-router"
+import { useTranslation } from "react-i18next"
+import { LinkButton } from "@duro-app/ui"
 import type { Route } from "./+types/auth.callback"
+import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { runEffect } from "~/lib/runtime.server"
 import { OidcClient } from "~/lib/services/OidcClient.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
@@ -52,4 +55,24 @@ export async function loader({ request }: Route.LoaderArgs) {
   headers.append("Set-Cookie", clearPkceCookie())
 
   throw redirect(returnUrl, { headers })
+}
+
+/**
+ * Every new user passes through this route. A stale PKCE state or an IdP hiccup
+ * makes the loader's code exchange throw — without a boundary here it falls to
+ * the root one and shows a raw error. Give them a clean "try again" instead.
+ */
+export function ErrorBoundary() {
+  const { t } = useTranslation()
+  return (
+    <ErrorCard
+      title={t("authError.title")}
+      message={t("authError.message")}
+      action={
+        <LinkButton href="/" variant="primary" fullWidth>
+          {t("authError.retry")}
+        </LinkButton>
+      }
+    />
+  )
 }

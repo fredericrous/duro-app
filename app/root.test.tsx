@@ -60,13 +60,29 @@ describe("root ErrorBoundary", () => {
       data: null,
       internal: false,
     })
-    expect(screen.getByText("Error")).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: t("error.generic") })).toBeInTheDocument()
     expect(screen.getByText("Internal Server Error")).toBeInTheDocument()
   })
 
-  it("renders the JS Error message when an unhandled Error is thrown", () => {
+  it("offers a go-home link on every error", () => {
+    renderBoundary(new Error("boom"))
+    expect(screen.getByRole("link", { name: t("error.goHome") })).toHaveAttribute("href", "/")
+  })
+
+  it("renders the JS Error message when an unhandled Error is thrown (non-production)", () => {
     renderBoundary(new Error("Something exploded"))
     expect(screen.getByText("Something exploded")).toBeInTheDocument()
+  })
+
+  it("hides the raw Error message in production (no internal leak)", () => {
+    vi.stubEnv("NODE_ENV", "production")
+    try {
+      renderBoundary(new Error("secret db connection string leaked"))
+      expect(screen.queryByText("secret db connection string leaked")).not.toBeInTheDocument()
+      expect(screen.getByText(t("error.details"))).toBeInTheDocument()
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 
   it("renders the generic fallback when error is not a Response or Error", () => {
