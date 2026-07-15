@@ -15,7 +15,7 @@ vi.mock("~/lib/auth.server", () => ({ getAuth: vi.fn() }))
 import { runEffect } from "~/lib/runtime.server"
 import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { getAuth } from "~/lib/auth.server"
-import { action, loader } from "./admin.invitations"
+import { action, loader, invitationToast } from "./admin.invitations"
 import { callAction, callLoader, expectData } from "~/test/route-utils"
 
 const mockRunEffect = vi.mocked(runEffect)
@@ -24,6 +24,29 @@ const mockGetAuth = vi.mocked(getAuth)
 beforeEach(() => {
   vi.clearAllMocks()
   mockGetAuth.mockResolvedValue({ user: "admin", sub: "admin-sub", groups: ["lldap_admin"] } as never)
+})
+
+describe("invitationToast", () => {
+  const t = (key: string) => key // identity translator for deterministic assertions
+
+  it("maps a success result to a success toast", () => {
+    expect(invitationToast({ success: "created" }, t)).toEqual({
+      variant: "success",
+      message: "admin.invitations.success.created",
+    })
+  })
+
+  it("maps an error result to an error toast", () => {
+    expect(invitationToast({ error: "target_required" }, t)).toEqual({
+      variant: "error",
+      message: "admin.invitations.error.target_required",
+    })
+  })
+
+  it("returns null for non-result data", () => {
+    expect(invitationToast(null, t)).toBeNull()
+    expect(invitationToast({}, t)).toBeNull()
+  })
 })
 
 describe("/admin/invitations loader", () => {
@@ -108,6 +131,7 @@ describe("/admin/invitations action", () => {
 // ===========================================================================
 
 import { screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import AdminInvitationsPage from "./admin.invitations"
 import { renderRoute } from "~/test/render-route"
 
@@ -184,6 +208,21 @@ describe("AdminInvitationsPage component", () => {
     expect(screen.getByText("Bob")).toBeInTheDocument()
     // Cancel button only on the pending row.
     expect(screen.getAllByRole("button", { name: /Cancel/i })).toHaveLength(1)
+  })
+
+  it("opens the create dialog with the application and person fields", async () => {
+    const user = userEvent.setup()
+    renderPage({
+      applications: [{ id: "app-1", slug: "j", displayName: "Jellyfin" }],
+      principals: [{ id: "p1", displayName: "Alice" }],
+      rolesByApp: { "app-1": [{ id: "r1", displayName: "Viewer" }] },
+      entitlementsByApp: { "app-1": [{ id: "e1", displayName: "Read" }] },
+    })
+    const openButtons = await screen.findAllByRole("button", { name: "Create Invitation" })
+    await user.click(openButtons[0])
+    await waitFor(() => expect(screen.getByText("Create Access Invitation")).toBeInTheDocument())
+    expect(screen.getByLabelText("Application")).toBeInTheDocument()
+    expect(screen.getByLabelText("Person")).toBeInTheDocument()
   })
 
   it("shows the empty state with no invitations", async () => {
