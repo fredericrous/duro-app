@@ -2,6 +2,7 @@ import { Effect } from "effect"
 import { useNavigate } from "react-router"
 import { useTranslation } from "react-i18next"
 import { runEffect } from "~/lib/runtime.server"
+import { requireAdmin } from "~/lib/admin-guard.server"
 import { PluginRegistry } from "~/lib/plugins/PluginRegistry.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
@@ -20,7 +21,8 @@ interface LoaderData {
   recentEvents: AuditEvent[]
 }
 
-export async function loader({ params }: { params: { slug: string } }) {
+export async function loader({ request, params }: { request: Request; params: { slug: string } }) {
+  await requireAdmin(request)
   const slug = params.slug
 
   const data = await runEffect(

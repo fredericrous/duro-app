@@ -134,4 +134,22 @@ describe("approveRecovery / denyRecovery", () => {
     const exit = await run(approveRecovery("does-not-exist", "admin", false).pipe(Effect.either))
     expect((exit as { _tag: string })._tag).toBe("Left")
   })
+
+  it("approve is idempotent — a second approve is rejected and issues no second cert", async () => {
+    const req = await seedRequest()
+    const first = await run(approveRecovery(req.id, "admin", false))
+    expect(first).toMatchObject({ email: "bob@example.com" })
+    const renewalAfterFirst = (await findById(req.id))?.renewalId
+    expect(renewalAfterFirst).not.toBeNull()
+
+    // The request is now 'approved'; a racing/double approve must not issue a
+    // second cert. The atomic claim (markReviewed WHERE pending) rejects it.
+    const second = await run(approveRecovery(req.id, "admin", false).pipe(Effect.either))
+    expect((second as { _tag: string })._tag).toBe("Left")
+
+    const after = await findById(req.id)
+    expect(after?.status).toBe("approved")
+    // renewalId unchanged → no second issuance was recorded.
+    expect(after?.renewalId).toBe(renewalAfterFirst)
+  })
 })

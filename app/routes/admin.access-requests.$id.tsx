@@ -4,8 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.access-requests.$id"
 import { runEffect } from "~/lib/runtime.server"
-import { isOriginAllowed } from "~/lib/config.server"
-import { getAuth } from "~/lib/auth.server"
+import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { AccessRequestRepo } from "~/lib/governance/AccessRequestRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { handleAdminAccessRequestsMutation } from "~/lib/mutations/admin-access-requests"
@@ -26,7 +25,8 @@ import {
 } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ request, params }: Route.LoaderArgs) {
+  await requireAdmin(request)
   const requestId = params.id
 
   const [accessRequest, approvals] = await Promise.all([
@@ -52,15 +52,11 @@ export async function loader({ params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if (!isOriginAllowed(request.headers.get("Origin"))) {
-    throw new Response("Invalid origin", { status: 403 })
-  }
+  const auth = await requireAdminAction(request)
 
   const formData = await request.formData()
   const intent = formData.get("intent") as string
   const requestId = params.id
-  const auth = await getAuth(request)
-  if (!auth.sub) return { error: "not_authenticated" as const }
 
   // Resolve the OIDC subject to a governance principal id. The downstream
   // tables (request_approvals.approver_id, audit_events.actor_id) are FK to

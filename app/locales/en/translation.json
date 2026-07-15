@@ -136,7 +136,32 @@
       "cancel_failed": "Could not cancel this request. Please try again.",
       "missing_request_id": "Missing request id.",
       "principal_not_found": "Your account isn't fully provisioned yet.",
-      "not_authenticated": "You need to be signed in."
+      "not_authenticated": "You need to be signed in.",
+      "not_found": "That invitation no longer exists.",
+      "not_yours": "That invitation isn't addressed to you.",
+      "not_pending": "That invitation has already been resolved.",
+      "expired": "That invitation has expired.",
+      "no_target": "That invitation has nothing to grant.",
+      "invitation_failed": "Couldn't complete that action. Please try again.",
+      "missing_invitation_id": "Missing invitation.",
+      "db": "Something went wrong. Please try again."
+    },
+    "invitations": {
+      "title": "Invitations",
+      "cols": {
+        "application": "Application",
+        "access": "Access",
+        "invitedBy": "Invited by",
+        "message": "Message",
+        "action": "Action"
+      },
+      "accept": "Accept",
+      "decline": "Decline"
+    },
+    "success": {
+      "cancelled": "Request cancelled.",
+      "invitation_accepted": "Invitation accepted — access is being provisioned.",
+      "invitation_declined": "Invitation declined."
     }
   },
   "categories": {
@@ -782,6 +807,61 @@
       "view": "View",
       "facet": {
         "all": "All"
+      }
+    },
+    "invitations": {
+      "title": "Access Invitations ({{n}})",
+      "create": "Create Invitation",
+      "cancel": "Cancel",
+      "empty": "No access invitations yet.",
+      "cols": {
+        "status": "Status",
+        "application": "Application",
+        "invitedPrincipal": "Invited",
+        "access": "Access",
+        "invitedBy": "Invited by",
+        "created": "Created",
+        "action": "Action"
+      },
+      "status": {
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "declined": "Declined",
+        "expired": "Expired"
+      },
+      "success": {
+        "created": "Invitation created.",
+        "cancelled": "Invitation cancelled."
+      },
+      "error": {
+        "generic": "Something went wrong.",
+        "app_and_principal_required": "Application and person are required.",
+        "target_required": "Choose a role or an entitlement to grant.",
+        "target_exclusive": "Choose either a role or an entitlement, not both.",
+        "create_failed": "Couldn't create the invitation.",
+        "missing_invitation_id": "Missing invitation.",
+        "principal_not_found": "Your admin account could not be resolved.",
+        "not_found": "That invitation no longer exists.",
+        "not_pending": "That invitation has already been resolved.",
+        "db": "Something went wrong.",
+        "unknown_intent": "Unknown action."
+      },
+      "dialog": {
+        "title": "Create Access Invitation",
+        "application": "Application",
+        "applicationPlaceholder": "Select application",
+        "principal": "Person",
+        "principalPlaceholder": "Select person",
+        "role": "Role",
+        "rolePlaceholder": "Select a role (optional)",
+        "entitlement": "Entitlement",
+        "entitlementPlaceholder": "Select an entitlement (optional)",
+        "message": "Message",
+        "messagePlaceholder": "Optional note to the invitee",
+        "expiresAt": "Expires",
+        "expiresHint": "Defaults to {{days}} days if left empty.",
+        "creating": "Creating…",
+        "submit": "Create Invitation"
       }
     }
   },

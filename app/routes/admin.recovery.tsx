@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import { runEffect } from "~/lib/runtime.server"
 import { requireAuth } from "~/lib/auth.server"
+import { requireAdmin } from "~/lib/admin-guard.server"
 import { config, isOriginAllowed } from "~/lib/config.server"
 import { RecoveryRepo, type RecoveryRequest } from "~/lib/services/RecoveryRepo.server"
 import { approveRecovery, denyRecovery } from "~/lib/workflows/recovery.server"
@@ -12,7 +13,8 @@ import { CardSection } from "~/components/CardSection/CardSection"
 import { Button, Checkbox, ConfirmDialog, Inline, Stack, Table, Text } from "@duro-app/ui"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 
-export async function loader() {
+export async function loader({ request }: Route.LoaderArgs) {
+  await requireAdmin(request)
   const pending = await runEffect(
     Effect.gen(function* () {
       const repo = yield* RecoveryRepo

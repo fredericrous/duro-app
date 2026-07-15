@@ -5,13 +5,18 @@ vi.mock("~/lib/config.server", () => ({
   config: { isSystemUser: (id: string) => id === "system" },
   isOriginAllowed: vi.fn(() => true),
 }))
+vi.mock("~/lib/admin-guard.server", () => ({
+  requireAdmin: vi.fn().mockResolvedValue({ sub: "admin", user: "admin", email: "a@b", groups: ["lldap_admin"] }),
+  requireAdminAction: vi.fn().mockResolvedValue({ sub: "admin", user: "admin", email: "a@b", groups: ["lldap_admin"] }),
+}))
 
 import { runEffect } from "~/lib/runtime.server"
-import { isOriginAllowed } from "~/lib/config.server"
+import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { loader, action } from "./admin.identities"
 
 const mockRunEffect = vi.mocked(runEffect)
-const mockOriginAllowed = vi.mocked(isOriginAllowed)
+
+const req = () => new Request("http://x/admin/identities")
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -28,7 +33,7 @@ describe("/admin/identities loader", () => {
       .mockResolvedValueOnce([] as never)
       .mockResolvedValueOnce({} as never)
 
-    const data = (await loader()) as {
+    const data = (await loader({ request: req() } as never)) as {
       users: unknown[]
       principals: unknown[]
       systemUserIds: string[]
@@ -36,6 +41,11 @@ describe("/admin/identities loader", () => {
     expect(data.users).toHaveLength(2)
     expect(data.principals).toHaveLength(1)
     expect(data.systemUserIds).toEqual(["system"])
+  })
+
+  it("denies a non-admin (403)", async () => {
+    vi.mocked(requireAdmin).mockRejectedValueOnce(new Response("Forbidden", { status: 403 }))
+    await expect(loader({ request: req() } as never)).rejects.toMatchObject({ status: 403 })
   })
 })
 
@@ -48,8 +58,8 @@ describe("/admin/identities action", () => {
     return action({ request: new Request("http://x/admin/identities", { method: "POST", body: fd }) } as never)
   }
 
-  it("rejects a disallowed origin with 403", async () => {
-    mockOriginAllowed.mockReturnValueOnce(false)
+  it("surfaces the guard's 403 when requireAdminAction rejects (bad origin / non-admin)", async () => {
+    vi.mocked(requireAdminAction).mockRejectedValueOnce(new Response("Forbidden", { status: 403 }))
     await expect(post({ intent: "revokeUser" })).rejects.toMatchObject({ status: 403 })
   })
 

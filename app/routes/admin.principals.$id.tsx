@@ -1,6 +1,7 @@
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.principals.$id"
 import { runEffect } from "~/lib/runtime.server"
+import { requireAdmin } from "~/lib/admin-guard.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { RbacRepo } from "~/lib/governance/RbacRepo.server"
@@ -11,7 +12,8 @@ import { html } from "react-strict-dom"
 import { Badge, EmptyState, Heading, Stack, Text, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ request, params }: Route.LoaderArgs) {
+  await requireAdmin(request)
   const principalId = params.id
 
   const [principal, grants, groups, roles, entitlements, principals] = await Promise.all([

@@ -154,38 +154,43 @@ export const submitAccessRequest = (input: SubmitRequestInput) =>
     // 2. Find approval policy
     const policy = yield* requestRepo.findApprovalPolicy(input.applicationId, input.roleId, input.entitlementId)
 
+    // Auto-approve in a transaction: mint the grant, mark the request
+    // approved, link it, and audit — all atomically. Validation above
+    // guarantees exactly one of roleId / entitlementId is set; narrow on
+    // roleId to drive both branches without non-null assertions. Shared by the
+    // no-policy path and the zero-approvers path so the latter can no longer
+    // mark a request approved without actually creating the grant.
+    const autoApprove = sql.withTransaction(
+      Effect.gen(function* () {
+        const grant = input.roleId
+          ? yield* grantRepo.grantRole({
+              principalId: input.requesterId,
+              roleId: input.roleId,
+              resourceId: input.resourceId,
+              grantedBy: input.requesterId,
+              reason: "auto-approved",
+            })
+          : yield* grantRepo.grantEntitlement({
+              principalId: input.requesterId,
+              entitlementId: input.entitlementId as string,
+              resourceId: input.resourceId,
+              grantedBy: input.requesterId,
+              reason: "auto-approved",
+            })
+        yield* requestRepo.updateStatus(created.id, "approved")
+        yield* requestRepo.linkGrant(created.id, grant.id)
+        yield* audit.emit({
+          eventType: "access.auto_approved",
+          actorId: input.requesterId,
+          targetType: "access_request",
+          targetId: created.id,
+          applicationId: input.applicationId,
+        })
+      }),
+    )
+
     if (!policy || policy.mode === "none") {
-      // Auto-approve in a transaction. Validation above guarantees exactly
-      // one of roleId / entitlementId is set; narrow on roleId to drive both
-      // branches without non-null assertions.
-      yield* sql.withTransaction(
-        Effect.gen(function* () {
-          const grant = input.roleId
-            ? yield* grantRepo.grantRole({
-                principalId: input.requesterId,
-                roleId: input.roleId,
-                resourceId: input.resourceId,
-                grantedBy: input.requesterId,
-                reason: "auto-approved",
-              })
-            : yield* grantRepo.grantEntitlement({
-                principalId: input.requesterId,
-                entitlementId: input.entitlementId as string,
-                resourceId: input.resourceId,
-                grantedBy: input.requesterId,
-                reason: "auto-approved",
-              })
-          yield* requestRepo.updateStatus(created.id, "approved")
-          yield* requestRepo.linkGrant(created.id, grant.id)
-          yield* audit.emit({
-            eventType: "access.auto_approved",
-            actorId: input.requesterId,
-            targetType: "access_request",
-            targetId: created.id,
-            applicationId: input.applicationId,
-          })
-        }),
-      )
+      yield* autoApprove
       return { requestId: created.id, status: "approved" as const }
     }
 
@@ -205,8 +210,7 @@ export const submitAccessRequest = (input: SubmitRequestInput) =>
 
     if (approverIds.length === 0) {
       yield* Effect.logWarning("No approvers resolved, auto-approving")
-      // auto-approve same as above... (simplified: just update status)
-      yield* requestRepo.updateStatus(created.id, "approved")
+      yield* autoApprove
       return { requestId: created.id, status: "approved" as const }
     }
 
@@ -245,12 +249,19 @@ export const decideApproval = (input: DecideInput) =>
 
     yield* sqlClient.withTransaction(
       Effect.gen(function* () {
+        // 0. Lock the request row and guard on status. Two concurrent deciders
+        //    (a second one_of approver, a double-click, a retry) would both
+        //    re-run evaluatePolicy, see the prior approval, and each mint a
+        //    grant — duplicating access. FOR UPDATE serializes them; the
+        //    status check makes an already-decided request a no-op.
+        yield* sqlClient`SELECT id FROM access_requests WHERE id = ${input.requestId} FOR UPDATE`
+        const request = yield* requestRepo.findById(input.requestId)
+        if (!request || request.status !== "pending") return
+
         // 1. Record the individual decision
         yield* requestRepo.recordDecision(input.requestId, input.approverId, input.decision, input.comment)
 
-        // 2. Load request + approvals + policy
-        const request = yield* requestRepo.findById(input.requestId)
-        if (!request) return
+        // 2. Load approvals + policy
 
         const approvals = yield* requestRepo.getApprovals(input.requestId)
         const policy = yield* requestRepo.findApprovalPolicy(

@@ -136,7 +136,32 @@
       "cancel_failed": "Impossible d'annuler cette demande. Veuillez reessayer.",
       "missing_request_id": "Identifiant de demande manquant.",
       "principal_not_found": "Votre compte n'est pas encore entierement provisionne.",
-      "not_authenticated": "Vous devez etre connecte."
+      "not_authenticated": "Vous devez etre connecte.",
+      "not_found": "Cette invitation n'existe plus.",
+      "not_yours": "Cette invitation ne vous est pas adressée.",
+      "not_pending": "Cette invitation a déjà été traitée.",
+      "expired": "Cette invitation a expiré.",
+      "no_target": "Cette invitation n'accorde aucun accès.",
+      "invitation_failed": "Action impossible. Veuillez réessayer.",
+      "missing_invitation_id": "Invitation manquante.",
+      "db": "Une erreur est survenue. Veuillez réessayer."
+    },
+    "invitations": {
+      "title": "Invitations",
+      "cols": {
+        "application": "Application",
+        "access": "Accès",
+        "invitedBy": "Invité par",
+        "message": "Message",
+        "action": "Action"
+      },
+      "accept": "Accepter",
+      "decline": "Refuser"
+    },
+    "success": {
+      "cancelled": "Demande annulée.",
+      "invitation_accepted": "Invitation acceptée — l'accès est en cours d'attribution.",
+      "invitation_declined": "Invitation refusée."
     }
   },
   "categories": {
@@ -782,6 +807,61 @@
       "view": "Voir",
       "facet": {
         "all": "Tous"
+      }
+    },
+    "invitations": {
+      "title": "Invitations d'accès ({{n}})",
+      "create": "Créer une invitation",
+      "cancel": "Annuler",
+      "empty": "Aucune invitation d'accès pour le moment.",
+      "cols": {
+        "status": "Statut",
+        "application": "Application",
+        "invitedPrincipal": "Invité",
+        "access": "Accès",
+        "invitedBy": "Invité par",
+        "created": "Créée",
+        "action": "Action"
+      },
+      "status": {
+        "pending": "En attente",
+        "accepted": "Acceptée",
+        "declined": "Refusée",
+        "expired": "Expirée"
+      },
+      "success": {
+        "created": "Invitation créée.",
+        "cancelled": "Invitation annulée."
+      },
+      "error": {
+        "generic": "Une erreur est survenue.",
+        "app_and_principal_required": "L'application et la personne sont requises.",
+        "target_required": "Choisissez un rôle ou un droit à accorder.",
+        "target_exclusive": "Choisissez soit un rôle, soit un droit, pas les deux.",
+        "create_failed": "Impossible de créer l'invitation.",
+        "missing_invitation_id": "Invitation manquante.",
+        "principal_not_found": "Votre compte administrateur n'a pas pu être résolu.",
+        "not_found": "Cette invitation n'existe plus.",
+        "not_pending": "Cette invitation a déjà été traitée.",
+        "db": "Une erreur est survenue.",
+        "unknown_intent": "Action inconnue."
+      },
+      "dialog": {
+        "title": "Créer une invitation d'accès",
+        "application": "Application",
+        "applicationPlaceholder": "Sélectionner une application",
+        "principal": "Personne",
+        "principalPlaceholder": "Sélectionner une personne",
+        "role": "Rôle",
+        "rolePlaceholder": "Sélectionner un rôle (facultatif)",
+        "entitlement": "Droit",
+        "entitlementPlaceholder": "Sélectionner un droit (facultatif)",
+        "message": "Message",
+        "messagePlaceholder": "Note facultative pour l'invité",
+        "expiresAt": "Expire le",
+        "expiresHint": "Par défaut {{days}} jours si laissé vide.",
+        "creating": "Création…",
+        "submit": "Créer l'invitation"
       }
     }
   },

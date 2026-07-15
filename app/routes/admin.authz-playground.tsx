@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.authz-playground"
 import { runEffect } from "~/lib/runtime.server"
-import { isOriginAllowed } from "~/lib/config.server"
+import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { AuthzEngine } from "~/lib/governance/AuthzEngine.server"
@@ -15,7 +15,8 @@ import { Alert, Button, Callout, Combobox, Field, Heading, Input, Panel, Stack, 
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
-export async function loader() {
+export async function loader({ request }: Route.LoaderArgs) {
+  await requireAdmin(request)
   const [principals, applications] = await Promise.all([
     runEffect(
       Effect.gen(function* () {
@@ -35,9 +36,7 @@ export async function loader() {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  if (!isOriginAllowed(request.headers.get("Origin"))) {
-    throw new Response("Invalid origin", { status: 403 })
-  }
+  await requireAdminAction(request)
 
   const formData = await request.formData()
   const intent = formData.get("intent") as string
