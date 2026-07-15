@@ -3,6 +3,7 @@ import { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { colors } from "@duro-app/tokens/tokens/colors.css"
 import {
   Alert,
   Badge,
@@ -49,7 +50,7 @@ const styles = css.create({
     paddingBottom: spacing.sm,
     borderTopWidth: 1,
     borderTopStyle: "solid",
-    borderTopColor: "var(--colors-border-subtle, #e5e7eb)",
+    borderTopColor: colors.border,
   },
   firstRow: {
     borderTopWidth: 0,
@@ -63,10 +64,11 @@ const styles = css.create({
     wordBreak: "break-all",
     padding: spacing.sm,
     borderRadius: 6,
-    backgroundColor: "var(--colors-background-subtle, #f3f4f6)",
+    backgroundColor: colors.bgCard,
+    color: colors.text,
     borderWidth: 1,
     borderStyle: "solid",
-    borderColor: "var(--colors-border-subtle, #e5e7eb)",
+    borderColor: colors.border,
   },
 })
 
@@ -385,7 +387,9 @@ export function ApiKeysSection({ apiKeys }: Props) {
                     fontSize: 12,
                     padding: 8,
                     borderRadius: 6,
-                    border: "1px solid var(--colors-border-subtle, #d1d5db)",
+                    border: `1px solid ${colors.border}`,
+                    backgroundColor: colors.bgCard,
+                    color: colors.text,
                     resize: "vertical",
                     minHeight: 64,
                   }}

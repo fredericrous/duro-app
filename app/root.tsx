@@ -59,9 +59,17 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let details = t("error.details")
 
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? t("error.404") : "Error"
-    details = error.status === 404 ? t("error.404msg") : error.statusText || details
-  } else if (error instanceof Error) {
+    if (error.status === 404) {
+      message = t("error.404")
+      details = t("error.404msg")
+    } else {
+      message = t("error.generic")
+      // statusText is developer-controlled (e.g. "Forbidden"), safe to show.
+      details = error.statusText || t("error.details")
+    }
+  } else if (process.env.NODE_ENV !== "production" && error instanceof Error) {
+    // Surface the real message only outside production — a raw internal error
+    // message must never leak to end users.
     details = error.message
   }
 
@@ -69,6 +77,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     <main className="error-container">
       <h1>{message}</h1>
       <p>{details}</p>
+      <a href="/">{t("error.goHome")}</a>
     </main>
   )
 }

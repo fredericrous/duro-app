@@ -870,7 +870,9 @@
     "404": "404",
     "title": "Oups !",
     "details": "Une erreur inattendue s'est produite.",
-    "404msg": "La page demandee n'a pas pu etre trouvee."
+    "404msg": "La page demandee n'a pas pu etre trouvee.",
+    "generic": "Une erreur est survenue",
+    "goHome": "Retour à l'accueil"
   },
   "email": {
     "invite": {
@@ -924,5 +926,10 @@
       "consumed": "Ce mot de passe a deja ete revele. Demandez un nouveau certificat si vous en avez encore besoin.",
       "unknown": "Une erreur s'est produite. Reessayez ou demandez un nouveau certificat."
     }
+  },
+  "authError": {
+    "title": "La connexion n'a pas pu être finalisée",
+    "message": "Une erreur est survenue lors de la finalisation de votre connexion. Cela peut arriver si la page est restée ouverte trop longtemps. Veuillez réessayer.",
+    "retry": "Réessayer de se connecter"
   }
 }
