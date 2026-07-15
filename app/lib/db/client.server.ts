@@ -27,6 +27,7 @@ import m0020 from "./migrations/pg/0020_add_invite_delivery_tracking"
 import m0021 from "./migrations/pg/0021_add_cert_reveal_tokens"
 import m0022 from "./migrations/pg/0022_add_certificate_label"
 import m0023 from "./migrations/pg/0023_create_recovery_requests"
+import m0024 from "./migrations/pg/0024_grants_resource_restrict"
 
 const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
@@ -92,6 +93,7 @@ const migrations: Array<
   [21, "add_cert_reveal_tokens", m0021],
   [22, "add_certificate_label", m0022],
   [23, "create_recovery_requests", m0023],
+  [24, "grants_resource_restrict", m0024],
 ]
 
 const runMigrations = Effect.gen(function* () {
@@ -109,13 +111,26 @@ const runMigrations = Effect.gen(function* () {
   const appliedIds = new Set(applied.map((r: any) => r.id))
 
   yield* Effect.log(`migrations: discovered ${migrations.length}, already applied ${appliedIds.size}`)
+  // Also emit to stdout directly: the app's Effect logger ships to OTLP, which
+  // is not captured in some environments (e.g. the CI prod-clone check, whose
+  // ephemeral runner never flushes the exporter). A raw console write is the
+  // only channel guaranteed to reach stdout/stderr, so a migration that hangs
+  // or fails is diagnosable from plain logs instead of silently wedging boot.
+  console.log(`[migrations] discovered ${migrations.length}, already applied ${appliedIds.size}`)
 
   let newCount = 0
   for (const [id, name, migration] of migrations) {
     if (appliedIds.has(id)) continue
-    yield* migration.pipe(Effect.tapError((e) => Effect.logError(`migration ${id}_${name} failed`, e)))
+    console.log(`[migrations] applying ${id}_${name}...`)
+    yield* migration.pipe(
+      Effect.tapError((e) =>
+        Effect.sync(() => console.error(`[migrations] ${id}_${name} FAILED:`, e instanceof Error ? e.stack : e)),
+      ),
+      Effect.tapError((e) => Effect.logError(`migration ${id}_${name} failed`, e)),
+    )
     yield* sql`INSERT INTO _migrations (id, name) VALUES (${id}, ${name})`
     yield* Effect.log(`migration ${id}_${name} applied`)
+    console.log(`[migrations] ${id}_${name} applied`)
     newCount++
   }
 
