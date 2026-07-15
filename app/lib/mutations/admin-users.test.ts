@@ -533,4 +533,54 @@ describe("handleAdminUsersMutation", () => {
     // batch handler reports both revoked + the failed list (empty here).
     expect(result).toMatchObject({ certsRevoked: true, count: 2 })
   })
+
+  it("revokeCertsBatch continues past a failed serial and still revokes the rest", async () => {
+    const mkCert = (sn: string): UserCertificate => ({
+      id: sn,
+      inviteId: null,
+      userId: null,
+      username: "alice",
+      email: "alice@x",
+      label: null,
+      serialNumber: sn,
+      issuedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      revokedAt: null,
+      revokeState: null,
+      revokeError: null,
+    })
+    const certs = new Map<string, UserCertificate>([
+      ["sn-fail", mkCert("sn-fail")],
+      ["sn-good", mkCert("sn-good")],
+    ])
+    const failingCert = Layer.succeed(CertManager, {
+      issueCert: () => Effect.succeed({ serialNumber: "cert-123", renewalId: "ren-1" }),
+      revokeCert: (sn: string) => (sn === "sn-fail" ? Effect.fail(new Error("revoke failed")) : Effect.void),
+      getP12Password: () => Effect.succeed("test-password"),
+      deleteP12Secret: () => Effect.void,
+      consumeP12Password: () => Effect.void,
+    } as any)
+    const layer = Layer.mergeAll(
+      failingCert,
+      mockCertRepo(certs),
+      mockInviteRepo,
+      mockUserManager,
+      mockEmailService,
+      mockPreferencesRepo,
+      mockCertRevealRepo,
+    )
+
+    const result = await Effect.runPromise(
+      handleAdminUsersMutation({ intent: "revokeCertsBatch", serialNumbers: ["sn-fail", "sn-good"] }).pipe(
+        Effect.provide(layer),
+      ),
+    )
+    // Previously Effect.tapError re-raised, aborting the batch and returning
+    // { error }. Now the batch continues: the good serial is revoked and the
+    // failed one is recorded, not silently dropped.
+    expect(result).toMatchObject({ certsRevoked: true })
+    expect(certs.get("sn-good")?.revokeState).toBe("completed")
+    expect(certs.get("sn-good")?.revokedAt).not.toBeNull()
+    expect(certs.get("sn-fail")?.revokeState).toBe("failed")
+  })
 })

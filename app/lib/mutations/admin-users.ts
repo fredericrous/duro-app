@@ -28,6 +28,22 @@ export type AdminUsersResult =
 // Dispatcher
 // ---------------------------------------------------------------------------
 
+/**
+ * Revoke one cert serial, recording completion or failure. Never fails: within
+ * a batch a single failure must NOT abort the rest — revoke as many as possible
+ * and record which failed (a security operation should not be blocked by one
+ * bad serial; the admin can retry those). Shared by all three batch loops.
+ */
+const revokeSerial = (serial: string) =>
+  Effect.gen(function* () {
+    const cert = yield* CertManager
+    const certRepo = yield* CertificateRepo
+    yield* cert.revokeCert(serial).pipe(
+      Effect.tap(() => certRepo.markRevokeCompleted(serial)),
+      Effect.catchAll((e) => certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void))),
+    )
+  })
+
 export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
   return Effect.gen(function* () {
     switch (mutation.intent) {
@@ -58,16 +74,10 @@ export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
       }
 
       case "revokeAllCerts": {
-        const cert = yield* CertManager
         const certRepo = yield* CertificateRepo
         const serials = yield* certRepo.revokeAllForUser(mutation.username)
         for (const serial of serials) {
-          yield* cert.revokeCert(serial).pipe(
-            Effect.tap(() => certRepo.markRevokeCompleted(serial)),
-            Effect.catchAll((e) =>
-              certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void)),
-            ),
-          )
+          yield* revokeSerial(serial)
         }
         return { certsRevoked: true as const, count: serials.length }
       }
@@ -86,36 +96,26 @@ export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
       }
 
       case "revokeCertsBatch": {
-        const cert = yield* CertManager
         const certRepo = yield* CertificateRepo
         let count = 0
         for (const serial of mutation.serialNumbers) {
           const affected = yield* certRepo.markRevokePending(serial)
           if (affected === 0) continue
-          yield* cert.revokeCert(serial).pipe(
-            Effect.tap(() => certRepo.markRevokeCompleted(serial)),
-            Effect.tapError((e) =>
-              certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void)),
-            ),
-          )
+          // Continue on failure (was Effect.tapError, which aborted the whole
+          // batch on the first bad serial and reported total failure).
+          yield* revokeSerial(serial)
           count++
         }
         return { certsRevoked: true as const, count }
       }
 
       case "revokeAllCertsBatch": {
-        const cert = yield* CertManager
         const certRepo = yield* CertificateRepo
         let total = 0
         for (const username of mutation.usernames) {
           const serials = yield* certRepo.revokeAllForUser(username)
           for (const serial of serials) {
-            yield* cert.revokeCert(serial).pipe(
-              Effect.tap(() => certRepo.markRevokeCompleted(serial)),
-              Effect.catchAll((e) =>
-                certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void)),
-              ),
-            )
+            yield* revokeSerial(serial)
           }
           total += serials.length
         }
