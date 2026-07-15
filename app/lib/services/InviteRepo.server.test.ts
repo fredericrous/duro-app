@@ -2,11 +2,14 @@
 import { describe, expect } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
+import * as SqlClient from "@effect/sql/SqlClient"
 import { InviteRepo, InviteRepoLive, InviteError } from "./InviteRepo.server"
 import { makeTestDbLayer } from "~/lib/db/client.server"
 import { hashToken } from "~/lib/crypto.server"
 
-const TestLayer = InviteRepoLive.pipe(Layer.provide(makeTestDbLayer()))
+// provideMerge (not provide) keeps SqlClient in the output context so tests can
+// run direct SQL (e.g. forcing an invite's expiry into the past).
+const TestLayer = InviteRepoLive.pipe(Layer.provideMerge(makeTestDbLayer()))
 
 describe("InviteRepo", () => {
   it.layer(TestLayer)("create + findById", (it) => {
@@ -275,6 +278,27 @@ describe("InviteRepo", () => {
         expect(error.message).toContain("invalid, expired, or already used")
       }),
     )
+
+    it.effect("fails to consume an expired invite", () =>
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const sql = yield* SqlClient.SqlClient
+        const { token } = yield* repo.create({
+          email: "expired@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
+
+        // create() always sets +7d expiry; force it into the past so the
+        // `expires_at > now()` guard in consumeByToken rejects it.
+        yield* sql`UPDATE invites SET expires_at = NOW() - INTERVAL '1 day' WHERE token_hash = ${hashToken(token)}`
+
+        const error = yield* repo.consumeByToken(token).pipe(Effect.flip)
+        expect(error).toBeInstanceOf(InviteError)
+        expect(error.message).toContain("invalid, expired, or already used")
+      }),
+    )
   })
 
   it.layer(TestLayer)("markUsedBy + findPending", (it) => {
@@ -299,6 +323,7 @@ describe("InviteRepo", () => {
     it.effect("findPending returns only unconsumed non-expired invites", () =>
       Effect.gen(function* () {
         const repo = yield* InviteRepo
+        const sql = yield* SqlClient.SqlClient
         yield* repo.create({
           email: "pending1@example.com",
           groups: [1],
@@ -311,9 +336,17 @@ describe("InviteRepo", () => {
           groupNames: ["family"],
           invitedBy: "admin",
         })
+        const { token: t3 } = yield* repo.create({
+          email: "pending3-expired@example.com",
+          groups: [1],
+          groupNames: ["friends"],
+          invitedBy: "admin",
+        })
 
-        // Consume one
+        // Consume one (excluded by used_at)
         yield* repo.consumeByToken(t2)
+        // Expire another (excluded by expires_at > now())
+        yield* sql`UPDATE invites SET expires_at = NOW() - INTERVAL '1 day' WHERE token_hash = ${hashToken(t3)}`
 
         const pending = yield* repo.findPending()
         expect(pending).toHaveLength(1)

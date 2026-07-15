@@ -6,7 +6,7 @@
   flex-direction: column;
 }
 
-.container > *:not(.canvas) {
+.container > *:not(.canvas):not(.cover) {
   flex: 1;
   min-height: 0;
 }
@@ -18,4 +18,28 @@
   height: 100%;
   cursor: crosshair;
   touch-action: none;
+}
+
+/* Full-cover accessible reveal button. `pointer-events: none` lets mouse
+   scratches pass through to the canvas beneath, while the button stays in the
+   tab order and keyboard-activatable (Enter/Space) for keyboard / screen-
+   reader users. Transparent, but shows a focus ring so keyboard users can see
+   it's the reveal control. */
+.cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  pointer-events: none;
+  color: inherit;
+}
+
+.cover:focus-visible {
+  outline: 2px solid var(--colors-focus-ring, #6aaffc);
+  outline-offset: 2px;
+  pointer-events: auto;
 }

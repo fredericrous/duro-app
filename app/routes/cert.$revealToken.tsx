@@ -115,7 +115,14 @@ function PasswordCard({ password }: { password: string }) {
 
   return (
     <InputGroup.Root>
-      <ScratchCard width={320} height={48} revealThreshold={0.8} initialRevealed={revealed} onReveal={handleReveal}>
+      <ScratchCard
+        width={320}
+        height={48}
+        revealThreshold={0.8}
+        initialRevealed={revealed}
+        onReveal={handleReveal}
+        label={t("common.scratchToReveal")}
+      >
         <Input defaultValue={password} />
       </ScratchCard>
       <InputGroup.Addon

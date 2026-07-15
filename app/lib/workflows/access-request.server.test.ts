@@ -25,6 +25,7 @@ import { ProvisioningService } from "~/lib/governance/ProvisioningService.server
 import { PluginHost } from "~/lib/plugins/PluginHost.server"
 import { ConnectedSystemRepoLive } from "~/lib/governance/ConnectedSystemRepo.server"
 import { ConnectorMappingRepoLive } from "~/lib/governance/ConnectorMappingRepo.server"
+import { DiscordNotifier } from "~/lib/services/DiscordNotifier.server"
 
 // ---------------------------------------------------------------------------
 // Section 1: Unit tests for evaluatePolicy (pure function)
@@ -87,6 +88,13 @@ const MockPluginHost = Layer.succeed(PluginHost, {
   runDeprovision: () => Effect.void,
 } as any)
 
+// Capturing DiscordNotifier — the workflow now requires it. Assertions read the
+// module-level array; tests that check it reset it first (discordCalls.length = 0).
+const discordCalls: string[] = []
+const CapturingDiscord = Layer.succeed(DiscordNotifier, {
+  notify: (content: string) => Effect.sync(() => void discordCalls.push(content)),
+})
+
 const TestLayer = Layer.mergeAll(
   AccessRequestRepoLive,
   GrantRepoLive,
@@ -98,6 +106,7 @@ const TestLayer = Layer.mergeAll(
   MockAudit,
   MockProvisioning,
   MockPluginHost,
+  CapturingDiscord,
 ).pipe(Layer.provideMerge(makeTestDbLayer()))
 
 // ---------------------------------------------------------------------------
@@ -534,6 +543,119 @@ describe("decideApproval", () => {
         const grants =
           yield* sql`SELECT id FROM grants WHERE principal_id = ${ids.requesterId} AND role_id = ${ids.roleId}`
         expect(grants.length).toBe(1)
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("notifies Discord that the request was approved", (it) => {
+    it.effect("captures an 'approved' message for the request + application", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        yield* sql`INSERT INTO approval_policies (id, application_id, scope_type, mode, rules)
+                     VALUES ('policy-notify-approve', ${ids.appId}, 'application', 'one_of',
+                       ${JSON.stringify([{ approverType: "app_owner" }])}::jsonb)`
+
+        const result = yield* submitAccessRequest({
+          requesterId: ids.requesterId,
+          applicationId: ids.appId,
+          roleId: ids.roleId,
+        })
+        expect(result.status).toBe("pending")
+
+        discordCalls.length = 0
+        yield* decideApproval({
+          requestId: result.requestId,
+          approverId: ids.approverId,
+          decision: "approved",
+        })
+
+        expect(discordCalls.length).toBe(1)
+        expect(discordCalls[0]).toContain(result.requestId)
+        expect(discordCalls[0]).toContain(ids.appId)
+        expect(discordCalls[0]).toContain("approved")
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("notifies Discord that the request was rejected", (it) => {
+    it.effect("captures a 'rejected' message when the decision resolves to rejected", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        yield* sql`INSERT INTO approval_policies (id, application_id, scope_type, mode, rules)
+                     VALUES ('policy-notify-reject', ${ids.appId}, 'application', 'one_of',
+                       ${JSON.stringify([{ approverType: "app_owner" }])}::jsonb)`
+
+        const result = yield* submitAccessRequest({
+          requesterId: ids.requesterId,
+          applicationId: ids.appId,
+          roleId: ids.roleId,
+        })
+        expect(result.status).toBe("pending")
+
+        discordCalls.length = 0
+        yield* decideApproval({
+          requestId: result.requestId,
+          approverId: ids.approverId,
+          decision: "rejected",
+        })
+
+        // A single app_owner approver rejecting a one_of policy → rejected.
+        const requests = yield* sql`SELECT status FROM access_requests WHERE id = ${result.requestId}`
+        expect((requests[0] as any).status).toBe("rejected")
+
+        expect(discordCalls.length).toBe(1)
+        expect(discordCalls[0]).toContain(result.requestId)
+        expect(discordCalls[0]).toContain("rejected")
+      }),
+    )
+  })
+})
+
+describe("submitAccessRequest notifications", () => {
+  it.layer(TestLayer)("pings Discord about a new pending request when a policy applies", (it) => {
+    it.effect("captures a 'pending review' admin message", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        yield* sql`INSERT INTO approval_policies (id, application_id, scope_type, mode, rules)
+                     VALUES ('policy-notify-pending', ${ids.appId}, 'application', 'one_of',
+                       ${JSON.stringify([{ approverType: "app_owner" }])}::jsonb)`
+
+        discordCalls.length = 0
+        const result = yield* submitAccessRequest({
+          requesterId: ids.requesterId,
+          applicationId: ids.appId,
+          roleId: ids.roleId,
+        })
+        expect(result.status).toBe("pending")
+
+        expect(discordCalls.length).toBe(1)
+        expect(discordCalls[0]).toContain("pending review")
+        expect(discordCalls[0]).toContain(ids.appId)
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("does NOT ping Discord on the auto-approve path", (it) => {
+    it.effect("no pending-review notification when the request is auto-approved", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+
+        // No approval policy → auto-approve; no pending-review notification.
+        discordCalls.length = 0
+        const result = yield* submitAccessRequest({
+          requesterId: ids.requesterId,
+          applicationId: ids.appId,
+          roleId: ids.roleId,
+        })
+        expect(result.status).toBe("approved")
+
+        expect(discordCalls.some((c) => c.includes("pending review"))).toBe(false)
       }),
     )
   })

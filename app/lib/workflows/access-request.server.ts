@@ -3,6 +3,7 @@ import * as SqlClient from "@effect/sql/SqlClient"
 import { AccessRequestRepo } from "~/lib/governance/AccessRequestRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
+import { DiscordNotifier } from "~/lib/services/DiscordNotifier.server"
 import { activateGrant } from "./grant-activation.server"
 import { type ApprovalPolicyRule } from "~/lib/governance/types"
 
@@ -224,6 +225,11 @@ export const submitAccessRequest = (input: SubmitRequestInput) =>
       applicationId: input.applicationId,
     })
 
+    // Ping admins/approvers that a request is waiting on them. notify never
+    // fails, so the request outcome is unaffected by notification problems.
+    const discord = yield* DiscordNotifier
+    yield* discord.notify(`New access request pending review for application ${input.applicationId}`)
+
     return { requestId: created.id, status: "pending" as const }
   }).pipe(Effect.withSpan("submitAccessRequest"))
 
@@ -246,6 +252,10 @@ export const decideApproval = (input: DecideInput) =>
     const sqlClient = yield* SqlClient.SqlClient
 
     let newGrantId: string | null = null
+    // Capture the resolved outcome + app so the requester can be notified once
+    // the transaction has committed (still-pending decisions notify nobody).
+    let notifyOutcome: "approved" | "rejected" | null = null
+    let notifyApplicationId: string | null = null
 
     yield* sqlClient.withTransaction(
       Effect.gen(function* () {
@@ -299,6 +309,8 @@ export const decideApproval = (input: DecideInput) =>
             applicationId: request.applicationId,
           })
           newGrantId = grant.id
+          notifyOutcome = "approved"
+          notifyApplicationId = request.applicationId
         } else if (result === "rejected") {
           yield* requestRepo.updateStatus(input.requestId, "rejected")
           yield* audit.emit({
@@ -308,10 +320,22 @@ export const decideApproval = (input: DecideInput) =>
             targetId: input.requestId,
             applicationId: request.applicationId,
           })
+          notifyOutcome = "rejected"
+          notifyApplicationId = request.applicationId
         }
         // pending: no action needed
       }),
     )
+
+    // Notify the requester of a final decision (approved/rejected). Only fires
+    // once the transaction has committed; the still-pending case notifies
+    // nobody. notify never fails, so this can't break the decision.
+    if (notifyOutcome) {
+      const discord = yield* DiscordNotifier
+      yield* discord.notify(
+        `Access request ${input.requestId} for application ${notifyApplicationId} was ${notifyOutcome}`,
+      )
+    }
 
     // Fire-and-forget provisioning outside the transaction. activateGrant
     // enqueues the job(s) for the new grant AND forks the processing.

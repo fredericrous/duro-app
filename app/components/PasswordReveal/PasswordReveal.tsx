@@ -27,7 +27,7 @@ export function PasswordReveal({ p12Password }: { p12Password: string }) {
         </Heading>
         <Text as="p">{t("settings.cert.passwordWarning")}</Text>
         <InputGroup.Root>
-          <ScratchCard width={320} height={48} onReveal={handleReveal}>
+          <ScratchCard width={320} height={48} onReveal={handleReveal} label={t("common.scratchToReveal")}>
             <Input defaultValue={p12Password} />
           </ScratchCard>
           <InputGroup.Addon
