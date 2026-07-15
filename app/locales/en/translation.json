@@ -32,7 +32,8 @@
         "accepted": "Accepted",
         "declined": "Declined"
       }
-    }
+    },
+    "scratchToReveal": "Scratch or press Enter to reveal"
   },
   "header": {
     "welcome": "Welcome, {{user}}",

@@ -56,7 +56,14 @@ export function InvitePasswordReveal({ p12Password }: { p12Password: string | nu
           {t("invite.password.warning")}
         </Text>
         <InputGroup.Root>
-          <ScratchCard width={320} height={48} revealThreshold={0.8} initialRevealed={revealed} onReveal={onReveal}>
+          <ScratchCard
+            width={320}
+            height={48}
+            revealThreshold={0.8}
+            initialRevealed={revealed}
+            onReveal={onReveal}
+            label={t("common.scratchToReveal")}
+          >
             <Input defaultValue={p12Password} />
           </ScratchCard>
           <InputGroup.Addon

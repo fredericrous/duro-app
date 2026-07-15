@@ -185,6 +185,42 @@ describe("ScratchCard", () => {
     expect(onReveal).toHaveBeenCalledTimes(1)
   })
 
+  it("exposes an accessible, keyboard-activatable reveal button (the SR/keyboard path)", () => {
+    const onReveal = vi.fn()
+    render(
+      <ScratchCard width={100} height={100} onReveal={onReveal} label="Reveal the password">
+        <p>Hidden</p>
+      </ScratchCard>,
+    )
+    // A real button with an accessible name — Tab-focusable, and Enter/Space
+    // dispatch a click on a native button, which is what fireEvent.click models.
+    const button = screen.getByRole("button", { name: "Reveal the password" })
+    fireEvent.click(button)
+    expect(onReveal).toHaveBeenCalledTimes(1)
+  })
+
+  it("fires onScratchStart before onReveal when revealed via the button (no scratching)", () => {
+    const onReveal = vi.fn()
+    const onScratchStart = vi.fn()
+    render(
+      <ScratchCard width={100} height={100} onReveal={onReveal} onScratchStart={onScratchStart}>
+        <p>Hidden</p>
+      </ScratchCard>,
+    )
+    fireEvent.click(screen.getByRole("button"))
+    expect(onScratchStart).toHaveBeenCalledTimes(1)
+    expect(onReveal).toHaveBeenCalledTimes(1)
+  })
+
+  it("marks the scratch canvas aria-hidden so assistive tech only sees the button", () => {
+    render(
+      <ScratchCard width={100} height={100} onReveal={() => {}}>
+        <p>Hidden</p>
+      </ScratchCard>,
+    )
+    expect(document.querySelector("canvas")).toHaveAttribute("aria-hidden", "true")
+  })
+
   it("does NOT invoke onReveal when only a tiny patch was scratched (well below threshold)", () => {
     const onReveal = vi.fn()
     render(

@@ -32,7 +32,8 @@
         "accepted": "Acceptée",
         "declined": "Refusée"
       }
-    }
+    },
+    "scratchToReveal": "Grattez ou appuyez sur Entrée pour révéler"
   },
   "header": {
     "welcome": "Bienvenue, {{user}}",

@@ -36,7 +36,7 @@ export function ScratchCard({
   initialRevealed = false,
   onReveal,
   onScratchStart,
-  label = "Scratch to reveal",
+  label = "Scratch or press Enter to reveal",
   className,
   children,
 }: ScratchCardProps) {
@@ -45,6 +45,20 @@ export function ScratchCard({
   const revealed = useRef(initialRevealed)
   const scratchStarted = useRef(false)
   const [fadeOut, setFadeOut] = useState(initialRevealed)
+
+  // Single reveal path shared by the mouse scratch-threshold and the keyboard
+  // button. Keyboard/screen-reader users can't scratch a canvas, so the button
+  // below is their equivalent — without it, onboarding is impossible for them.
+  const reveal = useCallback(() => {
+    if (revealed.current) return
+    if (!scratchStarted.current) {
+      scratchStarted.current = true
+      onScratchStart?.()
+    }
+    revealed.current = true
+    setFadeOut(true)
+    onReveal()
+  }, [onReveal, onScratchStart])
 
   const canvasCallbackRef = useCallback(
     (node: HTMLCanvasElement | null) => {
@@ -90,9 +104,7 @@ export function ScratchCard({
     }
 
     if (transparent / total >= revealThreshold) {
-      revealed.current = true
-      setFadeOut(true)
-      onReveal()
+      reveal()
     }
   }
 
@@ -124,14 +136,23 @@ export function ScratchCard({
     <div className={`${styles.container}${className ? ` ${className}` : ""}`} style={{ width, height }}>
       {children}
       {!fadeOut && (
-        <canvas
-          ref={canvasCallbackRef}
-          className={styles.canvas}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerUp}
-        />
+        <>
+          {/* Decorative scratch surface: aria-hidden because the button below
+              is the accessible control. Keeps mouse pointer scratching. */}
+          <canvas
+            ref={canvasCallbackRef}
+            className={styles.canvas}
+            aria-hidden="true"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerUp}
+          />
+          {/* Accessible reveal control. `pointer-events: none` lets mouse
+              scratches fall through to the canvas, while it stays keyboard-
+              focusable and Enter/Space-activatable for keyboard/SR users. */}
+          <button type="button" className={styles.cover} aria-label={label} onClick={reveal} />
+        </>
       )}
     </div>
   )

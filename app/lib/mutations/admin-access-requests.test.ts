@@ -16,6 +16,7 @@ import { ConnectorMappingRepoLive } from "~/lib/governance/ConnectorMappingRepo.
 import { AuditServiceLive } from "~/lib/governance/AuditService.server"
 import { ProvisioningService } from "~/lib/governance/ProvisioningService.server"
 import { PluginHost } from "~/lib/plugins/PluginHost.server"
+import { DiscordNotifier } from "~/lib/services/DiscordNotifier.server"
 
 // Use the live AuditService so we can assert that the right event_type lands
 // in the audit_events table — the original C1 bug was that the route wrote
@@ -32,6 +33,10 @@ const MockPluginHost = Layer.succeed(PluginHost, {
   runDeprovision: () => Effect.void,
 } as any)
 
+// The access-request workflow now notifies via DiscordNotifier; provide a
+// no-op so these mutation tests don't need a webhook.
+const MockDiscord = Layer.succeed(DiscordNotifier, { notify: () => Effect.void })
+
 const TestLayer = Layer.mergeAll(
   AccessRequestRepoLive,
   GrantRepoLive,
@@ -43,6 +48,7 @@ const TestLayer = Layer.mergeAll(
   AuditServiceLive,
   MockProvisioning,
   MockPluginHost,
+  MockDiscord,
 ).pipe(Layer.provideMerge(makeTestDbLayer()))
 
 const seed = Effect.gen(function* () {
