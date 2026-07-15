@@ -36,8 +36,23 @@ export class EmailService extends Context.Tag("EmailService")<
       requesterEmail: string,
       note: string | null,
     ) => Effect.Effect<void, EmailError>
+    /**
+     * Generic transactional notification (heading + body + optional CTA link).
+     * Used for access-invitation and access-request updates. `cta.url` must be
+     * a trusted internal URL — it is not escaped.
+     */
+    readonly sendNotificationEmail: (
+      to: string,
+      subject: string,
+      heading: string,
+      body: string,
+      cta?: { text: string; url: string },
+    ) => Effect.Effect<void, EmailError>
   }
 >() {}
+
+/** Escape the three HTML-significant chars for safe interpolation into markup. */
+export const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 
 export const EmailServiceDev = Layer.succeed(EmailService, {
   sendInviteEmail: (email, _token, _invitedBy, locale, _openToken, inviteId) =>
@@ -48,6 +63,7 @@ export const EmailServiceDev = Layer.succeed(EmailService, {
     Effect.log(`[DEV] Would send cert renewal email to ${email} (locale=${locale ?? "en"})`),
   sendRecoveryNotificationEmail: (adminEmail, requesterEmail) =>
     Effect.log(`[DEV] Would notify admin ${adminEmail} of recovery request for ${requesterEmail}`),
+  sendNotificationEmail: (to, subject) => Effect.log(`[DEV] Would send notification email to ${to}: ${subject}`),
 })
 
 export const EmailServiceLive = Layer.scoped(
@@ -211,6 +227,27 @@ export const EmailServiceLive = Layer.scoped(
                 `<a href="${config.homeUrl}/admin/recovery">${config.homeUrl}/admin/recovery</a></p>`,
             }),
           catch: (e) => new EmailError({ message: "Failed to send recovery notification", cause: e }),
+        }).pipe(Effect.asVoid),
+
+      sendNotificationEmail: (
+        to: string,
+        subject: string,
+        heading: string,
+        body: string,
+        cta?: { text: string; url: string },
+      ) =>
+        Effect.tryPromise({
+          try: () =>
+            transporter.sendMail({
+              from,
+              to,
+              subject,
+              html:
+                `<h2>${escapeHtml(heading)}</h2>` +
+                `<p>${escapeHtml(body)}</p>` +
+                (cta ? `<p><a href="${cta.url}">${escapeHtml(cta.text)}</a></p>` : ""),
+            }),
+          catch: (e) => new EmailError({ message: "Failed to send notification email", cause: e }),
         }).pipe(Effect.asVoid),
     }
   }),

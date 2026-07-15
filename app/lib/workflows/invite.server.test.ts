@@ -354,6 +354,7 @@ const mockEmailService = (calls: { method: string; args: unknown[] }[] = []) =>
       return Effect.void
     },
     sendRecoveryNotificationEmail: () => Effect.void,
+    sendNotificationEmail: () => Effect.void,
   })
 
 const mockPreferencesRepo = () =>
@@ -528,6 +529,7 @@ describe("queueInvite", () => {
       // (typed as Effect<string>; the failure short-circuits before the value)
       sendCertRenewalEmail: () => Effect.void,
       sendRecoveryNotificationEmail: () => Effect.void,
+      sendNotificationEmail: () => Effect.void,
     } as EmailService["Type"])
 
     return queueInvite({

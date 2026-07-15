@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest"
 import { Effect, ManagedRuntime } from "effect"
-import { EmailService, EmailServiceDev } from "./EmailService.server"
+import { EmailService, EmailServiceDev, escapeHtml } from "./EmailService.server"
 
 // The Live variant uses nodemailer + reads /certs/ca.crt + renders
 // React Email templates with i18n — full mockable surface but expensive.
@@ -51,5 +51,28 @@ describe("EmailService (Dev)", () => {
         yield* e.sendCertRenewalEmail("alice@example.com", "fr", "reveal-tok")
       }),
     )
+  })
+
+  it("sendNotificationEmail resolves without throwing (logs only in dev)", async () => {
+    const debug = vi.spyOn(console, "log").mockImplementation(() => {})
+    await rt.runPromise(
+      Effect.gen(function* () {
+        const e = yield* EmailService
+        yield* e.sendNotificationEmail("alice@example.com", "Subject", "Heading", "Body", {
+          text: "Go",
+          url: "https://x/requests",
+        })
+      }),
+    )
+    debug.mockRestore()
+  })
+})
+
+describe("escapeHtml", () => {
+  it("escapes the three HTML-significant characters", () => {
+    expect(escapeHtml(`<b>a & b</b>`)).toBe("&lt;b&gt;a &amp; b&lt;/b&gt;")
+  })
+  it("leaves plain text unchanged", () => {
+    expect(escapeHtml("just text")).toBe("just text")
   })
 })

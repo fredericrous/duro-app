@@ -4,11 +4,19 @@ import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { makeTestDbLayer } from "~/lib/db/client.server"
-import { acceptInvitation, declineInvitation, cancelInvitation } from "./access-invitation.server"
+import {
+  acceptInvitation,
+  declineInvitation,
+  cancelInvitation,
+  notifyInviteeOfInvitation,
+} from "./access-invitation.server"
 import { AccessInvitationRepo, AccessInvitationRepoLive } from "~/lib/governance/AccessInvitationRepo.server"
 import { GrantRepoLive } from "~/lib/governance/GrantRepo.server"
+import { PrincipalRepoLive } from "~/lib/governance/PrincipalRepo.server"
+import { ApplicationRepoLive } from "~/lib/governance/ApplicationRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { DiscordNotifier } from "~/lib/services/DiscordNotifier.server"
+import { EmailService } from "~/lib/services/EmailService.server"
 import { ProvisioningService } from "~/lib/governance/ProvisioningService.server"
 import { PluginHost } from "~/lib/plugins/PluginHost.server"
 
@@ -25,13 +33,24 @@ const MockPluginHost = Layer.succeed(PluginHost, {
   runDeprovision: () => Effect.void,
 } as any)
 
+const emailCalls: Array<{ to: string; subject: string }> = []
+const CapturingEmail = Layer.succeed(EmailService, {
+  sendInviteEmail: () => Effect.succeed(""),
+  sendCertRenewalEmail: () => Effect.void,
+  sendRecoveryNotificationEmail: () => Effect.void,
+  sendNotificationEmail: (to: string, subject: string) => Effect.sync(() => void emailCalls.push({ to, subject })),
+})
+
 const TestLayer = Layer.mergeAll(
   AccessInvitationRepoLive,
   GrantRepoLive,
+  PrincipalRepoLive,
+  ApplicationRepoLive,
   MockAudit,
   MockDiscord,
   MockProvisioning,
   MockPluginHost,
+  CapturingEmail,
 ).pipe(Layer.provideMerge(makeTestDbLayer()))
 
 const seed = Effect.gen(function* () {
@@ -212,6 +231,37 @@ describe("markExpired", () => {
         const freshRow = yield* sql`SELECT status FROM access_invitations WHERE id = ${fresh.id}`
         expect((staleRow[0] as any).status).toBe("expired")
         expect((freshRow[0] as any).status).toBe("pending")
+      }),
+    )
+  })
+})
+
+describe("notifyInviteeOfInvitation", () => {
+  it.layer(TestLayer)("emails the invited principal about the invitation", (it) => {
+    it.effect("captures an email to the invitee with the app name", () =>
+      Effect.gen(function* () {
+        const ids = yield* seed
+        emailCalls.length = 0
+        yield* notifyInviteeOfInvitation({ invitedPrincipalId: ids.inviteeId, applicationId: ids.appId })
+        expect(emailCalls.length).toBe(1)
+        expect(emailCalls[0].to).toBe("invitee@example.com")
+        expect(emailCalls[0].subject).toContain("Invite App")
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("is a silent no-op when the invitee has no email", (it) => {
+    it.effect("sends nothing", () =>
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* sql`INSERT INTO principals (id, principal_type, display_name) VALUES ('p-noemail', 'user', 'No Email')`
+        yield* sql`INSERT INTO principals (id, principal_type, display_name, email)
+                   VALUES ('p-admin2', 'user', 'Admin2', 'admin2@x')`
+        yield* sql`INSERT INTO applications (id, slug, display_name, access_mode, owner_id)
+                   VALUES ('app-noemail', 'a2', 'App2', 'invite_only', 'p-admin2')`
+        emailCalls.length = 0
+        yield* notifyInviteeOfInvitation({ invitedPrincipalId: "p-noemail", applicationId: "app-noemail" })
+        expect(emailCalls.length).toBe(0)
       }),
     )
   })
