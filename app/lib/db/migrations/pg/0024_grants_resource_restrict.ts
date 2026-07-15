@@ -1,5 +1,5 @@
 import * as SqlClient from "@effect/sql/SqlClient"
-import { Effect } from "effect"
+import { Effect, Schedule } from "effect"
 
 /**
  * grants.resource_id was `ON DELETE SET NULL`. The AuthzEngine treats a NULL
@@ -14,25 +14,42 @@ import { Effect } from "effect"
  * The inline FK from 0008 is named `grants_resource_id_fkey` (Postgres default
  * for an inline column reference).
  *
- * The constraint is added `NOT VALID` on purpose. A plain `ADD CONSTRAINT ...
- * FOREIGN KEY` runs a full-table validation scan of `grants` under a lock to
- * prove every existing row has a parent — on a populated prod table that scan
- * is what previously wedged the migration (boot hung, /health/ready stuck 503).
- * `NOT VALID` skips only that one-time scan of pre-existing rows; it does NOT
- * weaken the fix. The `ON DELETE RESTRICT` referential action is installed
- * immediately and fires for *every* referencing row (validated or not), so a
- * resource with any live grant still cannot be deleted — the escalation is
- * closed. New/updated grant rows are also checked against `resources` right
- * away. (A later migration can `VALIDATE CONSTRAINT` once existing rows are
- * known clean; that is a separate integrity concern, not this security fix.)
+ * Postgres has no `ALTER CONSTRAINT` to change a FK's ON DELETE action, so the
+ * change is a DROP + re-ADD. Both statements need a strong lock on `grants`
+ * (ACCESS EXCLUSIVE for DROP, SHARE ROW EXCLUSIVE for ADD). On a live/just-
+ * restored database something else may already hold a conflicting lock on
+ * `grants` (e.g. an anti-wraparound autovacuum right after a clone bootstraps).
+ * Without a bound, the DDL blocks *forever* — and because migrations run during
+ * AppLayer build on first boot, that hangs the whole pod (readiness never turns
+ * green). So:
+ *   - `SET LOCAL lock_timeout` bounds how long we wait for the lock, turning an
+ *     unbounded hang into a fast, retryable failure that never wedges boot.
+ *   - a short bounded retry rides out transient contention (autovacuum finishing).
+ *   - the DROP + ADD run in one transaction so we never leave `grants` with no
+ *     FK at all if the retry gives up.
+ *
+ * The constraint is added `NOT VALID`: that skips only the one-time validation
+ * scan of pre-existing rows, NOT the fix. `ON DELETE RESTRICT` is installed
+ * immediately and fires for every referencing row, so a resource with any live
+ * grant still cannot be deleted — the escalation is closed. (A later migration
+ * can `VALIDATE CONSTRAINT` once existing rows are known clean.)
  */
-export default Effect.gen(function* () {
+const swap = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
-
-  yield* sql`ALTER TABLE grants DROP CONSTRAINT IF EXISTS grants_resource_id_fkey`
-  yield* sql`
-    ALTER TABLE grants
-    ADD CONSTRAINT grants_resource_id_fkey
-    FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE RESTRICT NOT VALID
-  `
+  yield* sql.withTransaction(
+    Effect.gen(function* () {
+      yield* sql`SET LOCAL lock_timeout = '4s'`
+      yield* sql`ALTER TABLE grants DROP CONSTRAINT IF EXISTS grants_resource_id_fkey`
+      yield* sql`
+        ALTER TABLE grants
+        ADD CONSTRAINT grants_resource_id_fkey
+        FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE RESTRICT NOT VALID
+      `
+    }),
+  )
 })
+
+// Retry a handful of times for transient lock contention, then give up fast
+// rather than hang boot. ~5 attempts * (up to 4s lock wait + 3s spacing) keeps
+// the worst case well under the readiness window.
+export default swap.pipe(Effect.retry(Schedule.intersect(Schedule.spaced("3 seconds"), Schedule.recurs(4))))
