@@ -211,6 +211,61 @@ describe("AuthzEngine", () => {
     )
   })
 
+  it.layer(TestLayer)("allows access via an ancestor resource-path grant", (it) => {
+    it.effect("a grant on a parent path matches a descendant resource", () =>
+      Effect.gen(function* () {
+        const engine = yield* AuthzEngine
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        yield* sql`INSERT INTO resources (id, application_id, resource_type, display_name, path)
+                   VALUES ('res-parent', ${ids.appId}, 'folder', 'Parent', 'team/eng')`
+        yield* sql`INSERT INTO resources (id, application_id, resource_type, display_name, path)
+                   VALUES ('res-child', ${ids.appId}, 'folder', 'Child', 'team/eng/proj1')`
+        // Grant scoped to the PARENT resource.
+        yield* sql`INSERT INTO grants (id, principal_id, entitlement_id, resource_id, granted_by)
+                   VALUES ('grant-anc', ${ids.principalId}, ${ids.entReadId}, 'res-parent', ${ids.principalId})`
+
+        const decision = yield* engine.checkAccess({
+          subject: "testuser",
+          application: "test-app",
+          action: "read",
+          resourceId: "res-child",
+        })
+        expect(decision.allow).toBe(true)
+        expect(decision.matchedGrantIds).toContain("grant-anc")
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("does not over-match a LIKE metacharacter in a resource path", (it) => {
+    it.effect("a grant on 'team_eng' must NOT bleed to sibling 'teamXeng/...'", () =>
+      Effect.gen(function* () {
+        const engine = yield* AuthzEngine
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        // Grant is scoped to a resource whose path contains '_', a LIKE wildcard.
+        yield* sql`INSERT INTO resources (id, application_id, resource_type, display_name, path)
+                   VALUES ('res-underscore', ${ids.appId}, 'folder', 'Underscore', 'team_eng')`
+        // An unrelated resource the '_' wildcard WOULD have matched under the
+        // old unescaped LIKE — it is not a literal descendant of 'team_eng'.
+        yield* sql`INSERT INTO resources (id, application_id, resource_type, display_name, path)
+                   VALUES ('res-bleed', ${ids.appId}, 'folder', 'Bleed', 'teamXeng/secret')`
+        yield* sql`INSERT INTO grants (id, principal_id, entitlement_id, resource_id, granted_by)
+                   VALUES ('grant-underscore', ${ids.principalId}, ${ids.entReadId}, 'res-underscore', ${ids.principalId})`
+
+        const decision = yield* engine.checkAccess({
+          subject: "testuser",
+          application: "test-app",
+          action: "read",
+          resourceId: "res-bleed",
+        })
+        expect(decision.allow).toBe(false)
+      }),
+    )
+  })
+
   it.layer(TestLayer)("checkBulk returns correct decisions", (it) => {
     it.effect("bulk check returns mixed allow/deny", () =>
       Effect.gen(function* () {

@@ -120,7 +120,7 @@ const checkAccessImpl = (sql: SqlClient.SqlClient, check: AccessCheck) =>
               SELECT g.id AS grant_id FROM grants g
               JOIN resources r ON r.id = g.resource_id
               WHERE g.id = ANY(${matched.filter((r: any) => r.resourceId !== null).map((r: any) => r.grantId)})
-                AND ${resourcePath} LIKE r.path || '/%'
+                AND starts_with(${resourcePath}, r.path || '/')
             `,
             "Failed to check ancestor grants",
           )
