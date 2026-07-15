@@ -238,6 +238,28 @@ describe("AuthzEngine", () => {
     )
   })
 
+  it.layer(TestLayer)("a resource with active grants cannot be deleted (no SET-NULL escalation)", (it) => {
+    it.effect("DELETE on the resource is rejected, so the grant never becomes app-wide", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        yield* sql`INSERT INTO resources (id, application_id, resource_type, display_name, path)
+                   VALUES ('res-x', ${ids.appId}, 'folder', 'X', 'x')`
+        yield* sql`INSERT INTO grants (id, principal_id, entitlement_id, resource_id, granted_by)
+                   VALUES ('g-x', ${ids.principalId}, ${ids.entReadId}, 'res-x', ${ids.principalId})`
+
+        // Was ON DELETE SET NULL, which would have nulled resource_id and made
+        // the grant app-wide. RESTRICT rejects the delete instead.
+        const exit = yield* Effect.exit(sql`DELETE FROM resources WHERE id = 'res-x'`)
+        expect(exit._tag).toBe("Failure")
+
+        const rows = yield* sql`SELECT resource_id FROM grants WHERE id = 'g-x'`
+        expect((rows[0] as any).resourceId).toBe("res-x")
+      }),
+    )
+  })
+
   it.layer(TestLayer)("does not over-match a LIKE metacharacter in a resource path", (it) => {
     it.effect("a grant on 'team_eng' must NOT bleed to sibling 'teamXeng/...'", () =>
       Effect.gen(function* () {
