@@ -32,11 +32,14 @@ export const queueInvite = (input: InviteInput) =>
     const users = yield* UserManager
     const prefs = yield* PreferencesRepo
 
-    // Revoke any existing failed invite for this email so we can re-create
+    // Fully revoke any existing failed invite for this email before re-creating.
+    // Use the revokeInvite workflow (not the bare inviteRepo.revoke, which only
+    // flips used_at) so the stale invite's Vault P12 + issued cert/serial are
+    // cleaned up — otherwise every failed-then-reissued invite orphans them.
     const existingFailed = yield* inviteRepo.findFailed()
     const stale = existingFailed.find((i) => i.email === input.email)
     if (stale) {
-      yield* inviteRepo.revoke(stale.id)
+      yield* revokeInvite(stale.id)
     }
 
     const invite = yield* inviteRepo.create(input)

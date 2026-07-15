@@ -385,6 +385,50 @@ const mockCertRevealRepo = (calls: { method: string; args: unknown[] }[] = []) =
 // --- Tests ---
 
 describe("queueInvite", () => {
+  it.effect("fully revokes a stale failed invite before re-inviting (cleans up its Vault cert)", () => {
+    const store = new Map<string, Invite>()
+    // A previous invite for this email that failed after its cert was issued.
+    store.set(
+      "stale-1",
+      makeInvite({
+        id: "stale-1",
+        email: "alice@example.com",
+        certIssued: true,
+        certUsername: "alice",
+        failedAt: new Date().toISOString(),
+      }),
+    )
+    const certCalls: { method: string; args: unknown[] }[] = []
+    const certRepoCalls: { method: string; args: unknown[] }[] = []
+
+    return queueInvite({
+      email: "alice@example.com",
+      groups: [1],
+      groupNames: ["friends"],
+      invitedBy: "admin",
+    }).pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          // The full revokeInvite cleanup ran on the stale invite — not just
+          // inviteRepo.revoke (which would orphan the Vault P12 + serial).
+          expect(certCalls.find((c) => c.method === "deleteP12Secret" && c.args[0] === "stale-1")).toBeDefined()
+          expect(certCalls.find((c) => c.method === "deleteCertByUsername" && c.args[0] === "alice")).toBeDefined()
+          expect(certRepoCalls.find((c) => c.method === "revokeAllForUser" && c.args[0] === "alice")).toBeDefined()
+        }),
+      ),
+      Effect.provide(
+        Layer.mergeAll(
+          mockInviteRepo(store),
+          mockCertManager(certCalls),
+          mockEmailService(),
+          mockCertificateRepo(certRepoCalls),
+          mockUserManager(),
+          mockPreferencesRepo(),
+        ),
+      ),
+    )
+  })
+
   it.effect("creates an invite, issues cert, and sends email", () => {
     const store = new Map<string, Invite>()
     const certCalls: { method: string; args: unknown[] }[] = []
