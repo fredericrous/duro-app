@@ -11,7 +11,20 @@ import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { RbacRepo } from "~/lib/governance/RbacRepo.server"
 import { cancelInvitation } from "~/lib/workflows/access-invitation.server"
 import type { Role, Entitlement } from "~/lib/governance/types"
-import { Alert, Badge, Button, Dialog, EmptyState, Field, Input, Select, Stack, Table, Text } from "@duro-app/ui"
+import {
+  Badge,
+  Button,
+  Dialog,
+  EmptyState,
+  Field,
+  Input,
+  Select,
+  Stack,
+  Table,
+  Text,
+  type ToastOptions,
+} from "@duro-app/ui"
+import { useFetcherToast } from "~/lib/useFetcherToast"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 const DEFAULT_EXPIRY_DAYS = 14
@@ -135,6 +148,29 @@ const statusBadge = (status: string): "default" | "success" | "warning" | "error
   return "default"
 }
 
+/**
+ * Map a create/cancel action result to a translated toast — matches the admin
+ * area's useFetcherToast convention. Module-level (not a component closure) so
+ * it's directly unit-testable. Returns null for non-result data.
+ */
+export function invitationToast(
+  raw: unknown,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): ToastOptions | null {
+  const d = raw as { success?: string; error?: string } | null
+  if (!d) return null
+  if (d.success) {
+    return { variant: "success", message: t(`admin.invitations.success.${d.success}`, { defaultValue: "" }) }
+  }
+  if (d.error) {
+    return {
+      variant: "error",
+      message: t(`admin.invitations.error.${d.error}`, { defaultValue: t("admin.invitations.error.generic") }),
+    }
+  }
+  return null
+}
+
 export default function AdminInvitationsPage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
   const { invitations, applications, principals, rolesByApp, entitlementsByApp } = loaderData
@@ -143,7 +179,9 @@ export default function AdminInvitationsPage({ loaderData }: Route.ComponentProp
   const [selectedApp, setSelectedApp] = useState<string>("")
 
   const busy = fetcher.state !== "idle"
-  const data = (fetcher.data ?? null) as { success?: string; error?: string } | null
+
+  // Toast the create/cancel result once it settles.
+  useFetcherToast(fetcher, { render: (d) => invitationToast(d, t) })
 
   const roles = useMemo(() => (selectedApp ? (rolesByApp[selectedApp] ?? []) : []), [selectedApp, rolesByApp])
   const entitlements = useMemo(
@@ -153,17 +191,6 @@ export default function AdminInvitationsPage({ loaderData }: Route.ComponentProp
 
   return (
     <Stack gap="md">
-      {data?.success && (
-        <Alert variant="success">
-          {t(`admin.invitations.success.${data.success}`, { defaultValue: "" }) as string}
-        </Alert>
-      )}
-      {data?.error && (
-        <Alert variant="error">
-          {t(`admin.invitations.error.${data.error}`, { defaultValue: t("admin.invitations.error.generic") }) as string}
-        </Alert>
-      )}
-
       <CardSection
         title={t("admin.invitations.title", { n: invitations.length })}
         action={
