@@ -10,6 +10,12 @@ import { EmailService, EmailError } from "~/lib/services/EmailService.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
+import { AuditService } from "~/lib/governance/AuditService.server"
+
+const mockAudit = Layer.succeed(AuditService, {
+  emit: () => Effect.void,
+  query: () => Effect.succeed([]),
+} as any)
 
 // --- Mock helpers ---
 
@@ -425,6 +431,7 @@ describe("queueInvite", () => {
           mockCertificateRepo(certRepoCalls),
           mockUserManager(),
           mockPreferencesRepo(),
+          mockAudit,
         ),
       ),
     )
@@ -469,6 +476,7 @@ describe("queueInvite", () => {
           mockCertificateRepo(),
           mockUserManager(),
           mockPreferencesRepo(),
+          mockAudit,
         ),
       ),
     )
@@ -515,6 +523,7 @@ describe("queueInvite", () => {
           mockCertificateRepo(),
           mockUserManager([], [existing]),
           prefsFr,
+          mockAudit,
         ),
       ),
     )
@@ -556,6 +565,7 @@ describe("queueInvite", () => {
           mockCertificateRepo(),
           mockUserManager(),
           mockPreferencesRepo(),
+          mockAudit,
         ),
       ),
     )
@@ -668,7 +678,9 @@ describe("revokeInvite", () => {
           expect(certCalls.find((c) => c.method === "deleteCertByUsername" && c.args[0] === "alice")).toBeDefined()
         }),
       ),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls), mockCertificateRepo())),
+      Effect.provide(
+        Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls), mockCertificateRepo(), mockAudit),
+      ),
     )
   })
 
@@ -690,7 +702,9 @@ describe("revokeInvite", () => {
           expect(certCalls.find((c) => c.method === "deleteCertByUsername" && c.args[0] === "bobsmith")).toBeDefined()
         }),
       ),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls), mockCertificateRepo())),
+      Effect.provide(
+        Layer.mergeAll(mockInviteRepo(store), mockCertManager(certCalls), mockCertificateRepo(), mockAudit),
+      ),
     )
   })
 })
@@ -724,6 +738,7 @@ describe("revokeUser", () => {
           mockUserManager(userCalls),
           mockCertManager(certCalls),
           mockCertificateRepo(),
+          mockAudit,
         ),
       ),
     )
@@ -776,6 +791,83 @@ describe("resendCert", () => {
           mockPreferencesRepo(),
           mockCertificateRepo(),
           mockCertRevealRepo(revealCalls),
+          mockAudit,
+        ),
+      ),
+    )
+  })
+})
+
+describe("audit emissions", () => {
+  it.effect("queueInvite emits a cert.issued audit event", () => {
+    const store = new Map<string, Invite>()
+    const events: string[] = []
+    const capturingAudit = Layer.succeed(AuditService, {
+      emit: (e: { eventType: string }) => Effect.sync(() => void events.push(e.eventType)),
+      query: () => Effect.succeed([]),
+    } as any)
+
+    return queueInvite({
+      email: "alice@example.com",
+      groups: [1],
+      groupNames: ["friends"],
+      invitedBy: "admin",
+    }).pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          expect(events).toContain("cert.issued")
+        }),
+      ),
+      Effect.provide(
+        Layer.mergeAll(
+          mockInviteRepo(store),
+          mockCertManager(),
+          mockEmailService(),
+          mockCertificateRepo(),
+          mockUserManager(),
+          mockPreferencesRepo(),
+          capturingAudit,
+        ),
+      ),
+    )
+  })
+
+  it.effect("revokeUser emits user.revoked and cert.revoked audit events", () => {
+    const events: string[] = []
+    const capturingAudit = Layer.succeed(AuditService, {
+      emit: (e: { eventType: string }) => Effect.sync(() => void events.push(e.eventType)),
+      query: () => Effect.succeed([]),
+    } as any)
+    // A CertificateRepo that returns one active serial so the revoke loop runs
+    // and a cert.revoked event is emitted after markRevokeCompleted.
+    const certRepoWithSerial = Layer.succeed(CertificateRepo, {
+      store: () => Effect.void,
+      setLabel: () => Effect.succeed(1),
+      listValid: () => Effect.succeed([]),
+      listAllByUsernames: () => Effect.succeed({}),
+      findBySerial: () => Effect.succeed(null),
+      markRevokePending: () => Effect.succeed(1),
+      markRevokeCompleted: () => Effect.void,
+      markRevokeFailed: () => Effect.void,
+      revokeAllForUser: () => Effect.succeed(["serial-1"]),
+      setUserId: () => Effect.void,
+      updateUsername: () => Effect.void,
+    } as any)
+
+    return revokeUser("alice", "alice@example.com", "admin", "cleanup").pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          expect(events).toContain("user.revoked")
+          expect(events).toContain("cert.revoked")
+        }),
+      ),
+      Effect.provide(
+        Layer.mergeAll(
+          mockInviteRepo(new Map()),
+          mockUserManager(),
+          mockCertManager(),
+          certRepoWithSerial,
+          capturingAudit,
         ),
       ),
     )
