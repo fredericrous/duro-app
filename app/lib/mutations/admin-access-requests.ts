@@ -1,4 +1,5 @@
 import { Effect } from "effect"
+import { errorMessage } from "~/lib/error-message"
 import { AccessRequestRepo } from "~/lib/governance/AccessRequestRepo.server"
 import { decideApproval } from "~/lib/workflows/access-request.server"
 
@@ -48,12 +49,7 @@ export function handleAdminAccessRequestsMutation(mutation: AdminAccessRequestsM
     }
   }).pipe(
     Effect.catchAll((e) => {
-      const message =
-        e instanceof Error
-          ? e.message
-          : typeof e === "object" && e !== null && "message" in e
-            ? String((e as any).message)
-            : "Operation failed"
+      const message = errorMessage(e, "Operation failed")
       return Effect.succeed({ error: message } as AdminAccessRequestsResult)
     }),
   )

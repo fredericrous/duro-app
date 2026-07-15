@@ -1,4 +1,5 @@
 import { Effect } from "effect"
+import { errorMessage } from "~/lib/error-message"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { queueInvite, revokeInvite } from "~/lib/workflows/invite.server"
 
@@ -104,12 +105,7 @@ export function handleAdminInvitesMutation(mutation: AdminInvitesMutation) {
               return Effect.void
             }),
             Effect.catchAll((e) => {
-              const msg =
-                e instanceof Error
-                  ? e.message
-                  : typeof e === "object" && e !== null && "message" in e
-                    ? String((e as any).message)
-                    : "Unknown error"
+              const msg = errorMessage(e, "Unknown error")
               errors.push(`${email}: ${msg}`)
               return Effect.void
             }),
@@ -132,12 +128,7 @@ export function handleAdminInvitesMutation(mutation: AdminInvitesMutation) {
     }
   }).pipe(
     Effect.catchAll((e) => {
-      const message =
-        e instanceof Error
-          ? e.message
-          : typeof e === "object" && e !== null && "message" in e
-            ? String((e as any).message)
-            : "Operation failed"
+      const message = errorMessage(e, "Operation failed")
       return Effect.succeed({ error: message } as AdminInvitesResult)
     }),
   )
