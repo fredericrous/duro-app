@@ -1,4 +1,4 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, Config, Redacted } from "effect"
 import * as client from "openid-client"
 
 export interface OidcUser {
@@ -46,6 +46,21 @@ export const OidcClientDev = Layer.succeed(OidcClient, {
   getEndSessionUrl: () => Effect.succeed("/"),
 })
 
+/**
+ * Read a required OIDC config value via the ambient ConfigProvider (env),
+ * mapping a missing value to OidcError. Read lazily at first use — same timing
+ * as the old process.env reads — so the layer still builds without OIDC env
+ * (the failure surfaces at login, where these are always set in production),
+ * and the client secret goes through Config.redacted so it never lands in logs.
+ */
+export const requireConfig = (name: string) =>
+  Config.string(name).pipe(Effect.mapError((e) => new OidcError({ message: `Missing OIDC config ${name}`, cause: e })))
+
+export const requireSecret = (name: string) =>
+  Config.redacted(name).pipe(
+    Effect.mapError((e) => new OidcError({ message: `Missing OIDC config ${name}`, cause: e })),
+  )
+
 export const OidcClientLive = Layer.effect(
   OidcClient,
   Effect.sync(() => {
@@ -54,22 +69,23 @@ export const OidcClientLive = Layer.effect(
     const getConfig = (): Effect.Effect<client.Configuration, OidcError> =>
       oidcConfig
         ? Effect.succeed(oidcConfig)
-        : Effect.tryPromise({
-            try: async () => {
-              oidcConfig = await client.discovery(
-                new URL(process.env.OIDC_ISSUER_URL!),
-                process.env.OIDC_CLIENT_ID!,
-                process.env.OIDC_CLIENT_SECRET!,
-              )
-              return oidcConfig
-            },
-            catch: (e) => new OidcError({ message: "OIDC discovery failed", cause: e }),
+        : Effect.gen(function* () {
+            const issuerUrl = yield* requireConfig("OIDC_ISSUER_URL")
+            const clientId = yield* requireConfig("OIDC_CLIENT_ID")
+            const clientSecret = yield* requireSecret("OIDC_CLIENT_SECRET")
+            const discovered = yield* Effect.tryPromise({
+              try: () => client.discovery(new URL(issuerUrl), clientId, Redacted.value(clientSecret)),
+              catch: (e) => new OidcError({ message: "OIDC discovery failed", cause: e }),
+            })
+            oidcConfig = discovered
+            return discovered
           })
 
     return {
       buildAuthRequest: () =>
         Effect.gen(function* () {
           const config = yield* getConfig()
+          const redirectUri = yield* requireConfig("OIDC_REDIRECT_URI")
           const codeVerifier = client.randomPKCECodeVerifier()
           const codeChallenge = yield* Effect.tryPromise({
             try: () => client.calculatePKCECodeChallenge(codeVerifier),
@@ -78,7 +94,7 @@ export const OidcClientLive = Layer.effect(
           const state = client.randomState()
 
           const authorizationUrl = client.buildAuthorizationUrl(config, {
-            redirect_uri: process.env.OIDC_REDIRECT_URI!,
+            redirect_uri: redirectUri,
             scope: "openid profile email groups",
             code_challenge: codeChallenge,
             code_challenge_method: "S256",
@@ -116,7 +132,8 @@ export const OidcClientLive = Layer.effect(
         Effect.gen(function* () {
           const config = yield* getConfig()
           const metadata = config.serverMetadata()
-          return metadata.end_session_endpoint ?? process.env.OIDC_ISSUER_URL!
+          if (metadata.end_session_endpoint) return metadata.end_session_endpoint
+          return yield* requireConfig("OIDC_ISSUER_URL")
         }),
     }
   }),
