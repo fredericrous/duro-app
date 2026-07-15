@@ -13,6 +13,18 @@ import { Effect } from "effect"
  *
  * The inline FK from 0008 is named `grants_resource_id_fkey` (Postgres default
  * for an inline column reference).
+ *
+ * The constraint is added `NOT VALID` on purpose. A plain `ADD CONSTRAINT ...
+ * FOREIGN KEY` runs a full-table validation scan of `grants` under a lock to
+ * prove every existing row has a parent — on a populated prod table that scan
+ * is what previously wedged the migration (boot hung, /health/ready stuck 503).
+ * `NOT VALID` skips only that one-time scan of pre-existing rows; it does NOT
+ * weaken the fix. The `ON DELETE RESTRICT` referential action is installed
+ * immediately and fires for *every* referencing row (validated or not), so a
+ * resource with any live grant still cannot be deleted — the escalation is
+ * closed. New/updated grant rows are also checked against `resources` right
+ * away. (A later migration can `VALIDATE CONSTRAINT` once existing rows are
+ * known clean; that is a separate integrity concern, not this security fix.)
  */
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -21,6 +33,6 @@ export default Effect.gen(function* () {
   yield* sql`
     ALTER TABLE grants
     ADD CONSTRAINT grants_resource_id_fkey
-    FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE RESTRICT
+    FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE RESTRICT NOT VALID
   `
 })
