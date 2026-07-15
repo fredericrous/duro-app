@@ -1,4 +1,5 @@
 import { Effect } from "effect"
+import { errorMessage } from "~/lib/error-message"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
@@ -59,12 +60,7 @@ function handleIssueCert(auth: AuthInfo, label?: string | null) {
     return { certSent: true as const, p12Password }
   }).pipe(
     Effect.catchAll((e) => {
-      const message =
-        e instanceof Error
-          ? e.message
-          : typeof e === "object" && e !== null && "message" in e
-            ? String((e as any).message)
-            : "Failed to send certificate"
+      const message = errorMessage(e, "Failed to send certificate")
       return Effect.succeed({ certError: message } as SettingsResult)
     }),
   )
@@ -104,12 +100,7 @@ function handleRevokeCert(serialNumber: string, auth: AuthInfo) {
     return { certRevoked: true as const } as SettingsResult
   }).pipe(
     Effect.catchAll((e) => {
-      const message =
-        e instanceof Error
-          ? e.message
-          : typeof e === "object" && e !== null && "message" in e
-            ? String((e as any).message)
-            : "Failed to revoke certificate"
+      const message = errorMessage(e, "Failed to revoke certificate")
       return Effect.succeed({ certError: message } as SettingsResult)
     }),
   )

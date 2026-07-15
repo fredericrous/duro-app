@@ -1,4 +1,5 @@
 import { Effect } from "effect"
+import { errorMessage } from "~/lib/error-message"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
@@ -123,12 +124,7 @@ export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
     }
   }).pipe(
     Effect.catchAll((e) => {
-      const message =
-        e instanceof Error
-          ? e.message
-          : typeof e === "object" && e !== null && "message" in e
-            ? String((e as any).message)
-            : "Operation failed"
+      const message = errorMessage(e, "Operation failed")
       return Effect.succeed({ error: message } as AdminUsersResult)
     }),
   )

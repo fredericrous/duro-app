@@ -1,4 +1,5 @@
 import { Effect } from "effect"
+import { errorMessage } from "~/lib/error-message"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { RbacRepo } from "~/lib/governance/RbacRepo.server"
 import { AppSyncService } from "~/lib/governance/AppSyncService.server"
@@ -81,12 +82,7 @@ export function handleAdminApplicationsMutation(mutation: AdminApplicationsMutat
     }
   }).pipe(
     Effect.catchAll((e) => {
-      const message =
-        e instanceof Error
-          ? e.message
-          : typeof e === "object" && e !== null && "message" in e
-            ? String((e as any).message)
-            : "Operation failed"
+      const message = errorMessage(e, "Operation failed")
       return Effect.succeed({ error: message } as AdminApplicationsResult)
     }),
   )

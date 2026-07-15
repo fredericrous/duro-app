@@ -23,6 +23,16 @@ export interface AcceptInput {
 
 // --- Queue Invite (called by UI action) ---
 
+/**
+ * Derive a cert username from an email: the local-part, lowercased, with only
+ * `[a-z0-9_-]` retained. Used for Vault cert cleanup keying.
+ */
+const certUsernameFromEmail = (email: string): string =>
+  email
+    .split("@")[0]
+    .replace(/[^a-z0-9_-]/gi, "")
+    .toLowerCase()
+
 export const queueInvite = (input: InviteInput) =>
   Effect.gen(function* () {
     const inviteRepo = yield* InviteRepo
@@ -45,10 +55,7 @@ export const queueInvite = (input: InviteInput) =>
     const invite = yield* inviteRepo.create(input)
 
     // Derive certUsername for revocation cleanup
-    const certUsername = input.email
-      .split("@")[0]
-      .replace(/[^a-z0-9_-]/gi, "")
-      .toLowerCase()
+    const certUsername = certUsernameFromEmail(input.email)
     yield* inviteRepo.setCertUsername(invite.id, certUsername)
 
     // Issue cert directly from Vault PKI. The P12 is kept in Vault (keyed by
@@ -167,10 +174,7 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
       .pipe(
         Effect.catchAll((e) => Effect.logWarning("acceptInvite: failed to set userId on cert", { error: String(e) })),
       )
-    const certUsername = invite.email
-      .split("@")[0]
-      .replace(/[^a-z0-9_-]/gi, "")
-      .toLowerCase()
+    const certUsername = certUsernameFromEmail(invite.email)
     yield* certRepo
       .updateUsername(certUsername, input.username)
       .pipe(
@@ -204,12 +208,7 @@ export const revokeInvite = (inviteId: string) =>
       )
 
     // Clean up cert secret by username
-    const certUsername =
-      invite.certUsername ??
-      invite.email
-        .split("@")[0]
-        .replace(/[^a-z0-9_-]/gi, "")
-        .toLowerCase()
+    const certUsername = invite.certUsername ?? certUsernameFromEmail(invite.email)
     yield* cert
       .deleteCertByUsername(certUsername)
       .pipe(
@@ -246,11 +245,7 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
       .deleteUser(username)
       .pipe(Effect.catchAll((e) => Effect.logWarning("revokeUser: failed to delete user", { error: String(e) })))
 
-    // Derive cert username from email (matching queueInvite pattern)
-    const certUsername = email
-      .split("@")[0]
-      .replace(/[^a-z0-9_-]/gi, "")
-      .toLowerCase()
+    const certUsername = certUsernameFromEmail(email)
 
     // Clean up cert secret
     yield* cert
