@@ -4,6 +4,10 @@ import { AccessRequestRepo } from "~/lib/governance/AccessRequestRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { DiscordNotifier } from "~/lib/services/DiscordNotifier.server"
+import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
+import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
+import { EmailService } from "~/lib/services/EmailService.server"
+import { config } from "~/lib/config.server"
 import { activateGrant } from "./grant-activation.server"
 import { type ApprovalPolicyRule } from "~/lib/governance/types"
 
@@ -256,6 +260,7 @@ export const decideApproval = (input: DecideInput) =>
     // the transaction has committed (still-pending decisions notify nobody).
     let notifyOutcome: "approved" | "rejected" | null = null
     let notifyApplicationId: string | null = null
+    let notifyRequesterId: string | null = null
 
     yield* sqlClient.withTransaction(
       Effect.gen(function* () {
@@ -311,6 +316,7 @@ export const decideApproval = (input: DecideInput) =>
           newGrantId = grant.id
           notifyOutcome = "approved"
           notifyApplicationId = request.applicationId
+          notifyRequesterId = request.requesterId
         } else if (result === "rejected") {
           yield* requestRepo.updateStatus(input.requestId, "rejected")
           yield* audit.emit({
@@ -322,6 +328,7 @@ export const decideApproval = (input: DecideInput) =>
           })
           notifyOutcome = "rejected"
           notifyApplicationId = request.applicationId
+          notifyRequesterId = request.requesterId
         }
         // pending: no action needed
       }),
@@ -335,6 +342,28 @@ export const decideApproval = (input: DecideInput) =>
       yield* discord.notify(
         `Access request ${input.requestId} for application ${notifyApplicationId} was ${notifyOutcome}`,
       )
+
+      // Also email the requester directly — Discord only reaches the shared
+      // channel. Best-effort: an email failure must not fail the decision.
+      yield* Effect.gen(function* () {
+        const principalRepo = yield* PrincipalRepo
+        const requester = notifyRequesterId ? yield* principalRepo.findById(notifyRequesterId) : null
+        if (!requester?.email) return
+        const appRepo = yield* ApplicationRepo
+        const app = notifyApplicationId ? yield* appRepo.findById(notifyApplicationId) : null
+        const appName = app?.displayName ?? notifyApplicationId ?? "an application"
+        const email = yield* EmailService
+        const approved = notifyOutcome === "approved"
+        yield* email.sendNotificationEmail(
+          requester.email,
+          `Your access request for ${appName} was ${notifyOutcome}`,
+          `Access request ${notifyOutcome}`,
+          approved
+            ? `Your request for access to ${appName} was approved. Access is being provisioned.`
+            : `Your request for access to ${appName} was not approved.`,
+          { text: "View your requests", url: `${config.homeUrl}/requests` },
+        )
+      }).pipe(Effect.catchAll(() => Effect.void))
     }
 
     // Fire-and-forget provisioning outside the transaction. activateGrant

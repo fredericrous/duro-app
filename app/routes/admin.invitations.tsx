@@ -9,7 +9,7 @@ import { AccessInvitationRepo, type AccessInvitationEnriched } from "~/lib/gover
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { RbacRepo } from "~/lib/governance/RbacRepo.server"
-import { cancelInvitation } from "~/lib/workflows/access-invitation.server"
+import { cancelInvitation, notifyInviteeOfInvitation } from "~/lib/workflows/access-invitation.server"
 import type { Role, Entitlement } from "~/lib/governance/types"
 import {
   Badge,
@@ -113,6 +113,11 @@ export async function action({ request }: Route.ActionArgs) {
           message,
           expiresAt,
         })
+
+        // Best-effort: email the invitee so they know an invitation awaits.
+        // An email failure must not fail the create.
+        yield* notifyInviteeOfInvitation({ invitedPrincipalId, applicationId }).pipe(Effect.catchAll(() => Effect.void))
+
         return { ok: true as const }
       }).pipe(
         Effect.catchAll((e) => {

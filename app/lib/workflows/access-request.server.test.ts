@@ -26,6 +26,7 @@ import { PluginHost } from "~/lib/plugins/PluginHost.server"
 import { ConnectedSystemRepoLive } from "~/lib/governance/ConnectedSystemRepo.server"
 import { ConnectorMappingRepoLive } from "~/lib/governance/ConnectorMappingRepo.server"
 import { DiscordNotifier } from "~/lib/services/DiscordNotifier.server"
+import { EmailService } from "~/lib/services/EmailService.server"
 
 // ---------------------------------------------------------------------------
 // Section 1: Unit tests for evaluatePolicy (pure function)
@@ -95,6 +96,16 @@ const CapturingDiscord = Layer.succeed(DiscordNotifier, {
   notify: (content: string) => Effect.sync(() => void discordCalls.push(content)),
 })
 
+// Capturing EmailService — decideApproval now emails the requester on a final
+// decision. Records (to, subject) so tests can assert who was notified.
+const emailCalls: Array<{ to: string; subject: string }> = []
+const CapturingEmail = Layer.succeed(EmailService, {
+  sendInviteEmail: () => Effect.succeed(""),
+  sendCertRenewalEmail: () => Effect.void,
+  sendRecoveryNotificationEmail: () => Effect.void,
+  sendNotificationEmail: (to: string, subject: string) => Effect.sync(() => void emailCalls.push({ to, subject })),
+})
+
 const TestLayer = Layer.mergeAll(
   AccessRequestRepoLive,
   GrantRepoLive,
@@ -107,6 +118,7 @@ const TestLayer = Layer.mergeAll(
   MockProvisioning,
   MockPluginHost,
   CapturingDiscord,
+  CapturingEmail,
 ).pipe(Layer.provideMerge(makeTestDbLayer()))
 
 // ---------------------------------------------------------------------------
@@ -565,6 +577,7 @@ describe("decideApproval", () => {
         expect(result.status).toBe("pending")
 
         discordCalls.length = 0
+        emailCalls.length = 0
         yield* decideApproval({
           requestId: result.requestId,
           approverId: ids.approverId,
@@ -575,6 +588,12 @@ describe("decideApproval", () => {
         expect(discordCalls[0]).toContain(result.requestId)
         expect(discordCalls[0]).toContain(ids.appId)
         expect(discordCalls[0]).toContain("approved")
+
+        // The requester is also emailed directly (Discord only hits the shared
+        // channel). seedTestData gives the requester an email.
+        expect(emailCalls.length).toBe(1)
+        expect(emailCalls[0].to).toBe("requester@example.com")
+        expect(emailCalls[0].subject.toLowerCase()).toContain("approved")
       }),
     )
   })

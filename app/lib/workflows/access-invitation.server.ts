@@ -4,7 +4,35 @@ import { AccessInvitationRepo } from "~/lib/governance/AccessInvitationRepo.serv
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { DiscordNotifier } from "~/lib/services/DiscordNotifier.server"
+import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
+import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
+import { EmailService } from "~/lib/services/EmailService.server"
+import { config } from "~/lib/config.server"
 import { activateGrant } from "~/lib/workflows/grant-activation.server"
+
+/**
+ * Email the invited principal that an access invitation awaits them — otherwise
+ * they only discover it by chance on /requests. Resolves the invitee's email
+ * and the app name; a missing email is a silent no-op. Callers should treat
+ * this as best-effort (catch failures) so it can't block invitation creation.
+ */
+export const notifyInviteeOfInvitation = (input: { invitedPrincipalId: string; applicationId: string }) =>
+  Effect.gen(function* () {
+    const principalRepo = yield* PrincipalRepo
+    const invitee = yield* principalRepo.findById(input.invitedPrincipalId)
+    if (!invitee?.email) return
+    const appRepo = yield* ApplicationRepo
+    const app = yield* appRepo.findById(input.applicationId)
+    const appName = app?.displayName ?? input.applicationId
+    const email = yield* EmailService
+    yield* email.sendNotificationEmail(
+      invitee.email,
+      `You've been invited to access ${appName}`,
+      `You've been invited to access ${appName}`,
+      "An administrator has invited you. Open your requests to accept or decline.",
+      { text: "Review your invitation", url: `${config.homeUrl}/requests` },
+    )
+  }).pipe(Effect.withSpan("notifyInviteeOfInvitation"))
 
 /**
  * Access-invitation lifecycle: an admin invites an existing principal to a
