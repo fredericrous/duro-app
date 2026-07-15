@@ -6,7 +6,16 @@ vi.mock("~/lib/runtime.server", async () => {
   const mod = await import("~/test/test-runtime")
   return { runEffect: mod.testRunEffect }
 })
+vi.mock("~/lib/admin-guard.server", () => ({
+  requireAdmin: vi
+    .fn()
+    .mockResolvedValue({ sub: "admin", user: "admin", email: "admin@test", groups: ["lldap_admin"] }),
+  requireAdminAction: vi
+    .fn()
+    .mockResolvedValue({ sub: "admin", user: "admin", email: "admin@test", groups: ["lldap_admin"] }),
+}))
 
+import { requireAdmin } from "~/lib/admin-guard.server"
 import { loader } from "./admin.principals.$id"
 import { seedTestDb, truncateAll } from "~/test/test-runtime"
 import { callLoader, expectData } from "~/test/route-utils"
@@ -44,6 +53,13 @@ describe("/admin/principals/:id loader", () => {
     const result = await callLoader(loader, { params: { id: "ghost" } })
     expect(result.kind).toBe("response")
     if (result.kind === "response") expect(result.response.status).toBe(404)
+  })
+
+  it("denies a non-admin caller (403) when the guard rejects", async () => {
+    vi.mocked(requireAdmin).mockRejectedValueOnce(new Response("Forbidden", { status: 403 }))
+    const result = await callLoader(loader, { params: { id: "p-alice" } })
+    expect(result.kind).toBe("response")
+    if (result.kind === "response") expect(result.response.status).toBe(403)
   })
 })
 

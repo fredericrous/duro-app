@@ -478,4 +478,63 @@ describe("decideApproval", () => {
       }),
     )
   })
+
+  it.layer(TestLayer)("approving an already-approved request does not create a second grant", (it) => {
+    it.effect("is idempotent — a duplicate approve is a no-op", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        yield* sql`INSERT INTO approval_policies (id, application_id, scope_type, mode, rules)
+                     VALUES ('policy-idem', ${ids.appId}, 'application', 'one_of',
+                       ${JSON.stringify([{ approverType: "app_owner" }])}::jsonb)`
+
+        const result = yield* submitAccessRequest({
+          requesterId: ids.requesterId,
+          applicationId: ids.appId,
+          roleId: ids.roleId,
+        })
+        expect(result.status).toBe("pending")
+
+        // Two approvals for the same request (double-submit / second approver).
+        yield* decideApproval({ requestId: result.requestId, approverId: ids.approverId, decision: "approved" })
+        yield* decideApproval({ requestId: result.requestId, approverId: ids.approverId, decision: "approved" })
+
+        // Exactly one grant — the status guard must prevent a second.
+        const grants =
+          yield* sql`SELECT id FROM grants WHERE principal_id = ${ids.requesterId} AND role_id = ${ids.roleId}`
+        expect(grants.length).toBe(1)
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("auto-approves and grants when a policy resolves zero approvers", (it) => {
+    it.effect("creates the grant instead of approving with nothing granted", () =>
+      Effect.gen(function* () {
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        // A 'principal' rule with no approverPrincipalId resolves to zero
+        // approvers — the branch that previously marked the request approved
+        // without ever creating a grant.
+        yield* sql`INSERT INTO approval_policies (id, application_id, scope_type, mode, rules)
+                     VALUES ('policy-noapprovers', ${ids.appId}, 'application', 'one_of',
+                       ${JSON.stringify([{ approverType: "principal" }])}::jsonb)`
+
+        const result = yield* submitAccessRequest({
+          requesterId: ids.requesterId,
+          applicationId: ids.appId,
+          roleId: ids.roleId,
+        })
+        expect(result.status).toBe("approved")
+
+        const requests = yield* sql`SELECT status FROM access_requests WHERE id = ${result.requestId}`
+        expect((requests[0] as any).status).toBe("approved")
+
+        const grants =
+          yield* sql`SELECT id FROM grants WHERE principal_id = ${ids.requesterId} AND role_id = ${ids.roleId}`
+        expect(grants.length).toBe(1)
+      }),
+    )
+  })
 })

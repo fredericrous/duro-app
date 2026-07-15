@@ -3,8 +3,17 @@ import { describe, expect, it, vi, beforeEach } from "vitest"
 vi.mock("~/lib/runtime.server", () => ({
   runEffect: vi.fn(),
 }))
+vi.mock("~/lib/admin-guard.server", () => ({
+  requireAdmin: vi
+    .fn()
+    .mockResolvedValue({ sub: "admin", user: "admin", email: "admin@test", groups: ["lldap_admin"] }),
+  requireAdminAction: vi
+    .fn()
+    .mockResolvedValue({ sub: "admin", user: "admin", email: "admin@test", groups: ["lldap_admin"] }),
+}))
 
 import { runEffect } from "~/lib/runtime.server"
+import { requireAdmin } from "~/lib/admin-guard.server"
 import { loader } from "./admin.audit"
 import { callLoader, expectData } from "~/test/route-utils"
 
@@ -50,6 +59,13 @@ describe("/admin/audit loader", () => {
     const data = expectData<{ events: unknown[]; source?: string }>(result)
     expect(data.events).toEqual([])
     expect(data.source).toBe("plugin:gitea")
+  })
+
+  it("denies a non-admin caller (403) when the guard rejects", async () => {
+    vi.mocked(requireAdmin).mockRejectedValueOnce(new Response("Forbidden", { status: 403 }))
+    const result = await callLoader(loader)
+    expect(result.kind).toBe("response")
+    if (result.kind === "response") expect(result.response.status).toBe(403)
   })
 })
 

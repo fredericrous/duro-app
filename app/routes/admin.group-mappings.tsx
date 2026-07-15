@@ -4,8 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.group-mappings"
 import { runEffect } from "~/lib/runtime.server"
-import { isOriginAllowed } from "~/lib/config.server"
-import { getAuth } from "~/lib/auth.server"
+import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { GroupMappingRepo, type GroupMappingWithNames } from "~/lib/governance/GroupMappingRepo.server"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
@@ -28,7 +27,8 @@ import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
 type TFunc = (key: string, opts?: Record<string, unknown>) => string
 
-export async function loader() {
+export async function loader({ request }: Route.LoaderArgs) {
+  await requireAdmin(request)
   const [mappings, applications, principals] = await Promise.all([
     runEffect(
       Effect.gen(function* () {
@@ -67,13 +67,10 @@ export async function loader() {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  if (!isOriginAllowed(request.headers.get("Origin"))) {
-    throw new Response("Invalid origin", { status: 403 })
-  }
+  await requireAdminAction(request)
 
   const formData = await request.formData()
   const intent = formData.get("intent") as string
-  await getAuth(request)
 
   if (intent === "create") {
     const oidcGroupName = (formData.get("oidcGroupName") as string)?.trim()

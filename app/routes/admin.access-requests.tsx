@@ -5,6 +5,7 @@ import { enumLabel } from "~/lib/enum-labels"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.access-requests"
 import { runEffect } from "~/lib/runtime.server"
+import { requireAdmin } from "~/lib/admin-guard.server"
 import { AccessRequestRepo, type AccessRequestEnriched } from "~/lib/governance/AccessRequestRepo.server"
 import {
   useReactTable,
@@ -21,7 +22,8 @@ import { Badge, EmptyState, Stack, Table, Tooltip } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
-export async function loader() {
+export async function loader({ request }: Route.LoaderArgs) {
+  await requireAdmin(request)
   const requests = await runEffect(
     Effect.gen(function* () {
       const repo = yield* AccessRequestRepo

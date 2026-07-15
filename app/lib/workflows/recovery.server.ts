@@ -110,30 +110,51 @@ export const approveRecovery = (requestId: string, adminUser: string, revokeOthe
     const req = yield* repo.findById(requestId).pipe(Effect.mapError(() => new RecoveryError({ code: "db" })))
     if (!req || req.status !== "pending") return yield* new RecoveryError({ code: "not_found" })
 
-    let revokedCount = 0
-    if (revokeOthers) {
-      const certRepo = yield* CertificateRepo
-      const revoked = yield* certRepo
-        .revokeAllForUser(req.username)
-        .pipe(
-          Effect.mapError(
-            (e) =>
-              new RecoveryError({ code: "issue_failed", message: e instanceof Error ? e.message : "revoke failed" }),
-          ),
-        )
-      revokedCount = revoked.length
-    }
-
-    const result = yield* resendCert(req.email, req.username).pipe(
-      Effect.mapError(
-        (e) =>
-          new RecoveryError({ code: "issue_failed", message: e instanceof Error ? e.message : "resendCert failed" }),
-      ),
-    )
-
-    yield* repo
-      .markReviewed(requestId, "approved", adminUser, result.renewalId)
+    // Atomically claim the request (pending → approved) BEFORE issuing anything.
+    // resendCert mints a Vault cert and emails a reveal link — irreversible
+    // side effects — so two admins double-approving (or a double-submit) must
+    // not both reach it. markReviewed is a conditional UPDATE ... WHERE
+    // status = 'pending'; only the winner gets count 1. The loser stops here
+    // with no cert issued and no second reveal email. renewal_id is attached
+    // after issuance (below).
+    const claimed = yield* repo
+      .markReviewed(requestId, "approved", adminUser)
       .pipe(Effect.mapError(() => new RecoveryError({ code: "db" })))
+    if (claimed === 0) return yield* new RecoveryError({ code: "not_found" })
+
+    // If issuance fails after the claim, reopen the request so an admin can
+    // retry — otherwise it would be stuck "approved" with no cert.
+    const issue = Effect.gen(function* () {
+      let revokedCount = 0
+      if (revokeOthers) {
+        const certRepo = yield* CertificateRepo
+        const revoked = yield* certRepo
+          .revokeAllForUser(req.username)
+          .pipe(
+            Effect.mapError(
+              (e) =>
+                new RecoveryError({ code: "issue_failed", message: e instanceof Error ? e.message : "revoke failed" }),
+            ),
+          )
+        revokedCount = revoked.length
+      }
+
+      const result = yield* resendCert(req.email, req.username).pipe(
+        Effect.mapError(
+          (e) =>
+            new RecoveryError({ code: "issue_failed", message: e instanceof Error ? e.message : "resendCert failed" }),
+        ),
+      )
+
+      yield* repo
+        .attachRenewal(requestId, result.renewalId)
+        .pipe(Effect.mapError(() => new RecoveryError({ code: "db" })))
+      return revokedCount
+    })
+
+    const revokedCount = yield* issue.pipe(
+      Effect.tapError(() => repo.reopen(requestId).pipe(Effect.catchAll(() => Effect.void))),
+    )
 
     const audit = yield* AuditService
     yield* audit

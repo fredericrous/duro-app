@@ -143,6 +143,109 @@ describe("/requests action — cancel flow", () => {
   })
 })
 
+/** Seed alice, an invite_only app + role, and one pending invitation for her. */
+const seedAliceInvitation = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  yield* sql`INSERT INTO principals (id, principal_type, external_id, display_name, email)
+             VALUES ('p-alice', 'user', 'alice-sub', 'Alice', 'a@x')`
+  yield* sql`INSERT INTO principals (id, principal_type, external_id, display_name, email)
+             VALUES ('p-admin', 'user', 'admin-sub', 'Admin', 'admin@x')`
+  yield* sql`INSERT INTO applications (id, slug, display_name, access_mode, owner_id)
+             VALUES ('app-1', 'app-1', 'App 1', 'invite_only', 'p-admin')`
+  yield* sql`INSERT INTO roles (id, application_id, slug, display_name)
+             VALUES ('role-1', 'app-1', 'viewer', 'Viewer')`
+  yield* sql`INSERT INTO access_invitations (id, application_id, role_id, invited_principal_id, invited_by, status)
+             VALUES ('inv-1', 'app-1', 'role-1', 'p-alice', 'p-admin', 'pending')`
+})
+
+describe("/requests loader — invitations", () => {
+  it("returns the user's pending invitations with display names", async () => {
+    mockGetAuth.mockResolvedValue({ user: "alice", sub: "alice-sub", groups: [] } as never)
+    await seedTestDb(seedAliceInvitation)
+
+    const result = await callLoader(loader)
+    const data = expectData<{ invitations: Array<{ id: string; applicationName: string; roleName: string | null }> }>(
+      result,
+    )
+    expect(data.invitations).toHaveLength(1)
+    expect(data.invitations[0]).toMatchObject({ id: "inv-1", applicationName: "App 1", roleName: "Viewer" })
+  })
+})
+
+describe("/requests action — invitation flow", () => {
+  beforeEach(() => {
+    mockGetAuth.mockResolvedValue({ user: "alice", sub: "alice-sub", groups: [] } as never)
+  })
+
+  it("missing_invitation_id when blank", async () => {
+    const result = await callAction(action, { formData: { intent: "acceptInvitation", invitationId: "  " } })
+    expect(expectData<{ error?: string }>(result)).toEqual({ error: "missing_invitation_id" })
+  })
+
+  it("accepts a pending invitation and materialises the grant (real DB)", async () => {
+    await seedTestDb(seedAliceInvitation)
+
+    const result = await callAction(action, { formData: { intent: "acceptInvitation", invitationId: "inv-1" } })
+    expect(expectData<{ success?: boolean; message?: string }>(result)).toEqual({
+      success: true,
+      message: "invitation_accepted",
+    })
+
+    const state = await seedTestDb(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        const inv = yield* sql<{ status: string }>`SELECT status FROM access_invitations WHERE id = 'inv-1'`
+        const grants = yield* sql<{ n: number }>`SELECT count(*)::int AS n FROM grants WHERE principal_id = 'p-alice'`
+        return { status: inv[0]?.status, grants: grants[0]?.n }
+      }) as Effect.Effect<{ status?: string; grants?: number }, never, never>,
+    )
+    expect(state.status).toBe("accepted")
+    expect(state.grants).toBe(1)
+  })
+
+  it("declines a pending invitation without granting", async () => {
+    await seedTestDb(seedAliceInvitation)
+
+    const result = await callAction(action, { formData: { intent: "declineInvitation", invitationId: "inv-1" } })
+    expect(expectData<{ success?: boolean; message?: string }>(result)).toEqual({
+      success: true,
+      message: "invitation_declined",
+    })
+
+    const state = await seedTestDb(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        const inv = yield* sql<{ status: string }>`SELECT status FROM access_invitations WHERE id = 'inv-1'`
+        const grants = yield* sql<{ n: number }>`SELECT count(*)::int AS n FROM grants WHERE principal_id = 'p-alice'`
+        return { status: inv[0]?.status, grants: grants[0]?.n }
+      }) as Effect.Effect<{ status?: string; grants?: number }, never, never>,
+    )
+    expect(state.status).toBe("declined")
+    expect(state.grants).toBe(0)
+  })
+
+  it("surfaces not_yours when accepting an invitation addressed to someone else", async () => {
+    await seedTestDb(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* sql`INSERT INTO principals (id, principal_type, external_id, display_name, email)
+                   VALUES ('p-alice', 'user', 'alice-sub', 'Alice', 'a@x')`
+        yield* sql`INSERT INTO principals (id, principal_type, external_id, display_name, email)
+                   VALUES ('p-bob', 'user', 'bob-sub', 'Bob', 'b@x')`
+        yield* sql`INSERT INTO applications (id, slug, display_name, access_mode, owner_id)
+                   VALUES ('app-1', 'app-1', 'App 1', 'invite_only', 'p-bob')`
+        yield* sql`INSERT INTO roles (id, application_id, slug, display_name)
+                   VALUES ('role-1', 'app-1', 'viewer', 'Viewer')`
+        yield* sql`INSERT INTO access_invitations (id, application_id, role_id, invited_principal_id, invited_by, status)
+                   VALUES ('inv-bob', 'app-1', 'role-1', 'p-bob', 'p-bob', 'pending')`
+      }) as Effect.Effect<void, never, never>,
+    )
+
+    const result = await callAction(action, { formData: { intent: "acceptInvitation", invitationId: "inv-bob" } })
+    expect(expectData<{ error?: string }>(result)).toEqual({ error: "not_yours" })
+  })
+})
+
 // ===========================================================================
 // Component-render tests via createRoutesStub. Central MSW server + global
 // setup handle the HTTP boundary; no per-file bootstrap.
@@ -150,8 +253,27 @@ describe("/requests action — cancel flow", () => {
 
 import { screen, waitFor } from "@testing-library/react"
 import type { AccessRequestEnriched } from "~/lib/governance/AccessRequestRepo.server"
+import type { AccessInvitationEnriched } from "~/lib/governance/AccessInvitationRepo.server"
 import MyRequestsPage from "./requests"
 import { renderRoute } from "~/test/render-route"
+
+const invRow = (overrides: Partial<AccessInvitationEnriched>): AccessInvitationEnriched => ({
+  id: overrides.id ?? "inv-1",
+  status: "pending",
+  applicationId: "app-1",
+  applicationName: overrides.applicationName ?? "Jellyfin",
+  roleId: "role-1",
+  roleName: overrides.roleName ?? "Viewer",
+  entitlementId: null,
+  entitlementName: null,
+  invitedPrincipalId: "p-alice",
+  invitedPrincipalName: "Alice",
+  invitedByName: overrides.invitedByName ?? "Admin",
+  message: overrides.message ?? null,
+  createdAt: "2026-01-01T00:00:00Z",
+  expiresAt: null,
+  ...overrides,
+})
 
 const reqRow = (overrides: Partial<AccessRequestEnriched>): AccessRequestEnriched =>
   ({
@@ -177,6 +299,7 @@ const reqRow = (overrides: Partial<AccessRequestEnriched>): AccessRequestEnriche
 
 const renderRequests = (
   requests: AccessRequestEnriched[],
+  invitations: AccessInvitationEnriched[] = [],
   url = "/requests",
   dashboard: { user: string; isAdmin: boolean } = { user: "alice", isAdmin: false },
 ) =>
@@ -186,7 +309,7 @@ const renderRequests = (
     route: {
       path: "/requests",
       Component: MyRequestsPage as never,
-      loader: () => ({ requests }),
+      loader: () => ({ requests, invitations }),
     },
     url,
   })
@@ -237,5 +360,24 @@ describe("MyRequestsPage component", () => {
       const truncated = "x".repeat(60) + "…"
       expect(screen.getByText(truncated)).toBeInTheDocument()
     })
+  })
+
+  it("shows the invitations section with Accept and Decline when the user has a pending invitation", async () => {
+    renderRequests([], [invRow({ id: "inv-1", applicationName: "Immich", roleName: "Viewer" })])
+
+    await waitFor(() => {
+      expect(screen.getByText("Immich")).toBeInTheDocument()
+    })
+    expect(screen.getByRole("button", { name: /Accept/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /Decline/i })).toBeInTheDocument()
+  })
+
+  it("hides the invitations section entirely when there are none", async () => {
+    renderRequests([reqRow({ id: "r1", status: "pending" })], [])
+
+    await waitFor(() => {
+      expect(screen.getByText("App 1")).toBeInTheDocument()
+    })
+    expect(screen.queryByRole("button", { name: /Accept/i })).not.toBeInTheDocument()
   })
 })

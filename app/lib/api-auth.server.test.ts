@@ -22,8 +22,10 @@ beforeEach(() => {
 const req = (headers: Record<string, string> = {}) => new Request("http://localhost/api/x", { headers })
 
 describe("requireApiAuth", () => {
-  it("returns a session-source result when the session resolves to a known principal", async () => {
-    mockGetSession.mockResolvedValue({ name: "alice-sub", email: "a@x", groups: [] } as never)
+  it("returns a session-source result when the session resolves to a known principal (keyed on sub, not name)", async () => {
+    // sub and name deliberately differ — principals are keyed on the OIDC
+    // subject, so the display name must NOT be what drives the lookup.
+    mockGetSession.mockResolvedValue({ sub: "alice-sub", name: "Alice Display", email: "a@x", groups: [] } as never)
     mockRunEffect.mockResolvedValueOnce({ id: "p-alice" } as never)
 
     const result = await requireApiAuth(req())
@@ -31,7 +33,7 @@ describe("requireApiAuth", () => {
   })
 
   it("falls through when the session principal can't be found", async () => {
-    mockGetSession.mockResolvedValue({ name: "ghost", email: "", groups: [] } as never)
+    mockGetSession.mockResolvedValue({ sub: "ghost", name: "Ghost", email: "", groups: [] } as never)
     mockRunEffect.mockResolvedValueOnce(null as never) // principal lookup miss
 
     await expect(requireApiAuth(req())).rejects.toBeInstanceOf(Response)

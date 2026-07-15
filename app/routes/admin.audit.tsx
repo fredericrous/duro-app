@@ -5,6 +5,7 @@ import { enumLabel } from "~/lib/enum-labels"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.audit"
 import { runEffect } from "~/lib/runtime.server"
+import { requireAdmin } from "~/lib/admin-guard.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import type { AuditEvent } from "~/lib/governance/types"
@@ -45,6 +46,7 @@ function safeParseMetadata(metadata: unknown): Record<string, unknown> {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
+  await requireAdmin(request)
   const url = new URL(request.url)
   const eventType = url.searchParams.get("eventType") || undefined
   const actorId = url.searchParams.get("actorId") || undefined

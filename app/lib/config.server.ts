@@ -27,9 +27,16 @@ export const config = {
   autheliaUrl: process.env.AUTHELIA_URL ?? "",
 } as const
 
-/** Check if a request Origin header matches the allowed suffix. */
+/**
+ * Check whether a request's Origin matches the allowed suffix.
+ *
+ * Only ever called on state-changing actions (POST), never on loaders, so a
+ * missing Origin is treated as DENY: modern browsers always send Origin on a
+ * same-origin state-changing request, and accepting its absence would let a
+ * caller skip the CSRF check entirely by simply omitting the header.
+ */
 export function isOriginAllowed(origin: string | null): boolean {
-  if (!origin) return true
+  if (!origin) return false
   try {
     return new URL(origin).hostname.endsWith(config.allowedOriginSuffix)
   } catch {

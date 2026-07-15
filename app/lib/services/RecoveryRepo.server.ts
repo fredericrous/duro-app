@@ -57,6 +57,16 @@ export class RecoveryRepo extends Context.Tag("RecoveryRepo")<
       reviewedBy: string,
       renewalId?: string | null,
     ) => Effect.Effect<number, RecoveryRepoError>
+    /**
+     * Record the issued renewal id after an approval was already claimed.
+     * Unconditional (the row is no longer `pending` by this point).
+     */
+    readonly attachRenewal: (id: string, renewalId: string) => Effect.Effect<void, RecoveryRepoError>
+    /**
+     * Revert a claimed-but-failed approval back to `pending` so an admin can
+     * retry. Used when cert issuance fails after the row was already claimed.
+     */
+    readonly reopen: (id: string) => Effect.Effect<void, RecoveryRepoError>
     /** Count requests (any status) for an email since `sinceIso` — rate limiting. */
     readonly countRecentByEmail: (email: string, sinceIso: string) => Effect.Effect<number, RecoveryRepoError>
     /** Count requests (any status) from an IP since `sinceIso` — rate limiting. */
@@ -137,6 +147,20 @@ export const RecoveryRepoLive = Layer.effect(
               WHERE id = ${id} AND status = 'pending'
               RETURNING id`.pipe(Effect.map((rows) => rows.length)),
           "Failed to mark recovery request reviewed",
+        ),
+
+      attachRenewal: (id, renewalId) =>
+        withErr(
+          sql`UPDATE recovery_requests SET renewal_id = ${renewalId} WHERE id = ${id}`.pipe(Effect.asVoid),
+          "Failed to attach renewal id to recovery request",
+        ),
+
+      reopen: (id) =>
+        withErr(
+          sql`UPDATE recovery_requests
+              SET status = 'pending', reviewed_at = NULL, reviewed_by = NULL, renewal_id = NULL
+              WHERE id = ${id}`.pipe(Effect.asVoid),
+          "Failed to reopen recovery request",
         ),
 
       countRecentByEmail: (email, sinceIso) =>

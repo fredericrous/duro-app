@@ -21,7 +21,9 @@ export async function requireApiAuth(request: Request): Promise<ApiAuthResult> {
     const principal = await runEffect(
       Effect.gen(function* () {
         const repo = yield* PrincipalRepo
-        return yield* repo.findByExternalId(session.name)
+        // principals.external_id is keyed on the OIDC subject, not the display
+        // name — matching on session.name is a principal-confusion bug.
+        return yield* repo.findByExternalId(session.sub)
       }),
     )
     if (principal) {

@@ -5,7 +5,7 @@ import { enumLabel } from "~/lib/enum-labels"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.applications"
 import { runEffect } from "~/lib/runtime.server"
-import { isOriginAllowed } from "~/lib/config.server"
+import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { parseAdminApplicationsMutation, handleAdminApplicationsMutation } from "~/lib/mutations/admin-applications"
 import type { Application } from "~/lib/governance/types"
@@ -24,7 +24,8 @@ import { Alert, Badge, Button, EmptyState, Stack, Table } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
-export async function loader() {
+export async function loader({ request }: Route.LoaderArgs) {
+  await requireAdmin(request)
   const applications = await runEffect(
     Effect.gen(function* () {
       const repo = yield* ApplicationRepo
@@ -35,9 +36,7 @@ export async function loader() {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  if (!isOriginAllowed(request.headers.get("Origin"))) {
-    throw new Response("Invalid origin", { status: 403 })
-  }
+  await requireAdminAction(request)
 
   const formData = await request.formData()
   const parsed = parseAdminApplicationsMutation(formData as any)

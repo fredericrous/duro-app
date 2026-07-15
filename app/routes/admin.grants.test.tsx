@@ -15,11 +15,23 @@ vi.mock("~/lib/auth-decision.server", () => ({
 vi.mock("~/lib/workflows/grant-activation.server", () => ({
   deactivateGrant: vi.fn(),
 }))
+// The loader self-gates via requireAdmin; its action keeps its own inline
+// getAuth + checkAuthDecision + origin gate (mocked below), so only the guard
+// used by the loader is stubbed here.
+vi.mock("~/lib/admin-guard.server", () => ({
+  requireAdmin: vi
+    .fn()
+    .mockResolvedValue({ sub: "admin", user: "admin", email: "admin@test", groups: ["lldap_admin"] }),
+  requireAdminAction: vi
+    .fn()
+    .mockResolvedValue({ sub: "admin", user: "admin", email: "admin@test", groups: ["lldap_admin"] }),
+}))
 
 import { runEffect } from "~/lib/runtime.server"
 import { isOriginAllowed } from "~/lib/config.server"
 import { getAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"
+import { requireAdmin } from "~/lib/admin-guard.server"
 import { action, loader } from "./admin.grants"
 import { callAction, callLoader, expectData, expectResponse } from "~/test/route-utils"
 
@@ -41,6 +53,13 @@ describe("/admin/grants loader", () => {
     const result = await callLoader(loader)
     const loaded = expectData<{ grants: unknown[] }>(result)
     expect(loaded).toEqual(data)
+  })
+
+  it("denies a non-admin caller (403) when the guard rejects", async () => {
+    vi.mocked(requireAdmin).mockRejectedValueOnce(new Response("Forbidden", { status: 403 }))
+    const result = await callLoader(loader)
+    expect(result.kind).toBe("response")
+    if (result.kind === "response") expect(result.response.status).toBe(403)
   })
 })
 

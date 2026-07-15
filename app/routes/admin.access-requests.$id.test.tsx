@@ -6,25 +6,24 @@ vi.mock("~/lib/runtime.server", async () => {
   const mod = await import("~/test/test-runtime")
   return { runEffect: mod.testRunEffect }
 })
-vi.mock("~/lib/auth.server", () => ({
-  getAuth: vi.fn(),
-}))
-vi.mock("~/lib/config.server", () => ({
-  isOriginAllowed: vi.fn().mockReturnValue(true),
+// The admin + origin gate now lives entirely in the guard; the loader/action
+// call it, so we stub it here and drive its return (auth.sub) per test.
+vi.mock("~/lib/admin-guard.server", () => ({
+  requireAdmin: vi
+    .fn()
+    .mockResolvedValue({ sub: "admin", user: "admin", email: "admin@test", groups: ["lldap_admin"] }),
+  requireAdminAction: vi
+    .fn()
+    .mockResolvedValue({ sub: "admin", user: "admin", email: "admin@test", groups: ["lldap_admin"] }),
 }))
 
-import { getAuth } from "~/lib/auth.server"
-import { isOriginAllowed } from "~/lib/config.server"
+import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { action, loader } from "./admin.access-requests.$id"
 import { seedTestDb, truncateAll } from "~/test/test-runtime"
 import { callAction, callLoader, expectData, expectResponse } from "~/test/route-utils"
 
-const mockGetAuth = vi.mocked(getAuth)
-const mockOrigin = vi.mocked(isOriginAllowed)
-
 beforeEach(async () => {
   vi.clearAllMocks()
-  mockOrigin.mockReturnValue(true)
   await truncateAll()
 })
 
@@ -63,11 +62,17 @@ describe("/admin/access-requests/:id loader", () => {
     const result = await callLoader(loader, { params: { id: "nope" } })
     expect(expectResponse(result).status).toBe(404)
   })
+
+  it("denies a non-admin caller (403) when the guard rejects", async () => {
+    vi.mocked(requireAdmin).mockRejectedValueOnce(new Response("Forbidden", { status: 403 }))
+    const result = await callLoader(loader, { params: { id: "req-1" } })
+    expect(expectResponse(result).status).toBe(403)
+  })
 })
 
-describe("/admin/access-requests/:id action — origin gate", () => {
-  it("throws 403 when origin is invalid", async () => {
-    mockOrigin.mockReturnValue(false)
+describe("/admin/access-requests/:id action — guard + resolution", () => {
+  it("surfaces the guard's 403 when requireAdminAction rejects (non-admin / bad origin)", async () => {
+    vi.mocked(requireAdminAction).mockRejectedValueOnce(new Response("Forbidden", { status: 403 }))
     const result = await callAction(action, {
       params: { id: "req-1" },
       formData: { intent: "approve" },
@@ -75,19 +80,9 @@ describe("/admin/access-requests/:id action — origin gate", () => {
     expect(expectResponse(result).status).toBe(403)
   })
 
-  it("returns the not_authenticated error when the session has no sub", async () => {
-    mockGetAuth.mockResolvedValueOnce({ user: "alice", sub: undefined } as never)
-    const result = await callAction(action, {
-      params: { id: "req-1" },
-      formData: { intent: "approve" },
-    })
-    const data = expectData<{ error?: string }>(result)
-    expect(data.error).toBe("not_authenticated")
-  })
-
   it("returns principal_not_found when the auth sub doesn't match any principal", async () => {
-    mockGetAuth.mockResolvedValueOnce({ user: "ghost", sub: "ghost-sub" } as never)
-    // No principals seeded → findByExternalId returns null.
+    // Guard resolves with sub "admin"; no principals seeded → findByExternalId
+    // returns null.
     const result = await callAction(action, {
       params: { id: "req-1" },
       formData: { intent: "approve" },
@@ -97,9 +92,15 @@ describe("/admin/access-requests/:id action — origin gate", () => {
   })
 
   it("returns the unknown-intent error for an unrecognized intent", async () => {
-    // Seed an admin principal so the auth lookup succeeds.
+    // Seed an admin principal (external_id 'admin-sub') and align the guard's
+    // resolved sub so the principal lookup succeeds.
     await seedTestDb(seedRequest)
-    mockGetAuth.mockResolvedValueOnce({ user: "admin", sub: "admin-sub" } as never)
+    vi.mocked(requireAdminAction).mockResolvedValueOnce({
+      sub: "admin-sub",
+      user: "admin",
+      email: "ad@x",
+      groups: ["lldap_admin"],
+    } as never)
     const result = await callAction(action, {
       params: { id: "req-1" },
       formData: { intent: "doesNotExist" },

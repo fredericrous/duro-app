@@ -7,6 +7,16 @@ vi.mock("~/lib/config.server", () => ({
   isOriginAllowed: vi.fn().mockReturnValue(true),
 }))
 vi.mock("~/lib/auth.server", () => ({ requireAuth: vi.fn() }))
+// The loader self-gates via requireAdmin; the action keeps its own inline
+// requireAuth + admin-group + origin gate (mocked above).
+vi.mock("~/lib/admin-guard.server", () => ({
+  requireAdmin: vi
+    .fn()
+    .mockResolvedValue({ sub: "admin", user: "admin", email: "admin@test", groups: ["lldap_admin"] }),
+  requireAdminAction: vi
+    .fn()
+    .mockResolvedValue({ sub: "admin", user: "admin", email: "admin@test", groups: ["lldap_admin"] }),
+}))
 vi.mock("~/lib/workflows/recovery.server", () => ({
   approveRecovery: vi.fn(() => Effect.succeed({ email: "bob@example.com", revokedCount: 2 })),
   denyRecovery: vi.fn(() => Effect.succeed(undefined)),
@@ -17,6 +27,7 @@ import AdminRecoveryPage, { loader, action } from "./admin.recovery"
 import { runEffect } from "~/lib/runtime.server"
 import { isOriginAllowed } from "~/lib/config.server"
 import { requireAuth } from "~/lib/auth.server"
+import { requireAdmin } from "~/lib/admin-guard.server"
 import { approveRecovery, denyRecovery } from "~/lib/workflows/recovery.server"
 import { callLoader, callAction, expectData, expectResponse } from "~/test/route-utils"
 import { renderRoute } from "~/test/render-route"
@@ -44,6 +55,13 @@ describe("admin.recovery loader", () => {
     mockRunEffect.mockResolvedValue([{ id: "r1" }] as never)
     const data = expectData<{ pending: unknown[] }>(await callLoader(loader))
     expect(data.pending).toEqual([{ id: "r1" }])
+  })
+
+  it("denies a non-admin caller (403) when the guard rejects", async () => {
+    vi.mocked(requireAdmin).mockRejectedValueOnce(new Response("Forbidden", { status: 403 }))
+    const result = await callLoader(loader)
+    expect(result.kind).toBe("response")
+    if (result.kind === "response") expect(result.response.status).toBe(403)
   })
 })
 

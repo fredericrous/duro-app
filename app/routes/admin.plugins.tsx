@@ -1,6 +1,7 @@
 import { Effect } from "effect"
 import { useNavigate } from "react-router"
 import { runEffect } from "~/lib/runtime.server"
+import { requireAdmin } from "~/lib/admin-guard.server"
 import { PluginRegistry } from "~/lib/plugins/PluginRegistry.server"
 import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
 import type { PluginManifest } from "~/lib/plugins/contracts"
@@ -12,7 +13,8 @@ interface PluginRow {
   installCount: number
 }
 
-export async function loader() {
+export async function loader({ request }: { request: Request }) {
+  await requireAdmin(request)
   const data = await runEffect(
     Effect.gen(function* () {
       const registry = yield* PluginRegistry

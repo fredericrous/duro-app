@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/admin.identities"
 import { Effect } from "effect"
 import { runEffect } from "~/lib/runtime.server"
-import { config, isOriginAllowed } from "~/lib/config.server"
+import { config } from "~/lib/config.server"
+import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { CertificateRepo, type UserCertificate } from "~/lib/services/CertificateRepo.server"
@@ -58,7 +59,8 @@ import { ActionCell } from "~/components/admin/ActionCell"
 import { CertPanelContent } from "~/components/admin/CertPanelContent"
 import { RevokedUserRow } from "~/components/admin/RevokedUserRow"
 
-export async function loader() {
+export async function loader({ request }: Route.LoaderArgs) {
+  await requireAdmin(request)
   const [users, principals, revocations, certsByUser] = await Promise.all([
     runEffect(
       Effect.gen(function* () {
@@ -94,9 +96,7 @@ export async function loader() {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  if (!isOriginAllowed(request.headers.get("Origin"))) {
-    throw new Response("Invalid origin", { status: 403 })
-  }
+  await requireAdminAction(request)
 
   const formData = await request.formData()
   const parsed = parseAdminUsersMutation(formData as any)

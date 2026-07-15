@@ -10,10 +10,19 @@ vi.mock("~/lib/mutations/admin-invites", () => ({
   parseAdminInvitesMutation: vi.fn(),
   handleAdminInvitesMutation: vi.fn(),
 }))
+vi.mock("~/lib/admin-guard.server", () => ({
+  requireAdmin: vi
+    .fn()
+    .mockResolvedValue({ sub: "admin", user: "admin", email: "admin@test", groups: ["lldap_admin"] }),
+  requireAdminAction: vi
+    .fn()
+    .mockResolvedValue({ sub: "admin", user: "admin", email: "admin@test", groups: ["lldap_admin"] }),
+}))
 
 import { runEffect } from "~/lib/runtime.server"
 import { isOriginAllowed } from "~/lib/config.server"
 import { parseAdminInvitesMutation, handleAdminInvitesMutation } from "~/lib/mutations/admin-invites"
+import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { action, loader } from "./admin.invites"
 import { callAction, callLoader, expectData, expectResponse } from "~/test/route-utils"
 
@@ -58,11 +67,18 @@ describe("/admin/invites loader", () => {
     expect(data.failedInvites).toHaveLength(1)
     expect(data.checklist.showInviteTeammate).toBe(true)
   })
+
+  it("denies a non-admin caller (403) when the guard rejects", async () => {
+    vi.mocked(requireAdmin).mockRejectedValueOnce(new Response("Forbidden", { status: 403 }))
+    const result = await callLoader(loader)
+    expect(result.kind).toBe("response")
+    if (result.kind === "response") expect(result.response.status).toBe(403)
+  })
 })
 
 describe("/admin/invites action", () => {
-  it("throws 403 when origin is invalid", async () => {
-    mockOrigin.mockReturnValue(false)
+  it("surfaces the guard's 403 when requireAdminAction rejects (non-admin / bad origin)", async () => {
+    vi.mocked(requireAdminAction).mockRejectedValueOnce(new Response("Forbidden", { status: 403 }))
     const result = await callAction(action, { formData: { intent: "create" } })
     expect(expectResponse(result).status).toBe(403)
   })

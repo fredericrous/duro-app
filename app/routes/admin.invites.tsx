@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/admin.invites"
 import { Effect } from "effect"
 import { runEffect } from "~/lib/runtime.server"
-import { config, isOriginAllowed } from "~/lib/config.server"
+import { config } from "~/lib/config.server"
+import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
@@ -30,7 +31,8 @@ import {
 import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 
-export async function loader() {
+export async function loader({ request }: Route.LoaderArgs) {
+  await requireAdmin(request)
   const [groups, pendingInvites, failedInvites, checklist] = await Promise.all([
     runEffect(
       Effect.gen(function* () {
@@ -81,10 +83,7 @@ export async function loader() {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const origin = request.headers.get("Origin")
-  if (!isOriginAllowed(origin)) {
-    throw new Response("Invalid origin", { status: 403 })
-  }
+  await requireAdminAction(request)
 
   const formData = await request.formData()
   const parsed = parseAdminInvitesMutation(formData as any)
