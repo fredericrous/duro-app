@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, useFetcher, useSearchParams } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { TFunction } from "i18next"
@@ -23,7 +23,6 @@ import { useReactTable, getCoreRowModel, createColumnHelper } from "@tanstack/re
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import {
-  Alert,
   Badge,
   Button,
   Callout,
@@ -40,8 +39,10 @@ import {
   Tabs,
   Table,
   Text,
+  useToast,
 } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { AnimatedNumber } from "~/components/motion/AnimatedNumber"
 import { AppOverview } from "~/components/AppOverview/AppOverview"
 import { QuickGrantDialog } from "~/components/QuickGrantDialog/QuickGrantDialog"
 
@@ -159,7 +160,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         return yield* repo.createRole(appId, slug, displayName, description)
       }),
     )
-    return { success: true }
+    return { success: true, message: "role_created" as const }
   }
 
   if (intent === "createEntitlement") {
@@ -178,7 +179,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         return yield* repo.createEntitlement(appId, slug, displayName, description)
       }),
     )
-    return { success: true }
+    return { success: true, message: "entitlement_created" as const }
   }
 
   if (intent === "updateSettings") {
@@ -223,7 +224,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         })
       }),
     )
-    return { success: true }
+    return { success: true, message: "resource_created" as const }
   }
 
   if (intent === "syncNow") {
@@ -399,6 +400,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
   const initialTab = searchParams.get("tab") ?? "overview"
   const [activeTab, setActiveTab] = useState(initialTab)
   const settingsFetcher = useFetcher<typeof action>()
+  const { toast } = useToast()
   const [roleDialogOpen, setRoleDialogOpen] = useState(false)
   const [entitlementDialogOpen, setEntitlementDialogOpen] = useState(false)
   const [resourceDialogOpen, setResourceDialogOpen] = useState(false)
@@ -415,6 +417,26 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Surface action results (create role/entitlement/resource, settings save) as
+  // transient toasts instead of layout-shifting inline alerts. The identity
+  // guard fires each result exactly once (incl. React StrictMode remounts).
+  const lastCreateResult = useRef<unknown>(null)
+  useEffect(() => {
+    const d = fetcher.data as { success?: boolean; message?: string; error?: string } | undefined
+    if (fetcher.state !== "idle" || !d || lastCreateResult.current === d) return
+    lastCreateResult.current = d
+    if (d.success && d.message) toast({ variant: "success", message: t(`admin.applications.action.${d.message}`) })
+    else if (d.error) toast({ variant: "error", message: t(`admin.applications.action.${d.error}`) })
+  }, [fetcher.state, fetcher.data, toast, t])
+
+  const lastSettingsResult = useRef<unknown>(null)
+  useEffect(() => {
+    const d = settingsFetcher.data
+    if (settingsFetcher.state !== "idle" || !d || lastSettingsResult.current === d) return
+    lastSettingsResult.current = d
+    if ("message" in d && d.message) toast({ variant: "success", message: t(`admin.applications.action.${d.message}`) })
+  }, [settingsFetcher.state, settingsFetcher.data, toast, t])
 
   const isSubmitting = fetcher.state !== "idle"
 
@@ -488,14 +510,20 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
       <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
         <Tabs.List>
           <Tabs.Tab value="overview">{t("admin.applications.tabs.overview")}</Tabs.Tab>
-          <Tabs.Tab value="roles">{t("admin.applications.tabs.roles", { count: roles.length })}</Tabs.Tab>
-          <Tabs.Tab value="entitlements">
-            {t("admin.applications.tabs.entitlements", { count: entitlements.length })}
+          <Tabs.Tab value="roles">
+            {t("admin.applications.tabs.roles")} (<AnimatedNumber value={roles.length} />)
           </Tabs.Tab>
-          <Tabs.Tab value="resources">{t("admin.applications.tabs.resources", { count: resources.length })}</Tabs.Tab>
-          <Tabs.Tab value="grants">{t("admin.applications.tabs.grants", { count: grants.length })}</Tabs.Tab>
+          <Tabs.Tab value="entitlements">
+            {t("admin.applications.tabs.entitlements")} (<AnimatedNumber value={entitlements.length} />)
+          </Tabs.Tab>
+          <Tabs.Tab value="resources">
+            {t("admin.applications.tabs.resources")} (<AnimatedNumber value={resources.length} />)
+          </Tabs.Tab>
+          <Tabs.Tab value="grants">
+            {t("admin.applications.tabs.grants")} (<AnimatedNumber value={grants.length} />)
+          </Tabs.Tab>
           <Tabs.Tab value="requests">
-            {t("admin.applications.tabs.requests", { count: pendingRequests.length })}
+            {t("admin.applications.tabs.requests")} (<AnimatedNumber value={pendingRequests.length} />)
           </Tabs.Tab>
           <Tabs.Tab value="settings">{t("admin.applications.tabs.settings")}</Tabs.Tab>
         </Tabs.List>
@@ -513,6 +541,15 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                   </Inline>
                 </Callout>
               )}
+              {pendingRequests.length === 0 &&
+                (application.accessMode === "request" || application.accessMode === "invite_only") && (
+                  <Callout variant="success">
+                    <Inline gap="sm" align="center">
+                      <Icon name="check-circle" size={18} />
+                      <Text>{t("admin.applications.caughtUp")}</Text>
+                    </Inline>
+                  </Callout>
+                )}
               <AppOverview
                 application={application}
                 roles={roles as Role[]}
@@ -677,9 +714,6 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
 
           {activeTab === "settings" && (
             <CardSection title={t("admin.applications.sections.settings")}>
-              {settingsFetcher.data && "message" in settingsFetcher.data && settingsFetcher.data.message && (
-                <Alert variant="success">{t(`admin.applications.action.${settingsFetcher.data.message}`)}</Alert>
-              )}
               <settingsFetcher.Form method="post">
                 <input type="hidden" name="intent" value="updateSettings" />
                 <Stack gap="md">

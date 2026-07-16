@@ -266,6 +266,7 @@ describe("/admin/applications/:id action — createResource (real DB)", () => {
 // =============================================================================
 
 import { screen, waitFor } from "@testing-library/react"
+import { t } from "~/test/test-utils"
 import AdminApplicationDetailPage from "./admin.applications.$id"
 import { renderRoute } from "~/test/render-route"
 
@@ -360,10 +361,31 @@ describe("AdminApplicationDetailPage component", () => {
     await waitFor(() => {
       expect(screen.getByRole("tablist")).toBeInTheDocument()
     })
-    // The tab labels include their respective collection sizes.
-    expect(screen.getByText("Roles (2)")).toBeInTheDocument()
-    expect(screen.getByText("Entitlements (1)")).toBeInTheDocument()
-    expect(screen.getByText("Grants (0)")).toBeInTheDocument()
+    // The tab labels include their respective collection sizes. The count is a
+    // separate <AnimatedNumber> node, so assert via the tab's accessible name
+    // (which flattens the label + count text nodes together).
+    expect(screen.getByRole("tab", { name: "Roles (2)" })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: "Entitlements (1)" })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: "Grants (0)" })).toBeInTheDocument()
+  })
+
+  it("shows an all-caught-up note when a request-based app has no pending requests", async () => {
+    // base data is accessMode "request" with pendingRequests: []
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByRole("tablist")).toBeInTheDocument()
+    })
+    expect(screen.getByText(t("admin.applications.caughtUp"))).toBeInTheDocument()
+  })
+
+  it("hides the all-caught-up note while requests are pending", async () => {
+    renderPage({
+      pendingRequests: [{ id: "r1", requesterId: "u1", createdAt: new Date().toISOString() }] as unknown[],
+    })
+    await waitFor(() => {
+      expect(screen.getByRole("tablist")).toBeInTheDocument()
+    })
+    expect(screen.queryByText(t("admin.applications.caughtUp"))).not.toBeInTheDocument()
   })
 
   it("opens the roles tab when ?tab=roles is in the URL", async () => {

@@ -6,6 +6,7 @@ import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { hasStarterTemplate } from "~/lib/governance/defaultRbac"
 import type { Application, Entitlement, Grant, Role } from "~/lib/governance/types"
 import { StatGrid, type Stat } from "./StatGrid"
+import { SetupCompleteness, type SetupCriterion } from "./SetupCompleteness"
 
 interface AppOverviewProps {
   application: Application
@@ -58,6 +59,18 @@ export function AppOverview({
     entitlements.map((e) => e.slug),
   )
 
+  const setupCriteria: SetupCriterion[] = [
+    { id: "owner", done: !!application.ownerId, onFix: () => onSwitchTab("settings") },
+    {
+      id: "description",
+      done: !!(application.description && application.description.trim()),
+      onFix: () => onSwitchTab("settings"),
+    },
+    { id: "roles", done: roles.length > 0, onFix: () => onSwitchTab("roles") },
+    { id: "entitlements", done: entitlements.length > 0, onFix: () => onSwitchTab("entitlements") },
+    { id: "grants", done: grants.length > 0, onFix: onOpenQuickGrant },
+  ]
+
   return (
     <Stack gap="md">
       <html.div style={styles.headerRow}>
@@ -86,6 +99,8 @@ export function AppOverview({
       </html.div>
 
       <StatGrid stats={stats} />
+
+      <SetupCompleteness criteria={setupCriteria} />
 
       {showStarterCallout && !pluginInfo && (
         <Callout variant="info">

@@ -675,6 +675,7 @@
       "unlimited": "Unlimited",
       "entitlementLabel": "(entitlement)",
       "review": "Review",
+      "caughtUp": "You're all caught up — no requests awaiting review.",
       "pendingReview_one": "1 access request is awaiting your review.",
       "pendingReview_other": "{{count}} access requests are awaiting your review.",
       "addRole": "Add Role",
@@ -687,11 +688,11 @@
       "grantFirstAccess": "Grant your first access",
       "tabs": {
         "overview": "Overview",
-        "roles": "Roles ({{count}})",
-        "entitlements": "Entitlements ({{count}})",
-        "resources": "Resources ({{count}})",
-        "grants": "Grants ({{count}})",
-        "requests": "Requests ({{count}})",
+        "roles": "Roles",
+        "entitlements": "Entitlements",
+        "resources": "Resources",
+        "grants": "Grants",
+        "requests": "Requests",
         "settings": "Settings"
       },
       "sections": {
@@ -738,10 +739,32 @@
         "resource_type_and_name_required": "Resource type and display name are required",
         "principal_and_role_required": "Principal and role are required",
         "settings_updated": "Settings updated",
+        "role_created": "Role created",
+        "entitlement_created": "Entitlement created",
+        "resource_created": "Resource created",
         "grant_created": "Grant created",
         "grant_failed": "Failed to create grant",
         "sync_failed": "Sync failed",
         "synced": "Synced {{total}} apps: {{created}} created, {{updated}} updated, {{disabled}} disabled"
+      },
+      "setup": {
+        "title": "Setup completeness",
+        "progress": "of {{total}} configured",
+        "complete": "This application is fully configured.",
+        "criteria": {
+          "owner": "Owner assigned",
+          "description": "Description added",
+          "roles": "At least one role",
+          "entitlements": "At least one entitlement",
+          "grants": "At least one grant"
+        },
+        "fix": {
+          "owner": "Assign",
+          "description": "Add",
+          "roles": "Create role",
+          "entitlements": "Add entitlement",
+          "grants": "Grant access"
+        }
       }
     },
     "grants": {

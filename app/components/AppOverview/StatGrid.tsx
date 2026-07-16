@@ -1,4 +1,5 @@
 import { Card, Grid, Heading, Stack, Text } from "@duro-app/ui"
+import { AnimatedNumber } from "~/components/motion/AnimatedNumber"
 
 export interface Stat {
   label: string
@@ -19,7 +20,7 @@ export function StatGrid({ stats }: StatGridProps) {
             <Text color="muted" variant="caption">
               {s.label}
             </Text>
-            <Heading level={2}>{s.value}</Heading>
+            <Heading level={2}>{typeof s.value === "number" ? <AnimatedNumber value={s.value} /> : s.value}</Heading>
             {s.hint && (
               <Text color="muted" variant="caption">
                 {s.hint}
