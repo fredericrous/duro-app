@@ -138,12 +138,14 @@ jobs:
             namespace: ${MC_NS}
           spec:
             appName: duro
-            ttlSeconds: 1800
+            # Must exceed the Ready wait (~25m) plus build + migrate + serve, or
+            # the operator GCs the clone mid-test.
+            ttlSeconds: 2700
           YAML
 
       - name: Wait for clone to be Ready
         run: |
-          for i in $(seq 1 180); do   # up to ~15m — Ceph snapshot + CNPG bootstrap is ~7m but spikes past 10m
+          for i in $(seq 1 300); do   # up to ~25m — warm clone bring-up measured ~11.5m (IO-bound postgres startup off an encrypted 30Gi snapshot); cold snapshots spike higher
             phase=$(kubectl -n "$MC_NS" get migrationcheck "$MC_NAME" -o jsonpath='{.status.phase}' 2>/dev/null || true)
             echo "phase=$phase ($i)"
             case "$phase" in
