@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import { css, html } from "react-strict-dom"
 import { Button, Heading, Inline, Panel, Stack, StatusIcon, Text } from "@duro-app/ui"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { duration, easing } from "@duro-app/tokens/tokens/motion.css"
 import { useReducedMotion } from "~/lib/useReducedMotion"
 import { AnimatedNumber } from "~/components/motion/AnimatedNumber"
 
@@ -110,10 +111,10 @@ const styles = css.create({
     backgroundColor: "var(--color-border)",
     transitionProperty: "background-color",
     transitionDuration: {
-      default: "320ms",
-      "@media (prefers-reduced-motion: reduce)": "0ms",
+      default: duration.slow,
+      "@media (prefers-reduced-motion: reduce)": duration.instant,
     },
-    transitionTimingFunction: "ease",
+    transitionTimingFunction: easing.standard,
   },
   segmentFilled: {
     backgroundColor: "var(--color-accent)",
@@ -124,10 +125,10 @@ const styles = css.create({
     opacity: 1,
     transitionProperty: "transform, opacity",
     transitionDuration: {
-      default: "280ms",
-      "@media (prefers-reduced-motion: reduce)": "0ms",
+      default: duration.slow,
+      "@media (prefers-reduced-motion: reduce)": duration.instant,
     },
-    transitionTimingFunction: "ease-out",
+    transitionTimingFunction: easing.easeOut,
   },
   // Starting frame of the one-shot completion pop; cleared on the next frame so
   // the banner transitions up to its resting scale/opacity.
