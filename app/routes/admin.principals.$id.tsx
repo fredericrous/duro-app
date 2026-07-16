@@ -7,6 +7,8 @@ import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { RbacRepo } from "~/lib/governance/RbacRepo.server"
 import type { Principal, Grant, Role, Entitlement } from "~/lib/governance/types"
 import { useMemo } from "react"
+import { useTranslation } from "react-i18next"
+import type { TFunction } from "i18next"
 import { useReactTable, getCoreRowModel, createColumnHelper } from "@tanstack/react-table"
 import { html } from "react-strict-dom"
 import { Badge, EmptyState, Heading, Stack, Text, Table } from "@duro-app/ui"
@@ -68,64 +70,70 @@ interface GrantNameResolvers {
   entitlement: (id: string | null) => string
   principal: (id: string) => string
 }
-const buildGrantColumns = (r: GrantNameResolvers) => [
+const buildGrantColumns = (r: GrantNameResolvers, t: TFunction) => [
   grantColumnHelper.accessor("id", {
-    header: "Grant ID",
+    header: t("admin.cols.grantId"),
     cell: ({ getValue }) => getValue().slice(0, 8) + "...",
   }),
   grantColumnHelper.accessor("roleId", {
-    header: "Role",
+    header: t("admin.cols.role"),
     cell: ({ getValue }) => r.role(getValue()),
   }),
   grantColumnHelper.accessor("entitlementId", {
-    header: "Entitlement",
+    header: t("admin.cols.entitlement"),
     cell: ({ getValue }) => r.entitlement(getValue()),
   }),
   grantColumnHelper.accessor("resourceId", {
-    header: "Resource",
-    cell: ({ getValue }) => getValue() ?? "All",
+    header: t("admin.cols.resource"),
+    cell: ({ getValue }) => getValue() ?? t("admin.cols.all"),
   }),
   grantColumnHelper.accessor("grantedBy", {
-    header: "Granted By",
+    header: t("admin.cols.grantedBy"),
     cell: ({ getValue }) => r.principal(getValue()),
   }),
   grantColumnHelper.accessor("expiresAt", {
-    header: "Expires",
+    header: t("admin.cols.expires"),
     cell: ({ getValue }) => {
       const v = getValue()
-      return v ? new Date(v).toLocaleDateString() : "Never"
+      return v ? new Date(v).toLocaleDateString() : t("admin.cols.never")
     },
   }),
 ]
 
 const groupColumnHelper = createColumnHelper<Principal>()
-const groupColumns = [
-  groupColumnHelper.accessor("displayName", { header: "Group Name" }),
+const buildGroupColumns = (t: TFunction) => [
+  groupColumnHelper.accessor("displayName", { header: t("admin.cols.groupName") }),
   groupColumnHelper.accessor("externalId", {
-    header: "External ID",
+    header: t("admin.cols.externalId"),
     cell: ({ getValue }) => getValue() ?? "\u2014",
   }),
 ]
 
 export default function AdminPrincipalDetailPage({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation()
   const { principal, grants, groups, roles = [], entitlements = [], principals = [] } = loaderData
 
   const grantColumns = useMemo(() => {
     const roleName = new Map((roles as Role[]).map((x) => [x.id, x.displayName]))
     const entName = new Map((entitlements as Entitlement[]).map((x) => [x.id, x.displayName]))
     const principalName = new Map((principals as Principal[]).map((p) => [p.id, p.displayName]))
-    return buildGrantColumns({
-      role: (id) => (id ? (roleName.get(id) ?? id) : "—"),
-      entitlement: (id) => (id ? (entName.get(id) ?? id) : "—"),
-      principal: (id) => principalName.get(id) ?? id,
-    })
-  }, [roles, entitlements, principals])
+    return buildGrantColumns(
+      {
+        role: (id) => (id ? (roleName.get(id) ?? id) : "—"),
+        entitlement: (id) => (id ? (entName.get(id) ?? id) : "—"),
+        principal: (id) => principalName.get(id) ?? id,
+      },
+      t,
+    )
+  }, [roles, entitlements, principals, t])
 
   const grantsTable = useReactTable({
     data: grants,
     columns: grantColumns,
     getCoreRowModel: getCoreRowModel(),
   })
+
+  const groupColumns = useMemo(() => buildGroupColumns(t), [t])
 
   const groupsTable = useReactTable({
     data: groups,
@@ -138,21 +146,27 @@ export default function AdminPrincipalDetailPage({ loaderData }: Route.Component
       <html.div>
         <Heading level={2}>{principal.displayName}</Heading>
         <Text color="muted">
-          <Badge variant={principal.principalType === "user" ? "default" : "info"}>{principal.principalType}</Badge>{" "}
-          &middot; {principal.email ?? "No email"} &middot;{" "}
+          <Badge variant={principal.principalType === "user" ? "default" : "info"}>
+            {t(`common.enums.principalType.${principal.principalType}`)}
+          </Badge>{" "}
+          &middot; {principal.email ?? t("admin.principals.noEmail")} &middot;{" "}
           <Badge variant={principal.enabled ? "success" : "default"}>
-            {principal.enabled ? "Enabled" : "Disabled"}
+            {principal.enabled ? t("admin.cols.enabled") : t("admin.cols.disabled")}
           </Badge>
         </Text>
       </html.div>
 
-      <CardSection title={`Active Grants (${grants.length})`}>
-        {grants.length === 0 ? <EmptyState message="No active grants." /> : <Table.FromTanstack table={grantsTable} />}
+      <CardSection title={t("admin.grants.title", { count: grants.length })}>
+        {grants.length === 0 ? (
+          <EmptyState message={t("admin.principals.noGrants")} />
+        ) : (
+          <Table.FromTanstack table={grantsTable} />
+        )}
       </CardSection>
 
-      <CardSection title={`Groups (${groups.length})`}>
+      <CardSection title={t("admin.principals.groupsTitle", { count: groups.length })}>
         {groups.length === 0 ? (
-          <EmptyState message="Not a member of any groups." />
+          <EmptyState message={t("admin.principals.noGroups")} />
         ) : (
           <Table.FromTanstack table={groupsTable} />
         )}

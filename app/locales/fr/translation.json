@@ -597,7 +597,17 @@
       "targetType": "Type de cible",
       "target": "Cible",
       "ipAddress": "Adresse IP",
-      "timestamp": "Horodatage"
+      "timestamp": "Horodatage",
+      "grantId": "ID de l'octroi",
+      "groupName": "Nom du groupe",
+      "externalId": "ID externe",
+      "disabled": "Désactivé",
+      "description": "Description",
+      "path": "Chemin",
+      "maxDuration": "Durée max",
+      "reason": "Raison",
+      "grantedAt": "Octroyé le",
+      "action": "Action"
     },
     "empty": {
       "principals": "Aucun principal pour l'instant. Synchronisez votre fournisseur d'identite ou invitez des utilisateurs pour commencer.",
@@ -653,11 +663,86 @@
     "principals": {
       "filterByName": "Filtrer par nom...",
       "filterByType": "Filtrer par type...",
-      "noResults": "Aucun resultat"
+      "noResults": "Aucun resultat",
+      "noEmail": "Aucun e-mail",
+      "groupsTitle": "Groupes ({{count}})",
+      "noGrants": "Aucun grant actif.",
+      "noGroups": "Membre d'aucun groupe."
     },
     "applications": {
       "syncFromCluster": "Synchroniser depuis le cluster",
-      "syncing": "Synchronisation..."
+      "syncing": "Synchronisation...",
+      "unlimited": "Illimitée",
+      "entitlementLabel": "(droit)",
+      "review": "Examiner",
+      "pendingReview_one": "1 demande d'accès attend votre examen.",
+      "pendingReview_other": "{{count}} demandes d'accès attendent votre examen.",
+      "addRole": "Ajouter un rôle",
+      "addEntitlement": "Ajouter un droit",
+      "addResource": "Ajouter une ressource",
+      "grantAccess": "Accorder l'accès",
+      "createFirstRole": "Créez votre premier rôle",
+      "createFirstEntitlement": "Créez votre premier droit",
+      "createFirstResource": "Créez votre première ressource",
+      "grantFirstAccess": "Accordez votre premier accès",
+      "tabs": {
+        "overview": "Vue d'ensemble",
+        "roles": "Rôles ({{count}})",
+        "entitlements": "Droits ({{count}})",
+        "resources": "Ressources ({{count}})",
+        "grants": "Octrois ({{count}})",
+        "requests": "Demandes ({{count}})",
+        "settings": "Paramètres"
+      },
+      "sections": {
+        "roles": "Rôles",
+        "entitlements": "Droits",
+        "resources": "Ressources",
+        "grants": "Octrois actifs",
+        "requests": "Demandes en attente",
+        "settings": "Paramètres de l'application"
+      },
+      "empty": {
+        "roles": "Aucun rôle pour l'instant. Les rôles regroupent des droits et sont ce que vous accordez aux personnes.",
+        "entitlements": "Aucun droit pour l'instant. Les droits sont les permissions individuelles que les rôles regroupent.",
+        "resources": "Aucune ressource pour l'instant. Les ressources limitent les octrois à des objets précis (dossiers, projets, etc.).",
+        "grants": "Aucun octroi actif pour cette application pour l'instant.",
+        "requests": "Aucune demande en attente pour cette application."
+      },
+      "settings": {
+        "syncedReadOnly": "Synchronisé depuis Kubernetes — lecture seule",
+        "accessModePlaceholder": "Sélectionner un mode d'accès",
+        "enabledLabel": "L'application est activée",
+        "ownerPlaceholder": "Sélectionner un principal",
+        "save": "Enregistrer les paramètres",
+        "saving": "Enregistrement..."
+      },
+      "dialog": {
+        "createRole": "Créer un rôle",
+        "createEntitlement": "Créer un droit",
+        "createResource": "Créer une ressource",
+        "creating": "Création...",
+        "descriptionPlaceholder": "Description facultative",
+        "roleSlugPlaceholder": "admin",
+        "roleNamePlaceholder": "Administrateur",
+        "entitlementSlugPlaceholder": "read",
+        "entitlementNamePlaceholder": "Accès en lecture",
+        "resourceType": "Type de ressource",
+        "resourceTypePlaceholder": "folder",
+        "resourceNamePlaceholder": "Documents",
+        "externalIdPlaceholder": "Identifiant externe facultatif",
+        "pathPlaceholder": "/documents"
+      },
+      "action": {
+        "slug_and_name_required": "L'identifiant et le nom d'affichage sont requis",
+        "resource_type_and_name_required": "Le type de ressource et le nom d'affichage sont requis",
+        "principal_and_role_required": "Le principal et le rôle sont requis",
+        "settings_updated": "Paramètres mis à jour",
+        "grant_created": "Octroi créé",
+        "grant_failed": "Échec de la création de l'octroi",
+        "sync_failed": "Échec de la synchronisation",
+        "synced": "{{total}} applications synchronisées : {{created}} créées, {{updated}} mises à jour, {{disabled}} désactivées"
+      }
     },
     "grants": {
       "title": "Octrois actifs ({{count}})",
