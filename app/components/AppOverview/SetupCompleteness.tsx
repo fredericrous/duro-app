@@ -4,6 +4,7 @@ import { css, html } from "react-strict-dom"
 import { Button, Heading, Inline, Panel, Stack, StatusIcon, Text } from "@duro-app/ui"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { useReducedMotion } from "~/lib/useReducedMotion"
+import { AnimatedNumber } from "~/components/motion/AnimatedNumber"
 
 export interface SetupCriterion {
   /** stable id, maps to admin.applications.setup.criteria.<id> / .fix.<id> */
@@ -50,7 +51,7 @@ export function SetupCompleteness({ criteria }: SetupCompletenessProps) {
         <Inline justify="between" align="center">
           <Heading level={4}>{t("admin.applications.setup.title")}</Heading>
           <Text color="muted" variant="caption">
-            {t("admin.applications.setup.progress", { done, total })}
+            <AnimatedNumber value={done} /> {t("admin.applications.setup.progress", { total })}
           </Text>
         </Inline>
       </Panel.Header>

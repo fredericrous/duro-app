@@ -12,9 +12,9 @@ function makeCriteria(done: Partial<Record<(typeof IDS)[number], boolean>> = {})
 describe("SetupCompleteness", () => {
   it("reports how many criteria are configured", () => {
     render(<SetupCompleteness criteria={makeCriteria({ owner: true, roles: true })} />)
-    expect(
-      screen.getByText(t("admin.applications.setup.progress", undefined, { done: 2, total: 5 })),
-    ).toBeInTheDocument()
+    // The count is a separate <AnimatedNumber> node, but it and the static suffix
+    // are text children of the same caption element, so its text reads together.
+    expect(screen.getByText("2 of 5 configured")).toBeInTheDocument()
   })
 
   it("offers a fix action only for unmet criteria", () => {

@@ -749,7 +749,7 @@
       },
       "setup": {
         "title": "Progression de la configuration",
-        "progress": "{{done}} sur {{total}} configurés",
+        "progress": "sur {{total}} configurés",
         "complete": "Cette application est entièrement configurée.",
         "criteria": {
           "owner": "Propriétaire attribué",

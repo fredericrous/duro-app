@@ -749,7 +749,7 @@
       },
       "setup": {
         "title": "Setup completeness",
-        "progress": "{{done}} of {{total}} configured",
+        "progress": "of {{total}} configured",
         "complete": "This application is fully configured.",
         "criteria": {
           "owner": "Owner assigned",
