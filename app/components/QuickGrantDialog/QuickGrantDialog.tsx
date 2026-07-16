@@ -1,4 +1,5 @@
 import { useFetcher } from "react-router"
+import { useTranslation } from "react-i18next"
 import { useEffect, useMemo } from "react"
 import { Button, Combobox, Dialog, EmptyState, Field, Input, Select, Stack, Text } from "@duro-app/ui"
 import type { Principal, Role } from "~/lib/governance/types"
@@ -20,6 +21,7 @@ export function QuickGrantDialog({
   ldapProvisioned,
   onGoToRoles,
 }: QuickGrantDialogProps) {
+  const { t } = useTranslation()
   const fetcher = useFetcher()
   const isSubmitting = fetcher.state !== "idle"
 
@@ -138,7 +140,12 @@ export function QuickGrantDialog({
                   </Field.Description>
                 </Field.Root>
 
-                {fetcher.data && "error" in fetcher.data && <Text color="error">{String(fetcher.data.error)}</Text>}
+                {fetcher.data && "error" in fetcher.data && (
+                  <Text color="error">
+                    {t(`admin.applications.action.${fetcher.data.error}`)}
+                    {"detail" in fetcher.data && fetcher.data.detail ? `: ${fetcher.data.detail}` : ""}
+                  </Text>
+                )}
 
                 <Button type="submit" variant="primary" disabled={isSubmitting}>
                   {isSubmitting ? "Granting…" : "Grant access"}

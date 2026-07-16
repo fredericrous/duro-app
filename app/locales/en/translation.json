@@ -597,7 +597,17 @@
       "targetType": "Target Type",
       "target": "Target",
       "ipAddress": "IP Address",
-      "timestamp": "Timestamp"
+      "timestamp": "Timestamp",
+      "grantId": "Grant ID",
+      "groupName": "Group Name",
+      "externalId": "External ID",
+      "disabled": "Disabled",
+      "description": "Description",
+      "path": "Path",
+      "maxDuration": "Max Duration",
+      "reason": "Reason",
+      "grantedAt": "Granted at",
+      "action": "Action"
     },
     "empty": {
       "principals": "No principals yet. Sync your identity provider or invite users to get started.",
@@ -653,11 +663,86 @@
     "principals": {
       "filterByName": "Filter by name...",
       "filterByType": "Filter by type...",
-      "noResults": "No results"
+      "noResults": "No results",
+      "noEmail": "No email",
+      "groupsTitle": "Groups ({{count}})",
+      "noGrants": "No active grants.",
+      "noGroups": "Not a member of any groups."
     },
     "applications": {
       "syncFromCluster": "Sync from cluster",
-      "syncing": "Syncing..."
+      "syncing": "Syncing...",
+      "unlimited": "Unlimited",
+      "entitlementLabel": "(entitlement)",
+      "review": "Review",
+      "pendingReview_one": "1 access request is awaiting your review.",
+      "pendingReview_other": "{{count}} access requests are awaiting your review.",
+      "addRole": "Add Role",
+      "addEntitlement": "Add Entitlement",
+      "addResource": "Add Resource",
+      "grantAccess": "Grant access",
+      "createFirstRole": "Create your first role",
+      "createFirstEntitlement": "Create your first entitlement",
+      "createFirstResource": "Create your first resource",
+      "grantFirstAccess": "Grant your first access",
+      "tabs": {
+        "overview": "Overview",
+        "roles": "Roles ({{count}})",
+        "entitlements": "Entitlements ({{count}})",
+        "resources": "Resources ({{count}})",
+        "grants": "Grants ({{count}})",
+        "requests": "Requests ({{count}})",
+        "settings": "Settings"
+      },
+      "sections": {
+        "roles": "Roles",
+        "entitlements": "Entitlements",
+        "resources": "Resources",
+        "grants": "Active grants",
+        "requests": "Pending requests",
+        "settings": "Application Settings"
+      },
+      "empty": {
+        "roles": "No roles yet. Roles bundle entitlements and are what you grant to people.",
+        "entitlements": "No entitlements yet. Entitlements are the discrete permissions roles bundle together.",
+        "resources": "No resources yet. Resources scope grants to specific objects (folders, projects, etc).",
+        "grants": "No active grants for this application yet.",
+        "requests": "No pending requests for this application."
+      },
+      "settings": {
+        "syncedReadOnly": "Synced from Kubernetes — read only",
+        "accessModePlaceholder": "Select access mode",
+        "enabledLabel": "Application is enabled",
+        "ownerPlaceholder": "Select a principal",
+        "save": "Save Settings",
+        "saving": "Saving..."
+      },
+      "dialog": {
+        "createRole": "Create Role",
+        "createEntitlement": "Create Entitlement",
+        "createResource": "Create Resource",
+        "creating": "Creating...",
+        "descriptionPlaceholder": "Optional description",
+        "roleSlugPlaceholder": "admin",
+        "roleNamePlaceholder": "Administrator",
+        "entitlementSlugPlaceholder": "read",
+        "entitlementNamePlaceholder": "Read Access",
+        "resourceType": "Resource Type",
+        "resourceTypePlaceholder": "folder",
+        "resourceNamePlaceholder": "Documents",
+        "externalIdPlaceholder": "Optional external identifier",
+        "pathPlaceholder": "/documents"
+      },
+      "action": {
+        "slug_and_name_required": "Slug and display name are required",
+        "resource_type_and_name_required": "Resource type and display name are required",
+        "principal_and_role_required": "Principal and role are required",
+        "settings_updated": "Settings updated",
+        "grant_created": "Grant created",
+        "grant_failed": "Failed to create grant",
+        "sync_failed": "Sync failed",
+        "synced": "Synced {{total}} apps: {{created}} created, {{updated}} updated, {{disabled}} disabled"
+      }
     },
     "grants": {
       "title": "Active Grants ({{count}})",

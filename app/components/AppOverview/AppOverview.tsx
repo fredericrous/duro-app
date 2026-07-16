@@ -1,4 +1,5 @@
 import { useFetcher } from "react-router"
+import { useTranslation } from "react-i18next"
 import { css, html } from "react-strict-dom"
 import { Badge, Button, Callout, Heading, Inline, Panel, Stack, Text } from "@duro-app/ui"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
@@ -38,6 +39,7 @@ export function AppOverview({
   onOpenQuickGrant,
   onSwitchTab,
 }: AppOverviewProps) {
+  const { t } = useTranslation()
   const syncFetcher = useFetcher()
   const isSyncing = syncFetcher.state !== "idle"
 
@@ -136,12 +138,15 @@ export function AppOverview({
 
       {syncFetcher.data && "message" in syncFetcher.data && (
         <Callout variant="success">
-          <Text>{String(syncFetcher.data.message)}</Text>
+          <Text>{t(`admin.applications.action.${syncFetcher.data.message}`, syncFetcher.data)}</Text>
         </Callout>
       )}
       {syncFetcher.data && "error" in syncFetcher.data && (
         <Callout variant="error">
-          <Text>{String(syncFetcher.data.error)}</Text>
+          <Text>
+            {t(`admin.applications.action.${syncFetcher.data.error}`)}
+            {"detail" in syncFetcher.data && syncFetcher.data.detail ? `: ${syncFetcher.data.detail}` : ""}
+          </Text>
         </Callout>
       )}
     </Stack>

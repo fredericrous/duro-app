@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link, useFetcher, useSearchParams } from "react-router"
+import { useTranslation } from "react-i18next"
+import type { TFunction } from "i18next"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import type { Route } from "./+types/admin.applications.$id"
@@ -148,7 +150,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const description = (formData.get("description") as string) || undefined
 
     if (!slug || !displayName) {
-      return { error: "Slug and display name are required" }
+      return { error: "slug_and_name_required" as const }
     }
 
     await runEffect(
@@ -167,7 +169,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const description = (formData.get("description") as string) || undefined
 
     if (!slug || !displayName) {
-      return { error: "Slug and display name are required" }
+      return { error: "slug_and_name_required" as const }
     }
 
     await runEffect(
@@ -195,7 +197,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         yield* repo.update(appId, fields)
       }),
     )
-    return { success: true, message: "Settings updated" }
+    return { success: true, message: "settings_updated" as const }
   }
 
   if (intent === "createResource") {
@@ -206,7 +208,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const path = (formData.get("path") as string) || undefined
 
     if (!resourceType || !displayName) {
-      return { error: "Resource type and display name are required" }
+      return { error: "resource_type_and_name_required" as const }
     }
 
     await runEffect(
@@ -235,10 +237,14 @@ export async function action({ request, params }: Route.ActionArgs) {
       )
       return {
         success: true,
-        message: `Synced ${result.total} apps: ${result.created} created, ${result.updated} updated, ${result.disabled} disabled`,
+        message: "synced" as const,
+        total: result.total,
+        created: result.created,
+        updated: result.updated,
+        disabled: result.disabled,
       }
-    } catch (e: any) {
-      return { error: e?.message ?? "Sync failed" }
+    } catch (e) {
+      return { error: "sync_failed" as const, detail: e instanceof Error ? e.message : String(e) }
     }
   }
 
@@ -250,7 +256,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const expiresAt = normalizeExpiresAt((formData.get("expiresAt") as string) || undefined)
 
     if (!principalId || !roleId) {
-      return { error: "Principal and role are required" }
+      return { error: "principal_and_role_required" as const }
     }
 
     try {
@@ -285,9 +291,9 @@ export async function action({ request, params }: Route.ActionArgs) {
           yield* activateGrant(grantId)
         }),
       )
-      return { success: true, message: "Grant created" }
-    } catch (e: any) {
-      return { error: e?.message ?? "Failed to create grant" }
+      return { success: true, message: "grant_created" as const }
+    } catch (e) {
+      return { error: "grant_failed" as const, detail: e instanceof Error ? e.message : String(e) }
     }
   }
 
@@ -299,42 +305,42 @@ export async function action({ request, params }: Route.ActionArgs) {
 // ---------------------------------------------------------------------------
 
 const roleColumnHelper = createColumnHelper<Role>()
-const roleColumns = [
-  roleColumnHelper.accessor("slug", { header: "Slug" }),
-  roleColumnHelper.accessor("displayName", { header: "Name" }),
+const buildRoleColumns = (t: TFunction) => [
+  roleColumnHelper.accessor("slug", { header: t("admin.cols.slug") }),
+  roleColumnHelper.accessor("displayName", { header: t("admin.cols.name") }),
   roleColumnHelper.accessor("description", {
-    header: "Description",
+    header: t("admin.cols.description"),
     cell: ({ getValue }) => getValue() ?? "\u2014",
   }),
   roleColumnHelper.accessor("maxDurationHours", {
-    header: "Max Duration",
+    header: t("admin.cols.maxDuration"),
     cell: ({ getValue }) => {
       const v = getValue()
-      return v != null ? `${v}h` : "Unlimited"
+      return v != null ? `${v}h` : t("admin.applications.unlimited")
     },
   }),
 ]
 
 const entitlementColumnHelper = createColumnHelper<Entitlement>()
-const entitlementColumns = [
-  entitlementColumnHelper.accessor("slug", { header: "Slug" }),
-  entitlementColumnHelper.accessor("displayName", { header: "Name" }),
+const buildEntitlementColumns = (t: TFunction) => [
+  entitlementColumnHelper.accessor("slug", { header: t("admin.cols.slug") }),
+  entitlementColumnHelper.accessor("displayName", { header: t("admin.cols.name") }),
   entitlementColumnHelper.accessor("description", {
-    header: "Description",
+    header: t("admin.cols.description"),
     cell: ({ getValue }) => getValue() ?? "\u2014",
   }),
 ]
 
 const resourceColumnHelper = createColumnHelper<Resource>()
-const resourceColumns = [
-  resourceColumnHelper.accessor("displayName", { header: "Name" }),
-  resourceColumnHelper.accessor("resourceType", { header: "Type" }),
+const buildResourceColumns = (t: TFunction) => [
+  resourceColumnHelper.accessor("displayName", { header: t("admin.cols.name") }),
+  resourceColumnHelper.accessor("resourceType", { header: t("admin.cols.type") }),
   resourceColumnHelper.accessor("externalId", {
-    header: "External ID",
+    header: t("admin.cols.externalId"),
     cell: ({ getValue }) => getValue() ?? "\u2014",
   }),
   resourceColumnHelper.accessor("path", {
-    header: "Path",
+    header: t("admin.cols.path"),
     cell: ({ getValue }) => getValue() ?? "\u2014",
   }),
 ]
@@ -350,23 +356,23 @@ interface GrantRow {
 }
 
 const grantColumnHelper = createColumnHelper<GrantRow>()
-const grantColumns = [
-  grantColumnHelper.accessor("principalName", { header: "Principal" }),
-  grantColumnHelper.accessor("roleName", { header: "Role" }),
-  grantColumnHelper.accessor("grantedBy", { header: "Granted by" }),
+const buildGrantColumns = (t: TFunction) => [
+  grantColumnHelper.accessor("principalName", { header: t("admin.cols.principal") }),
+  grantColumnHelper.accessor("roleName", { header: t("admin.cols.role") }),
+  grantColumnHelper.accessor("grantedBy", { header: t("admin.cols.grantedBy") }),
   grantColumnHelper.accessor("reason", {
-    header: "Reason",
+    header: t("admin.cols.reason"),
     cell: ({ getValue }) => getValue() ?? "\u2014",
   }),
   grantColumnHelper.accessor("createdAt", {
-    header: "Granted at",
+    header: t("admin.cols.grantedAt"),
     cell: ({ getValue }) => new Date(getValue()).toLocaleString(),
   }),
   grantColumnHelper.accessor("expiresAt", {
-    header: "Expires",
+    header: t("admin.cols.expires"),
     cell: ({ getValue }) => {
       const v = getValue()
-      return v ? new Date(v).toLocaleString() : "Never"
+      return v ? new Date(v).toLocaleString() : t("admin.cols.never")
     },
   }),
 ]
@@ -376,6 +382,7 @@ const grantColumns = [
 // ---------------------------------------------------------------------------
 
 export default function AdminApplicationDetailPage({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation()
   const {
     application,
     roles,
@@ -417,12 +424,17 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
   const grantRows: GrantRow[] = (grants as Grant[]).map((g) => ({
     id: g.id,
     principalName: principalNameById.get(g.principalId) ?? g.principalId,
-    roleName: g.roleId ? (roleNameById.get(g.roleId) ?? g.roleId) : "(entitlement)",
+    roleName: g.roleId ? (roleNameById.get(g.roleId) ?? g.roleId) : t("admin.applications.entitlementLabel"),
     grantedBy: principalNameById.get(g.grantedBy) ?? g.grantedBy,
     reason: g.reason,
     expiresAt: g.expiresAt,
     createdAt: g.createdAt,
   }))
+
+  const roleColumns = useMemo(() => buildRoleColumns(t), [t])
+  const entitlementColumns = useMemo(() => buildEntitlementColumns(t), [t])
+  const resourceColumns = useMemo(() => buildResourceColumns(t), [t])
+  const grantColumns = useMemo(() => buildGrantColumns(t), [t])
 
   const rolesTable = useReactTable({
     data: roles as Role[],
@@ -463,11 +475,11 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                   : "default"
             }
           >
-            {application.accessMode}
+            {t(`common.enums.accessMode.${application.accessMode}`)}
           </Badge>{" "}
           &middot;{" "}
           <Badge variant={application.enabled ? "success" : "default"}>
-            {application.enabled ? "Enabled" : "Disabled"}
+            {application.enabled ? t("admin.cols.enabled") : t("admin.cols.disabled")}
           </Badge>
         </Text>
         {application.description && <Text>{application.description}</Text>}
@@ -475,13 +487,17 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
 
       <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
         <Tabs.List>
-          <Tabs.Tab value="overview">Overview</Tabs.Tab>
-          <Tabs.Tab value="roles">Roles ({roles.length})</Tabs.Tab>
-          <Tabs.Tab value="entitlements">Entitlements ({entitlements.length})</Tabs.Tab>
-          <Tabs.Tab value="resources">Resources ({resources.length})</Tabs.Tab>
-          <Tabs.Tab value="grants">Grants ({grants.length})</Tabs.Tab>
-          <Tabs.Tab value="requests">Requests ({pendingRequests.length})</Tabs.Tab>
-          <Tabs.Tab value="settings">Settings</Tabs.Tab>
+          <Tabs.Tab value="overview">{t("admin.applications.tabs.overview")}</Tabs.Tab>
+          <Tabs.Tab value="roles">{t("admin.applications.tabs.roles", { count: roles.length })}</Tabs.Tab>
+          <Tabs.Tab value="entitlements">
+            {t("admin.applications.tabs.entitlements", { count: entitlements.length })}
+          </Tabs.Tab>
+          <Tabs.Tab value="resources">{t("admin.applications.tabs.resources", { count: resources.length })}</Tabs.Tab>
+          <Tabs.Tab value="grants">{t("admin.applications.tabs.grants", { count: grants.length })}</Tabs.Tab>
+          <Tabs.Tab value="requests">
+            {t("admin.applications.tabs.requests", { count: pendingRequests.length })}
+          </Tabs.Tab>
+          <Tabs.Tab value="settings">{t("admin.applications.tabs.settings")}</Tabs.Tab>
         </Tabs.List>
 
         <html.div style={styles.tabContent}>
@@ -490,13 +506,9 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
               {pendingRequests.length > 0 && (
                 <Callout variant="info">
                   <Inline gap="sm" align="center" justify="between">
-                    <Text>
-                      {pendingRequests.length === 1
-                        ? "1 access request is awaiting your review."
-                        : `${pendingRequests.length} access requests are awaiting your review.`}
-                    </Text>
+                    <Text>{t("admin.applications.pendingReview", { count: pendingRequests.length })}</Text>
                     <Button variant="secondary" size="small" onClick={() => setActiveTab("requests")}>
-                      Review
+                      {t("admin.applications.review")}
                     </Button>
                   </Inline>
                 </Callout>
@@ -515,20 +527,20 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
 
           {activeTab === "roles" && (
             <CardSection
-              title="Roles"
+              title={t("admin.applications.sections.roles")}
               action={
                 <Button variant="primary" size="small" onClick={() => setRoleDialogOpen(true)}>
-                  Add Role
+                  {t("admin.applications.addRole")}
                 </Button>
               }
             >
               {roles.length === 0 ? (
                 <EmptyState
                   icon={<Icon name="shield" size={32} />}
-                  message="No roles yet. Roles bundle entitlements and are what you grant to people."
+                  message={t("admin.applications.empty.roles")}
                   action={
                     <Button variant="primary" onClick={() => setRoleDialogOpen(true)}>
-                      Create your first role
+                      {t("admin.applications.createFirstRole")}
                     </Button>
                   }
                 />
@@ -540,20 +552,20 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
 
           {activeTab === "entitlements" && (
             <CardSection
-              title="Entitlements"
+              title={t("admin.applications.sections.entitlements")}
               action={
                 <Button variant="primary" size="small" onClick={() => setEntitlementDialogOpen(true)}>
-                  Add Entitlement
+                  {t("admin.applications.addEntitlement")}
                 </Button>
               }
             >
               {entitlements.length === 0 ? (
                 <EmptyState
                   icon={<Icon name="key" size={32} />}
-                  message="No entitlements yet. Entitlements are the discrete permissions roles bundle together."
+                  message={t("admin.applications.empty.entitlements")}
                   action={
                     <Button variant="primary" onClick={() => setEntitlementDialogOpen(true)}>
-                      Create your first entitlement
+                      {t("admin.applications.createFirstEntitlement")}
                     </Button>
                   }
                 />
@@ -565,20 +577,20 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
 
           {activeTab === "resources" && (
             <CardSection
-              title="Resources"
+              title={t("admin.applications.sections.resources")}
               action={
                 <Button variant="primary" size="small" onClick={() => setResourceDialogOpen(true)}>
-                  Add Resource
+                  {t("admin.applications.addResource")}
                 </Button>
               }
             >
               {resources.length === 0 ? (
                 <EmptyState
                   icon={<Icon name="lock" size={32} />}
-                  message="No resources yet. Resources scope grants to specific objects (folders, projects, etc)."
+                  message={t("admin.applications.empty.resources")}
                   action={
                     <Button variant="primary" onClick={() => setResourceDialogOpen(true)}>
-                      Create your first resource
+                      {t("admin.applications.createFirstResource")}
                     </Button>
                   }
                 />
@@ -590,20 +602,20 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
 
           {activeTab === "grants" && (
             <CardSection
-              title="Active grants"
+              title={t("admin.applications.sections.grants")}
               action={
                 <Button variant="primary" size="small" onClick={() => setQuickGrantOpen(true)}>
-                  Grant access
+                  {t("admin.applications.grantAccess")}
                 </Button>
               }
             >
               {grantRows.length === 0 ? (
                 <EmptyState
                   icon={<Icon name="check-circle" size={32} />}
-                  message="No active grants for this application yet."
+                  message={t("admin.applications.empty.grants")}
                   action={
                     <Button variant="primary" onClick={() => setQuickGrantOpen(true)}>
-                      Grant your first access
+                      {t("admin.applications.grantFirstAccess")}
                     </Button>
                   }
                 />
@@ -614,22 +626,22 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
           )}
 
           {activeTab === "requests" && (
-            <CardSection title="Pending requests">
+            <CardSection title={t("admin.applications.sections.requests")}>
               {pendingRequests.length === 0 ? (
                 <EmptyState
                   icon={<Icon name="check-circle" size={32} />}
-                  message="No pending requests for this application."
+                  message={t("admin.applications.empty.requests")}
                 />
               ) : (
                 <Table.Root>
                   <Table.Header>
                     <Table.Row>
-                      <Table.HeaderCell>Requester</Table.HeaderCell>
-                      <Table.HeaderCell>Role</Table.HeaderCell>
-                      <Table.HeaderCell>Entitlement</Table.HeaderCell>
-                      <Table.HeaderCell>Justification</Table.HeaderCell>
-                      <Table.HeaderCell>Created</Table.HeaderCell>
-                      <Table.HeaderCell>Action</Table.HeaderCell>
+                      <Table.HeaderCell>{t("admin.cols.requester")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("admin.cols.role")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("admin.cols.entitlement")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("admin.cols.justification")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("admin.cols.created")}</Table.HeaderCell>
+                      <Table.HeaderCell>{t("admin.cols.action")}</Table.HeaderCell>
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
@@ -651,7 +663,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                         <Table.Cell isActions>
                           <Link to={`/admin/access-requests/${r.id}`}>
                             <Button variant="secondary" size="small">
-                              Review
+                              {t("admin.applications.review")}
                             </Button>
                           </Link>
                         </Table.Cell>
@@ -664,45 +676,45 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
           )}
 
           {activeTab === "settings" && (
-            <CardSection title="Application Settings">
-              {settingsFetcher.data && "message" in settingsFetcher.data && (
-                <Alert variant="success">{settingsFetcher.data.message}</Alert>
+            <CardSection title={t("admin.applications.sections.settings")}>
+              {settingsFetcher.data && "message" in settingsFetcher.data && settingsFetcher.data.message && (
+                <Alert variant="success">{t(`admin.applications.action.${settingsFetcher.data.message}`)}</Alert>
               )}
               <settingsFetcher.Form method="post">
                 <input type="hidden" name="intent" value="updateSettings" />
                 <Stack gap="md">
                   <Field.Root>
-                    <Field.Label>Slug</Field.Label>
+                    <Field.Label>{t("admin.cols.slug")}</Field.Label>
                     <Input value={application.slug} disabled />
-                    <Field.Description>Synced from Kubernetes — read only</Field.Description>
+                    <Field.Description>{t("admin.applications.settings.syncedReadOnly")}</Field.Description>
                   </Field.Root>
                   <Field.Root>
-                    <Field.Label>Display Name</Field.Label>
+                    <Field.Label>{t("admin.cols.displayName")}</Field.Label>
                     <Input value={application.displayName} disabled />
-                    <Field.Description>Synced from Kubernetes — read only</Field.Description>
+                    <Field.Description>{t("admin.applications.settings.syncedReadOnly")}</Field.Description>
                   </Field.Root>
                   <Field.Root>
-                    <Field.Label>Access Mode</Field.Label>
+                    <Field.Label>{t("admin.cols.accessMode")}</Field.Label>
                     <Select.Root name="accessMode" defaultValue={application.accessMode}>
-                      <Select.Trigger aria-label="Access Mode">
-                        <Select.Value placeholder="Select access mode" />
+                      <Select.Trigger aria-label={t("admin.cols.accessMode")}>
+                        <Select.Value placeholder={t("admin.applications.settings.accessModePlaceholder")} />
                         <Select.Icon />
                       </Select.Trigger>
                       <Select.Popup>
                         <Select.Item value="open">
-                          <Select.ItemText>Open</Select.ItemText>
+                          <Select.ItemText>{t("common.enums.accessMode.open")}</Select.ItemText>
                         </Select.Item>
                         <Select.Item value="request">
-                          <Select.ItemText>Request</Select.ItemText>
+                          <Select.ItemText>{t("common.enums.accessMode.request")}</Select.ItemText>
                         </Select.Item>
                         <Select.Item value="invite_only">
-                          <Select.ItemText>Invite Only</Select.ItemText>
+                          <Select.ItemText>{t("common.enums.accessMode.invite_only")}</Select.ItemText>
                         </Select.Item>
                       </Select.Popup>
                     </Select.Root>
                   </Field.Root>
                   <Field.Root>
-                    <Field.Label>Enabled</Field.Label>
+                    <Field.Label>{t("admin.cols.enabled")}</Field.Label>
                     <input type="hidden" name="enabled" value={application.enabled ? "true" : "false"} />
                     <Checkbox
                       name="enabled"
@@ -713,14 +725,14 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                         if (hidden) hidden.value = e.target.checked ? "true" : "false"
                       }}
                     >
-                      Application is enabled
+                      {t("admin.applications.settings.enabledLabel")}
                     </Checkbox>
                   </Field.Root>
                   <Field.Root>
-                    <Field.Label>Owner</Field.Label>
+                    <Field.Label>{t("admin.cols.owner")}</Field.Label>
                     <Select.Root name="ownerId" defaultValue={application.ownerId ?? ""}>
-                      <Select.Trigger aria-label="Owner">
-                        <Select.Value placeholder="Select a principal" />
+                      <Select.Trigger aria-label={t("admin.cols.owner")}>
+                        <Select.Value placeholder={t("admin.applications.settings.ownerPlaceholder")} />
                         <Select.Icon />
                       </Select.Trigger>
                       <Select.Popup>
@@ -733,7 +745,9 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                     </Select.Root>
                   </Field.Root>
                   <Button type="submit" variant="primary" disabled={settingsFetcher.state !== "idle"}>
-                    {settingsFetcher.state !== "idle" ? "Saving..." : "Save Settings"}
+                    {settingsFetcher.state !== "idle"
+                      ? t("admin.applications.settings.saving")
+                      : t("admin.applications.settings.save")}
                   </Button>
                 </Stack>
               </settingsFetcher.Form>
@@ -755,7 +769,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
       <Dialog.Root open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
         <Dialog.Portal>
           <Dialog.Header>
-            <Dialog.Title>Create Role</Dialog.Title>
+            <Dialog.Title>{t("admin.applications.dialog.createRole")}</Dialog.Title>
             <Dialog.Close />
           </Dialog.Header>
           <Dialog.Body>
@@ -763,19 +777,19 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
               <input type="hidden" name="intent" value="createRole" />
               <Stack gap="md">
                 <Field.Root>
-                  <Field.Label>Slug</Field.Label>
-                  <Input name="slug" placeholder="admin" required />
+                  <Field.Label>{t("admin.cols.slug")}</Field.Label>
+                  <Input name="slug" placeholder={t("admin.applications.dialog.roleSlugPlaceholder")} required />
                 </Field.Root>
                 <Field.Root>
-                  <Field.Label>Display Name</Field.Label>
-                  <Input name="displayName" placeholder="Administrator" required />
+                  <Field.Label>{t("admin.cols.displayName")}</Field.Label>
+                  <Input name="displayName" placeholder={t("admin.applications.dialog.roleNamePlaceholder")} required />
                 </Field.Root>
                 <Field.Root>
-                  <Field.Label>Description</Field.Label>
-                  <Input name="description" placeholder="Optional description" />
+                  <Field.Label>{t("admin.cols.description")}</Field.Label>
+                  <Input name="description" placeholder={t("admin.applications.dialog.descriptionPlaceholder")} />
                 </Field.Root>
                 <Button type="submit" variant="primary" disabled={isSubmitting}>
-                  {isSubmitting ? "Creating..." : "Create Role"}
+                  {isSubmitting ? t("admin.applications.dialog.creating") : t("admin.applications.dialog.createRole")}
                 </Button>
               </Stack>
             </fetcher.Form>
@@ -787,7 +801,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
       <Dialog.Root open={entitlementDialogOpen} onOpenChange={setEntitlementDialogOpen}>
         <Dialog.Portal>
           <Dialog.Header>
-            <Dialog.Title>Create Entitlement</Dialog.Title>
+            <Dialog.Title>{t("admin.applications.dialog.createEntitlement")}</Dialog.Title>
             <Dialog.Close />
           </Dialog.Header>
           <Dialog.Body>
@@ -795,19 +809,25 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
               <input type="hidden" name="intent" value="createEntitlement" />
               <Stack gap="md">
                 <Field.Root>
-                  <Field.Label>Slug</Field.Label>
-                  <Input name="slug" placeholder="read" required />
+                  <Field.Label>{t("admin.cols.slug")}</Field.Label>
+                  <Input name="slug" placeholder={t("admin.applications.dialog.entitlementSlugPlaceholder")} required />
                 </Field.Root>
                 <Field.Root>
-                  <Field.Label>Display Name</Field.Label>
-                  <Input name="displayName" placeholder="Read Access" required />
+                  <Field.Label>{t("admin.cols.displayName")}</Field.Label>
+                  <Input
+                    name="displayName"
+                    placeholder={t("admin.applications.dialog.entitlementNamePlaceholder")}
+                    required
+                  />
                 </Field.Root>
                 <Field.Root>
-                  <Field.Label>Description</Field.Label>
-                  <Input name="description" placeholder="Optional description" />
+                  <Field.Label>{t("admin.cols.description")}</Field.Label>
+                  <Input name="description" placeholder={t("admin.applications.dialog.descriptionPlaceholder")} />
                 </Field.Root>
                 <Button type="submit" variant="primary" disabled={isSubmitting}>
-                  {isSubmitting ? "Creating..." : "Create Entitlement"}
+                  {isSubmitting
+                    ? t("admin.applications.dialog.creating")
+                    : t("admin.applications.dialog.createEntitlement")}
                 </Button>
               </Stack>
             </fetcher.Form>
@@ -819,7 +839,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
       <Dialog.Root open={resourceDialogOpen} onOpenChange={setResourceDialogOpen}>
         <Dialog.Portal>
           <Dialog.Header>
-            <Dialog.Title>Create Resource</Dialog.Title>
+            <Dialog.Title>{t("admin.applications.dialog.createResource")}</Dialog.Title>
             <Dialog.Close />
           </Dialog.Header>
           <Dialog.Body>
@@ -827,23 +847,33 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
               <input type="hidden" name="intent" value="createResource" />
               <Stack gap="md">
                 <Field.Root>
-                  <Field.Label>Resource Type</Field.Label>
-                  <Input name="resourceType" placeholder="folder" required />
+                  <Field.Label>{t("admin.applications.dialog.resourceType")}</Field.Label>
+                  <Input
+                    name="resourceType"
+                    placeholder={t("admin.applications.dialog.resourceTypePlaceholder")}
+                    required
+                  />
                 </Field.Root>
                 <Field.Root>
-                  <Field.Label>Display Name</Field.Label>
-                  <Input name="displayName" placeholder="Documents" required />
+                  <Field.Label>{t("admin.cols.displayName")}</Field.Label>
+                  <Input
+                    name="displayName"
+                    placeholder={t("admin.applications.dialog.resourceNamePlaceholder")}
+                    required
+                  />
                 </Field.Root>
                 <Field.Root>
-                  <Field.Label>External ID</Field.Label>
-                  <Input name="externalId" placeholder="Optional external identifier" />
+                  <Field.Label>{t("admin.cols.externalId")}</Field.Label>
+                  <Input name="externalId" placeholder={t("admin.applications.dialog.externalIdPlaceholder")} />
                 </Field.Root>
                 <Field.Root>
-                  <Field.Label>Path</Field.Label>
-                  <Input name="path" placeholder="/documents" />
+                  <Field.Label>{t("admin.cols.path")}</Field.Label>
+                  <Input name="path" placeholder={t("admin.applications.dialog.pathPlaceholder")} />
                 </Field.Root>
                 <Button type="submit" variant="primary" disabled={isSubmitting}>
-                  {isSubmitting ? "Creating..." : "Create Resource"}
+                  {isSubmitting
+                    ? t("admin.applications.dialog.creating")
+                    : t("admin.applications.dialog.createResource")}
                 </Button>
               </Stack>
             </fetcher.Form>
