@@ -687,11 +687,11 @@
       "grantFirstAccess": "Grant your first access",
       "tabs": {
         "overview": "Overview",
-        "roles": "Roles ({{count}})",
-        "entitlements": "Entitlements ({{count}})",
-        "resources": "Resources ({{count}})",
-        "grants": "Grants ({{count}})",
-        "requests": "Requests ({{count}})",
+        "roles": "Roles",
+        "entitlements": "Entitlements",
+        "resources": "Resources",
+        "grants": "Grants",
+        "requests": "Requests",
         "settings": "Settings"
       },
       "sections": {

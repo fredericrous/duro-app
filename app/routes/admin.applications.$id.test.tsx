@@ -360,10 +360,12 @@ describe("AdminApplicationDetailPage component", () => {
     await waitFor(() => {
       expect(screen.getByRole("tablist")).toBeInTheDocument()
     })
-    // The tab labels include their respective collection sizes.
-    expect(screen.getByText("Roles (2)")).toBeInTheDocument()
-    expect(screen.getByText("Entitlements (1)")).toBeInTheDocument()
-    expect(screen.getByText("Grants (0)")).toBeInTheDocument()
+    // The tab labels include their respective collection sizes. The count is a
+    // separate <AnimatedNumber> node, so assert via the tab's accessible name
+    // (which flattens the label + count text nodes together).
+    expect(screen.getByRole("tab", { name: "Roles (2)" })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: "Entitlements (1)" })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: "Grants (0)" })).toBeInTheDocument()
   })
 
   it("opens the roles tab when ?tab=roles is in the URL", async () => {

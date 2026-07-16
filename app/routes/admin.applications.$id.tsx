@@ -42,6 +42,7 @@ import {
   useToast,
 } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { AnimatedNumber } from "~/components/motion/AnimatedNumber"
 import { AppOverview } from "~/components/AppOverview/AppOverview"
 import { QuickGrantDialog } from "~/components/QuickGrantDialog/QuickGrantDialog"
 
@@ -509,14 +510,20 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
       <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
         <Tabs.List>
           <Tabs.Tab value="overview">{t("admin.applications.tabs.overview")}</Tabs.Tab>
-          <Tabs.Tab value="roles">{t("admin.applications.tabs.roles", { count: roles.length })}</Tabs.Tab>
-          <Tabs.Tab value="entitlements">
-            {t("admin.applications.tabs.entitlements", { count: entitlements.length })}
+          <Tabs.Tab value="roles">
+            {t("admin.applications.tabs.roles")} (<AnimatedNumber value={roles.length} />)
           </Tabs.Tab>
-          <Tabs.Tab value="resources">{t("admin.applications.tabs.resources", { count: resources.length })}</Tabs.Tab>
-          <Tabs.Tab value="grants">{t("admin.applications.tabs.grants", { count: grants.length })}</Tabs.Tab>
+          <Tabs.Tab value="entitlements">
+            {t("admin.applications.tabs.entitlements")} (<AnimatedNumber value={entitlements.length} />)
+          </Tabs.Tab>
+          <Tabs.Tab value="resources">
+            {t("admin.applications.tabs.resources")} (<AnimatedNumber value={resources.length} />)
+          </Tabs.Tab>
+          <Tabs.Tab value="grants">
+            {t("admin.applications.tabs.grants")} (<AnimatedNumber value={grants.length} />)
+          </Tabs.Tab>
           <Tabs.Tab value="requests">
-            {t("admin.applications.tabs.requests", { count: pendingRequests.length })}
+            {t("admin.applications.tabs.requests")} (<AnimatedNumber value={pendingRequests.length} />)
           </Tabs.Tab>
           <Tabs.Tab value="settings">{t("admin.applications.tabs.settings")}</Tabs.Tab>
         </Tabs.List>

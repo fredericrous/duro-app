@@ -687,11 +687,11 @@
       "grantFirstAccess": "Accordez votre premier accès",
       "tabs": {
         "overview": "Vue d'ensemble",
-        "roles": "Rôles ({{count}})",
-        "entitlements": "Droits ({{count}})",
-        "resources": "Ressources ({{count}})",
-        "grants": "Octrois ({{count}})",
-        "requests": "Demandes ({{count}})",
+        "roles": "Rôles",
+        "entitlements": "Droits",
+        "resources": "Ressources",
+        "grants": "Octrois",
+        "requests": "Demandes",
         "settings": "Paramètres"
       },
       "sections": {
