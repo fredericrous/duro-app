@@ -675,6 +675,7 @@
       "unlimited": "Illimitée",
       "entitlementLabel": "(droit)",
       "review": "Examiner",
+      "caughtUp": "Vous êtes à jour — aucune demande d'accès en attente.",
       "pendingReview_one": "1 demande d'accès attend votre examen.",
       "pendingReview_other": "{{count}} demandes d'accès attendent votre examen.",
       "addRole": "Ajouter un rôle",

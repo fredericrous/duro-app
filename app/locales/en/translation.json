@@ -675,6 +675,7 @@
       "unlimited": "Unlimited",
       "entitlementLabel": "(entitlement)",
       "review": "Review",
+      "caughtUp": "You're all caught up — no requests awaiting review.",
       "pendingReview_one": "1 access request is awaiting your review.",
       "pendingReview_other": "{{count}} access requests are awaiting your review.",
       "addRole": "Add Role",

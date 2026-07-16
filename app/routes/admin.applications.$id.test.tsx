@@ -266,6 +266,7 @@ describe("/admin/applications/:id action — createResource (real DB)", () => {
 // =============================================================================
 
 import { screen, waitFor } from "@testing-library/react"
+import { t } from "~/test/test-utils"
 import AdminApplicationDetailPage from "./admin.applications.$id"
 import { renderRoute } from "~/test/render-route"
 
@@ -366,6 +367,25 @@ describe("AdminApplicationDetailPage component", () => {
     expect(screen.getByRole("tab", { name: "Roles (2)" })).toBeInTheDocument()
     expect(screen.getByRole("tab", { name: "Entitlements (1)" })).toBeInTheDocument()
     expect(screen.getByRole("tab", { name: "Grants (0)" })).toBeInTheDocument()
+  })
+
+  it("shows an all-caught-up note when a request-based app has no pending requests", async () => {
+    // base data is accessMode "request" with pendingRequests: []
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByRole("tablist")).toBeInTheDocument()
+    })
+    expect(screen.getByText(t("admin.applications.caughtUp"))).toBeInTheDocument()
+  })
+
+  it("hides the all-caught-up note while requests are pending", async () => {
+    renderPage({
+      pendingRequests: [{ id: "r1", requesterId: "u1", createdAt: new Date().toISOString() }] as unknown[],
+    })
+    await waitFor(() => {
+      expect(screen.getByRole("tablist")).toBeInTheDocument()
+    })
+    expect(screen.queryByText(t("admin.applications.caughtUp"))).not.toBeInTheDocument()
   })
 
   it("opens the roles tab when ?tab=roles is in the URL", async () => {
