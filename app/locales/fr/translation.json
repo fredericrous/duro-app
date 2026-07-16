@@ -742,6 +742,25 @@
         "grant_failed": "Échec de la création de l'octroi",
         "sync_failed": "Échec de la synchronisation",
         "synced": "{{total}} applications synchronisées : {{created}} créées, {{updated}} mises à jour, {{disabled}} désactivées"
+      },
+      "setup": {
+        "title": "Progression de la configuration",
+        "progress": "{{done}} sur {{total}} configurés",
+        "complete": "Cette application est entièrement configurée.",
+        "criteria": {
+          "owner": "Propriétaire attribué",
+          "description": "Description ajoutée",
+          "roles": "Au moins un rôle",
+          "entitlements": "Au moins un droit",
+          "grants": "Au moins un octroi"
+        },
+        "fix": {
+          "owner": "Attribuer",
+          "description": "Ajouter",
+          "roles": "Créer un rôle",
+          "entitlements": "Ajouter un droit",
+          "grants": "Accorder l'accès"
+        }
       }
     },
     "grants": {
