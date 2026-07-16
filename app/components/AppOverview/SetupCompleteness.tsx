@@ -58,7 +58,14 @@ export function SetupCompleteness({ criteria }: SetupCompletenessProps) {
       </Panel.Header>
       <Panel.Body>
         <Stack gap="md">
-          <html.div style={styles.track}>
+          <html.div
+            role="progressbar"
+            aria-valuenow={done}
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-label={t("admin.applications.setup.title")}
+            style={[styles.track, styles.trackCols(total)]}
+          >
             {criteria.map((c, i) => (
               <html.div key={c.id} style={[styles.segment, i < done && styles.segmentFilled]} />
             ))}
@@ -99,12 +106,15 @@ export function SetupCompleteness({ criteria }: SetupCompletenessProps) {
 }
 
 const styles = css.create({
-  // Fixed 5 columns: matches the five governance criteria fed by AppOverview.
   track: {
     display: "grid",
-    gridTemplateColumns: "repeat(5, 1fr)",
     gap: spacing.xs,
   },
+  // One equal column per criterion — derived from the count rather than a fixed
+  // 5, so the bar stays correct if the criteria list ever changes.
+  trackCols: (cols: number) => ({
+    gridTemplateColumns: `repeat(${cols}, 1fr)`,
+  }),
   segment: {
     height: 6,
     borderRadius: 999,
