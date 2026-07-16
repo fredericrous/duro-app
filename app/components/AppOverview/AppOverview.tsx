@@ -138,7 +138,7 @@ export function AppOverview({
 
       {syncFetcher.data && "message" in syncFetcher.data && (
         <Callout variant="success">
-          <Text>{t(`admin.applications.action.${syncFetcher.data.message}`, syncFetcher.data)}</Text>
+          <Text>{String(t(`admin.applications.action.${syncFetcher.data.message}`, syncFetcher.data))}</Text>
         </Callout>
       )}
       {syncFetcher.data && "error" in syncFetcher.data && (
