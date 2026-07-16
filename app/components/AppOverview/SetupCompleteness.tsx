@@ -1,7 +1,9 @@
+import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { css, html } from "react-strict-dom"
 import { Button, Heading, Inline, Panel, Stack, StatusIcon, Text } from "@duro-app/ui"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { useReducedMotion } from "~/lib/useReducedMotion"
 
 export interface SetupCriterion {
   /** stable id, maps to admin.applications.setup.criteria.<id> / .fix.<id> */
@@ -22,9 +24,25 @@ interface SetupCompletenessProps {
  */
 export function SetupCompleteness({ criteria }: SetupCompletenessProps) {
   const { t } = useTranslation()
+  const reduced = useReducedMotion()
   const done = criteria.filter((c) => c.done).length
   const total = criteria.length
   const complete = done === total
+
+  // One-shot "pop" when the meter flips to complete in place (e.g. granting the
+  // last criterion via the QuickGrant dialog, which keeps this mounted). Not on
+  // first mount of an already-complete app, and skipped under reduced motion.
+  const wasComplete = useRef(complete)
+  const [entering, setEntering] = useState(false)
+  useEffect(() => {
+    if (!wasComplete.current && complete && !reduced) {
+      setEntering(true)
+      const raf = requestAnimationFrame(() => setEntering(false))
+      wasComplete.current = complete
+      return () => cancelAnimationFrame(raf)
+    }
+    wasComplete.current = complete
+  }, [complete, reduced])
 
   return (
     <Panel.Root bordered>
@@ -45,10 +63,12 @@ export function SetupCompleteness({ criteria }: SetupCompletenessProps) {
           </html.div>
 
           {complete ? (
-            <Inline gap="sm" align="center">
-              <StatusIcon name="check-circle" variant="success" size={20} />
-              <Text>{t("admin.applications.setup.complete")}</Text>
-            </Inline>
+            <html.div style={[styles.completeBanner, entering && styles.completeBannerEnter]}>
+              <Inline gap="sm" align="center">
+                <StatusIcon name="check-circle" variant="success" size={20} />
+                <Text>{t("admin.applications.setup.complete")}</Text>
+              </Inline>
+            </html.div>
           ) : (
             <Stack gap="sm">
               {criteria.map((c) => (
@@ -96,5 +116,22 @@ const styles = css.create({
   },
   segmentFilled: {
     backgroundColor: "var(--color-accent)",
+  },
+  completeBanner: {
+    transformOrigin: "left center",
+    transform: "scale(1)",
+    opacity: 1,
+    transitionProperty: "transform, opacity",
+    transitionDuration: {
+      default: "280ms",
+      "@media (prefers-reduced-motion: reduce)": "0ms",
+    },
+    transitionTimingFunction: "ease-out",
+  },
+  // Starting frame of the one-shot completion pop; cleared on the next frame so
+  // the banner transitions up to its resting scale/opacity.
+  completeBannerEnter: {
+    transform: "scale(0.92)",
+    opacity: 0,
   },
 })
