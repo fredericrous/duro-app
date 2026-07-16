@@ -42,7 +42,11 @@ export function AnimatedNumber({ value, durationMs = 500 }: AnimatedNumberProps)
     let raf = 0
     const tick = (now: number) => {
       const progress = Math.min(1, (now - start) / durationMs)
-      setDisplay(Math.round(from + (to - from) * easeOutCubic(progress)))
+      const current = Math.round(from + (to - from) * easeOutCubic(progress))
+      setDisplay(current)
+      // Track the live value so a tween interrupted by a new `value` resumes
+      // from where it is on screen instead of snapping back to the old start.
+      fromRef.current = current
       if (progress < 1) {
         raf = requestAnimationFrame(tick)
       } else {
