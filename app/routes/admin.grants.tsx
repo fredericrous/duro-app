@@ -32,7 +32,10 @@ import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
 type GrantWithNames = Grant & {
   principalName: string
+  applicationId: string | null
+  applicationName: string
   roleName: string
+  entitlementName: string | null
   grantedByName: string
 }
 
@@ -47,15 +50,16 @@ export async function loader({ request }: Route.LoaderArgs) {
       const principals = yield* principalRepo.list()
       const principalMap = new Map(principals.map((p) => [p.id, p.displayName]))
 
-      // Build a single roleId → displayName map across all applications.
-      // Known smell: one listRoles call per app (small N today). Follow-up:
-      // collapse via RbacRepo.listAll().
+      // Resolve roles + entitlements to display names AND their owning
+      // application, so each grant shows "which app / which role-or-entitlement"
+      // instead of a raw UUID. A grant is role XOR entitlement; both are scoped
+      // to one application, so the app comes from whichever side is set.
       const apps = yield* appRepo.list()
-      const roleMap = new Map<string, string>()
-      for (const app of apps) {
-        const roles = yield* rbac.listRoles(app.id)
-        for (const r of roles) roleMap.set(r.id, r.displayName)
-      }
+      const appNameById = new Map(apps.map((a) => [a.id, a.displayName]))
+      const roles = yield* rbac.listAllRoles()
+      const roleInfoById = new Map(roles.map((r) => [r.id, { name: r.displayName, appId: r.applicationId }]))
+      const entitlements = yield* rbac.listAllEntitlements()
+      const entInfoById = new Map(entitlements.map((e) => [e.id, { name: e.displayName, appId: e.applicationId }]))
 
       // Collect active grants for all principals
       const allGrants: GrantWithNames[] = []
@@ -63,10 +67,16 @@ export async function loader({ request }: Route.LoaderArgs) {
         const grantRepo = yield* GrantRepo
         const grants = yield* grantRepo.findActiveForPrincipal(principal.id)
         for (const grant of grants) {
+          const roleInfo = grant.roleId ? roleInfoById.get(grant.roleId) : undefined
+          const entInfo = grant.entitlementId ? entInfoById.get(grant.entitlementId) : undefined
+          const appId = roleInfo?.appId ?? entInfo?.appId ?? null
           allGrants.push({
             ...grant,
             principalName: principalMap.get(grant.principalId) ?? grant.principalId,
-            roleName: grant.roleId === null ? "—" : (roleMap.get(grant.roleId) ?? grant.roleId),
+            applicationId: appId,
+            applicationName: appId ? (appNameById.get(appId) ?? appId) : "—",
+            roleName: grant.roleId === null ? "—" : (roleInfo?.name ?? grant.roleId),
+            entitlementName: grant.entitlementId === null ? null : (entInfo?.name ?? grant.entitlementId),
             grantedByName: principalMap.get(grant.grantedBy) ?? grant.grantedBy,
           })
         }
@@ -137,11 +147,15 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
       header: t("admin.cols.principal"),
       enableSorting: true,
     }),
+    columnHelper.accessor("applicationName", {
+      header: t("admin.cols.application"),
+      enableSorting: true,
+    }),
     columnHelper.accessor("roleName", {
       header: t("admin.cols.role"),
       enableSorting: true,
     }),
-    columnHelper.accessor("entitlementId", {
+    columnHelper.accessor("entitlementName", {
       header: t("admin.cols.entitlement"),
       cell: ({ getValue }) => getValue() ?? "\u2014",
     }),
