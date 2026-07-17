@@ -95,6 +95,32 @@ const ensurePluginProvisioning = (appId: string, slug: string) =>
     }
   })
 
+/**
+ * The "admins see every app" rule: bundle this app's `access` entitlement into
+ * the `duro` admin role, so any admin (lldap_admin → duro admin grant, seeded in
+ * migration 0025) sees the app on the home grid without a re-login. No-op until
+ * the duro app + its admin role exist. Idempotent — mirrors migration 0026 step
+ * 2 (which backfilled the pre-existing apps), scoped to a single app so newly
+ * synced apps like social-planner get grid visibility automatically.
+ */
+const ensureAdminSeesApp = (appId: string, slug: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`
+      INSERT INTO role_entitlements (role_id, entitlement_id)
+      SELECT ar.id, e.id
+      FROM entitlements e
+      JOIN roles ar ON ar.slug = 'admin'
+      JOIN applications da ON da.id = ar.application_id AND da.slug = 'duro'
+      WHERE e.application_id = ${appId} AND e.slug = 'access'
+      ON CONFLICT (role_id, entitlement_id) DO NOTHING
+    `.pipe(
+      Effect.mapError(
+        (e) => new AppSyncError({ message: `Failed to bundle access for ${slug} into the duro admin role`, cause: e }),
+      ),
+    )
+  })
+
 const ensureSinglePlugin = (appId: string, slug: string, reg: ProvisioningTemplateRegistration) =>
   Effect.gen(function* () {
     const connectedSystems = yield* ConnectedSystemRepo
@@ -177,6 +203,8 @@ export const AppSyncServiceLive = Layer.succeed(AppSyncService, {
                   Effect.mapError(wrapRbacRepoErr(`Failed to seed starter RBAC for ${app.id}`)),
                 )
 
+                yield* ensureAdminSeesApp(createdApp.id, app.id)
+
                 yield* ensurePluginProvisioning(createdApp.id, app.id)
               }),
             )
@@ -205,6 +233,8 @@ export const AppSyncServiceLive = Layer.succeed(AppSyncService, {
                   Effect.mapError(wrapRbacRepoErr(`Failed to ensure starter RBAC for ${app.id}`)),
                 )
 
+                yield* ensureAdminSeesApp(existing.id, existing.slug)
+
                 yield* ensurePluginProvisioning(existing.id, existing.slug)
               }),
             )
@@ -219,7 +249,14 @@ export const AppSyncServiceLive = Layer.succeed(AppSyncService, {
       }
 
       for (const existing of existingApps) {
-        if (!clusterSlugs.has(existing.slug) && existing.enabled) {
+        // Only auto-disable apps that were previously discovered from the
+        // cluster (last_synced_at set) but are now gone. Never disable an app
+        // that never came from a sync (last_synced_at null) — e.g. the
+        // migration-seeded `duro` portal, which is intentionally absent from the
+        // operator list. Disabling it would make the AuthzEngine (which resolves
+        // only `enabled = TRUE` apps) stop resolving `duro`, breaking the admin
+        // gate and locking admins out.
+        if (!clusterSlugs.has(existing.slug) && existing.enabled && existing.lastSyncedAt != null) {
           yield* appRepo
             .update(existing.id, { enabled: false })
             .pipe(Effect.mapError(wrapAppRepoErr(`Failed to disable app ${existing.slug}`)))
