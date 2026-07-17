@@ -4,6 +4,19 @@ export const STARTER_ENTITLEMENTS = [
   { slug: "manage", displayName: "Manage", description: "Administer the application" },
 ] as const
 
+/**
+ * The `access` entitlement gates *home-grid visibility* (home.tsx checks the
+ * engine for action="access"), which is a distinct concept from the read/write/
+ * manage RBAC verbs — so it lives outside STARTER_ENTITLEMENTS and is not
+ * attached to any starter role. Every registered app gets it (seedDefaultRbac);
+ * admins see all apps by bundling it into the duro admin role (see AppSyncService).
+ */
+export const ACCESS_ENTITLEMENT = {
+  slug: "access",
+  displayName: "Access",
+  description: "Grants visibility of this app on the home grid",
+} as const
+
 export const STARTER_ROLES = [
   {
     slug: "viewer",

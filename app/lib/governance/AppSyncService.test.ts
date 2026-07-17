@@ -24,7 +24,7 @@ import { ConnectedSystemRepo, ConnectedSystemRepoLive } from "./ConnectedSystemR
 import { ConnectorMappingRepo, ConnectorMappingRepoLive } from "./ConnectorMappingRepo.server"
 import { PluginRegistryLive } from "~/lib/plugins/PluginRegistry.server"
 import { makeTestDbLayer } from "~/lib/db/client.server"
-import { STARTER_ENTITLEMENTS, STARTER_ROLES } from "./defaultRbac"
+import { ACCESS_ENTITLEMENT, STARTER_ENTITLEMENTS, STARTER_ROLES } from "./defaultRbac"
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -82,7 +82,14 @@ function layersFor(operatorApps: ClusterApp[]) {
  * objects the old mock used. Called inside the Effect so SQL is available.
  */
 const seedExistingApps = (
-  apps: Array<{ slug: string; displayName: string; enabled?: boolean; accessMode?: string; ownerId?: string }>,
+  apps: Array<{
+    slug: string
+    displayName: string
+    enabled?: boolean
+    accessMode?: string
+    ownerId?: string
+    lastSyncedAt?: string | null
+  }>,
 ) =>
   Effect.gen(function* () {
     const repo = yield* ApplicationRepo
@@ -92,6 +99,10 @@ const seedExistingApps = (
         displayName: a.displayName,
         accessMode: a.accessMode ?? "invite_only",
         ownerId: a.ownerId,
+        // Seeded "existing" apps represent apps discovered by a *prior* sync, so
+        // default them to a set last_synced_at. Pass `null` to simulate a
+        // migration-seeded app (e.g. the duro portal) that never came from a sync.
+        lastSyncedAt: a.lastSyncedAt === null ? undefined : (a.lastSyncedAt ?? "2020-01-01T00:00:00.000Z"),
       })
       if (a.enabled === false) {
         yield* repo.update(created.id, { enabled: false })
@@ -165,6 +176,29 @@ describe("AppSyncService", () => {
     expect(result.disabled).toBe(0)
   })
 
+  it("never disables an app that never came from a sync (last_synced_at NULL), e.g. the duro portal", async () => {
+    const state = await Effect.gen(function* () {
+      yield* seedExistingApps([
+        // Migration-seeded portal app, intentionally absent from the operator
+        // list and never synced — must survive the disable sweep.
+        { slug: "duro", displayName: "Duro", lastSyncedAt: null },
+        // Previously-synced app now gone from the cluster — should be disabled.
+        { slug: "removed-app", displayName: "Removed App" },
+      ])
+      const sync = yield* AppSyncService
+      yield* sync.syncFromCluster()
+      const appRepo = yield* ApplicationRepo
+      const apps = yield* appRepo.list()
+      return {
+        duroEnabled: apps.find((a) => a.slug === "duro")!.enabled,
+        removedEnabled: apps.find((a) => a.slug === "removed-app")!.enabled,
+      }
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
+
+    expect(state.duroEnabled).toBe(true) // portal app protected — admin gate stays intact
+    expect(state.removedEnabled).toBe(false) // previously-synced + now absent → disabled
+  })
+
   it("handles empty cluster (disables all)", async () => {
     const result = await Effect.gen(function* () {
       yield* seedExistingApps([
@@ -224,8 +258,38 @@ describe("AppSyncService", () => {
     }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
 
     expect(new Set(roles.map((r) => r.slug))).toEqual(new Set(STARTER_ROLES.map((r) => r.slug)))
-    expect(new Set(ents.map((e) => e.slug))).toEqual(new Set(STARTER_ENTITLEMENTS.map((e) => e.slug)))
+    expect(new Set(ents.map((e) => e.slug))).toEqual(
+      new Set([...STARTER_ENTITLEMENTS.map((e) => e.slug), ACCESS_ENTITLEMENT.slug]),
+    )
     expect(app.lastSyncedAt).not.toBeNull()
+  })
+
+  it("bundles each synced app's access entitlement into the duro admin role", async () => {
+    // makeTestDbLayer truncates governance tables, so the duro app + admin role
+    // (normally seeded by migration 0025) don't exist — seed them here so the
+    // "admins see all apps" bundling has a target.
+    const { adminEntSlugs, adminEntAppSlugs } = await Effect.gen(function* () {
+      const appRepo = yield* ApplicationRepo
+      const rbac = yield* RbacRepo
+      const duro = yield* appRepo.create({ slug: "duro", displayName: "Duro" })
+      const adminRole = yield* rbac.ensureRole(duro.id, "admin", "Admin")
+
+      const sync = yield* AppSyncService
+      yield* sync.syncFromCluster()
+
+      const bundled = yield* rbac.listRoleEntitlements(adminRole.id)
+      // Resolve each bundled entitlement's app slug for a readable assertion.
+      const apps = yield* appRepo.list()
+      const slugByAppId = new Map(apps.map((a) => [a.id, a.slug]))
+      return {
+        adminEntSlugs: new Set(bundled.map((e) => e.slug)),
+        adminEntAppSlugs: new Set(bundled.map((e) => slugByAppId.get(e.applicationId))),
+      }
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
+
+    // Only `access` entitlements are bundled, one per synced app.
+    expect(adminEntSlugs).toEqual(new Set(["access"]))
+    expect(adminEntAppSlugs).toEqual(new Set(["jellyfin", "gitea", "grafana"]))
   })
 
   it("backfills starter rbac for existing apps that had none", async () => {
@@ -408,7 +472,7 @@ describe("AppSyncService — transactional seeding (real DB)", () => {
 
     expect(app.lastSyncedAt).not.toBeNull()
     expect(new Set(roles.map((r) => r.slug))).toEqual(new Set(["viewer", "editor", "admin"]))
-    expect(new Set(ents.map((e) => e.slug))).toEqual(new Set(["read", "write", "manage"]))
+    expect(new Set(ents.map((e) => e.slug))).toEqual(new Set(["read", "write", "manage", "access"]))
     expect(system).not.toBeNull()
   })
 })

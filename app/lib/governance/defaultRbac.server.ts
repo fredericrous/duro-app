@@ -1,8 +1,14 @@
 import { Effect } from "effect"
 import { RbacRepo, type RbacRepoError } from "./RbacRepo.server"
-import { STARTER_ENTITLEMENTS, STARTER_ROLES } from "./defaultRbac"
+import { ACCESS_ENTITLEMENT, STARTER_ENTITLEMENTS, STARTER_ROLES } from "./defaultRbac"
 
-export { STARTER_ENTITLEMENTS, STARTER_ROLES, STARTER_ROLE_SLUGS, STARTER_ENTITLEMENT_SLUGS } from "./defaultRbac"
+export {
+  ACCESS_ENTITLEMENT,
+  STARTER_ENTITLEMENTS,
+  STARTER_ROLES,
+  STARTER_ROLE_SLUGS,
+  STARTER_ENTITLEMENT_SLUGS,
+} from "./defaultRbac"
 export { hasStarterTemplate } from "./defaultRbac"
 
 export const seedDefaultRbac = (appId: string): Effect.Effect<void, RbacRepoError, RbacRepo> =>
@@ -14,6 +20,15 @@ export const seedDefaultRbac = (appId: string): Effect.Effect<void, RbacRepoErro
       const ent = yield* rbac.ensureEntitlement(appId, e.slug, e.displayName, e.description)
       entitlementIdBySlug.set(e.slug, ent.id)
     }
+
+    // Home-grid visibility marker — created for every app but attached to no
+    // starter role (it's granted directly / bundled into the duro admin role).
+    yield* rbac.ensureEntitlement(
+      appId,
+      ACCESS_ENTITLEMENT.slug,
+      ACCESS_ENTITLEMENT.displayName,
+      ACCESS_ENTITLEMENT.description,
+    )
 
     for (const r of STARTER_ROLES) {
       const role = yield* rbac.ensureRole(appId, r.slug, r.displayName, r.description)
