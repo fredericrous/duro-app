@@ -8,7 +8,7 @@ import type { Route } from "./+types/admin"
 import { getAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"
 import { runEffect } from "~/lib/runtime.server"
-import { Badge, Button, DetailPanel, Drawer, Inline, PageShell, SideNav } from "@duro-app/ui"
+import { Badge, Button, DetailPanel, Drawer, Icon, Inline, PageShell, SideNav } from "@duro-app/ui"
 import { Header } from "~/components/Header/Header"
 import { useMediaQuery } from "~/hooks/useMediaQuery"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
@@ -228,40 +228,50 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
 
   const navContent = (
     <SideNav.Root value={activeValue} onValueChange={handleValueChange}>
-      {/* Grouped by the admin's job, not the data model: who + their access,
-          then apps, then pending work, then oversight, then rarely-touched
-          power tools. Item values (and thus navMap/URLs) are unchanged. Every
-          group is `defaultExpanded` so all sections are visible at a glance and
-          the active item always shows (SideNav only renders an expanded group's
-          items); the admin can still collapse a section. Requires @duro-app/ui
-          ≥ the idempotent-expand fix so a defaultExpanded group holding the
-          active item isn't double-toggled closed. */}
-      <SideNav.Group label={t("admin.nav.peopleAccess", "People & access")} defaultExpanded>
-        <SideNav.Item value="identities">{t("admin.nav.identities", "Identities")}</SideNav.Item>
-        <SideNav.Item value="grants">{t("admin.nav.grants", "Grants")}</SideNav.Item>
-      </SideNav.Group>
-      {/* Applications is a single destination — a top-level item, not a
-          one-entry group (Item reads SideNav.Root context, so no Group wrapper
-          is needed). */}
-      <SideNav.Item value="applications">{t("admin.nav.applications", "Applications")}</SideNav.Item>
-      <SideNav.Group label={t("admin.nav.requestsInvites", "Requests & invites")} defaultExpanded>
-        <SideNav.Item value="access-requests">
+      {/* Flat menu: static (non-collapsible) Section headers + per-item icons,
+          grouped by the admin's job rather than the data model. Item values
+          (and thus navMap/URLs) are unchanged. */}
+      <SideNav.Section label={t("admin.nav.accessManagement", "Access management")}>
+        <SideNav.Item value="identities" icon={<Icon name="users" size={18} />}>
+          {t("admin.nav.identities", "Identities")}
+        </SideNav.Item>
+        <SideNav.Item value="grants" icon={<Icon name="key" size={18} />}>
+          {t("admin.nav.grants", "Grants")}
+        </SideNav.Item>
+        <SideNav.Item value="applications" icon={<Icon name="layers" size={18} />}>
+          {t("admin.nav.applications", "Applications")}
+        </SideNav.Item>
+      </SideNav.Section>
+      <SideNav.Section label={t("admin.nav.requestsInvites", "Requests & invites")}>
+        <SideNav.Item value="access-requests" icon={<Icon name="clock" size={18} />}>
           <NavLabel label={t("admin.nav.accessRequests", "Access Requests")} count={counts.accessRequests} />
         </SideNav.Item>
-        <SideNav.Item value="invitations">
+        <SideNav.Item value="invitations" icon={<Icon name="mail" size={18} />}>
           <NavLabel label={t("admin.nav.invitations", "Access Invitations")} count={counts.accessInvitations} />
         </SideNav.Item>
-        <SideNav.Item value="invites">{t("admin.nav.invites", "User Invites")}</SideNav.Item>
-      </SideNav.Group>
-      <SideNav.Group label={t("admin.nav.auditRecovery", "Audit & recovery")} defaultExpanded>
-        <SideNav.Item value="audit">{t("admin.nav.auditLog", "Audit Log")}</SideNav.Item>
-        <SideNav.Item value="recovery">{t("admin.nav.recovery", "Device Recovery")}</SideNav.Item>
-      </SideNav.Group>
-      <SideNav.Group label={t("admin.nav.advanced", "Advanced")} defaultExpanded>
-        <SideNav.Item value="group-mappings">{t("admin.nav.groupMappings", "Group Mappings")}</SideNav.Item>
-        <SideNav.Item value="authz-playground">{t("admin.nav.authzPlayground", "Authz Playground")}</SideNav.Item>
-        <SideNav.Item value="plugins">{t("admin.nav.plugins", "Plugins")}</SideNav.Item>
-      </SideNav.Group>
+        <SideNav.Item value="invites" icon={<Icon name="user-plus" size={18} />}>
+          {t("admin.nav.invites", "User Invites")}
+        </SideNav.Item>
+      </SideNav.Section>
+      <SideNav.Section label={t("admin.nav.auditRecovery", "Audit & recovery")}>
+        <SideNav.Item value="audit" icon={<Icon name="file-text" size={18} />}>
+          {t("admin.nav.auditLog", "Audit Log")}
+        </SideNav.Item>
+        <SideNav.Item value="recovery" icon={<Icon name="shield" size={18} />}>
+          {t("admin.nav.recovery", "Device Recovery")}
+        </SideNav.Item>
+      </SideNav.Section>
+      <SideNav.Section label={t("admin.nav.advanced", "Advanced")}>
+        <SideNav.Item value="group-mappings" icon={<Icon name="git-branch" size={18} />}>
+          {t("admin.nav.groupMappings", "Group Mappings")}
+        </SideNav.Item>
+        <SideNav.Item value="authz-playground" icon={<Icon name="shield-check" size={18} />}>
+          {t("admin.nav.authzPlayground", "Authz Playground")}
+        </SideNav.Item>
+        <SideNav.Item value="plugins" icon={<Icon name="plug" size={18} />}>
+          {t("admin.nav.plugins", "Plugins")}
+        </SideNav.Item>
+      </SideNav.Section>
     </SideNav.Root>
   )
 
