@@ -12,9 +12,6 @@ vi.mock("~/lib/governance/bootstrap.server", () => ({
 vi.mock("~/lib/runtime.server", () => ({
   runEffect: vi.fn(),
 }))
-vi.mock("~/lib/governance-mode.server", () => ({
-  authMode: "strict",
-}))
 
 import { requireAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"

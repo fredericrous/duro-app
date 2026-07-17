@@ -5,7 +5,6 @@ import { requireAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"
 import { isFirstRun } from "~/lib/governance/bootstrap.server"
 import { runEffect } from "~/lib/runtime.server"
-import { authMode } from "~/lib/governance-mode.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -23,7 +22,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   // (mostly /requests). The catalog itself moved to per-route loaders + the
   // GET /api/catalog endpoint so it doesn't fire on every navigation.
   let currentPrincipalId: string | null = null
-  if (authMode !== "legacy" && auth.sub) {
+  if (auth.sub) {
     try {
       currentPrincipalId = await runEffect(
         Effect.gen(function* () {
