@@ -53,7 +53,10 @@ export const loadAppsCatalogForPrincipal = (principalId: string) =>
     const sql = yield* SqlClient.SqlClient
 
     const allApps = yield* appRepo.list()
-    const enabledApps = allApps.filter((a) => a.enabled !== false)
+    // Exclude the "duro" portal itself: it's registered as an application only
+    // so the AuthzEngine can resolve it for the admin gate (see migration 0025),
+    // not as something users request access to from the catalog.
+    const enabledApps = allApps.filter((a) => a.enabled !== false && a.slug !== "duro")
     const grants = yield* grantRepo.findActiveForPrincipal(principalId)
     const requests = yield* requestRepo.listForRequester(principalId)
     const pending = requests.filter((r) => r.status === "pending")
