@@ -20,8 +20,8 @@
     "app/**/*.{ts,tsx,js,jsx,json,css}": "prettier --write"
   },
   "dependencies": {
-    "@duro-app/tokens": "^0.40.0",
-    "@duro-app/ui": "^0.40.0",
+    "@duro-app/tokens": "^0.41.0",
+    "@duro-app/ui": "^0.41.0",
     "@duro-app/ui-email": "^0.38.0",
     "@effect/experimental": "^0.58.0",
     "@effect/opentelemetry": "^0.61.0",

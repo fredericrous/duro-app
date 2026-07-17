@@ -66,27 +66,30 @@ const renderLayout = (loaderData = { pendingCounts: { accessRequests: 0, accessI
   })
 
 describe("AdminLayout component", () => {
-  it("renders every job-based section expanded with its items visible", async () => {
+  it("renders every static section with its items visible", async () => {
     renderLayout()
     await waitFor(() => {
-      // People & access is defaultExpanded, so its first item is visible with
-      // no interaction — this is the regression guard for the DS double-toggle
-      // (a defaultExpanded group holding the active item used to collapse).
+      // Sections are static (non-collapsible), so every item is visible with no
+      // interaction — nothing folds.
       expect(screen.getByText(t("admin.nav.identities", "Identities"))).toBeInTheDocument()
     })
-    // Applications is a top-level item (no group wrapper).
+    // Applications lives in the Access management section.
     expect(screen.getByText(t("admin.nav.applications", "Applications"))).toBeInTheDocument()
-    // Advanced section items are visible too (all groups defaultExpanded).
+    // Items across other sections are visible too (no folding).
     expect(screen.getByText(t("admin.nav.groupMappings", "Group Mappings"))).toBeInTheDocument()
-    // Its own section holding the active item stays open (regression guard).
     expect(screen.getByText(t("admin.nav.invites", "User Invites"))).toBeInTheDocument()
   })
 
   it("marks the active item for the current route", async () => {
-    // At "/", the derived active value is "invites" (User Invites).
+    // At "/", the derived active value is "invites" (User Invites). Query the
+    // button by role — SideNav.Item wraps its label in a span, so the label text
+    // node isn't the element that carries aria-current.
     renderLayout({ pendingCounts: { accessRequests: 7, accessInvitations: 2 } })
     await waitFor(() => {
-      expect(screen.getByText(t("admin.nav.invites", "User Invites"))).toHaveAttribute("aria-current", "page")
+      expect(screen.getByRole("button", { name: t("admin.nav.invites", "User Invites") })).toHaveAttribute(
+        "aria-current",
+        "page",
+      )
     })
   })
 })
