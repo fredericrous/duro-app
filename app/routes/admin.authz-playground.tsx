@@ -7,17 +7,18 @@ import { runEffect } from "~/lib/runtime.server"
 import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
+import { RbacRepo } from "~/lib/governance/RbacRepo.server"
 import { AuthzEngine } from "~/lib/governance/AuthzEngine.server"
 import type { AccessDecision } from "~/lib/governance/types"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { Alert, Button, Callout, Combobox, Field, Heading, Input, Panel, Stack, Text } from "@duro-app/ui"
+import { Alert, Button, Callout, Combobox, Heading, Panel, Stack, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request)
-  const [principals, applications] = await Promise.all([
+  const [principals, applications, entitlements, resources] = await Promise.all([
     runEffect(
       Effect.gen(function* () {
         const repo = yield* PrincipalRepo
@@ -30,9 +31,41 @@ export async function loader({ request }: Route.LoaderArgs) {
         return yield* repo.list()
       }),
     ),
+    runEffect(
+      Effect.gen(function* () {
+        const repo = yield* RbacRepo
+        return yield* repo.listAllEntitlements()
+      }),
+    ),
+    runEffect(
+      Effect.gen(function* () {
+        const repo = yield* RbacRepo
+        return yield* repo.listAllResources()
+      }),
+    ),
   ])
 
-  return { principals, applications }
+  // Actions and resources are per-application: the engine only allows an action
+  // if the principal holds an entitlement whose slug equals that action on the
+  // resolved app, and resources are scoped to their app. Group both by app slug
+  // so the form can offer exactly the valid choices for the selected app rather
+  // than making the admin guess free-text.
+  const slugByAppId = new Map(applications.map((a) => [a.id, a.slug]))
+  const actionsByApp: Record<string, string[]> = {}
+  for (const e of entitlements) {
+    const slug = slugByAppId.get(e.applicationId)
+    if (!slug) continue
+    ;(actionsByApp[slug] ??= []).push(e.slug)
+  }
+  const resourcesByApp: Record<string, Array<{ id: string; label: string }>> = {}
+  for (const r of resources) {
+    const slug = slugByAppId.get(r.applicationId)
+    if (!slug) continue
+    const label = r.path ? `${r.displayName} (${r.path})` : `${r.displayName} · ${r.resourceType}`
+    ;(resourcesByApp[slug] ??= []).push({ id: r.id, label })
+  }
+
+  return { principals, applications, actionsByApp, resourcesByApp }
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -72,9 +105,17 @@ export async function action({ request }: Route.ActionArgs) {
 export default function AdminAuthzPlaygroundPage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
   const { principals, applications } = loaderData
+  const actionsByApp = loaderData.actionsByApp ?? {}
+  const resourcesByApp = loaderData.resourcesByApp ?? {}
   const fetcher = useFetcher()
   const [selectedSubject, setSelectedSubject] = useState("")
   const [selectedApp, setSelectedApp] = useState("")
+  // Action + resource are scoped to the chosen app, so reset them whenever the
+  // application changes (a stale action from another app would just deny).
+  const [selectedAction, setSelectedAction] = useState("")
+  const [selectedResource, setSelectedResource] = useState("")
+  const appActions = actionsByApp[selectedApp] ?? []
+  const appResources = resourcesByApp[selectedApp] ?? []
 
   const isChecking = fetcher.state !== "idle"
   const result = fetcher.data as { decision: AccessDecision } | { error: string } | undefined
@@ -118,7 +159,14 @@ export default function AdminAuthzPlaygroundPage({ loaderData }: Route.Component
 
               <html.div>
                 <Text>{t("admin.cols.application")}</Text>
-                <Combobox.Root value={selectedApp} onValueChange={(v) => setSelectedApp(v ?? "")}>
+                <Combobox.Root
+                  value={selectedApp}
+                  onValueChange={(v) => {
+                    setSelectedApp(v ?? "")
+                    setSelectedAction("")
+                    setSelectedResource("")
+                  }}
+                >
                   <Combobox.Input placeholder={t("admin.authz.applicationPlaceholder")} />
                   <Combobox.Popup>
                     {applications.map((app) => (
@@ -132,15 +180,47 @@ export default function AdminAuthzPlaygroundPage({ loaderData }: Route.Component
                 <input type="hidden" name="application" value={selectedApp} />
               </html.div>
 
-              <Field.Root>
-                <Field.Label>{t("admin.authz.actionLabel")}</Field.Label>
-                <Input name="action" placeholder={t("admin.authz.actionPlaceholder")} required />
-                <Field.Description>{t("admin.authz.actionHint")}</Field.Description>
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>{t("admin.authz.resourceLabel")}</Field.Label>
-                <Input name="resourceId" placeholder={t("admin.authz.resourcePlaceholder")} />
-              </Field.Root>
+              <html.div>
+                <Text>{t("admin.authz.actionLabel")}</Text>
+                <Combobox.Root value={selectedAction} onValueChange={(v) => setSelectedAction(v ?? "")}>
+                  <Combobox.Input
+                    placeholder={selectedApp ? t("admin.authz.actionPlaceholder") : t("admin.authz.selectAppFirst")}
+                  />
+                  <Combobox.Popup>
+                    {appActions.map((a) => (
+                      <Combobox.Item key={a} value={a}>
+                        {a}
+                      </Combobox.Item>
+                    ))}
+                    <Combobox.Empty>
+                      {selectedApp ? t("admin.authz.actionNone") : t("admin.authz.selectAppFirst")}
+                    </Combobox.Empty>
+                  </Combobox.Popup>
+                </Combobox.Root>
+                <input type="hidden" name="action" value={selectedAction} />
+                <Text color="muted">{t("admin.authz.actionHint")}</Text>
+              </html.div>
+
+              <html.div>
+                <Text>{t("admin.authz.resourceLabel")}</Text>
+                <Combobox.Root value={selectedResource} onValueChange={(v) => setSelectedResource(v ?? "")}>
+                  <Combobox.Input
+                    placeholder={selectedApp ? t("admin.authz.resourcePlaceholder") : t("admin.authz.selectAppFirst")}
+                  />
+                  <Combobox.Popup>
+                    {appResources.map((r) => (
+                      <Combobox.Item key={r.id} value={r.id}>
+                        {r.label}
+                      </Combobox.Item>
+                    ))}
+                    <Combobox.Empty>
+                      {selectedApp ? t("admin.authz.resourceNone") : t("admin.authz.selectAppFirst")}
+                    </Combobox.Empty>
+                  </Combobox.Popup>
+                </Combobox.Root>
+                <input type="hidden" name="resourceId" value={selectedResource} />
+                <Text color="muted">{t("admin.authz.resourceHint")}</Text>
+              </html.div>
               <Button type="submit" variant="primary" disabled={isChecking}>
                 {isChecking ? t("admin.authz.checking") : t("admin.authz.checkAccess")}
               </Button>
