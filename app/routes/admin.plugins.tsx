@@ -5,8 +5,21 @@ import { requireAdmin } from "~/lib/admin-guard.server"
 import { PluginRegistry } from "~/lib/plugins/PluginRegistry.server"
 import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
 import type { PluginManifest } from "~/lib/plugins/contracts"
-import { Badge, Heading, Inline, Stack, Table, Tag, Text } from "@duro-app/ui"
+import { Badge, Heading, Stack, Table, Tag, Text } from "@duro-app/ui"
+import { css, html } from "react-strict-dom"
+import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { CardSection } from "~/components/CardSection/CardSection"
+
+const styles = css.create({
+  // Capabilities can be many tags; wrap them onto multiple lines instead of
+  // letting Inline (row, no-wrap) overflow into the next column.
+  capabilities: {
+    display: "flex",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+  },
+})
 
 interface PluginRow {
   manifest: PluginManifest
@@ -84,13 +97,13 @@ export default function AdminPluginsPage({ loaderData }: { loaderData: Awaited<R
                   </Badge>
                 </Table.Cell>
                 <Table.Cell>
-                  <Inline gap="xs">
+                  <html.div style={styles.capabilities}>
                     {p.manifest.capabilities.map((cap: string) => (
                       <Tag key={cap} size="sm">
                         {cap}
                       </Tag>
                     ))}
-                  </Inline>
+                  </html.div>
                 </Table.Cell>
                 <Table.Cell>
                   <Text>{p.installCount}</Text>

@@ -209,10 +209,11 @@ describe("AdminGrantsPage component", () => {
     await waitFor(() => {
       expect(screen.getByText("Alice")).toBeInTheDocument()
     })
-    // The roleName column renders "Editor"; admin column shows "Admin"
-    // (granted_by name). Per-row revoke action — at least one button
-    // labelled revoke/revoquer is rendered in the populated state.
+    // The roleName column renders "Editor"; the application column resolves the
+    // grant's owning app to a name ("Jellyfin") instead of a UUID. Per-row
+    // revoke action — at least one button labelled revoke/revoquer is rendered.
     expect(screen.getByText("Editor")).toBeInTheDocument()
+    expect(screen.getByText("Jellyfin")).toBeInTheDocument()
     const revokeButtons = screen.getAllByRole("button", { name: /revoke|revoquer/i })
     expect(revokeButtons.length).toBeGreaterThan(0)
   })

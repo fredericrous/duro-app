@@ -8,9 +8,15 @@ import { runEffect } from "~/lib/runtime.server"
 import { requireAdmin } from "~/lib/admin-guard.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
+import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
+import { RbacRepo } from "~/lib/governance/RbacRepo.server"
 import type { AuditEvent } from "~/lib/governance/types"
 
-type AuditEventWithNames = AuditEvent & { actorName: string | null }
+type AuditEventWithNames = AuditEvent & {
+  actorName: string | null
+  applicationName: string | null
+  targetName: string | null
+}
 import {
   useReactTable,
   getCoreRowModel,
@@ -65,8 +71,10 @@ export async function loader({ request }: Route.LoaderArgs) {
       Effect.gen(function* () {
         const svc = yield* AuditService
         const principalRepo = yield* PrincipalRepo
+        const appRepo = yield* ApplicationRepo
+        const rbac = yield* RbacRepo
 
-        const [raw, principals] = [
+        const [raw, principals, apps, roles, entitlements] = [
           yield* svc.query({
             eventType,
             actorId,
@@ -77,8 +85,32 @@ export async function loader({ request }: Route.LoaderArgs) {
             offset: source ? 0 : page * pageSize,
           }),
           yield* principalRepo.list(),
+          yield* appRepo.list(),
+          yield* rbac.listAllRoles(),
+          yield* rbac.listAllEntitlements(),
         ]
         const actorMap = new Map(principals.map((p) => [p.id, p.displayName]))
+        const appNameById = new Map(apps.map((a) => [a.id, a.displayName]))
+        const roleNameById = new Map(roles.map((r) => [r.id, r.displayName]))
+        const entNameById = new Map(entitlements.map((en) => [en.id, en.displayName]))
+
+        // Resolve a polymorphic audit target (targetType + targetId) to a name
+        // for the types we can look up; other types keep their id.
+        const resolveTarget = (type: string | null, id: string | null): string | null => {
+          if (!id) return null
+          switch (type) {
+            case "principal":
+              return actorMap.get(id) ?? null
+            case "application":
+              return appNameById.get(id) ?? null
+            case "role":
+              return roleNameById.get(id) ?? null
+            case "entitlement":
+              return entNameById.get(id) ?? null
+            default:
+              return null
+          }
+        }
 
         // Ensure metadata is always a plain serializable object so
         // react-router's JSON serialization doesn't blow up on weird
@@ -87,6 +119,8 @@ export async function loader({ request }: Route.LoaderArgs) {
           ...e,
           metadata: safeParseMetadata(e.metadata),
           actorName: e.actorId ? (actorMap.get(e.actorId) ?? null) : null,
+          applicationName: e.applicationId ? (appNameById.get(e.applicationId) ?? null) : null,
+          targetName: resolveTarget(e.targetType, e.targetId),
         }))
 
         if (!source) return sanitized
@@ -125,15 +159,19 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
     }),
     columnHelper.accessor("targetId", {
       header: t("admin.cols.target"),
-      cell: ({ getValue }) => {
-        const v = getValue()
+      cell: ({ row }) => {
+        // Prefer the resolved target name; fall back to the (truncated) id for
+        // target types we can't name (grant, invitation, access_request, \u2026).
+        const name = row.original.targetName
+        if (name) return name
+        const v = row.original.targetId
         if (!v) return "\u2014"
         return v.length > 16 ? v.slice(0, 16) + "..." : v
       },
     }),
     columnHelper.accessor("applicationId", {
       header: t("admin.cols.application"),
-      cell: ({ getValue }) => getValue() ?? "\u2014",
+      cell: ({ row }) => row.original.applicationName ?? "\u2014",
     }),
     columnHelper.accessor("ipAddress", {
       header: t("admin.cols.ipAddress"),
