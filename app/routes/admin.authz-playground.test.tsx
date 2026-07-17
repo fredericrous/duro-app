@@ -65,6 +65,8 @@ const renderPage = (
   data: {
     principals?: Array<{ id: string; displayName: string; externalId: string | null }>
     applications?: Array<{ id: string; slug: string; displayName: string }>
+    actionsByApp?: Record<string, string[]>
+    resourcesByApp?: Record<string, Array<{ id: string; label: string }>>
   } = {},
 ) =>
   renderRoute({
@@ -76,6 +78,8 @@ const renderPage = (
       loader: () => ({
         principals: data.principals ?? [{ id: "p-alice", displayName: "Alice", externalId: "alice-sub" }],
         applications: data.applications ?? [{ id: "app-1", slug: "jellyfin", displayName: "Jellyfin" }],
+        actionsByApp: data.actionsByApp ?? { jellyfin: ["access", "manage", "read", "write"] },
+        resourcesByApp: data.resourcesByApp ?? {},
       }),
     },
   })
@@ -89,8 +93,9 @@ describe("AdminAuthzPlaygroundPage component", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: new RegExp(t("admin.authz.title"), "i") })).toBeInTheDocument()
     })
-    // Two comboboxes (subject + application).
-    expect(screen.getAllByRole("combobox").length).toBeGreaterThanOrEqual(2)
+    // Four comboboxes: subject, application, action, resource — action and
+    // resource are now app-driven selects, not free-text inputs.
+    expect(screen.getAllByRole("combobox").length).toBeGreaterThanOrEqual(4)
   })
 
   it("survives empty principals + applications lists", async () => {

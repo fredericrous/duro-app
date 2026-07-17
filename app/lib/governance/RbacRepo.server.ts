@@ -76,6 +76,7 @@ export class RbacRepo extends Context.Tag("RbacRepo")<
       path?: string
     }) => Effect.Effect<Resource, RbacRepoError>
     readonly listResources: (appId: string) => Effect.Effect<Resource[], RbacRepoError>
+    readonly listAllResources: () => Effect.Effect<Resource[], RbacRepoError>
     readonly getResourceAncestors: (resourceId: string) => Effect.Effect<Resource[], RbacRepoError>
   }
 >() {}
@@ -259,6 +260,14 @@ export const RbacRepoLive = Layer.effect(
             Effect.map((rows) => rows.map((r) => decodeResource(r))),
           ),
           "Failed to list resources",
+        ),
+
+      listAllResources: () =>
+        withErr(
+          sql`SELECT * FROM resources ORDER BY display_name`.pipe(
+            Effect.map((rows) => rows.map((r) => decodeResource(r))),
+          ),
+          "Failed to list all resources",
         ),
 
       getResourceAncestors: (resourceId) =>

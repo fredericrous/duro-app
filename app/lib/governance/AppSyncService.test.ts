@@ -424,6 +424,7 @@ const FailingRbacRepo: RbacRepoService = {
   listRoleEntitlements: () => Effect.succeed([]),
   createResource: () => Effect.fail(forcedError),
   listResources: () => Effect.succeed([]),
+  listAllResources: () => Effect.succeed([]),
   getResourceAncestors: () => Effect.succeed([]),
 }
 
