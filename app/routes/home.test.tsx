@@ -21,11 +21,12 @@ vi.mock("~/lib/config.server", () => ({
 }))
 vi.mock("~/lib/apps.server", () => ({
   getVisibleApps: vi.fn().mockReturnValue([]),
+  loadApps: vi.fn().mockReturnValue([]),
 }))
 
 import { getAuth } from "~/lib/auth.server"
 import { isOriginAllowed } from "~/lib/config.server"
-import { getVisibleApps } from "~/lib/apps.server"
+import { getVisibleApps, loadApps } from "~/lib/apps.server"
 import { action, loader } from "./home"
 import { seedTestDb, truncateAll } from "~/test/test-runtime"
 import { callAction, callLoader, expectData } from "~/test/route-utils"
@@ -33,11 +34,13 @@ import { callAction, callLoader, expectData } from "~/test/route-utils"
 const mockGetAuth = vi.mocked(getAuth)
 const mockOrigin = vi.mocked(isOriginAllowed)
 const mockGetVisibleApps = vi.mocked(getVisibleApps)
+const mockLoadApps = vi.mocked(loadApps)
 
 beforeEach(async () => {
   vi.clearAllMocks()
   mockOrigin.mockReturnValue(true)
   mockGetVisibleApps.mockReturnValue([])
+  mockLoadApps.mockReturnValue([])
   await truncateAll()
 })
 
@@ -97,6 +100,82 @@ describe("/home loader", () => {
 
     expect(resolved.visibleApps).toEqual(staticApps)
     expect(resolved.appsCatalog).toEqual([])
+  })
+
+  it("enriches governed apps with apps.json presentation (icon/category/url) by slug", async () => {
+    // Governance decides visibility; apps.json supplies icon/category/launch URL.
+    // Seed a real access grant so the engine allows jellyfin, and have apps.json
+    // carry the presentation the DB row lacks (no url/icon/category stored).
+    await seedTestDb(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* sql`INSERT INTO principals (id, principal_type, external_id, display_name, email)
+                   VALUES ('p-alice', 'user', 'alice-sub', 'Alice', 'a@x')`
+        yield* sql`INSERT INTO applications (id, slug, display_name, access_mode, owner_id)
+                   VALUES ('app-jelly', 'jellyfin', 'Jellyfin', 'request', 'p-alice')`
+        yield* sql`INSERT INTO entitlements (id, application_id, slug, display_name)
+                   VALUES ('ent-access', 'app-jelly', 'access', 'Access')`
+        yield* sql`INSERT INTO grants (principal_id, entitlement_id, granted_by, reason)
+                   VALUES ('p-alice', 'ent-access', 'p-alice', 'test')`
+      }),
+    )
+
+    mockGetAuth.mockResolvedValue({ user: "alice", sub: "alice-sub", groups: [] } as never)
+    mockLoadApps.mockReturnValue([
+      {
+        id: "jellyfin",
+        name: "Jellyfin (static)",
+        url: "https://jelly.example",
+        category: "media",
+        icon: "<svg>JELLY</svg>",
+        groups: [],
+        priority: 5,
+      },
+    ] as never)
+
+    const result = await callLoader(loader, { url: "http://localhost/" })
+    const data = expectData<{
+      homeDataPromise: Promise<{ visibleApps: AppDefinition[] }>
+    }>(result)
+    const resolved = await data.homeDataPromise
+
+    expect(resolved.visibleApps).toHaveLength(1)
+    const app = resolved.visibleApps[0]
+    expect(app.id).toBe("jellyfin")
+    expect(app.icon).toBe("<svg>JELLY</svg>") // from apps.json, not blank
+    expect(app.category).toBe("media") // from apps.json, not "governance"
+    expect(app.url).toBe("https://jelly.example") // launch URL restored
+    expect(app.name).toBe("Jellyfin") // DB displayName wins over static name
+  })
+
+  it("keeps a governed app visible but unstyled when it is absent from apps.json", async () => {
+    await seedTestDb(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* sql`INSERT INTO principals (id, principal_type, external_id, display_name, email)
+                   VALUES ('p-alice', 'user', 'alice-sub', 'Alice', 'a@x')`
+        yield* sql`INSERT INTO applications (id, slug, display_name, access_mode, owner_id)
+                   VALUES ('app-x', 'mystery', 'Mystery App', 'request', 'p-alice')`
+        yield* sql`INSERT INTO entitlements (id, application_id, slug, display_name)
+                   VALUES ('ent-x', 'app-x', 'access', 'Access')`
+        yield* sql`INSERT INTO grants (principal_id, entitlement_id, granted_by, reason)
+                   VALUES ('p-alice', 'ent-x', 'p-alice', 'test')`
+      }),
+    )
+
+    mockGetAuth.mockResolvedValue({ user: "alice", sub: "alice-sub", groups: [] } as never)
+    mockLoadApps.mockReturnValue([]) // apps.json has no match
+
+    const result = await callLoader(loader, { url: "http://localhost/" })
+    const data = expectData<{ homeDataPromise: Promise<{ visibleApps: AppDefinition[] }> }>(result)
+    const resolved = await data.homeDataPromise
+
+    expect(resolved.visibleApps).toHaveLength(1)
+    const app = resolved.visibleApps[0]
+    expect(app.name).toBe("Mystery App")
+    expect(app.category).toBe("governance") // fallback
+    expect(app.icon).toBe("") // fallback (no-link/no-icon state)
+    expect(app.url).toBe("")
   })
 })
 
