@@ -1,7 +1,7 @@
 import { Suspense, use } from "react"
 import { Effect } from "effect"
 import type { Route } from "./+types/home"
-import { getVisibleApps } from "~/lib/apps.server"
+import { getVisibleApps, loadApps } from "~/lib/apps.server"
 import { config, isOriginAllowed } from "~/lib/config.server"
 import { Header } from "~/components/Header/Header"
 import { AppGrid } from "~/components/AppGrid/AppGrid"
@@ -47,6 +47,12 @@ async function loadHomeData(request: Request): Promise<HomeData> {
 
   if (auth.user) {
     try {
+      // Governance owns *visibility* (which apps a user may see); it does not
+      // store *presentation* (icon, category, launch URL — the operator/DB has
+      // none of these). Recover those from apps.json by slug so the grid keeps
+      // its icons, real categories, and working launch links. Apps not in
+      // apps.json still render (name from the DB), just unstyled + no link.
+      const staticBySlug = new Map(loadApps().map((a) => [a.id, a]))
       const governedApps = await runEffect(
         Effect.gen(function* () {
           const appRepo = yield* ApplicationRepo
@@ -60,19 +66,20 @@ async function loadHomeData(request: Request): Promise<HomeData> {
           const decisions = yield* engine.checkBulk(checks)
           return allApps
             .filter((_, i) => decisions[i].allow)
-            .map(
-              (a): AppDefinition => ({
+            .map((a): AppDefinition => {
+              const s = staticBySlug.get(a.slug)
+              return {
                 id: a.slug,
-                name: a.displayName,
-                // Empty string signals "no launch URL configured" — AppCard
-                // renders a non-link state with a help hint instead of a 404.
-                url: a.url ?? "",
-                category: "governance",
-                icon: "",
+                name: a.displayName || s?.name || a.slug,
+                // Empty URL signals "no launch URL configured" — AppCard renders
+                // a non-link state with a help hint instead of a 404.
+                url: a.url ?? s?.url ?? "",
+                category: s?.category ?? "governance",
+                icon: s?.icon ?? "",
                 groups: [],
-                priority: 10,
-              }),
-            )
+                priority: s?.priority ?? 10,
+              }
+            })
         }),
       )
 
