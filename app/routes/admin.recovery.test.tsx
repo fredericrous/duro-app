@@ -2,13 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { Effect } from "effect"
 
 vi.mock("~/lib/runtime.server", () => ({ runEffect: vi.fn() }))
-vi.mock("~/lib/config.server", () => ({
-  config: { adminGroupName: "lldap_admin" },
-  isOriginAllowed: vi.fn().mockReturnValue(true),
-}))
-vi.mock("~/lib/auth.server", () => ({ requireAuth: vi.fn() }))
-// The loader self-gates via requireAdmin; the action keeps its own inline
-// requireAuth + admin-group + origin gate (mocked above).
+// The loader self-gates via requireAdmin; the action self-gates via
+// requireAdminAction (admin decision + origin). Both allow by default.
 vi.mock("~/lib/admin-guard.server", () => ({
   requireAdmin: vi
     .fn()
@@ -25,9 +20,7 @@ vi.mock("~/lib/workflows/recovery.server", () => ({
 import { screen, waitFor, fireEvent } from "@testing-library/react"
 import AdminRecoveryPage, { loader, action } from "./admin.recovery"
 import { runEffect } from "~/lib/runtime.server"
-import { isOriginAllowed } from "~/lib/config.server"
-import { requireAuth } from "~/lib/auth.server"
-import { requireAdmin } from "~/lib/admin-guard.server"
+import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { approveRecovery, denyRecovery } from "~/lib/workflows/recovery.server"
 import { callLoader, callAction, expectData, expectResponse } from "~/test/route-utils"
 import { renderRoute } from "~/test/render-route"
@@ -35,17 +28,15 @@ import { t } from "~/test/test-utils"
 import type { RecoveryRequest } from "~/lib/services/RecoveryRepo.server"
 
 const mockRunEffect = vi.mocked(runEffect)
-const mockOrigin = vi.mocked(isOriginAllowed)
-const mockAuth = vi.mocked(requireAuth)
 const mockApprove = vi.mocked(approveRecovery)
 const mockDeny = vi.mocked(denyRecovery)
 
-const adminAuth = { groups: ["lldap_admin"], user: "admin", sub: "admin-sub" } as never
+const adminAuth = { sub: "admin", user: "admin", email: "admin@test", groups: ["lldap_admin"] } as never
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockOrigin.mockReturnValue(true)
-  mockAuth.mockResolvedValue(adminAuth)
+  vi.mocked(requireAdmin).mockResolvedValue(adminAuth)
+  vi.mocked(requireAdminAction).mockResolvedValue(adminAuth)
   mockApprove.mockImplementation(() => Effect.succeed({ email: "bob@example.com", revokedCount: 2 }) as never)
   mockDeny.mockImplementation(() => Effect.succeed(undefined) as never)
 })
@@ -66,13 +57,8 @@ describe("admin.recovery loader", () => {
 })
 
 describe("admin.recovery action", () => {
-  it("403s when the caller is not in the admin group", async () => {
-    mockAuth.mockResolvedValue({ groups: ["users"], user: "eve" } as never)
-    expect(expectResponse(await callAction(action, { formData: { intent: "deny", requestId: "r1" } })).status).toBe(403)
-  })
-
-  it("403s on a disallowed origin", async () => {
-    mockOrigin.mockReturnValue(false)
+  it("403s when the admin/origin gate rejects", async () => {
+    vi.mocked(requireAdminAction).mockRejectedValueOnce(new Response("Forbidden", { status: 403 }))
     expect(expectResponse(await callAction(action, { formData: { intent: "deny", requestId: "r1" } })).status).toBe(403)
   })
 

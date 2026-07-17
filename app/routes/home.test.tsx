@@ -15,9 +15,6 @@ vi.mock("~/lib/runtime.server", async () => {
 vi.mock("~/lib/auth.server", () => ({
   getAuth: vi.fn(),
 }))
-vi.mock("~/lib/governance-mode.server", () => ({
-  authMode: "strict",
-}))
 vi.mock("~/lib/config.server", () => ({
   config: { categoryOrder: ["media", "tools"] },
   isOriginAllowed: vi.fn().mockReturnValue(true),

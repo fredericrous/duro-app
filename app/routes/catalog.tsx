@@ -12,7 +12,6 @@ import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 import { RequestAccessDialog } from "~/components/RequestAccessDialog/RequestAccessDialog"
 import { AppSearchBar, AppSearchBarSkeleton } from "~/components/AppSearchBar/AppSearchBar"
 import { runEffect } from "~/lib/runtime.server"
-import { authMode } from "~/lib/governance-mode.server"
 import { loadApps } from "~/lib/apps.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { loadAppsCatalogForPrincipal, type AppCatalogEntry, type AppCatalogState } from "~/lib/apps-catalog.server"
@@ -31,7 +30,7 @@ export function meta() {
 async function loadCatalog(request: Request): Promise<AppCatalogEntry[]> {
   const { getAuth } = await import("~/lib/auth.server")
   const auth = await getAuth(request)
-  if (authMode === "legacy" || !auth.sub) return []
+  if (!auth.sub) return []
 
   try {
     return await runEffect(

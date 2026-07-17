@@ -16,11 +16,6 @@ vi.mock("~/lib/runtime.server", async () => {
 vi.mock("~/lib/auth.server", () => ({
   getAuth: vi.fn(),
 }))
-// authMode is a module-level config constant; the test layer doesn't care
-// about it, but the loader's "legacy → skip" short-circuit does.
-vi.mock("~/lib/governance-mode.server", () => ({
-  authMode: "strict",
-}))
 // loadApps reads /data/apps.json — file IO outside the Effect runtime.
 vi.mock("~/lib/apps.server", () => ({
   loadApps: vi.fn().mockReturnValue([]),

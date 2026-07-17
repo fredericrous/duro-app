@@ -11,7 +11,6 @@ import { AppSearchBar, AppSearchBarSkeleton } from "~/components/AppSearchBar/Ap
 import { EmptyState, PageShell, Stack, Button } from "@duro-app/ui"
 import { useFetcher, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
-import { authMode } from "~/lib/governance-mode.server"
 import { runEffect } from "~/lib/runtime.server"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { AuthzEngine } from "~/lib/governance/AuthzEngine.server"
@@ -46,7 +45,7 @@ async function loadHomeData(request: Request): Promise<HomeData> {
 
   let visibleApps = staticApps
 
-  if (authMode !== "legacy" && auth.user) {
+  if (auth.user) {
     try {
       const governedApps = await runEffect(
         Effect.gen(function* () {
@@ -77,27 +76,7 @@ async function loadHomeData(request: Request): Promise<HomeData> {
         }),
       )
 
-      if (authMode === "shadow") {
-        const govSlugs = new Set(governedApps.map((a) => a.id))
-        const staticSlugs = new Set(staticApps.map((a) => a.id))
-        const onlyGov = governedApps.filter((a) => !staticSlugs.has(a.id))
-        const onlyStatic = staticApps.filter((a) => !govSlugs.has(a.id))
-        if (onlyGov.length > 0 || onlyStatic.length > 0) {
-          await runEffect(
-            Effect.logWarning("app visibility mismatch", {
-              user: auth.user,
-              govOnly: onlyGov.map((a) => a.id),
-              staticOnly: onlyStatic.map((a) => a.id),
-            }),
-          )
-        }
-      } else if (authMode === "dual") {
-        const govSlugs = new Set(governedApps.map((a) => a.id))
-        const uniqueStatic = staticApps.filter((a) => !govSlugs.has(a.id))
-        visibleApps = [...governedApps, ...uniqueStatic]
-      } else {
-        visibleApps = governedApps
-      }
+      visibleApps = governedApps
     } catch (err) {
       await runEffect(
         Effect.logWarning("governance app visibility failed, falling back to static", { error: String(err) }),
@@ -106,7 +85,7 @@ async function loadHomeData(request: Request): Promise<HomeData> {
   }
 
   let appsCatalog: AppCatalogEntry[] = []
-  if (authMode !== "legacy" && auth.user && visibleApps.length === 0) {
+  if (auth.user && visibleApps.length === 0) {
     try {
       appsCatalog = await runEffect(
         Effect.gen(function* () {

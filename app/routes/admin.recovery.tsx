@@ -4,9 +4,7 @@ import { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import { runEffect } from "~/lib/runtime.server"
-import { requireAuth } from "~/lib/auth.server"
-import { requireAdmin } from "~/lib/admin-guard.server"
-import { config, isOriginAllowed } from "~/lib/config.server"
+import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { RecoveryRepo, type RecoveryRequest } from "~/lib/services/RecoveryRepo.server"
 import { approveRecovery, denyRecovery } from "~/lib/workflows/recovery.server"
 import { CardSection } from "~/components/CardSection/CardSection"
@@ -25,15 +23,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  // This action mints a certificate on approval, so gate it explicitly on the
-  // admin group rather than relying solely on the gateway/parent-loader gate.
-  const auth = await requireAuth(request)
-  if (!auth.groups.includes(config.adminGroupName)) {
-    throw new Response("Forbidden", { status: 403 })
-  }
-  if (!isOriginAllowed(request.headers.get("Origin"))) {
-    throw new Response("Invalid origin", { status: 403 })
-  }
+  // This action mints a certificate on approval, so self-gate it explicitly
+  // (admin decision + origin check) rather than relying solely on the
+  // gateway/parent-loader gate.
+  const auth = await requireAdminAction(request)
 
   const fd = await request.formData()
   const intent = fd.get("intent") as string | null
