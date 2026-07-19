@@ -86,6 +86,7 @@ interface AuditEvent {
   applicationName: string | null
   targetType: string | null
   targetId: string | null
+  targetName: string | null
   metadata: Record<string, unknown> | null
   createdAt: string
 }
@@ -97,6 +98,7 @@ const mkEvent = (o: Partial<AuditEvent> & Pick<AuditEvent, "id" | "eventType">):
   applicationName: null,
   targetType: "grant",
   targetId: "g1",
+  targetName: null,
   metadata: null,
   createdAt: "2026-01-01T00:00:00Z",
   // Spread last so required id/eventType + any overrides win.
@@ -126,6 +128,23 @@ describe("AdminAuditPage component", () => {
       expect(screen.getByText("Grant created")).toBeInTheDocument()
     })
     expect(screen.getByText("Grant revoked")).toBeInTheDocument()
+  })
+
+  it("shows a resolved target name instead of the raw target id", async () => {
+    renderPage([
+      mkEvent({
+        id: "e1",
+        eventType: "grant.created",
+        targetType: "grant",
+        targetId: "g-abcdef1234567890",
+        targetName: "Editor → daddy",
+      }),
+    ])
+    await waitFor(() => {
+      expect(screen.getByText("Editor → daddy")).toBeInTheDocument()
+    })
+    // The opaque target id is not shown once a name is resolved.
+    expect(screen.queryByText(/g-abcdef/)).not.toBeInTheDocument()
   })
 
   it("survives an empty event list", async () => {
