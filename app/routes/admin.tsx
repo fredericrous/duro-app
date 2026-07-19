@@ -261,10 +261,9 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
           {t("admin.nav.recovery", "Device Recovery")}
         </SideNav.Item>
       </SideNav.Section>
+      {/* Group Mappings intentionally lives on /admin/identities (a button in
+          its header), not in the menu — it's identity/group configuration. */}
       <SideNav.Section label={t("admin.nav.advanced", "Advanced")}>
-        <SideNav.Item value="group-mappings" icon={<Icon name="git-branch" size={18} />}>
-          {t("admin.nav.groupMappings", "Group Mappings")}
-        </SideNav.Item>
         <SideNav.Item value="authz-playground" icon={<Icon name="shield-check" size={18} />}>
           {t("admin.nav.authzPlayground", "Authz Playground")}
         </SideNav.Item>

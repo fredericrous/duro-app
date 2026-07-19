@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
-import { useFetcher } from "react-router"
+import { useFetcher, useSearchParams } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/admin.identities"
 import { Effect } from "effect"
@@ -241,7 +241,14 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
     [users, principals, certsByUser, systemUserIds],
   )
 
-  const [facet, setFacet] = useState<"all" | IdentityType>("all")
+  // The type facet lives in the URL (?type=user|group|…) so it's bookmarkable
+  // and shareable, and survives reloads. Derive it (source of truth = the URL).
+  const [searchParams, setSearchParams] = useSearchParams()
+  const facetParam = searchParams.get("type")
+  const facet: "all" | IdentityType =
+    facetParam === "user" || facetParam === "group" || facetParam === "service_account" || facetParam === "device"
+      ? facetParam
+      : "all"
   const [revokeTarget, setRevokeTarget] = useState<RevokeTarget | null>(null)
   const [revokeReason, setRevokeReason] = useState("")
   const [selectedCerts, setSelectedCerts] = useState<Set<string>>(new Set())
@@ -342,7 +349,9 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
   const columns = useMemo(() => buildIdentityColumns(t), [t])
 
   const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() =>
+    facet === "all" ? [] : [{ id: "type", value: facet }],
+  )
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
 
@@ -383,7 +392,10 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
   }, [identities])
 
   const applyFacet = (next: "all" | IdentityType) => {
-    setFacet(next)
+    const sp = new URLSearchParams(searchParams)
+    if (next === "all") sp.delete("type")
+    else sp.set("type", next)
+    setSearchParams(sp, { replace: true })
     table.getColumn("type")?.setFilterValue(next === "all" ? undefined : next)
   }
 
@@ -423,6 +435,11 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
           <>
             {sectionTitle} ({identities.length})
           </>
+        }
+        action={
+          <LinkButton href="/admin/group-mappings" variant="secondary" size="small">
+            {t("admin.nav.groupMappings", "Group Mappings")}
+          </LinkButton>
         }
       >
         <html.div style={styles.filterRow}>
