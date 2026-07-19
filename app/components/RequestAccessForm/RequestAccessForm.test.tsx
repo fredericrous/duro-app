@@ -31,6 +31,7 @@ const mkApp = (
   displayName: string,
   roleIds: string[] = ["r-viewer"],
   requestableRoleIds: string[] = roleIds,
+  grantedRoleIds: string[] = [],
 ): AppCatalogEntry =>
   ({
     app: { id, slug, displayName },
@@ -42,6 +43,7 @@ const mkApp = (
       description: null,
     })),
     requestableRoleIds,
+    grantedRoleIds,
   }) as unknown as AppCatalogEntry
 
 describe("RequestAccessForm", () => {
@@ -51,6 +53,20 @@ describe("RequestAccessForm", () => {
     expect(screen.getByPlaceholderText(t("noAccess.form.justificationPlaceholder"))).toBeInTheDocument()
     // Two buttons: cancel + submit.
     expect(screen.getAllByRole("button")).toHaveLength(2)
+  })
+
+  it("shows the roles the user already holds on the selected app", () => {
+    render(
+      <RequestAccessForm
+        // Holds Viewer already; Editor is still requestable (upgrade).
+        apps={[mkApp("app-1", "jellyfin", "Jellyfin", ["r-viewer", "r-editor"], ["r-editor"], ["r-viewer"])]}
+        fetcher={mkFetcher() as never}
+        preselectedAppId="app-1"
+      />,
+    )
+    expect(screen.getByText(t("noAccess.form.alreadyHave", undefined, { roles: "Viewer" }))).toBeInTheDocument()
+    // The role picker still offers only the requestable (not-yet-held) role.
+    expect(screen.getByPlaceholderText(t("noAccess.form.rolePlaceholder"))).toBeInTheDocument()
   })
 
   it("hides the cancel button when hideCancel is set", () => {

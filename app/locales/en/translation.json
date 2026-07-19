@@ -67,6 +67,7 @@
       "applicationPlaceholder": "Pick an application…",
       "role": "Role",
       "rolePlaceholder": "Pick a role…",
+      "alreadyHave": "You already have: {{roles}}",
       "noRequestableRoles": "You already hold every role available on this app.",
       "noResults": "No matches",
       "justification": "Why do you need access?",

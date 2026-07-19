@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import type { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
-import { Alert, Button, Combobox, Field, Inline, Stack, Textarea } from "@duro-app/ui"
+import { Alert, Button, Combobox, Field, Inline, Stack, Text, Textarea } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
 import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
 
@@ -85,6 +85,14 @@ export function RequestAccessForm({
     [requestableRoles],
   )
 
+  // Roles the user already holds on the selected app — shown for context so it's
+  // clear what's already granted (the role picker only lists requestable roles).
+  const grantedRoleNames = useMemo(() => {
+    if (!selectedEntry) return []
+    const granted = new Set(selectedEntry.grantedRoleIds ?? [])
+    return selectedEntry.roles.filter((r) => granted.has(r.id)).map((r) => r.displayName)
+  }, [selectedEntry])
+
   const isSubmitting = fetcher.state !== "idle"
   // Discriminated submit outcome from routes/home.tsx. Three success-shaped
   // states (submitted / auto_approved / duplicate) plus error; the form
@@ -139,6 +147,12 @@ export function RequestAccessForm({
               </Combobox.Popup>
             </Combobox.Root>
           </Field.Root>
+
+          {selectedEntry && grantedRoleNames.length > 0 && (
+            <Text color="muted" variant="caption">
+              {t("noAccess.form.alreadyHave", { roles: grantedRoleNames.join(", ") })}
+            </Text>
+          )}
 
           {selectedEntry && requestableRoles.length > 0 && (
             <Field.Root>
