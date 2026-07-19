@@ -67,6 +67,7 @@
       "applicationPlaceholder": "Choisissez une application…",
       "role": "Role",
       "rolePlaceholder": "Choisissez un role…",
+      "alreadyHave": "Vous avez deja : {{roles}}",
       "noRequestableRoles": "Vous detenez deja tous les roles disponibles sur cette application.",
       "noResults": "Aucun resultat",
       "justification": "Pourquoi avez-vous besoin de cet acces ?",
