@@ -71,7 +71,16 @@ import { screen, waitFor } from "@testing-library/react"
 import AdminPrincipalDetailPage from "./admin.principals.$id"
 import { renderRoute } from "~/test/render-route"
 
-const renderPage = (data: { principal?: unknown; grants?: unknown[]; groups?: unknown[] } = {}) =>
+const renderPage = (
+  data: {
+    principal?: unknown
+    grants?: unknown[]
+    groups?: unknown[]
+    roles?: unknown[]
+    entitlements?: unknown[]
+    applications?: unknown[]
+  } = {},
+) =>
   renderRoute({
     parentLoaderId: "routes/dashboard",
     parentLoader: () => ({ user: "admin", isAdmin: true }),
@@ -91,6 +100,9 @@ const renderPage = (data: { principal?: unknown; grants?: unknown[]; groups?: un
         },
         grants: data.grants ?? [],
         groups: data.groups ?? [],
+        roles: data.roles ?? [],
+        entitlements: data.entitlements ?? [],
+        applications: data.applications ?? [],
       }),
     },
   })
@@ -146,5 +158,36 @@ describe("AdminPrincipalDetailPage component", () => {
     expect(screen.getByText("Media Team")).toBeInTheDocument()
     expect(screen.getByText(/Active Grants \(1\)/)).toBeInTheDocument()
     expect(screen.getByText(/Groups \(1\)/)).toBeInTheDocument()
+  })
+
+  it("shows the grant's application (replacing the opaque grant id)", async () => {
+    renderPage({
+      grants: [
+        {
+          id: "g-abcdef12",
+          principalId: "p-alice",
+          roleId: "role-editor",
+          entitlementId: null,
+          resourceId: null,
+          grantedBy: "p-admin",
+          expiresAt: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          revokedAt: null,
+          revokedBy: null,
+          reason: null,
+        },
+      ],
+      roles: [{ id: "role-editor", applicationId: "app-jelly", slug: "editor", displayName: "Editor" }],
+      applications: [{ id: "app-jelly", slug: "jellyfin", displayName: "Jellyfin" }],
+    })
+
+    await waitFor(() => {
+      // Application resolved from the grant's role.
+      expect(screen.getByText("Jellyfin")).toBeInTheDocument()
+    })
+    // Role resolves to its display name…
+    expect(screen.getByText("Editor")).toBeInTheDocument()
+    // …and the old truncated grant-id is gone.
+    expect(screen.queryByText(/^g-abcdef12/)).not.toBeInTheDocument()
   })
 })

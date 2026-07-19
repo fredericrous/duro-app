@@ -5,7 +5,8 @@ import { requireAdmin } from "~/lib/admin-guard.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { RbacRepo } from "~/lib/governance/RbacRepo.server"
-import type { Principal, Grant, Role, Entitlement } from "~/lib/governance/types"
+import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
+import type { Principal, Grant, Role, Entitlement, Application } from "~/lib/governance/types"
 import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import type { TFunction } from "i18next"
@@ -18,7 +19,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   await requireAdmin(request)
   const principalId = params.id
 
-  const [principal, grants, groups, roles, entitlements, principals] = await Promise.all([
+  const [principal, grants, groups, roles, entitlements, principals, applications] = await Promise.all([
     runEffect(
       Effect.gen(function* () {
         const repo = yield* PrincipalRepo
@@ -55,13 +56,19 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         return yield* repo.list()
       }),
     ),
+    runEffect(
+      Effect.gen(function* () {
+        const repo = yield* ApplicationRepo
+        return yield* repo.list()
+      }),
+    ),
   ])
 
   if (!principal) {
     throw new Response("Principal not found", { status: 404 })
   }
 
-  return { principal, grants, groups, roles, entitlements, principals }
+  return { principal, grants, groups, roles, entitlements, principals, applications }
 }
 
 const grantColumnHelper = createColumnHelper<Grant>()
@@ -69,11 +76,15 @@ interface GrantNameResolvers {
   role: (id: string | null) => string
   entitlement: (id: string | null) => string
   principal: (id: string) => string
+  application: (grant: Grant) => string
 }
 const buildGrantColumns = (r: GrantNameResolvers, t: TFunction) => [
-  grantColumnHelper.accessor("id", {
-    header: t("admin.cols.grantId"),
-    cell: ({ getValue }) => getValue().slice(0, 8) + "...",
+  // The grant's owning application (from its role or entitlement — a grant is
+  // one or the other). Replaces the old opaque grant-id column.
+  grantColumnHelper.display({
+    id: "application",
+    header: t("admin.cols.application"),
+    cell: ({ row }) => r.application(row.original),
   }),
   grantColumnHelper.accessor("roleId", {
     header: t("admin.cols.role"),
@@ -111,21 +122,30 @@ const buildGroupColumns = (t: TFunction) => [
 
 export default function AdminPrincipalDetailPage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
-  const { principal, grants, groups, roles = [], entitlements = [], principals = [] } = loaderData
+  const { principal, grants, groups, roles = [], entitlements = [], principals = [], applications = [] } = loaderData
 
   const grantColumns = useMemo(() => {
     const roleName = new Map((roles as Role[]).map((x) => [x.id, x.displayName]))
     const entName = new Map((entitlements as Entitlement[]).map((x) => [x.id, x.displayName]))
     const principalName = new Map((principals as Principal[]).map((p) => [p.id, p.displayName]))
+    // Resolve a grant → its owning application via whichever of role/entitlement
+    // is set (both carry applicationId; a grant is role XOR entitlement).
+    const roleAppId = new Map((roles as Role[]).map((x) => [x.id, x.applicationId]))
+    const entAppId = new Map((entitlements as Entitlement[]).map((x) => [x.id, x.applicationId]))
+    const appName = new Map((applications as Application[]).map((a) => [a.id, a.displayName]))
     return buildGrantColumns(
       {
         role: (id) => (id ? (roleName.get(id) ?? id) : "—"),
         entitlement: (id) => (id ? (entName.get(id) ?? id) : "—"),
         principal: (id) => principalName.get(id) ?? id,
+        application: (g) => {
+          const appId = (g.roleId && roleAppId.get(g.roleId)) || (g.entitlementId && entAppId.get(g.entitlementId))
+          return appId ? (appName.get(appId) ?? appId) : "—"
+        },
       },
       t,
     )
-  }, [roles, entitlements, principals, t])
+  }, [roles, entitlements, principals, applications, t])
 
   const grantsTable = useReactTable({
     data: grants,

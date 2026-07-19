@@ -167,6 +167,14 @@ describe("AdminIdentitiesPage", () => {
     })
   })
 
+  it("links to Group Mappings from the identities header", async () => {
+    renderIdentities()
+    await waitFor(() => {
+      const link = screen.getByText(t("admin.nav.groupMappings", "Group Mappings"))
+      expect(link.closest("a")).toHaveAttribute("href", "/admin/group-mappings")
+    })
+  })
+
   it("renders cert status, disabled state, a selectable checkbox, and the revoked section", async () => {
     const expires = "2999-01-01T00:00:00Z"
     renderIdentities({

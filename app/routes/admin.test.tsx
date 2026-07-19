@@ -75,9 +75,13 @@ describe("AdminLayout component", () => {
     })
     // Applications lives in the Access management section.
     expect(screen.getByText(t("admin.nav.applications", "Applications"))).toBeInTheDocument()
-    // Items across other sections are visible too (no folding).
-    expect(screen.getByText(t("admin.nav.groupMappings", "Group Mappings"))).toBeInTheDocument()
+    // Items across other sections are visible too (no folding). Plugins is in
+    // the Advanced section (Group Mappings intentionally lives on /admin/
+    // identities, not the menu).
+    expect(screen.getByText(t("admin.nav.plugins", "Plugins"))).toBeInTheDocument()
     expect(screen.getByText(t("admin.nav.invites", "User Invites"))).toBeInTheDocument()
+    // Group Mappings must NOT be in the menu anymore.
+    expect(screen.queryByText(t("admin.nav.groupMappings", "Group Mappings"))).not.toBeInTheDocument()
   })
 
   it("marks the active item for the current route", async () => {
