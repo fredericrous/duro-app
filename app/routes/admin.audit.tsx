@@ -94,9 +94,17 @@ export async function loader({ request }: Route.LoaderArgs) {
         const roleNameById = new Map(roles.map((r) => [r.id, r.displayName]))
         const entNameById = new Map(entitlements.map((en) => [en.id, en.displayName]))
 
-        // Resolve a polymorphic audit target (targetType + targetId) to a name
-        // for the types we can look up; other types keep their id.
-        const resolveTarget = (type: string | null, id: string | null): string | null => {
+        // Resolve a polymorphic audit target (targetType + targetId) to a name.
+        // Directly-nameable entities are looked up by id; grant/access_request
+        // rows have a UUID target but carry the meaningful role/entitlement (and
+        // recipient) in their metadata, so we describe them from that instead.
+        // Everything reuses the already-loaded maps — no extra queries. Types we
+        // can't name (user_certificate, api_key, recovery_request, …) keep their id.
+        const resolveTarget = (
+          type: string | null,
+          id: string | null,
+          meta: Record<string, unknown>,
+        ): string | null => {
           if (!id) return null
           switch (type) {
             case "principal":
@@ -107,6 +115,16 @@ export async function loader({ request }: Route.LoaderArgs) {
               return roleNameById.get(id) ?? null
             case "entitlement":
               return entNameById.get(id) ?? null
+            case "grant":
+            case "access_request": {
+              const roleId = typeof meta.roleId === "string" ? meta.roleId : null
+              const entId = typeof meta.entitlementId === "string" ? meta.entitlementId : null
+              const principalId = typeof meta.principalId === "string" ? meta.principalId : null
+              const what = roleId ? roleNameById.get(roleId) : entId ? entNameById.get(entId) : null
+              const who = principalId ? actorMap.get(principalId) : null
+              if (what && who) return `${what} → ${who}`
+              return what ?? who ?? null
+            }
             default:
               return null
           }
@@ -115,13 +133,16 @@ export async function loader({ request }: Route.LoaderArgs) {
         // Ensure metadata is always a plain serializable object so
         // react-router's JSON serialization doesn't blow up on weird
         // JSONB values (circular refs, cause objects, etc)
-        const sanitized = raw.map((e) => ({
-          ...e,
-          metadata: safeParseMetadata(e.metadata),
-          actorName: e.actorId ? (actorMap.get(e.actorId) ?? null) : null,
-          applicationName: e.applicationId ? (appNameById.get(e.applicationId) ?? null) : null,
-          targetName: resolveTarget(e.targetType, e.targetId),
-        }))
+        const sanitized = raw.map((e) => {
+          const metadata = safeParseMetadata(e.metadata)
+          return {
+            ...e,
+            metadata,
+            actorName: e.actorId ? (actorMap.get(e.actorId) ?? null) : null,
+            applicationName: e.applicationId ? (appNameById.get(e.applicationId) ?? null) : null,
+            targetName: resolveTarget(e.targetType, e.targetId, metadata),
+          }
+        })
 
         if (!source) return sanitized
 
