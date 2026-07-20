@@ -677,6 +677,7 @@
     "applications": {
       "syncFromCluster": "Synchroniser depuis le cluster",
       "syncing": "Synchronisation...",
+      "range": "{{from}}–{{to}} sur {{total}}",
       "unlimited": "Illimitée",
       "entitlementLabel": "(droit)",
       "review": "Examiner",
