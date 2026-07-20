@@ -677,6 +677,7 @@
     "applications": {
       "syncFromCluster": "Sync from cluster",
       "syncing": "Syncing...",
+      "range": "{{from}}–{{to}} of {{total}}",
       "unlimited": "Unlimited",
       "entitlementLabel": "(entitlement)",
       "review": "Review",
