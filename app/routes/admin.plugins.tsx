@@ -99,7 +99,7 @@ export default function AdminPluginsPage({ loaderData }: { loaderData: Awaited<R
                 <Table.Cell>
                   <html.div style={styles.capabilities}>
                     {p.manifest.capabilities.map((cap: string) => (
-                      <Tag key={cap} size="sm">
+                      <Tag key={cap} size="sm" wrap>
                         {cap}
                       </Tag>
                     ))}
