@@ -220,7 +220,11 @@ export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentPr
               {table.getHeaderGroups().map((headerGroup) => (
                 <Table.Row key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
-                    <Table.HeaderCell key={header.id} label={String(header.column.columnDef.header ?? "")}>
+                    <Table.HeaderCell
+                      key={header.id}
+                      label={String(header.column.columnDef.header ?? "")}
+                      width={header.column.id === "actions" ? "max-content" : undefined}
+                    >
                       {header.isPlaceholder ? null : header.column.getCanSort() ? (
                         <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
                           {flexRender(header.column.columnDef.header, header.getContext())}

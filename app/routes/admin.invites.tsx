@@ -337,7 +337,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
                 <Table.HeaderCell>{t("admin.invites.cols.email")}</Table.HeaderCell>
                 <Table.HeaderCell>{t("admin.invites.cols.error")}</Table.HeaderCell>
                 <Table.HeaderCell>{t("admin.invites.cols.failedAt")}</Table.HeaderCell>
-                <Table.HeaderCell>{t("admin.invites.cols.actions")}</Table.HeaderCell>
+                <Table.HeaderCell width="max-content">{t("admin.invites.cols.actions")}</Table.HeaderCell>
               </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -363,7 +363,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
                 <Table.HeaderCell>{t("admin.invites.cols.progress")}</Table.HeaderCell>
                 <Table.HeaderCell>{t("admin.invites.cols.invitedBy")}</Table.HeaderCell>
                 <Table.HeaderCell>{t("admin.invites.cols.expires")}</Table.HeaderCell>
-                <Table.HeaderCell>{t("admin.invites.cols.actions")}</Table.HeaderCell>
+                <Table.HeaderCell width="max-content">{t("admin.invites.cols.actions")}</Table.HeaderCell>
               </Table.Row>
             </Table.Header>
             <Table.Body>

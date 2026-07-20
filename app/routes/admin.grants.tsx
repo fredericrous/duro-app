@@ -252,7 +252,14 @@ export default function AdminGrantsPage({ loaderData }: Route.ComponentProps) {
             {table.getHeaderGroups().map((headerGroup) => (
               <Table.Row key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <Table.HeaderCell key={header.id} label={String(header.column.columnDef.header ?? "")}>
+                  <Table.HeaderCell
+                    key={header.id}
+                    label={String(header.column.columnDef.header ?? "")}
+                    // Actions column holds buttons — give it its natural width
+                    // so it isn't squeezed to the column floor when the table
+                    // scrolls horizontally.
+                    width={header.column.id === "actions" ? "max-content" : undefined}
+                  >
                     {header.isPlaceholder ? null : header.column.getCanSort() ? (
                       <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>
                         {flexRender(header.column.columnDef.header, header.getContext())}

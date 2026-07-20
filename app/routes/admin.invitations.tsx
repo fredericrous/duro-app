@@ -216,7 +216,7 @@ export default function AdminInvitationsPage({ loaderData }: Route.ComponentProp
                 <Table.HeaderCell>{t("admin.invitations.cols.access")}</Table.HeaderCell>
                 <Table.HeaderCell>{t("admin.invitations.cols.invitedBy")}</Table.HeaderCell>
                 <Table.HeaderCell>{t("admin.invitations.cols.created")}</Table.HeaderCell>
-                <Table.HeaderCell>{t("admin.invitations.cols.action")}</Table.HeaderCell>
+                <Table.HeaderCell width="max-content">{t("admin.invitations.cols.action")}</Table.HeaderCell>
               </Table.Row>
             </Table.Header>
             <Table.Body>
