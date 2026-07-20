@@ -543,12 +543,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
               )}
               {pendingRequests.length === 0 &&
                 (application.accessMode === "request" || application.accessMode === "invite_only") && (
-                  <Callout variant="success">
-                    <Inline gap="sm" align="center">
-                      <Icon name="check-circle" size={18} />
-                      <Text>{t("admin.applications.caughtUp")}</Text>
-                    </Inline>
-                  </Callout>
+                  <Callout variant="success">{t("admin.applications.caughtUp")}</Callout>
                 )}
               <AppOverview
                 application={application}

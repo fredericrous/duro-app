@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { css, html } from "react-strict-dom"
-import { Button, Heading, Inline, Panel, Stack, StatusIcon, Text } from "@duro-app/ui"
+import { Button, Heading, Icon, Inline, Panel, Stack, Text } from "@duro-app/ui"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { duration, easing } from "@duro-app/tokens/tokens/motion.css"
 import { useReducedMotion } from "~/lib/useReducedMotion"
 import { AnimatedNumber } from "~/components/motion/AnimatedNumber"
@@ -74,7 +75,9 @@ export function SetupCompleteness({ criteria }: SetupCompletenessProps) {
           {complete ? (
             <html.div style={[styles.completeBanner, entering && styles.completeBannerEnter]}>
               <Inline gap="sm" align="center">
-                <StatusIcon name="check-circle" variant="success" size={20} />
+                <html.span style={[styles.statusIcon, styles.iconSuccess]}>
+                  <Icon name="check-circle" size={20} />
+                </html.span>
                 <Text>{t("admin.applications.setup.complete")}</Text>
               </Inline>
             </html.div>
@@ -83,11 +86,9 @@ export function SetupCompleteness({ criteria }: SetupCompletenessProps) {
               {criteria.map((c) => (
                 <Inline key={c.id} justify="between" align="center">
                   <Inline gap="sm" align="center">
-                    <StatusIcon
-                      name={c.done ? "check-circle" : "clock"}
-                      variant={c.done ? "success" : "muted"}
-                      size={18}
-                    />
+                    <html.span style={[styles.statusIcon, c.done ? styles.iconSuccess : styles.iconMuted]}>
+                      <Icon name={c.done ? "check-circle" : "clock"} size={18} />
+                    </html.span>
                     <Text color={c.done ? "muted" : undefined}>{t(`admin.applications.setup.criteria.${c.id}`)}</Text>
                   </Inline>
                   {!c.done && (
@@ -106,6 +107,19 @@ export function SetupCompleteness({ criteria }: SetupCompletenessProps) {
 }
 
 const styles = css.create({
+  // Margin-less colored icon wrapper — StatusIcon carries a bottom margin (for
+  // the hero/empty-state layout) that pushes it off-center when used inline.
+  statusIcon: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconSuccess: {
+    color: colors.success,
+  },
+  iconMuted: {
+    color: colors.textMuted,
+  },
   track: {
     display: "grid",
     gap: spacing.xs,
