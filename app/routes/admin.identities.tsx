@@ -171,7 +171,9 @@ function buildIdentityColumns(t: (key: string, opts?: Record<string, unknown>) =
     }),
     columnHelper.accessor("displayName", {
       header: t("admin.cols.displayName"),
-      size: 240,
+      // No fixed px width — a fixed Display Name + Type + max-content Actions
+      // left no room for Email/Status at mid widths, collapsing them to a
+      // char-per-line. Flexible columns share the row and shrink evenly.
       enableColumnFilter: true,
       enableSorting: true,
       cell: ({ row }) => {
@@ -191,7 +193,6 @@ function buildIdentityColumns(t: (key: string, opts?: Record<string, unknown>) =
     }),
     columnHelper.accessor("type", {
       header: t("admin.cols.type"),
-      size: 140,
       enableSorting: true,
       cell: ({ getValue }) => {
         const type = getValue()
@@ -476,7 +477,10 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
               options={table
                 .getAllColumns()
                 .filter((c) => c.getCanSort())
-                .map((c) => ({ id: c.id, label: String(c.columnDef.header ?? c.id) }))}
+                .map((c) => ({
+                  id: c.id,
+                  label: typeof c.columnDef.header === "string" ? c.columnDef.header : c.id,
+                }))}
               value={sorting[0] ? { id: sorting[0].id, desc: sorting[0].desc } : null}
               onChange={(next) => setSorting(next ? [{ id: next.id, desc: next.desc }] : [])}
             />
@@ -491,7 +495,7 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
                   return (
                     <Table.HeaderCell
                       key={header.id}
-                      label={String(header.column.columnDef.header ?? "")}
+                      label={typeof header.column.columnDef.header === "string" ? header.column.columnDef.header : ""}
                       width={isActions ? "max-content" : header.getSize() !== 150 ? `${header.getSize()}px` : undefined}
                     >
                       {header.isPlaceholder ? null : header.column.getCanSort() ? (
