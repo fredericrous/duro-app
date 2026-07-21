@@ -1047,6 +1047,23 @@
         "firstGrant": "Accorder l'accès",
         "firstInvite": "Inviter"
       }
+    },
+    "hygiene": {
+      "title": "Santé de la gouvernance",
+      "allClear": "Tout est en ordre — rien ne requiert votre attention pour le moment.",
+      "findings": {
+        "apps_without_owner_one": "{{count}} application n'a pas de propriétaire",
+        "apps_without_owner_other": "{{count}} applications n'ont pas de propriétaire",
+        "enabled_apps_without_role_one": "{{count}} application activée n'a aucun rôle — aucun accès ne peut être accordé",
+        "enabled_apps_without_role_other": "{{count}} applications activées n'ont aucun rôle — aucun accès ne peut être accordé",
+        "stale_invitations_one": "{{count}} invitation en attente a expiré",
+        "stale_invitations_other": "{{count}} invitations en attente ont expiré"
+      },
+      "fix": {
+        "apps_without_owner": "Attribuer des propriétaires",
+        "enabled_apps_without_role": "Ajouter des rôles",
+        "stale_invitations": "Examiner"
+      }
     }
   },
   "error": {

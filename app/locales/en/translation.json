@@ -1047,6 +1047,23 @@
         "firstGrant": "Grant access",
         "firstInvite": "Invite"
       }
+    },
+    "hygiene": {
+      "title": "Governance health",
+      "allClear": "All clear — nothing needs attention right now.",
+      "findings": {
+        "apps_without_owner_one": "{{count}} application has no owner",
+        "apps_without_owner_other": "{{count}} applications have no owner",
+        "enabled_apps_without_role_one": "{{count}} enabled application has no roles — nothing can be granted for it",
+        "enabled_apps_without_role_other": "{{count}} enabled applications have no roles — nothing can be granted for them",
+        "stale_invitations_one": "{{count}} pending invitation has expired",
+        "stale_invitations_other": "{{count}} pending invitations have expired"
+      },
+      "fix": {
+        "apps_without_owner": "Assign owners",
+        "enabled_apps_without_role": "Add roles",
+        "stale_invitations": "Review"
+      }
     }
   },
   "error": {

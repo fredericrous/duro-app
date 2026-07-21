@@ -11,6 +11,7 @@ import { runEffect } from "~/lib/runtime.server"
 import { Badge, Button, DetailPanel, Drawer, Icon, Inline, PageShell, SideNav, Stack } from "@duro-app/ui"
 import { Header } from "~/components/Header/Header"
 import { SetupCompleteness, type SetupCriterion } from "~/components/AppOverview/SetupCompleteness"
+import { GovernanceHygiene, type HygieneFinding } from "~/components/GovernanceHygiene/GovernanceHygiene"
 import { useMediaQuery } from "~/hooks/useMediaQuery"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
@@ -124,7 +125,29 @@ export async function loader({ request }: Route.LoaderArgs) {
     }),
   ).catch(() => ({ hasApp: true, hasGrant: true, hasInvite: true }))
 
-  return { pendingCounts, setup }
+  // Governance-health gaps: real misconfigurations an admin should clear —
+  // apps with no owner, enabled apps with no role (so nothing can be granted),
+  // and pending invitations that have already expired.
+  const hygiene = await runEffect(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      const [noOwner, noRole, staleInv] = yield* Effect.all([
+        sql`SELECT count(*)::int AS n FROM applications WHERE owner_id IS NULL`,
+        sql`SELECT count(*)::int AS n FROM applications a
+            WHERE a.enabled = true AND NOT EXISTS (SELECT 1 FROM roles r WHERE r.application_id = a.id)`,
+        sql`SELECT count(*)::int AS n FROM access_invitations
+            WHERE status = 'pending' AND expires_at IS NOT NULL AND expires_at < now()`,
+      ])
+      const n = (r: readonly unknown[]) => ((r[0] as { n?: number } | undefined)?.n ?? 0) as number
+      return {
+        appsWithoutOwner: n(noOwner),
+        enabledAppsWithoutRole: n(noRole),
+        staleInvitations: n(staleInv),
+      }
+    }),
+  ).catch(() => ({ appsWithoutOwner: 0, enabledAppsWithoutRole: 0, staleInvitations: 0 }))
+
+  return { pendingCounts, setup, hygiene }
 }
 
 function deriveActiveValue(pathname: string): string {
@@ -177,6 +200,23 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
     isAdminIndex && !setupComplete ? (
       <SetupCompleteness criteria={firstRunCriteria} i18nPrefix="admin.firstRun" />
     ) : null
+
+  // Governance-health panel — actionable gaps on the admin landing. Shown once
+  // the instance is operational (or whenever there's something to fix), so it
+  // doesn't compete with the first-run checklist during initial setup.
+  const hygiene = loaderData?.hygiene ?? { appsWithoutOwner: 0, enabledAppsWithoutRole: 0, staleInvitations: 0 }
+  const hygieneFindings: HygieneFinding[] = [
+    { id: "apps_without_owner", count: hygiene.appsWithoutOwner, onFix: () => navigate("/admin/applications") },
+    {
+      id: "enabled_apps_without_role",
+      count: hygiene.enabledAppsWithoutRole,
+      onFix: () => navigate("/admin/applications"),
+    },
+    { id: "stale_invitations", count: hygiene.staleInvitations, onFix: () => navigate("/admin/invitations") },
+  ]
+  const hasHygieneFindings = hygieneFindings.some((f) => f.count > 0)
+  const hygienePanel =
+    isAdminIndex && (setupComplete || hasHygieneFindings) ? <GovernanceHygiene findings={hygieneFindings} /> : null
 
   // Refresh side-nav counts every 45s while the tab is foregrounded so an
   // admin who leaves the page open doesn't miss new pending work. Pause when
@@ -326,6 +366,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
               <html.div style={styles.mainContent}>
                 <Stack gap="lg">
                   {firstRunPanel}
+                  {hygienePanel}
                   <Outlet context={outletContext} />
                 </Stack>
               </html.div>
@@ -339,6 +380,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
               </html.div>
               <Stack gap="lg">
                 {firstRunPanel}
+                {hygienePanel}
                 <Outlet context={outletContext} />
               </Stack>
             </>
