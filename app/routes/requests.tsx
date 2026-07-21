@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Effect } from "effect"
 import { useFetcher, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
@@ -12,7 +13,19 @@ import { acceptInvitation, declineInvitation } from "~/lib/workflows/access-invi
 import { Header } from "~/components/Header/Header"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
-import { Alert, Badge, Button, EmptyState, Inline, PageShell, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
+import {
+  Alert,
+  Badge,
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  Inline,
+  PageShell,
+  ScrollArea,
+  Stack,
+  Table,
+  Text,
+} from "@duro-app/ui"
 
 export function meta() {
   return [{ title: "My requests - Duro" }]
@@ -142,6 +155,10 @@ export default function MyRequestsPage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
   const { requests, invitations } = loaderData
   const fetcher = useFetcher<typeof action>()
+  // The consequential row actions (cancel a request, decline an invitation)
+  // open a confirm dialog keyed by the row id instead of firing on one click.
+  const [cancelId, setCancelId] = useState<string | null>(null)
+  const [declineId, setDeclineId] = useState<string | null>(null)
   const dashboardData = useRouteLoaderData("routes/dashboard") as { user?: string; isAdmin?: boolean } | undefined
   const user = dashboardData?.user ?? ""
   const isAdmin = dashboardData?.isAdmin ?? false
@@ -215,13 +232,14 @@ export default function MyRequestsPage({ loaderData }: Route.ComponentProps) {
                                   {t("requests.invitations.accept")}
                                 </Button>
                               </fetcher.Form>
-                              <fetcher.Form method="post">
-                                <input type="hidden" name="intent" value="declineInvitation" />
-                                <input type="hidden" name="invitationId" value={inv.id} />
-                                <Button type="submit" variant="secondary" disabled={busy}>
-                                  {t("requests.invitations.decline")}
-                                </Button>
-                              </fetcher.Form>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                disabled={busy}
+                                onClick={() => setDeclineId(inv.id)}
+                              >
+                                {t("requests.invitations.decline")}
+                              </Button>
                             </Inline>
                           </Table.Cell>
                         </Table.Row>
@@ -287,13 +305,14 @@ export default function MyRequestsPage({ loaderData }: Route.ComponentProps) {
                             <Table.Cell>{new Date(r.createdAt).toLocaleDateString()}</Table.Cell>
                             <Table.Cell>
                               {r.status === "pending" && (
-                                <fetcher.Form method="post">
-                                  <input type="hidden" name="intent" value="cancel" />
-                                  <input type="hidden" name="requestId" value={r.id} />
-                                  <Button type="submit" variant="secondary" disabled={fetcher.state !== "idle"}>
-                                    {t("requests.cancel")}
-                                  </Button>
-                                </fetcher.Form>
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  disabled={busy}
+                                  onClick={() => setCancelId(r.id)}
+                                >
+                                  {t("requests.cancel")}
+                                </Button>
                               )}
                             </Table.Cell>
                           </Table.Row>
@@ -310,6 +329,40 @@ export default function MyRequestsPage({ loaderData }: Route.ComponentProps) {
           </Stack>
         </CardSection>
       </Stack>
+
+      <ConfirmDialog
+        open={cancelId !== null}
+        onOpenChange={(open) => !open && setCancelId(null)}
+        title={t("requests.cancelConfirmTitle")}
+        confirmSlot={() => (
+          <fetcher.Form method="post" onSubmit={() => setCancelId(null)}>
+            <input type="hidden" name="intent" value="cancel" />
+            <input type="hidden" name="requestId" value={cancelId ?? ""} />
+            <Button type="submit" variant="secondary">
+              {t("requests.cancel")}
+            </Button>
+          </fetcher.Form>
+        )}
+      >
+        {t("requests.cancelConfirmBody")}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={declineId !== null}
+        onOpenChange={(open) => !open && setDeclineId(null)}
+        title={t("requests.invitations.declineConfirmTitle")}
+        confirmSlot={() => (
+          <fetcher.Form method="post" onSubmit={() => setDeclineId(null)}>
+            <input type="hidden" name="intent" value="declineInvitation" />
+            <input type="hidden" name="invitationId" value={declineId ?? ""} />
+            <Button type="submit" variant="secondary">
+              {t("requests.invitations.decline")}
+            </Button>
+          </fetcher.Form>
+        )}
+      >
+        {t("requests.invitations.declineConfirmBody")}
+      </ConfirmDialog>
     </PageShell>
   )
 }

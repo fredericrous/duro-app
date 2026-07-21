@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router"
 import { useTranslation } from "react-i18next"
 import { Button, Dialog, Inline, Menu, Stack, Text } from "@duro-app/ui"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { typeScale } from "@duro-app/tokens/tokens/typography.css"
 import { css, html } from "react-strict-dom"
 import { RequestAccessDialog } from "~/components/RequestAccessDialog/RequestAccessDialog"
@@ -12,6 +13,12 @@ const styles = css.create({
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
+    // Wrap instead of letting the account menu get pushed off-screen on very
+    // narrow viewports, and never let the row itself force horizontal overflow.
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    maxWidth: "100%",
+    minWidth: 0,
   },
   logo: {
     fontSize: typeScale.fontSize9,

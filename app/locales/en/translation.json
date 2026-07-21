@@ -33,7 +33,8 @@
         "declined": "Declined"
       }
     },
-    "scratchToReveal": "Scratch or press Enter to reveal"
+    "scratchToReveal": "Scratch or press Enter to reveal",
+    "processing": "Processing…"
   },
   "header": {
     "welcome": "Welcome, {{user}}",
@@ -109,7 +110,11 @@
     "openLaunch": "Open",
     "pendingBanner_one": "You have {{count}} pending request",
     "pendingBanner_other": "You have {{count}} pending requests",
-    "viewRequests": "View"
+    "viewRequests": "View",
+    "action": {
+      "availableOnHome": "Available on Home",
+      "askAdmin": "Ask an admin"
+    }
   },
   "search": {
     "placeholder": "Search apps…",
@@ -158,13 +163,17 @@
         "action": "Action"
       },
       "accept": "Accept",
-      "decline": "Decline"
+      "decline": "Decline",
+      "declineConfirmTitle": "Decline this invitation?",
+      "declineConfirmBody": "This declines the invitation — it won't grant you access, and an admin would need to invite you again."
     },
     "success": {
       "cancelled": "Request cancelled.",
       "invitation_accepted": "Invitation accepted — access is being provisioned.",
       "invitation_declined": "Invitation declined."
-    }
+    },
+    "cancelConfirmTitle": "Cancel this request?",
+    "cancelConfirmBody": "This withdraws your access request. You can submit a new one later if you still need access."
   },
   "categories": {
     "media": "Media",
@@ -797,7 +806,32 @@
     },
     "accessRequests": {
       "title": "Access Requests ({{count}})",
-      "decisionHint": "Approve grants the requested role. Reject denies it permanently. Cancel marks the request as no longer relevant — for example, the requester left or the request is obsolete."
+      "decisionHint": "Approve grants the requested role. Reject denies it permanently. Cancel marks the request as no longer relevant — for example, the requester left or the request is obsolete.",
+      "detail": {
+        "heading": "Access Request",
+        "created": "Created {{date}}",
+        "fields": {
+          "requester": "Requester",
+          "application": "Application",
+          "role": "Role",
+          "entitlement": "Entitlement",
+          "resource": "Resource",
+          "justification": "Justification",
+          "requestedDuration": "Requested duration",
+          "durationHours_one": "{{count}} hour",
+          "durationHours_other": "{{count}} hours"
+        },
+        "approvals": "Approvals ({{count}})",
+        "decision": "Decision",
+        "commentLabel": "Comment",
+        "commentPlaceholder": "Optional comment…",
+        "approve": "Approve",
+        "reject": "Reject",
+        "rejectConfirmTitle": "Reject this access request?",
+        "rejectConfirmBody": "Rejecting permanently denies the request — the requester is not granted access and must submit a new request. Your comment (if any) is recorded with the decision.",
+        "cancelConfirmTitle": "Cancel this access request?",
+        "cancelConfirmBody": "This marks the request as no longer relevant (for example, the requester left or it's obsolete). The requester is not granted access, and this can't be undone."
+      }
     },
     "detailPanel": {
       "label": "Detail panel",

@@ -6,6 +6,9 @@ export interface AppDefinition {
   icon: string
   groups: string[]
   priority: number
+  /** Optional one-line description shown under the name on the app card, so
+   *  ambiguously-named apps carry context for less-technical members. */
+  description?: string | null
 }
 
 export function groupAppsByCategory(apps: AppDefinition[]): Map<string, AppDefinition[]> {

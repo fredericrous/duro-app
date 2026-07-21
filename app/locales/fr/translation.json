@@ -33,7 +33,8 @@
         "declined": "Refusée"
       }
     },
-    "scratchToReveal": "Grattez ou appuyez sur Entrée pour révéler"
+    "scratchToReveal": "Grattez ou appuyez sur Entrée pour révéler",
+    "processing": "Traitement…"
   },
   "header": {
     "welcome": "Bienvenue, {{user}}",
@@ -109,7 +110,11 @@
     "openLaunch": "Ouvrir",
     "pendingBanner_one": "Vous avez {{count}} demande en attente",
     "pendingBanner_other": "Vous avez {{count}} demandes en attente",
-    "viewRequests": "Voir"
+    "viewRequests": "Voir",
+    "action": {
+      "availableOnHome": "Disponible sur l'Accueil",
+      "askAdmin": "Demandez à un admin"
+    }
   },
   "search": {
     "placeholder": "Rechercher des applications…",
@@ -158,13 +163,17 @@
         "action": "Action"
       },
       "accept": "Accepter",
-      "decline": "Refuser"
+      "decline": "Refuser",
+      "declineConfirmTitle": "Refuser cette invitation ?",
+      "declineConfirmBody": "Cela refuse l'invitation et ne vous accorde pas l'accès. Un administrateur devra vous réinviter."
     },
     "success": {
       "cancelled": "Demande annulée.",
       "invitation_accepted": "Invitation acceptée — l'accès est en cours d'attribution.",
       "invitation_declined": "Invitation refusée."
-    }
+    },
+    "cancelConfirmTitle": "Annuler cette demande ?",
+    "cancelConfirmBody": "Cela retire votre demande d'accès. Vous pourrez en soumettre une nouvelle plus tard si nécessaire."
   },
   "categories": {
     "media": "Medias",
@@ -797,7 +806,32 @@
     },
     "accessRequests": {
       "title": "Demandes d'acces ({{count}})",
-      "decisionHint": "Approuver accorde le role demande. Rejeter refuse la demande de maniere permanente. Annuler marque la demande comme obsolete (par exemple, le demandeur a quitte l'organisation)."
+      "decisionHint": "Approuver accorde le role demande. Rejeter refuse la demande de maniere permanente. Annuler marque la demande comme obsolete (par exemple, le demandeur a quitte l'organisation).",
+      "detail": {
+        "heading": "Demande d'accès",
+        "created": "Créée le {{date}}",
+        "fields": {
+          "requester": "Demandeur",
+          "application": "Application",
+          "role": "Rôle",
+          "entitlement": "Permission",
+          "resource": "Ressource",
+          "justification": "Justification",
+          "requestedDuration": "Durée demandée",
+          "durationHours_one": "{{count}} heure",
+          "durationHours_other": "{{count}} heures"
+        },
+        "approvals": "Approbations ({{count}})",
+        "decision": "Décision",
+        "commentLabel": "Commentaire",
+        "commentPlaceholder": "Commentaire facultatif…",
+        "approve": "Approuver",
+        "reject": "Refuser",
+        "rejectConfirmTitle": "Refuser cette demande d'accès ?",
+        "rejectConfirmBody": "Refuser refuse définitivement la demande — le demandeur n'obtient pas l'accès et doit soumettre une nouvelle demande. Votre commentaire (le cas échéant) est enregistré avec la décision.",
+        "cancelConfirmTitle": "Annuler cette demande d'accès ?",
+        "cancelConfirmBody": "La demande est marquée comme obsolète (par exemple, le demandeur est parti ou elle n'est plus pertinente). Le demandeur n'obtient pas l'accès. Cette action est irréversible."
+      }
     },
     "detailPanel": {
       "label": "Panneau de details",

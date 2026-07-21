@@ -17,6 +17,11 @@ const styles = css.create({
     height: 48,
     color: "#6aaffc", // tokens.colors.accent — can't use css.defineVars ref in Metro
   },
+  // Center + clamp the description so long copy doesn't blow out card height.
+  description: {
+    display: "block",
+    textAlign: "center",
+  },
 })
 
 interface AppCardProps {
@@ -36,6 +41,13 @@ export function AppCard({ app }: AppCardProps) {
           <Icon svg={app.icon} size={32} />
         </html.div>
         <Text variant="label">{app.name}</Text>
+        {app.description ? (
+          <html.span style={styles.description}>
+            <Text variant="bodySm" color="muted">
+              {app.description}
+            </Text>
+          </html.span>
+        ) : null}
         {!hasLaunchUrl && (
           <Text variant="bodySm" color="muted">
             {t("home.appCard.noLaunchUrl")}
