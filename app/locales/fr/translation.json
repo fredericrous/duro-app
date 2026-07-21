@@ -635,7 +635,8 @@
       "maxDuration": "Durée max",
       "reason": "Raison",
       "grantedAt": "Octroyé le",
-      "action": "Action"
+      "action": "Action",
+      "readiness": "Maturité"
     },
     "empty": {
       "principals": "Aucun principal pour l'instant. Synchronisez votre fournisseur d'identite ou invitez des utilisateurs pour commencer.",
@@ -797,6 +798,20 @@
           "roles": "Créer un rôle",
           "entitlements": "Ajouter un droit",
           "grants": "Accorder l'accès"
+        }
+      },
+      "readiness": {
+        "level": {
+          "draft": "Brouillon",
+          "configured": "Configurée",
+          "grantable": "Attribuable",
+          "provisioned": "Provisionnée"
+        },
+        "desc": {
+          "draft": "Tout juste créée — ajoutez un propriétaire et une description pour la configurer.",
+          "configured": "Configurée, mais sans rôle ni permission — rien ne peut encore être accordé.",
+          "grantable": "Prête à être attribuée — possède des rôles/permissions, mais personne n'y a encore accès.",
+          "provisioned": "En service — au moins une personne détient un accès actif."
         }
       }
     },
