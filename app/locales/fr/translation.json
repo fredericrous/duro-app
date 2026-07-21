@@ -358,7 +358,8 @@
       "consumed": "Le mot de passe du certificat a deja ete revele. Si vous avez besoin d'une nouvelle invitation, utilisez le lien dans votre e-mail d'invitation original.",
       "copy": "Copier",
       "copied": "Copie !",
-      "oneTime": "Sauvegardez ce mot de passe — vous en aurez besoin pour installer le certificat."
+      "oneTime": "Sauvegardez ce mot de passe — vous en aurez besoin pour installer le certificat.",
+      "copyFailed": "Copie automatique impossible. Sélectionnez la valeur ci-dessus et copiez-la manuellement."
     },
     "cert": {
       "checking": "Verification du certificat...",
@@ -405,6 +406,14 @@
       "title": "Inscription réussie",
       "message": "Bienvenue sur {{appName}} ! Votre compte est prêt — accédez à votre tableau de bord pour commencer.",
       "goHome": "Aller au tableau de bord"
+    },
+    "error": {
+      "missing_token": "Ce lien d'invitation ne contient pas son jeton. Utilisez le lien complet de votre invitation.",
+      "invalid_origin": "Cette requête provient d'une origine inattendue et a été bloquée. Réessayez depuis le lien d'invitation.",
+      "invalid_username": "Le nom d'utilisateur doit comporter 3 à 32 caractères — lettres, chiffres, tirets ou tirets bas.",
+      "password_too_short": "Le mot de passe doit comporter au moins 12 caractères.",
+      "password_mismatch": "Les mots de passe ne correspondent pas.",
+      "create_failed": "Impossible de créer votre compte. Réessayez ou demandez une nouvelle invitation à un administrateur."
     }
   },
   "reinvite": {
@@ -1011,7 +1020,9 @@
         "expiresHint": "Par défaut {{days}} jours si laissé vide.",
         "creating": "Création…",
         "submit": "Créer l'invitation"
-      }
+      },
+      "cancelConfirmTitle": "Annuler cette invitation ?",
+      "cancelConfirmBody": "Cela retire l'invitation en attente — la personne invitée ne pourra pas l'accepter et vous devrez en envoyer une nouvelle."
     }
   },
   "error": {

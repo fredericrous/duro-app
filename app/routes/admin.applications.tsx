@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { useFetcher, useNavigate, useSearchParams } from "react-router"
+import { Link, useFetcher, useNavigate, useSearchParams } from "react-router"
 import { useTranslation } from "react-i18next"
 import { enumLabel } from "~/lib/enum-labels"
 import { Effect } from "effect"
@@ -42,6 +42,19 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
     columnHelper.accessor("displayName", {
       header: t("admin.cols.name"),
       enableSorting: true,
+      // Render the name as a real link (focusable, announced as a link, works
+      // with middle-click / open-in-new-tab) rather than relying only on the
+      // implicit row-click navigation, which keyboard + AT users can't reach.
+      cell: ({ row, getValue }) => (
+        <Link
+          to={`/admin/applications/${row.original.id}`}
+          style={{ color: "#6aaffc", fontWeight: 500, textDecoration: "none" }}
+          // Row onClick already navigates here; don't double-fire it.
+          onClick={(e) => e.stopPropagation()}
+        >
+          {getValue()}
+        </Link>
+      ),
     }),
     columnHelper.accessor("slug", {
       header: t("admin.cols.slug"),

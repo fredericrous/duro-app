@@ -14,6 +14,7 @@ import type { Role, Entitlement } from "~/lib/governance/types"
 import {
   Badge,
   Button,
+  ConfirmDialog,
   Dialog,
   EmptyState,
   Field,
@@ -182,6 +183,9 @@ export default function AdminInvitationsPage({ loaderData }: Route.ComponentProp
   const fetcher = useFetcher<typeof action>()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedApp, setSelectedApp] = useState<string>("")
+  // Cancelling an invitation is consequential (the invitee loses their
+  // pending grant), so confirm it instead of firing on a single click.
+  const [cancelId, setCancelId] = useState<string | null>(null)
 
   const busy = fetcher.state !== "idle"
 
@@ -234,13 +238,15 @@ export default function AdminInvitationsPage({ loaderData }: Route.ComponentProp
                   <Table.Cell>{new Date(inv.createdAt).toLocaleDateString()}</Table.Cell>
                   <Table.Cell>
                     {inv.status === "pending" && (
-                      <fetcher.Form method="post">
-                        <input type="hidden" name="intent" value="cancelInvitation" />
-                        <input type="hidden" name="invitationId" value={inv.id} />
-                        <Button type="submit" variant="secondary" size="small" disabled={busy}>
-                          {t("admin.invitations.cancel")}
-                        </Button>
-                      </fetcher.Form>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="small"
+                        disabled={busy}
+                        onClick={() => setCancelId(inv.id)}
+                      >
+                        {t("admin.invitations.cancel")}
+                      </Button>
                     )}
                   </Table.Cell>
                 </Table.Row>
@@ -343,6 +349,23 @@ export default function AdminInvitationsPage({ loaderData }: Route.ComponentProp
           </Dialog.Body>
         </Dialog.Portal>
       </Dialog.Root>
+
+      <ConfirmDialog
+        open={cancelId !== null}
+        onOpenChange={(open) => !open && setCancelId(null)}
+        title={t("admin.invitations.cancelConfirmTitle")}
+        confirmSlot={() => (
+          <fetcher.Form method="post" onSubmit={() => setCancelId(null)}>
+            <input type="hidden" name="intent" value="cancelInvitation" />
+            <input type="hidden" name="invitationId" value={cancelId ?? ""} />
+            <Button type="submit" variant="danger">
+              {t("admin.invitations.cancel")}
+            </Button>
+          </fetcher.Form>
+        )}
+      >
+        {t("admin.invitations.cancelConfirmBody")}
+      </ConfirmDialog>
     </Stack>
   )
 }

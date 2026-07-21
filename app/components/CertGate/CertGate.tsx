@@ -65,7 +65,11 @@ export function CertGate({
 
   return (
     <>
-      {error && <Alert variant="error">{error}</Alert>}
+      {error && (
+        <Alert variant="error">
+          {t(`createAccount.error.${error}`, { defaultValue: t("createAccount.error.create_failed") })}
+        </Alert>
+      )}
 
       <Form
         schema={CreateAccountSchema}
