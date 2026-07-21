@@ -17,15 +17,23 @@ export interface SetupCriterion {
 
 interface SetupCompletenessProps {
   criteria: ReadonlyArray<SetupCriterion>
+  /**
+   * i18n key prefix for this checklist's copy. Resolves `<prefix>.title`,
+   * `.progress`, `.complete`, `.criteria.<id>`, `.fix.<id>`. Defaults to the
+   * per-application namespace so existing callers are unaffected; the first-run
+   * checklist passes its own prefix to reuse this same machinery.
+   */
+  i18nPrefix?: string
 }
 
 /**
- * Per-application "setup completeness" meter. Turns the flat governance CRUD
- * surface into a guided, rewarding checklist: a segmented progress bar fills as
- * each criterion is satisfied, and each unmet criterion offers a one-click jump
- * to where it's fixed. The bar animation respects prefers-reduced-motion.
+ * A guided, rewarding "completion checklist" meter: a segmented progress bar
+ * fills as each criterion is satisfied, and each unmet criterion offers a
+ * one-click jump to where it's fixed. Reused for per-application setup and for
+ * the admin first-run path via `i18nPrefix`. Animation respects
+ * prefers-reduced-motion.
  */
-export function SetupCompleteness({ criteria }: SetupCompletenessProps) {
+export function SetupCompleteness({ criteria, i18nPrefix = "admin.applications.setup" }: SetupCompletenessProps) {
   const { t } = useTranslation()
   const reduced = useReducedMotion()
   const done = criteria.filter((c) => c.done).length
@@ -51,9 +59,9 @@ export function SetupCompleteness({ criteria }: SetupCompletenessProps) {
     <Panel.Root bordered>
       <Panel.Header>
         <Inline justify="between" align="center">
-          <Heading level={4}>{t("admin.applications.setup.title")}</Heading>
+          <Heading level={4}>{t(`${i18nPrefix}.title`)}</Heading>
           <Text color="muted" variant="caption">
-            <AnimatedNumber value={done} /> {t("admin.applications.setup.progress", { total })}
+            <AnimatedNumber value={done} /> {t(`${i18nPrefix}.progress`, { total })}
           </Text>
         </Inline>
       </Panel.Header>
@@ -64,7 +72,7 @@ export function SetupCompleteness({ criteria }: SetupCompletenessProps) {
             aria-valuenow={done}
             aria-valuemin={0}
             aria-valuemax={total}
-            aria-label={t("admin.applications.setup.title")}
+            aria-label={t(`${i18nPrefix}.title`)}
             style={[styles.track, styles.trackCols(total)]}
           >
             {criteria.map((c, i) => (
@@ -78,7 +86,7 @@ export function SetupCompleteness({ criteria }: SetupCompletenessProps) {
                 <html.span style={[styles.statusIcon, styles.iconSuccess]}>
                   <Icon name="check-circle" size={20} />
                 </html.span>
-                <Text>{t("admin.applications.setup.complete")}</Text>
+                <Text>{t(`${i18nPrefix}.complete`)}</Text>
               </Inline>
             </html.div>
           ) : (
@@ -89,11 +97,11 @@ export function SetupCompleteness({ criteria }: SetupCompletenessProps) {
                     <html.span style={[styles.statusIcon, c.done ? styles.iconSuccess : styles.iconMuted]}>
                       <Icon name={c.done ? "check-circle" : "clock"} size={18} />
                     </html.span>
-                    <Text color={c.done ? "muted" : undefined}>{t(`admin.applications.setup.criteria.${c.id}`)}</Text>
+                    <Text color={c.done ? "muted" : undefined}>{t(`${i18nPrefix}.criteria.${c.id}`)}</Text>
                   </Inline>
                   {!c.done && (
                     <Button variant="secondary" size="small" onClick={c.onFix}>
-                      {t(`admin.applications.setup.fix.${c.id}`)}
+                      {t(`${i18nPrefix}.fix.${c.id}`)}
                     </Button>
                   )}
                 </Inline>

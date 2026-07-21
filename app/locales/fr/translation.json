@@ -34,7 +34,8 @@
       }
     },
     "scratchToReveal": "Grattez ou appuyez sur Entrée pour révéler",
-    "processing": "Traitement…"
+    "processing": "Traitement…",
+    "done": "Terminé"
   },
   "header": {
     "welcome": "Bienvenue, {{user}}",
@@ -43,7 +44,15 @@
     "myRequests": "Mes demandes",
     "requestDialog": {
       "loading": "Chargement des applications disponibles…",
-      "empty": "Vous avez deja acces a toutes les applications qui vous sont accessibles. Si vous pensez qu'il en manque, contactez un administrateur."
+      "empty": "Vous avez deja acces a toutes les applications qui vous sont accessibles. Si vous pensez qu'il en manque, contactez un administrateur.",
+      "outcome": {
+        "thisApp": "cette application",
+        "auto_approved": "Accès accordé — vous avez maintenant accès à {{app}}.",
+        "submitted": "Demande envoyée. Votre demande pour {{app}} est en attente d'approbation — vous serez notifié de la décision.",
+        "duplicate": "Vous avez déjà une demande en attente pour {{app}}.",
+        "open": "Ouvrir {{app}}",
+        "viewRequests": "Voir mes demandes"
+      }
     }
   },
   "home": {
@@ -1023,6 +1032,21 @@
       },
       "cancelConfirmTitle": "Annuler cette invitation ?",
       "cancelConfirmBody": "Cela retire l'invitation en attente — la personne invitée ne pourra pas l'accepter et vous devrez en envoyer une nouvelle."
+    },
+    "firstRun": {
+      "title": "Terminez la configuration de Duro",
+      "progress": "sur {{total}} effectué(s)",
+      "complete": "Tout est prêt — Duro est prêt à l'emploi.",
+      "criteria": {
+        "firstApp": "Enregistrez votre première application",
+        "firstGrant": "Accordez l'accès à quelqu'un",
+        "firstInvite": "Envoyez votre première invitation"
+      },
+      "fix": {
+        "firstApp": "Ajouter une application",
+        "firstGrant": "Accorder l'accès",
+        "firstInvite": "Inviter"
+      }
     }
   },
   "error": {
