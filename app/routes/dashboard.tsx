@@ -1,4 +1,5 @@
 import { Effect } from "effect"
+import * as SqlClient from "@effect/sql/SqlClient"
 import { Outlet, redirect } from "react-router"
 import type { Route } from "./+types/dashboard"
 import { requireAuth } from "~/lib/auth.server"
@@ -36,12 +37,35 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
   }
 
+  // Count the items awaiting the user on their "My requests" page — their own
+  // in-flight requests plus invitations still open for them — so the header can
+  // badge the link and nudge them back to read it. Cheap raw-SQL counts; the
+  // badge self-clears as requests are decided and invitations are answered.
+  let openRequestItems = 0
+  if (currentPrincipalId) {
+    openRequestItems = await runEffect(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        const [reqs, invs] = yield* Effect.all([
+          sql`SELECT count(*)::int AS n FROM access_requests
+              WHERE requester_id = ${currentPrincipalId} AND status = 'pending'`,
+          sql`SELECT count(*)::int AS n FROM access_invitations
+              WHERE invited_principal_id = ${currentPrincipalId} AND status = 'pending'
+                AND (expires_at IS NULL OR expires_at > now())`,
+        ])
+        const n = (r: readonly unknown[]) => ((r[0] as { n?: number } | undefined)?.n ?? 0) as number
+        return n(reqs) + n(invs)
+      }),
+    ).catch(() => 0)
+  }
+
   return {
     user: auth.user,
     email: auth.email,
     groups: auth.groups,
     isAdmin: adminDecision.allow,
     currentPrincipalId,
+    openRequestItems,
   }
 }
 
