@@ -7,6 +7,7 @@ import { hasStarterTemplate } from "~/lib/governance/defaultRbac"
 import type { Application, Entitlement, Grant, Role } from "~/lib/governance/types"
 import { StatGrid, type Stat } from "./StatGrid"
 import { SetupCompleteness, type SetupCriterion } from "./SetupCompleteness"
+import { ReadinessBadge } from "~/components/ReadinessBadge/ReadinessBadge"
 
 interface AppOverviewProps {
   application: Application
@@ -91,6 +92,14 @@ export function AppOverview({
             <Badge variant={application.enabled ? "success" : "default"}>
               {application.enabled ? "Enabled" : "Disabled"}
             </Badge>
+            <ReadinessBadge
+              signals={{
+                hasOwner: !!application.ownerId,
+                hasDescription: !!(application.description && application.description.trim()),
+                hasTarget: roles.length > 0 || entitlements.length > 0,
+                hasGrant: grants.length > 0,
+              }}
+            />
           </Inline>
           <Button variant="primary" onClick={onOpenQuickGrant}>
             Grant access

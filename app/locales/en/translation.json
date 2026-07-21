@@ -635,7 +635,8 @@
       "maxDuration": "Max Duration",
       "reason": "Reason",
       "grantedAt": "Granted at",
-      "action": "Action"
+      "action": "Action",
+      "readiness": "Readiness"
     },
     "empty": {
       "principals": "No principals yet. Sync your identity provider or invite users to get started.",
@@ -797,6 +798,20 @@
           "roles": "Create role",
           "entitlements": "Add entitlement",
           "grants": "Grant access"
+        }
+      },
+      "readiness": {
+        "level": {
+          "draft": "Draft",
+          "configured": "Configured",
+          "grantable": "Grantable",
+          "provisioned": "Provisioned"
+        },
+        "desc": {
+          "draft": "Just created — add an owner and a description to configure it.",
+          "configured": "Set up, but has no roles or entitlements yet, so nothing can be granted.",
+          "grantable": "Ready to grant — has roles/entitlements, but no one holds access yet.",
+          "provisioned": "In use — at least one person holds an active grant."
         }
       }
     },
