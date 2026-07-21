@@ -85,12 +85,12 @@ describe("AdminLayout component", () => {
   })
 
   it("marks the active item for the current route", async () => {
-    // At "/", the derived active value is "invites" (User Invites). Query the
-    // button by role — SideNav.Item wraps its label in a span, so the label text
-    // node isn't the element that carries aria-current.
+    // At the "/admin" index the derived active value is "dashboard" (Overview).
+    // Query the button by role — SideNav.Item wraps its label in a span, so the
+    // label text node isn't the element that carries aria-current.
     renderLayout({ pendingCounts: { accessRequests: 7, accessInvitations: 2 } })
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: t("admin.nav.invites", "User Invites") })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: t("admin.nav.dashboard", "Dashboard") })).toHaveAttribute(
         "aria-current",
         "page",
       )

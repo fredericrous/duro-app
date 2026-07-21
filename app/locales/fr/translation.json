@@ -592,7 +592,9 @@
       "plugins": "Extensions",
       "invites": "Invitations utilisateur",
       "users": "Utilisateurs",
-      "identities": "Identités"
+      "identities": "Identités",
+      "overview": "Vue d'ensemble",
+      "dashboard": "Tableau de bord"
     },
     "cols": {
       "name": "Nom",
@@ -1078,6 +1080,18 @@
         "apps_without_owner": "Attribuer des propriétaires",
         "enabled_apps_without_role": "Ajouter des rôles",
         "stale_invitations": "Examiner"
+      }
+    },
+    "dashboard": {
+      "title": "Vue d'ensemble",
+      "awaiting": {
+        "title": "En attente de traitement",
+        "allClear": "Rien ne requiert votre attention pour le moment.",
+        "accessRequests_one": "{{count}} demande d’accès à examiner",
+        "accessRequests_other": "{{count}} demandes d’accès à examiner",
+        "invitations_one": "{{count}} invitation en attente",
+        "invitations_other": "{{count}} invitations en attente",
+        "review": "Examiner"
       }
     }
   },

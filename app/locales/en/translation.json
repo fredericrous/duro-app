@@ -592,7 +592,9 @@
       "plugins": "Plugins",
       "invites": "User Invites",
       "users": "Users",
-      "identities": "Identities"
+      "identities": "Identities",
+      "overview": "Overview",
+      "dashboard": "Dashboard"
     },
     "cols": {
       "name": "Name",
@@ -1078,6 +1080,18 @@
         "apps_without_owner": "Assign owners",
         "enabled_apps_without_role": "Add roles",
         "stale_invitations": "Review"
+      }
+    },
+    "dashboard": {
+      "title": "Overview",
+      "awaiting": {
+        "title": "Awaiting review",
+        "allClear": "Nothing needs your attention right now.",
+        "accessRequests_one": "{{count}} access request to review",
+        "accessRequests_other": "{{count}} access requests to review",
+        "invitations_one": "{{count}} pending invitation",
+        "invitations_other": "{{count}} pending invitations",
+        "review": "Review"
       }
     }
   },
