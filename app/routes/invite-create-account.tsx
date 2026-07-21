@@ -113,12 +113,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 export async function action({ request, params }: Route.ActionArgs) {
   const token = params.token
   if (!token) {
-    return { error: "Missing invite token" }
+    return { error: "missing_token" as const }
   }
 
   const origin = request.headers.get("Origin")
   if (!isOriginAllowed(origin)) {
-    return { error: "Invalid request origin" }
+    return { error: "invalid_origin" as const }
   }
 
   const formData = await request.formData()
@@ -127,15 +127,13 @@ export async function action({ request, params }: Route.ActionArgs) {
   const confirmPassword = formData.get("confirmPassword") as string
 
   if (!username || !/^[a-zA-Z0-9_-]{3,32}$/.test(username)) {
-    return {
-      error: "Username must be 3-32 characters (letters, numbers, hyphens, underscores)",
-    }
+    return { error: "invalid_username" as const }
   }
   if (!password || password.length < 12) {
-    return { error: "Password must be at least 12 characters" }
+    return { error: "password_too_short" as const }
   }
   if (password !== confirmPassword) {
-    return { error: "Passwords do not match" }
+    return { error: "password_mismatch" as const }
   }
 
   try {
@@ -159,7 +157,7 @@ export async function action({ request, params }: Route.ActionArgs) {
           ? e.message
           : "Failed to create account"
     console.error("[create-account] action error:", message)
-    return { error: message }
+    return { error: "create_failed" as const }
   }
 }
 

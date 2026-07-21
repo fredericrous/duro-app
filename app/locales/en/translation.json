@@ -358,7 +358,8 @@
       "consumed": "The certificate password has already been revealed. If you need a new invite, use the link in your original invitation email.",
       "copy": "Copy",
       "copied": "Copied!",
-      "oneTime": "Save this password — you'll need it to install the certificate."
+      "oneTime": "Save this password — you'll need it to install the certificate.",
+      "copyFailed": "Couldn't copy automatically. Select the value above and copy it manually."
     },
     "cert": {
       "checking": "Checking certificate...",
@@ -405,6 +406,14 @@
       "title": "Successfully Joined",
       "message": "Welcome to {{appName}}! Your account is ready — head to your dashboard to get started.",
       "goHome": "Go to Dashboard"
+    },
+    "error": {
+      "missing_token": "This invitation link is missing its token. Use the full link from your invitation.",
+      "invalid_origin": "This request came from an unexpected origin and was blocked. Please try again from the invitation link.",
+      "invalid_username": "Username must be 3–32 characters — letters, numbers, hyphens, or underscores.",
+      "password_too_short": "Password must be at least 12 characters.",
+      "password_mismatch": "The passwords don't match.",
+      "create_failed": "We couldn't create your account. Please try again, or ask an admin for a new invitation."
     }
   },
   "reinvite": {
@@ -1011,7 +1020,9 @@
         "expiresHint": "Defaults to {{days}} days if left empty.",
         "creating": "Creating…",
         "submit": "Create Invitation"
-      }
+      },
+      "cancelConfirmTitle": "Cancel this invitation?",
+      "cancelConfirmBody": "This withdraws the pending invitation — the invitee won't be able to accept it, and you'd need to send a new one."
     }
   },
   "error": {

@@ -105,7 +105,33 @@ function PasswordCard({ password }: { password: string }) {
     `scratch:${typeof window !== "undefined" ? window.location.pathname : ""}`,
   )
   const [copied, setCopied] = useState(false)
+  const [copyFailed, setCopyFailed] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
+
+  // Copy can reject (denied permission) or be unavailable entirely (insecure
+  // context / older browser). Reflect the real outcome instead of always
+  // claiming success, and fall back to a "copy it manually" hint.
+  const copyPassword = useCallback(() => {
+    const clip = typeof navigator !== "undefined" ? navigator.clipboard : undefined
+    const flash = (setter: (v: boolean) => void, ms: number) => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+      setter(true)
+      timerRef.current = setTimeout(() => setter(false), ms)
+    }
+    const onOk = () => {
+      setCopyFailed(false)
+      flash(setCopied, 2000)
+    }
+    const onFail = () => {
+      setCopied(false)
+      flash(setCopyFailed, 5000)
+    }
+    if (!clip?.writeText) {
+      onFail()
+      return
+    }
+    clip.writeText(password).then(onOk, onFail)
+  }, [password])
 
   const handleReveal = useCallback(() => {
     onReveal()
@@ -114,30 +140,28 @@ function PasswordCard({ password }: { password: string }) {
   }, [fetcher, onReveal])
 
   return (
-    <InputGroup.Root>
-      <ScratchCard
-        width={320}
-        height={48}
-        revealThreshold={0.8}
-        initialRevealed={revealed}
-        onReveal={handleReveal}
-        label={t("common.scratchToReveal")}
-      >
-        <Input defaultValue={password} />
-      </ScratchCard>
-      <InputGroup.Addon
-        disabled={!revealed}
-        minWidth={72}
-        onClick={() => {
-          navigator.clipboard.writeText(password)
-          setCopied(true)
-          if (timerRef.current) clearTimeout(timerRef.current)
-          timerRef.current = setTimeout(() => setCopied(false), 2000)
-        }}
-      >
-        {copied ? t("invite.password.copied") : t("invite.password.copy")}
-      </InputGroup.Addon>
-    </InputGroup.Root>
+    <Stack gap="xs">
+      <InputGroup.Root>
+        <ScratchCard
+          width={320}
+          height={48}
+          revealThreshold={0.8}
+          initialRevealed={revealed}
+          onReveal={handleReveal}
+          label={t("common.scratchToReveal")}
+        >
+          <Input defaultValue={password} />
+        </ScratchCard>
+        <InputGroup.Addon disabled={!revealed} minWidth={72} onClick={copyPassword}>
+          {copied ? t("invite.password.copied") : t("invite.password.copy")}
+        </InputGroup.Addon>
+      </InputGroup.Root>
+      {copyFailed && (
+        <Text variant="bodySm" color="muted">
+          {t("invite.password.copyFailed")}
+        </Text>
+      )}
+    </Stack>
   )
 }
 

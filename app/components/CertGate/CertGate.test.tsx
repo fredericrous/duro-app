@@ -43,10 +43,17 @@ describe("CertGate", () => {
     expect(screen.getByRole("button", { name: t("createAccount.submit") })).toBeInTheDocument()
   })
 
-  it("surfaces an action error above the form", async () => {
-    renderGate(true, { error: "Username already taken" })
+  it("surfaces an action error above the form, mapped from its code", async () => {
+    renderGate(true, { error: "password_mismatch" })
     await waitFor(() => {
-      expect(screen.getByText("Username already taken")).toBeInTheDocument()
+      expect(screen.getByText(t("createAccount.error.password_mismatch"))).toBeInTheDocument()
+    })
+  })
+
+  it("falls back to a generic message for an unknown error code", async () => {
+    renderGate(true, { error: "something_unexpected" })
+    await waitFor(() => {
+      expect(screen.getByText(t("createAccount.error.create_failed"))).toBeInTheDocument()
     })
   })
 })

@@ -92,13 +92,13 @@ describe("/invite/:token/create-account loader", () => {
 })
 
 describe("/invite/:token/create-account action", () => {
-  it("returns 'Missing invite token' when params.token is absent", async () => {
+  it("returns the missing_token code when params.token is absent", async () => {
     const result = await callAction(action, { params: {} })
     const data = expectData<{ error?: string }>(result)
-    expect(data.error).toBe("Missing invite token")
+    expect(data.error).toBe("missing_token")
   })
 
-  it("returns 'Invalid request origin' when origin check fails", async () => {
+  it("returns the invalid_origin code when origin check fails", async () => {
     const { isOriginAllowed } = await import("~/lib/config.server")
     vi.mocked(isOriginAllowed).mockReturnValue(false)
 
@@ -107,7 +107,7 @@ describe("/invite/:token/create-account action", () => {
       headers: { Origin: "http://evil" },
     })
     const data = expectData<{ error?: string }>(result)
-    expect(data.error).toBe("Invalid request origin")
+    expect(data.error).toBe("invalid_origin")
   })
 })
 
