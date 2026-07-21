@@ -43,6 +43,7 @@ describe("/dashboard loader", () => {
     mockRunEffect
       .mockResolvedValueOnce(false as never) // isFirstRun
       .mockResolvedValueOnce("principal-1" as never) // principal lookup
+      .mockResolvedValueOnce(2 as never) // open-request-items count
     mockRequireAuth.mockResolvedValue({
       user: "alice",
       email: "alice@example.com",
@@ -57,6 +58,7 @@ describe("/dashboard loader", () => {
       email: string
       isAdmin: boolean
       currentPrincipalId: string | null
+      openRequestItems: number
     }>(result)
 
     expect(data).toEqual({
@@ -65,6 +67,7 @@ describe("/dashboard loader", () => {
       groups: ["users"],
       isAdmin: true,
       currentPrincipalId: "principal-1",
+      openRequestItems: 2,
     })
   })
 

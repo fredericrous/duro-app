@@ -1,7 +1,7 @@
 import { useState } from "react"
-import { Link, useNavigate } from "react-router"
+import { Link, useNavigate, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
-import { Button, Dialog, Inline, Menu, Stack, Text } from "@duro-app/ui"
+import { Badge, Button, Dialog, Inline, LinkButton, Menu, Stack, Text } from "@duro-app/ui"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { typeScale } from "@duro-app/tokens/tokens/typography.css"
@@ -27,6 +27,17 @@ const styles = css.create({
     textDecoration: "none",
     color: colors.text,
   },
+  // The primary verbs (Request access, My requests) live here as visible
+  // controls rather than buried in the account dropdown — hidden actions get
+  // forgotten. The cluster wraps on narrow viewports so nothing overflows.
+  actions: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+    minWidth: 0,
+  },
 })
 
 interface HeaderProps {
@@ -41,11 +52,17 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
   const [logoutOpen, setLogoutOpen] = useState(false)
   const [requestOpen, setRequestOpen] = useState(false)
 
-  // The "Request access" entry is intentionally always visible — predictable
-  // nav beats appearing/disappearing menu items, and the dialog itself can
-  // teach the user when there's nothing to request. The dialog fetches its
-  // own catalog from /api/catalog on open, so the Header pays no DB cost
-  // until the user actually clicks.
+  // Badge "My requests" with the count of items awaiting the user (their own
+  // in-flight requests + open invitations), loaded once by the dashboard
+  // layout. Reading it here keeps every caller from having to thread the count
+  // through as a prop; it falls back to 0 outside that layout (e.g. tests).
+  const dashboard = useRouteLoaderData("routes/dashboard") as { openRequestItems?: number } | undefined
+  const openItems = dashboard?.openRequestItems ?? 0
+
+  // "Request access" is the primary verb, so it's a persistent primary button
+  // (not a menu row). The dialog fetches its own catalog from /api/catalog on
+  // open, so the Header pays no DB cost until the user actually clicks. The
+  // account menu keeps only identity actions — where people expect to find them.
 
   return (
     <html.div style={styles.row}>
@@ -53,17 +70,28 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
         <html.span style={styles.logo}>{t("common.appTitle")}</html.span>
       </Link>
       {showMenu && (
-        <Menu.Root>
-          <Menu.Trigger>{t("header.welcome", { user })} &#9662;</Menu.Trigger>
-          <Menu.Popup align="end">
-            <Menu.Item onClick={() => setRequestOpen(true)}>{t("header.requestAccess")}</Menu.Item>
-            <Menu.LinkItem href="/catalog">{t("header.browseApps")}</Menu.LinkItem>
-            <Menu.LinkItem href="/requests">{t("header.myRequests")}</Menu.LinkItem>
-            {isAdmin && <Menu.LinkItem href="/admin">{t("common.admin")}</Menu.LinkItem>}
-            <Menu.LinkItem href="/settings">{t("common.settings")}</Menu.LinkItem>
-            <Menu.Item onClick={() => setLogoutOpen(true)}>{t("common.logout")}</Menu.Item>
-          </Menu.Popup>
-        </Menu.Root>
+        <html.div style={styles.actions}>
+          <Button variant="primary" onClick={() => setRequestOpen(true)}>
+            {t("header.requestAccess")}
+          </Button>
+          <LinkButton href="/requests" variant="secondary">
+            {t("header.myRequests")}
+            {openItems > 0 && (
+              <Badge variant="info" size="sm">
+                {openItems}
+              </Badge>
+            )}
+          </LinkButton>
+          <Menu.Root>
+            <Menu.Trigger>{t("header.welcome", { user })} &#9662;</Menu.Trigger>
+            <Menu.Popup align="end">
+              <Menu.LinkItem href="/catalog">{t("header.getAccess")}</Menu.LinkItem>
+              {isAdmin && <Menu.LinkItem href="/admin">{t("common.admin")}</Menu.LinkItem>}
+              <Menu.LinkItem href="/settings">{t("common.settings")}</Menu.LinkItem>
+              <Menu.Item onClick={() => setLogoutOpen(true)}>{t("common.logout")}</Menu.Item>
+            </Menu.Popup>
+          </Menu.Root>
+        </html.div>
       )}
 
       <RequestAccessDialog open={requestOpen} onOpenChange={setRequestOpen} />
