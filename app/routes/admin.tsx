@@ -22,6 +22,12 @@ const styles = css.create({
   pageWrap: {
     flex: 1,
     minWidth: 0,
+    // Safety net: nothing in the admin content may push the page wider than
+    // the viewport (which would shove the header's account menu off-screen on
+    // mobile). `clip` — not `hidden` — so it doesn't create a scroll container
+    // or break sticky positioning / table scroll-ports nested inside.
+    maxWidth: "100%",
+    overflowX: "clip",
   },
   layoutRow: {
     display: "flex",

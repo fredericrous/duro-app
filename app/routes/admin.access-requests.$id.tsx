@@ -8,6 +8,7 @@ import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { AccessRequestRepo } from "~/lib/governance/AccessRequestRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { handleAdminAccessRequestsMutation } from "~/lib/mutations/admin-access-requests"
+import { enumLabel } from "~/lib/enum-labels"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import {
@@ -88,6 +89,7 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
   const fetcher = useFetcher<typeof action>()
   const [comment, setComment] = useState("")
   const [rejectOpen, setRejectOpen] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
 
   const isSubmitting = fetcher.state !== "idle"
   const isPending = accessRequest.status === "pending"
@@ -105,10 +107,12 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
   return (
     <Stack gap="md">
       <html.div>
-        <Heading level={2}>Access Request</Heading>
+        <Heading level={2}>{t("admin.accessRequests.detail.heading")}</Heading>
         <Text color="muted">
-          <Badge variant={statusVariant}>{accessRequest.status}</Badge> &middot; Created{" "}
-          {new Date(accessRequest.createdAt).toLocaleString()}
+          <Badge variant={statusVariant}>{enumLabel(t, "requestStatus", accessRequest.status)}</Badge> &middot;{" "}
+          {t("admin.accessRequests.detail.created", {
+            date: new Date(accessRequest.createdAt).toLocaleString(),
+          })}
         </Text>
       </html.div>
 
@@ -119,41 +123,45 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
         <Panel.Body>
           <Stack gap="sm">
             <html.div style={styles.field}>
-              <Text color="muted">Requester</Text>
+              <Text color="muted">{t("admin.accessRequests.detail.fields.requester")}</Text>
               <Text>{accessRequest.requesterName ?? accessRequest.requesterId}</Text>
             </html.div>
             <html.div style={styles.field}>
-              <Text color="muted">Application</Text>
+              <Text color="muted">{t("admin.accessRequests.detail.fields.application")}</Text>
               <Text>{accessRequest.applicationName || accessRequest.applicationId}</Text>
             </html.div>
             {accessRequest.roleId && (
               <html.div style={styles.field}>
-                <Text color="muted">Role</Text>
+                <Text color="muted">{t("admin.accessRequests.detail.fields.role")}</Text>
                 <Text>{accessRequest.roleName ?? accessRequest.roleId}</Text>
               </html.div>
             )}
             {accessRequest.entitlementId && (
               <html.div style={styles.field}>
-                <Text color="muted">Entitlement</Text>
+                <Text color="muted">{t("admin.accessRequests.detail.fields.entitlement")}</Text>
                 <Text>{accessRequest.entitlementName ?? accessRequest.entitlementId}</Text>
               </html.div>
             )}
             {accessRequest.resourceId && (
               <html.div style={styles.field}>
-                <Text color="muted">Resource</Text>
+                <Text color="muted">{t("admin.accessRequests.detail.fields.resource")}</Text>
                 <Text>{accessRequest.resourceId}</Text>
               </html.div>
             )}
             {accessRequest.justification && (
               <html.div style={styles.field}>
-                <Text color="muted">Justification</Text>
+                <Text color="muted">{t("admin.accessRequests.detail.fields.justification")}</Text>
                 <Text>{accessRequest.justification}</Text>
               </html.div>
             )}
             {accessRequest.requestedDurationHours != null && (
               <html.div style={styles.field}>
-                <Text color="muted">Requested Duration</Text>
-                <Text>{accessRequest.requestedDurationHours} hours</Text>
+                <Text color="muted">{t("admin.accessRequests.detail.fields.requestedDuration")}</Text>
+                <Text>
+                  {t("admin.accessRequests.detail.fields.durationHours", {
+                    count: accessRequest.requestedDurationHours,
+                  })}
+                </Text>
               </html.div>
             )}
           </Stack>
@@ -161,16 +169,18 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
       </Panel.Root>
 
       {approvals.length > 0 && (
-        <CardSection title={`Approvals (${approvals.length})`}>
+        <CardSection title={t("admin.accessRequests.detail.approvals", { count: approvals.length })}>
           <Stack gap="sm">
             {approvals.map((approval) => (
               <html.div key={approval.id} style={styles.approvalRow}>
                 <Text>
                   {approval.approverId} &middot;{" "}
                   {approval.decision ? (
-                    <Badge variant={approval.decision === "approved" ? "success" : "error"}>{approval.decision}</Badge>
+                    <Badge variant={approval.decision === "approved" ? "success" : "error"}>
+                      {enumLabel(t, "requestStatus", approval.decision)}
+                    </Badge>
                   ) : (
-                    <Badge variant="warning">pending</Badge>
+                    <Badge variant="warning">{enumLabel(t, "requestStatus", "pending")}</Badge>
                   )}
                 </Text>
                 {approval.comment && <Text color="muted">{approval.comment}</Text>}
@@ -185,12 +195,12 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
         <Panel.Root bordered>
           <Panel.Body>
             <Stack gap="md">
-              <Heading level={4}>Decision</Heading>
+              <Heading level={4}>{t("admin.accessRequests.detail.decision")}</Heading>
               <Field.Root>
-                <Field.Label>Comment</Field.Label>
+                <Field.Label>{t("admin.accessRequests.detail.commentLabel")}</Field.Label>
                 <Textarea
                   name="comment"
-                  placeholder="Optional comment..."
+                  placeholder={t("admin.accessRequests.detail.commentPlaceholder")}
                   value={comment}
                   onChange={(e) => setComment((e.target as HTMLTextAreaElement).value)}
                 />
@@ -200,35 +210,49 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
                   <input type="hidden" name="intent" value="approve" />
                   <input type="hidden" name="comment" value={comment} />
                   <Button type="submit" variant="primary" disabled={isSubmitting}>
-                    {isSubmitting ? "Processing..." : "Approve"}
+                    {isSubmitting ? t("common.processing") : t("admin.accessRequests.detail.approve")}
                   </Button>
                 </fetcher.Form>
                 <Button type="button" variant="danger" disabled={isSubmitting} onClick={() => setRejectOpen(true)}>
-                  {isSubmitting ? "Processing..." : "Reject"}
+                  {isSubmitting ? t("common.processing") : t("admin.accessRequests.detail.reject")}
                 </Button>
-                <fetcher.Form method="post">
-                  <input type="hidden" name="intent" value="cancel" />
-                  <Button type="submit" variant="secondary" disabled={isSubmitting}>
-                    {isSubmitting ? "Processing..." : "Cancel"}
-                  </Button>
-                </fetcher.Form>
+                {/* Cancel is consequential (marks the request obsolete), so it
+                    gets the same confirm gate as Reject rather than firing on
+                    a single click. */}
+                <Button type="button" variant="secondary" disabled={isSubmitting} onClick={() => setCancelOpen(true)}>
+                  {isSubmitting ? t("common.processing") : t("common.cancel")}
+                </Button>
               </ButtonGroup>
               <ConfirmDialog
                 open={rejectOpen}
                 onOpenChange={setRejectOpen}
-                title="Reject this access request?"
+                title={t("admin.accessRequests.detail.rejectConfirmTitle")}
                 confirmSlot={() => (
                   <fetcher.Form method="post" onSubmit={() => setRejectOpen(false)}>
                     <input type="hidden" name="intent" value="reject" />
                     <input type="hidden" name="comment" value={comment} />
                     <Button type="submit" variant="danger">
-                      Reject
+                      {t("admin.accessRequests.detail.reject")}
                     </Button>
                   </fetcher.Form>
                 )}
               >
-                Rejecting permanently denies the request — the requester is not granted access and must submit a new
-                request. Your comment (if any) is recorded with the decision.
+                {t("admin.accessRequests.detail.rejectConfirmBody")}
+              </ConfirmDialog>
+              <ConfirmDialog
+                open={cancelOpen}
+                onOpenChange={setCancelOpen}
+                title={t("admin.accessRequests.detail.cancelConfirmTitle")}
+                confirmSlot={() => (
+                  <fetcher.Form method="post" onSubmit={() => setCancelOpen(false)}>
+                    <input type="hidden" name="intent" value="cancel" />
+                    <Button type="submit" variant="secondary">
+                      {t("common.cancel")}
+                    </Button>
+                  </fetcher.Form>
+                )}
+              >
+                {t("admin.accessRequests.detail.cancelConfirmBody")}
               </ConfirmDialog>
               <Text variant="bodySm" color="muted">
                 {t("admin.accessRequests.decisionHint")}

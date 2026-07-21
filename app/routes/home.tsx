@@ -78,6 +78,7 @@ async function loadHomeData(request: Request): Promise<HomeData> {
                 icon: s?.icon ?? "",
                 groups: [],
                 priority: s?.priority ?? 10,
+                description: a.description ?? s?.description ?? null,
               }
             })
         }),

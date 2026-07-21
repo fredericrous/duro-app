@@ -289,14 +289,22 @@ function CatalogBody({
                     <Badge variant={stateBadgeVariant[entry.state]}>{stateLabel(entry.state)}</Badge>
                   </Table.Cell>
                   {/* Action cell: right-aligned by convention for BI/admin
-                      tables. States with no user-actionable affordance
-                      (granted_full, invite_only) intentionally render an
-                      empty cell — the status badge already carries the
-                      information, restating it as muted prose in the action
-                      column would just create visual noise without giving
-                      the user anything they could click. */}
+                      tables. States with no clickable affordance (granted_full,
+                      invite_only) show muted microcopy pointing to the NEXT
+                      step (where to use it / how to get it) rather than an
+                      empty cell that reads like missing UI. */}
                   <Table.Cell>
                     <Inline justify="end">
+                      {entry.state === "granted_full" && (
+                        <Text variant="bodySm" color="muted">
+                          {t("apps.action.availableOnHome")}
+                        </Text>
+                      )}
+                      {entry.state === "invite_only" && (
+                        <Text variant="bodySm" color="muted">
+                          {t("apps.action.askAdmin")}
+                        </Text>
+                      )}
                       {entry.state === "requestable" && (
                         <Button variant="primary" onClick={() => openRequestDialog(entry.app.id)}>
                           {t("apps.status.requestable")}
