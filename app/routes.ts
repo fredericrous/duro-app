@@ -7,7 +7,8 @@ export default [
     route("catalog", "routes/catalog.tsx"),
     route("requests", "routes/requests.tsx"),
     route("admin", "routes/admin.tsx", [
-      index("routes/admin.invites.tsx"),
+      index("routes/admin.dashboard.tsx"),
+      route("invites", "routes/admin.invites.tsx"),
       route("identities", "routes/admin.identities.tsx"),
       // Users + Principals merged into Identities; the old paths 301 there.
       route("users", "routes/admin.users.tsx"),

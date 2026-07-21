@@ -187,7 +187,7 @@ function GetStartedChecklist({
     items.push({ key: "app", href: "/admin/applications", label: t("admin.checklist.addApplication") })
   }
   if (checklist.showInviteTeammate) {
-    items.push({ key: "teammate", href: "/admin", label: t("admin.checklist.inviteTeammate") })
+    items.push({ key: "teammate", href: "/admin/invites", label: t("admin.checklist.inviteTeammate") })
   }
   if (checklist.showConfigurePlugins) {
     items.push({ key: "plugins", href: "/admin/plugins", label: t("admin.checklist.configurePlugins") })

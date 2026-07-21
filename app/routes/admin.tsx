@@ -10,8 +10,6 @@ import { checkAuthDecision } from "~/lib/auth-decision.server"
 import { runEffect } from "~/lib/runtime.server"
 import { Badge, Button, DetailPanel, Drawer, Icon, Inline, PageShell, SideNav, Stack } from "@duro-app/ui"
 import { Header } from "~/components/Header/Header"
-import { SetupCompleteness, type SetupCriterion } from "~/components/AppOverview/SetupCompleteness"
-import { GovernanceHygiene, type HygieneFinding } from "~/components/GovernanceHygiene/GovernanceHygiene"
 import { useMediaQuery } from "~/hooks/useMediaQuery"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
@@ -109,57 +107,22 @@ export async function loader({ request }: Route.LoaderArgs) {
     }),
   ).catch(() => ({ accessRequests: 0, accessInvitations: 0 }))
 
-  // First-run milestones: does the instance have at least one application, one
-  // grant, and one invitation ever? Drives the setup checklist on the admin
-  // landing. `EXISTS` keeps it to a cheap boolean per table.
-  const setup = await runEffect(
-    Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient
-      const [apps, grants, invites] = yield* Effect.all([
-        sql`SELECT EXISTS(SELECT 1 FROM applications) AS x`,
-        sql`SELECT EXISTS(SELECT 1 FROM grants) AS x`,
-        sql`SELECT EXISTS(SELECT 1 FROM access_invitations) AS x`,
-      ])
-      const has = (r: readonly unknown[]) => Boolean((r[0] as { x?: boolean } | undefined)?.x)
-      return { hasApp: has(apps), hasGrant: has(grants), hasInvite: has(invites) }
-    }),
-  ).catch(() => ({ hasApp: true, hasGrant: true, hasInvite: true }))
-
-  // Governance-health gaps: real misconfigurations an admin should clear —
-  // apps with no owner, enabled apps with no role (so nothing can be granted),
-  // and pending invitations that have already expired.
-  const hygiene = await runEffect(
-    Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient
-      const [noOwner, noRole, staleInv] = yield* Effect.all([
-        sql`SELECT count(*)::int AS n FROM applications WHERE owner_id IS NULL`,
-        sql`SELECT count(*)::int AS n FROM applications a
-            WHERE a.enabled = true AND NOT EXISTS (SELECT 1 FROM roles r WHERE r.application_id = a.id)`,
-        sql`SELECT count(*)::int AS n FROM access_invitations
-            WHERE status = 'pending' AND expires_at IS NOT NULL AND expires_at < now()`,
-      ])
-      const n = (r: readonly unknown[]) => ((r[0] as { n?: number } | undefined)?.n ?? 0) as number
-      return {
-        appsWithoutOwner: n(noOwner),
-        enabledAppsWithoutRole: n(noRole),
-        staleInvitations: n(staleInv),
-      }
-    }),
-  ).catch(() => ({ appsWithoutOwner: 0, enabledAppsWithoutRole: 0, staleInvitations: 0 }))
-
-  return { pendingCounts, setup, hygiene }
+  // First-run + governance-health data lives on the admin index (dashboard)
+  // route now — the layout only owns the nav pending-count badges.
+  return { pendingCounts }
 }
 
 function deriveActiveValue(pathname: string): string {
-  if (pathname === "/admin" || pathname === "/admin/") return "invites"
+  if (pathname === "/admin" || pathname === "/admin/") return "dashboard"
   const segment = pathname.replace("/admin/", "").split("/")[0]
   // Users + Principals merged into Identities; their old paths keep the
   // Identities nav item highlighted (principals/:id detail included).
   if (segment === "users" || segment === "principals") return "identities"
-  return segment || "invites"
+  return segment || "dashboard"
 }
 
 const navMap: Record<string, string> = {
+  dashboard: "/admin",
   identities: "/admin/identities",
   applications: "/admin/applications",
   grants: "/admin/grants",
@@ -170,7 +133,7 @@ const navMap: Record<string, string> = {
   audit: "/admin/audit",
   recovery: "/admin/recovery",
   plugins: "/admin/plugins",
-  invites: "/admin",
+  invites: "/admin/invites",
 }
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
@@ -184,39 +147,6 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   }
   const counts = loaderData?.pendingCounts ?? { accessRequests: 0, accessInvitations: 0 }
   const revalidator = useRevalidator()
-
-  // First-run onboarding checklist — shown on the admin landing until the
-  // instance has its first application, grant, and invitation. Reuses the
-  // per-app SetupCompleteness machinery via i18nPrefix.
-  const setup = loaderData?.setup ?? { hasApp: true, hasGrant: true, hasInvite: true }
-  const setupComplete = setup.hasApp && setup.hasGrant && setup.hasInvite
-  const isAdminIndex = location.pathname === "/admin" || location.pathname === "/admin/"
-  const firstRunCriteria: SetupCriterion[] = [
-    { id: "firstApp", done: setup.hasApp, onFix: () => navigate("/admin/applications") },
-    { id: "firstGrant", done: setup.hasGrant, onFix: () => navigate("/admin/grants/new") },
-    { id: "firstInvite", done: setup.hasInvite, onFix: () => navigate("/admin/invitations") },
-  ]
-  const firstRunPanel =
-    isAdminIndex && !setupComplete ? (
-      <SetupCompleteness criteria={firstRunCriteria} i18nPrefix="admin.firstRun" />
-    ) : null
-
-  // Governance-health panel — actionable gaps on the admin landing. Shown once
-  // the instance is operational (or whenever there's something to fix), so it
-  // doesn't compete with the first-run checklist during initial setup.
-  const hygiene = loaderData?.hygiene ?? { appsWithoutOwner: 0, enabledAppsWithoutRole: 0, staleInvitations: 0 }
-  const hygieneFindings: HygieneFinding[] = [
-    { id: "apps_without_owner", count: hygiene.appsWithoutOwner, onFix: () => navigate("/admin/applications") },
-    {
-      id: "enabled_apps_without_role",
-      count: hygiene.enabledAppsWithoutRole,
-      onFix: () => navigate("/admin/applications"),
-    },
-    { id: "stale_invitations", count: hygiene.staleInvitations, onFix: () => navigate("/admin/invitations") },
-  ]
-  const hasHygieneFindings = hygieneFindings.some((f) => f.count > 0)
-  const hygienePanel =
-    isAdminIndex && (setupComplete || hasHygieneFindings) ? <GovernanceHygiene findings={hygieneFindings} /> : null
 
   // Refresh side-nav counts every 45s while the tab is foregrounded so an
   // admin who leaves the page open doesn't miss new pending work. Pause when
@@ -310,6 +240,11 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
       {/* Flat menu: static (non-collapsible) Section headers + per-item icons,
           grouped by the admin's job rather than the data model. Item values
           (and thus navMap/URLs) are unchanged. */}
+      <SideNav.Section label={t("admin.nav.overview", "Overview")}>
+        <SideNav.Item value="dashboard" icon={<Icon name="map" size={18} />}>
+          {t("admin.nav.dashboard", "Dashboard")}
+        </SideNav.Item>
+      </SideNav.Section>
       <SideNav.Section label={t("admin.nav.accessManagement", "Access management")}>
         <SideNav.Item value="identities" icon={<Icon name="users" size={18} />}>
           {t("admin.nav.identities", "Identities")}
@@ -365,8 +300,6 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
               <html.div style={styles.sideNav}>{navContent}</html.div>
               <html.div style={styles.mainContent}>
                 <Stack gap="lg">
-                  {firstRunPanel}
-                  {hygienePanel}
                   <Outlet context={outletContext} />
                 </Stack>
               </html.div>
@@ -379,8 +312,6 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
                 </Button>
               </html.div>
               <Stack gap="lg">
-                {firstRunPanel}
-                {hygienePanel}
                 <Outlet context={outletContext} />
               </Stack>
             </>
