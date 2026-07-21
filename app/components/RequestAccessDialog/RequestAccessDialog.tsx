@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 import { useFetcher, useRevalidator } from "react-router"
 import { useTranslation } from "react-i18next"
-import { Alert, Dialog, Spinner, Stack, Text } from "@duro-app/ui"
+import { Alert, Button, Dialog, Inline, LinkButton, Spinner, Stack, Text } from "@duro-app/ui"
 import { RequestAccessForm } from "~/components/RequestAccessForm/RequestAccessForm"
 import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
 
@@ -40,24 +40,24 @@ export function RequestAccessDialog({
     }
   }, [open, shouldFetch, catalogFetcher])
 
-  // Refresh route loaders on a real state change so /catalog and /requests
-  // pick up the new pending/granted row, then close. Duplicates are no-ops
-  // server-side — skip revalidation; just close after the user reads the alert.
   const data = (submitFetcher.data ?? null) as
-    | { outcome: "submitted" | "auto_approved" | "duplicate" }
+    | { outcome: "submitted" | "auto_approved" | "duplicate"; applicationId: string }
     | { outcome: "error" }
     | null
-  const isFreshSuccess = data?.outcome === "submitted" || data?.outcome === "auto_approved"
-  const isDuplicate = data?.outcome === "duplicate"
+  // Terminal outcomes (a request resolved) get a completion moment; errors stay
+  // in the form. Narrow here so `terminal.outcome` is the resolved-only union.
+  const terminal = data && data.outcome !== "error" ? data : null
+  const isFreshSuccess = terminal?.outcome === "submitted" || terminal?.outcome === "auto_approved"
+  // Refresh route loaders on a real state change so /catalog and /requests pick
+  // up the new pending/granted row. We deliberately DON'T auto-close on success
+  // anymore — the dialog shows a completion moment (see OutcomePanel) that the
+  // user dismisses (or acts on via "Open app").
   useEffect(() => {
-    if ((isFreshSuccess || isDuplicate) && open) {
-      if (isFreshSuccess) revalidator.revalidate()
-      const id = setTimeout(() => onOpenChange(false), 1200)
-      return () => clearTimeout(id)
-    }
-  }, [isFreshSuccess, isDuplicate, open, onOpenChange, revalidator])
+    if (isFreshSuccess && open) revalidator.revalidate()
+  }, [isFreshSuccess, open, revalidator])
 
   const sourceApps: ReadonlyArray<AppCatalogEntry> = apps ?? catalogFetcher.data?.apps ?? []
+  const requestedApp = terminal ? sourceApps.find((e) => e.app.id === terminal.applicationId)?.app : undefined
   // Only apps the user can act on (request fresh or upgrade). Pending apps
   // would dedup to the existing request and confuse the user.
   const dialogApps = sourceApps.filter((e) => e.state === "requestable" || e.state === "granted_can_upgrade")
@@ -72,7 +72,14 @@ export function RequestAccessDialog({
           <Dialog.Close aria-label={t("admin.detailPanel.close")} />
         </Dialog.Header>
         <Dialog.Body>
-          {isCatalogLoading ? (
+          {terminal ? (
+            <OutcomePanel
+              outcome={terminal.outcome}
+              appName={requestedApp?.displayName}
+              appUrl={requestedApp?.url || undefined}
+              onClose={() => onOpenChange(false)}
+            />
+          ) : isCatalogLoading ? (
             <Stack gap="sm" align="center">
               <Spinner />
               <Text color="muted">{t("header.requestDialog.loading")}</Text>
@@ -93,5 +100,44 @@ export function RequestAccessDialog({
         </Dialog.Body>
       </Dialog.Portal>
     </Dialog.Root>
+  )
+}
+
+// The completion moment shown after a request resolves. Auto-approval is the
+// star case: it confirms the grant and hands the user a direct "Open app" CTA
+// so the loop closes on their actual goal rather than silently dismissing.
+export function OutcomePanel({
+  outcome,
+  appName,
+  appUrl,
+  onClose,
+}: {
+  outcome: "submitted" | "auto_approved" | "duplicate"
+  appName?: string
+  appUrl?: string
+  onClose: () => void
+}) {
+  const { t } = useTranslation()
+  const app = appName ?? t("header.requestDialog.outcome.thisApp")
+  const isGranted = outcome === "auto_approved"
+
+  return (
+    <Stack gap="md">
+      <Alert variant={isGranted ? "success" : "info"}>{t(`header.requestDialog.outcome.${outcome}`, { app })}</Alert>
+      <Inline gap="sm" justify="end">
+        {isGranted && appUrl ? (
+          <LinkButton href={appUrl} target="_blank" variant="primary">
+            {t("header.requestDialog.outcome.open", { app })}
+          </LinkButton>
+        ) : (
+          <LinkButton href="/requests" variant="secondary">
+            {t("header.requestDialog.outcome.viewRequests")}
+          </LinkButton>
+        )}
+        <Button variant="secondary" onClick={onClose}>
+          {t("common.done")}
+        </Button>
+      </Inline>
+    </Stack>
   )
 }

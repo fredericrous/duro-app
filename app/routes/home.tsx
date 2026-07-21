@@ -124,9 +124,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 // Discriminated outcomes for the submit action — split clean states so the
 // form/dialog can branch on intent without overloading a `success` flag.
 export type SubmitOutcome =
-  | { outcome: "submitted"; requestId: string }
-  | { outcome: "auto_approved"; requestId: string }
-  | { outcome: "duplicate"; requestId: string }
+  // applicationId echoes back so the dialog can show a completion moment (name
+  // + "Open app") for the app that was just requested, without depending on
+  // the fetcher's transient formData.
+  | { outcome: "submitted"; requestId: string; applicationId: string }
+  | { outcome: "auto_approved"; requestId: string; applicationId: string }
+  | { outcome: "duplicate"; requestId: string; applicationId: string }
   | { outcome: "error"; error: string }
 
 export async function action({ request }: Route.ActionArgs): Promise<SubmitOutcome | Response> {
@@ -184,9 +187,10 @@ export async function action({ request }: Route.ActionArgs): Promise<SubmitOutco
       ),
     )
 
-    if (outcome._kind === "submitted") return { outcome: "submitted", requestId: outcome.requestId }
-    if (outcome._kind === "auto_approved") return { outcome: "auto_approved", requestId: outcome.requestId }
-    if (outcome._kind === "duplicate") return { outcome: "duplicate", requestId: outcome.requestId }
+    if (outcome._kind === "submitted") return { outcome: "submitted", requestId: outcome.requestId, applicationId }
+    if (outcome._kind === "auto_approved")
+      return { outcome: "auto_approved", requestId: outcome.requestId, applicationId }
+    if (outcome._kind === "duplicate") return { outcome: "duplicate", requestId: outcome.requestId, applicationId }
     return { outcome: "error", error: outcome._kind }
   }
 

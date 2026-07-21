@@ -41,4 +41,30 @@ describe("SetupCompleteness", () => {
     expect(screen.getByText(t("admin.applications.setup.complete"))).toBeInTheDocument()
     expect(screen.queryByRole("button")).not.toBeInTheDocument()
   })
+
+  // The first-run admin checklist reuses this component via i18nPrefix.
+  describe("reused for the first-run checklist (i18nPrefix)", () => {
+    const firstRun = (done: Record<string, boolean>): SetupCriterion[] =>
+      ["firstApp", "firstGrant", "firstInvite"].map((id) => ({ id, done: done[id] ?? false, onFix: vi.fn() }))
+
+    it("resolves copy from the passed namespace and shows the right progress", () => {
+      render(<SetupCompleteness i18nPrefix="admin.firstRun" criteria={firstRun({ firstApp: true })} />)
+      expect(screen.getByRole("heading", { name: t("admin.firstRun.title") })).toBeInTheDocument()
+      expect(screen.getByText("1 of 3 done")).toBeInTheDocument()
+      expect(screen.getByText(t("admin.firstRun.criteria.firstGrant"))).toBeInTheDocument()
+      // met criterion has no fix; unmet ones jump to where they're fixed
+      expect(screen.queryByRole("button", { name: t("admin.firstRun.fix.firstApp") })).not.toBeInTheDocument()
+      expect(screen.getByRole("button", { name: t("admin.firstRun.fix.firstInvite") })).toBeInTheDocument()
+    })
+
+    it("shows the all-set state when every milestone is met", () => {
+      render(
+        <SetupCompleteness
+          i18nPrefix="admin.firstRun"
+          criteria={firstRun({ firstApp: true, firstGrant: true, firstInvite: true })}
+        />,
+      )
+      expect(screen.getByText(t("admin.firstRun.complete"))).toBeInTheDocument()
+    })
+  })
 })

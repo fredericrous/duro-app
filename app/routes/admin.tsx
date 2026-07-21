@@ -8,8 +8,9 @@ import type { Route } from "./+types/admin"
 import { getAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"
 import { runEffect } from "~/lib/runtime.server"
-import { Badge, Button, DetailPanel, Drawer, Icon, Inline, PageShell, SideNav } from "@duro-app/ui"
+import { Badge, Button, DetailPanel, Drawer, Icon, Inline, PageShell, SideNav, Stack } from "@duro-app/ui"
 import { Header } from "~/components/Header/Header"
+import { SetupCompleteness, type SetupCriterion } from "~/components/AppOverview/SetupCompleteness"
 import { useMediaQuery } from "~/hooks/useMediaQuery"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
@@ -107,7 +108,23 @@ export async function loader({ request }: Route.LoaderArgs) {
     }),
   ).catch(() => ({ accessRequests: 0, accessInvitations: 0 }))
 
-  return { pendingCounts }
+  // First-run milestones: does the instance have at least one application, one
+  // grant, and one invitation ever? Drives the setup checklist on the admin
+  // landing. `EXISTS` keeps it to a cheap boolean per table.
+  const setup = await runEffect(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      const [apps, grants, invites] = yield* Effect.all([
+        sql`SELECT EXISTS(SELECT 1 FROM applications) AS x`,
+        sql`SELECT EXISTS(SELECT 1 FROM grants) AS x`,
+        sql`SELECT EXISTS(SELECT 1 FROM access_invitations) AS x`,
+      ])
+      const has = (r: readonly unknown[]) => Boolean((r[0] as { x?: boolean } | undefined)?.x)
+      return { hasApp: has(apps), hasGrant: has(grants), hasInvite: has(invites) }
+    }),
+  ).catch(() => ({ hasApp: true, hasGrant: true, hasInvite: true }))
+
+  return { pendingCounts, setup }
 }
 
 function deriveActiveValue(pathname: string): string {
@@ -144,6 +161,22 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   }
   const counts = loaderData?.pendingCounts ?? { accessRequests: 0, accessInvitations: 0 }
   const revalidator = useRevalidator()
+
+  // First-run onboarding checklist — shown on the admin landing until the
+  // instance has its first application, grant, and invitation. Reuses the
+  // per-app SetupCompleteness machinery via i18nPrefix.
+  const setup = loaderData?.setup ?? { hasApp: true, hasGrant: true, hasInvite: true }
+  const setupComplete = setup.hasApp && setup.hasGrant && setup.hasInvite
+  const isAdminIndex = location.pathname === "/admin" || location.pathname === "/admin/"
+  const firstRunCriteria: SetupCriterion[] = [
+    { id: "firstApp", done: setup.hasApp, onFix: () => navigate("/admin/applications") },
+    { id: "firstGrant", done: setup.hasGrant, onFix: () => navigate("/admin/grants/new") },
+    { id: "firstInvite", done: setup.hasInvite, onFix: () => navigate("/admin/invitations") },
+  ]
+  const firstRunPanel =
+    isAdminIndex && !setupComplete ? (
+      <SetupCompleteness criteria={firstRunCriteria} i18nPrefix="admin.firstRun" />
+    ) : null
 
   // Refresh side-nav counts every 45s while the tab is foregrounded so an
   // admin who leaves the page open doesn't miss new pending work. Pause when
@@ -291,7 +324,10 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             <html.div style={styles.layoutRow}>
               <html.div style={styles.sideNav}>{navContent}</html.div>
               <html.div style={styles.mainContent}>
-                <Outlet context={outletContext} />
+                <Stack gap="lg">
+                  {firstRunPanel}
+                  <Outlet context={outletContext} />
+                </Stack>
               </html.div>
             </html.div>
           ) : (
@@ -301,7 +337,10 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
                   {t("admin.nav.menu", "Menu")}
                 </Button>
               </html.div>
-              <Outlet context={outletContext} />
+              <Stack gap="lg">
+                {firstRunPanel}
+                <Outlet context={outletContext} />
+              </Stack>
             </>
           )}
         </PageShell>

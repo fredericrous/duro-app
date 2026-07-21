@@ -34,7 +34,8 @@
       }
     },
     "scratchToReveal": "Scratch or press Enter to reveal",
-    "processing": "Processing…"
+    "processing": "Processing…",
+    "done": "Done"
   },
   "header": {
     "welcome": "Welcome, {{user}}",
@@ -43,7 +44,15 @@
     "myRequests": "My requests",
     "requestDialog": {
       "loading": "Loading available apps…",
-      "empty": "You already have access to every app available to you. If you think something is missing, contact an administrator."
+      "empty": "You already have access to every app available to you. If you think something is missing, contact an administrator.",
+      "outcome": {
+        "thisApp": "this app",
+        "auto_approved": "Access granted — you now have access to {{app}}.",
+        "submitted": "Request sent. Your request for {{app}} is pending approval — you'll be notified when it's decided.",
+        "duplicate": "You already have a pending request for {{app}}.",
+        "open": "Open {{app}}",
+        "viewRequests": "View my requests"
+      }
     }
   },
   "home": {
@@ -1023,6 +1032,21 @@
       },
       "cancelConfirmTitle": "Cancel this invitation?",
       "cancelConfirmBody": "This withdraws the pending invitation — the invitee won't be able to accept it, and you'd need to send a new one."
+    },
+    "firstRun": {
+      "title": "Finish setting up Duro",
+      "progress": "of {{total}} done",
+      "complete": "You're all set — Duro is ready to use.",
+      "criteria": {
+        "firstApp": "Register your first application",
+        "firstGrant": "Grant access to someone",
+        "firstInvite": "Send your first invitation"
+      },
+      "fix": {
+        "firstApp": "Add application",
+        "firstGrant": "Grant access",
+        "firstInvite": "Invite"
+      }
     }
   },
   "error": {
