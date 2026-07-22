@@ -35,7 +35,8 @@
     },
     "scratchToReveal": "Scratch or press Enter to reveal",
     "processing": "Processing…",
-    "done": "Done"
+    "done": "Done",
+    "close": "Close"
   },
   "header": {
     "welcome": "Welcome, {{user}}",
@@ -290,6 +291,27 @@
         "warning": "If you're using this key in a tool right now (e.g. Claude CLI), you'll need to update its config with a fresh key.",
         "confirm": "Yes, revoke"
       }
+    },
+    "nav": {
+      "title": "Settings",
+      "general": "General",
+      "certificate": "Certificate",
+      "apiKeys": "API keys",
+      "security": "Security",
+      "menu": "Menu"
+    },
+    "display": {
+      "heading": "Date & time",
+      "saved": "Display preferences saved.",
+      "timezoneLabel": "Timezone",
+      "timezoneAuto": "Automatic (your device)",
+      "timeFormatLabel": "Clock format",
+      "timeFormat": {
+        "auto": "Automatic (locale default)",
+        "24": "24-hour",
+        "12": "12-hour"
+      },
+      "preview": "Preview"
     }
   },
   "recover": {

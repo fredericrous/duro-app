@@ -6,6 +6,7 @@ import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { resendCert } from "~/lib/workflows/invite.server"
 import { supportedLngs } from "~/lib/i18n"
 import { localeCookieHeader } from "~/lib/i18n.server"
+import { AUTO, TIMEZONE_OPTIONS, TIME_FORMAT_OPTIONS, selectToPref } from "~/lib/datetime"
 import type { AuthInfo } from "~/lib/auth.server"
 
 // ---------------------------------------------------------------------------
@@ -18,6 +19,7 @@ export type SettingsMutation =
   | { intent: "revokeCert"; serialNumber: string; auth: AuthInfo }
   | { intent: "renameCert"; serialNumber: string; label: string | null; auth: AuthInfo }
   | { intent: "saveLocale"; locale: string; auth: AuthInfo }
+  | { intent: "saveDisplayPrefs"; timezone: string | null; timeFormat: string | null; auth: AuthInfo }
 
 export type SettingsResult =
   | { certSent: true; p12Password: string | null }
@@ -26,6 +28,7 @@ export type SettingsResult =
   | { consumed: true }
   | { certRevoked: true }
   | { certRenamed: true }
+  | { displayPrefsSaved: true }
   | { error: string }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +124,18 @@ function handleRenameCert(serialNumber: string, label: string | null, auth: Auth
   )
 }
 
+function handleSaveDisplayPrefs(timezone: string | null, timeFormat: string | null, auth: AuthInfo) {
+  return Effect.gen(function* () {
+    const prefs = yield* PreferencesRepo
+    yield* prefs.setDisplayPrefs(auth.user!, { timezone, timeFormat })
+    return { displayPrefsSaved: true as const } as SettingsResult
+  }).pipe(
+    Effect.catchAll((e) =>
+      Effect.succeed({ error: errorMessage(e, "Failed to save display preferences") } as SettingsResult),
+    ),
+  )
+}
+
 function handleSaveLocale(locale: string, auth: AuthInfo) {
   return Effect.gen(function* () {
     if (!(supportedLngs as readonly string[]).includes(locale)) {
@@ -150,6 +165,8 @@ export function handleSettingsMutation(mutation: SettingsMutation) {
       return handleRenameCert(mutation.serialNumber, mutation.label, mutation.auth)
     case "saveLocale":
       return handleSaveLocale(mutation.locale, mutation.auth)
+    case "saveDisplayPrefs":
+      return handleSaveDisplayPrefs(mutation.timezone, mutation.timeFormat, mutation.auth)
   }
 }
 
@@ -182,6 +199,14 @@ export function parseSettingsMutation(formData: FormData, auth: AuthInfo): Setti
     const serialNumber = formData.get("serialNumber") as string
     if (!serialNumber) return { error: "Missing serial number" }
     return { intent, serialNumber, label: parseLabel(formData.get("label")), auth }
+  }
+  if (intent === "saveDisplayPrefs") {
+    const tzRaw = (formData.get("timezone") as string) || AUTO
+    const tfRaw = (formData.get("timeFormat") as string) || AUTO
+    if (!TIMEZONE_OPTIONS.some((o) => o.value === tzRaw) || !TIME_FORMAT_OPTIONS.some((o) => o.value === tfRaw)) {
+      return { error: "Invalid display preferences" }
+    }
+    return { intent, timezone: selectToPref(tzRaw), timeFormat: selectToPref(tfRaw), auth }
   }
 
   // Default: saveLocale

@@ -30,6 +30,7 @@ import m0023 from "./migrations/pg/0023_create_recovery_requests"
 import m0024 from "./migrations/pg/0024_grants_resource_restrict"
 import m0025 from "./migrations/pg/0025_seed_duro_governance"
 import m0026 from "./migrations/pg/0026_seed_app_access"
+import m0027 from "./migrations/pg/0027_add_display_preferences"
 
 const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
@@ -98,6 +99,7 @@ const migrations: Array<
   [24, "grants_resource_restrict", m0024],
   [25, "seed_duro_governance", m0025],
   [26, "seed_app_access", m0026],
+  [27, "add_display_preferences", m0027],
 ]
 
 const runMigrations = Effect.gen(function* () {

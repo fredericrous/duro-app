@@ -1,148 +1,153 @@
+import { useState, useCallback } from "react"
+import { Outlet, useLocation, useNavigate, useRouteLoaderData } from "react-router"
+import { css, html } from "react-strict-dom"
 import { useTranslation } from "react-i18next"
-import { redirect, useFetcher, useRouteLoaderData } from "react-router"
 import type { Route } from "./+types/settings"
 import { requireAuth } from "~/lib/auth.server"
-import { runEffect } from "~/lib/runtime.server"
-import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
-import { CertManager } from "~/lib/services/CertManager.server"
-import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
-import { ApiKeyRepo } from "~/lib/governance/ApiKeyRepo.server"
-import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { config } from "~/lib/config.server"
-import { resolveLocale } from "~/lib/i18n.server"
-import { handleSettingsMutation, parseSettingsMutation } from "~/lib/mutations/settings"
-import { handleSettingsApiKeysMutation, parseSettingsApiKeysMutation } from "~/lib/mutations/settings-api-keys.server"
-import { Effect } from "effect"
-import { Alert, Button, Field, LinkButton, PageShell, Stack, Text } from "@duro-app/ui"
+import { Button, Drawer, Icon, PageShell, SideNav, Stack } from "@duro-app/ui"
 import { Header } from "~/components/Header/Header"
-import { CardSection } from "~/components/CardSection/CardSection"
-import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
-import { CertificateSection } from "~/components/CertificateSection/CertificateSection"
-import { ApiKeysSection } from "~/components/ApiKeysSection/ApiKeysSection"
+import { useMediaQuery } from "~/hooks/useMediaQuery"
+import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+
+const styles = css.create({
+  outerFlex: {
+    display: "flex",
+    minHeight: 0,
+    flex: 1,
+  },
+  pageWrap: {
+    flex: 1,
+    minWidth: 0,
+    maxWidth: "100%",
+    overflowX: "clip",
+  },
+  layoutRow: {
+    display: "flex",
+    flex: 1,
+    minHeight: 0,
+    gap: spacing.lg,
+  },
+  sideNav: {
+    width: 220,
+    flexShrink: 0,
+  },
+  mainContent: {
+    flex: 1,
+    minWidth: 0,
+    paddingTop: spacing.md,
+  },
+  mobileHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+})
 
 export function meta() {
   return [{ title: "Settings - Duro" }]
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const auth = await requireAuth(request)
-  const { locale, lastCertRenewal, p12Password, certificates, apiKeys } = await runEffect(
-    Effect.gen(function* () {
-      const prefs = yield* PreferencesRepo
-      const cert = yield* CertManager
-      const certRepo = yield* CertificateRepo
-      const apiKeyRepo = yield* ApiKeyRepo
-      const principals = yield* PrincipalRepo
-      const locale = yield* prefs.getLocale(auth.user!)
-      const lastCertRenewal = yield* prefs.getLastCertRenewal(auth.user!)
-      const p12Password = lastCertRenewal.renewalId
-        ? yield* cert.getP12Password(lastCertRenewal.renewalId).pipe(Effect.catchAll(() => Effect.succeed(null)))
-        : null
-      const certificates = yield* certRepo.listValid(auth.user!).pipe(Effect.catchAll(() => Effect.succeed([])))
-      const principal = auth.sub ? yield* principals.findByExternalId(auth.sub) : null
-      const apiKeys = principal
-        ? yield* apiKeyRepo.listForPrincipal(principal.id).pipe(Effect.catchAll(() => Effect.succeed([])))
-        : []
-      return { locale, lastCertRenewal, p12Password, certificates, apiKeys }
-    }),
-  )
-  return {
-    locale,
-    currentLocale: resolveLocale(request),
-    email: auth.email,
-    lastCertRenewalAt: lastCertRenewal.at?.toISOString() ?? null,
-    p12Password,
-    certificates,
-    apiKeys,
-    autheliaUrl: config.autheliaUrl,
-  }
+  await requireAuth(request)
+  // The Security section only exists when an Authelia portal is configured;
+  // gate the nav item on it so we don't link to a dead section.
+  return { hasSecurity: Boolean(config.autheliaUrl) }
 }
 
-export async function action({ request }: Route.ActionArgs) {
-  const auth = await requireAuth(request)
-  const formData = await request.formData()
-  const intent = formData.get("intent")
-
-  if (intent === "createApiKey" || intent === "revokeApiKey") {
-    const parsed = parseSettingsApiKeysMutation(formData as any, auth)
-    if ("error" in parsed) return { apiKeyError: parsed.error }
-    return await runEffect(handleSettingsApiKeysMutation(parsed))
-  }
-
-  const parsed = parseSettingsMutation(formData as any, auth)
-  if ("error" in parsed) return parsed
-
-  const result = await runEffect(handleSettingsMutation(parsed))
-  if (result && typeof result === "object" && "_redirect" in result) {
-    return redirect((result as any)._redirect, {
-      headers: { "Set-Cookie": (result as any)._cookie },
-    })
-  }
-  return result
+function deriveActiveValue(pathname: string): string {
+  if (pathname === "/settings" || pathname === "/settings/") return "general"
+  const segment = pathname.replace("/settings/", "").split("/")[0]
+  return segment || "general"
 }
 
-export default function SettingsPage({ loaderData }: Route.ComponentProps) {
+const navMap: Record<string, string> = {
+  general: "/settings",
+  certificate: "/settings/certificate",
+  "api-keys": "/settings/api-keys",
+  security: "/settings/security",
+}
+
+export default function SettingsLayout({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
-  const dashboardData = useRouteLoaderData("routes/dashboard") as {
-    user: string
-    isAdmin: boolean
-  }
-  const fetcher = useFetcher<typeof action>()
-  const actionData = fetcher.data
+  const navigate = useNavigate()
+  const location = useLocation()
+  const isWide = useMediaQuery("(min-width: 768px)", true)
+  const [navDrawerOpen, setNavDrawerOpen] = useState(false)
+
+  const dashboardData = useRouteLoaderData("routes/dashboard") as { user: string; isAdmin: boolean } | undefined
+
+  const activeValue = deriveActiveValue(location.pathname)
+
+  const handleValueChange = useCallback(
+    (value: string) => {
+      const path = navMap[value]
+      if (path) navigate(path)
+      setNavDrawerOpen(false)
+    },
+    [navigate],
+  )
+
+  const navContent = (
+    <SideNav.Root value={activeValue} onValueChange={handleValueChange}>
+      <SideNav.Section label={t("settings.nav.title", "Settings")}>
+        <SideNav.Item value="general" icon={<Icon name="user-plus" size={18} />}>
+          {t("settings.nav.general", "General")}
+        </SideNav.Item>
+        <SideNav.Item value="certificate" icon={<Icon name="lock" size={18} />}>
+          {t("settings.nav.certificate", "Certificate")}
+        </SideNav.Item>
+        <SideNav.Item value="api-keys" icon={<Icon name="key" size={18} />}>
+          {t("settings.nav.apiKeys", "API keys")}
+        </SideNav.Item>
+        {loaderData.hasSecurity && (
+          <SideNav.Item value="security" icon={<Icon name="shield" size={18} />}>
+            {t("settings.nav.security", "Security")}
+          </SideNav.Item>
+        )}
+      </SideNav.Section>
+    </SideNav.Root>
+  )
 
   return (
-    <PageShell
-      maxWidth="sm"
-      header={<Header user={dashboardData?.user ?? ""} isAdmin={dashboardData?.isAdmin ?? false} />}
-    >
-      <Stack gap="lg">
-        <CardSection title={t("settings.languageLabel")}>
-          {actionData && "error" in actionData && <Alert variant="error">{actionData.error}</Alert>}
+    <html.div style={styles.outerFlex}>
+      <html.div style={styles.pageWrap}>
+        <PageShell
+          maxWidth="lg"
+          header={<Header user={dashboardData?.user ?? ""} isAdmin={dashboardData?.isAdmin ?? false} />}
+        >
+          {isWide ? (
+            <html.div style={styles.layoutRow}>
+              <html.div style={styles.sideNav}>{navContent}</html.div>
+              <html.div style={styles.mainContent}>
+                <Outlet />
+              </html.div>
+            </html.div>
+          ) : (
+            <>
+              <html.div style={styles.mobileHeader}>
+                <Button variant="secondary" size="small" onClick={() => setNavDrawerOpen(true)}>
+                  {t("settings.nav.menu", "Menu")}
+                </Button>
+              </html.div>
+              <Stack gap="lg">
+                <Outlet />
+              </Stack>
+            </>
+          )}
+        </PageShell>
+      </html.div>
 
-          <fetcher.Form method="post">
-            <input type="hidden" name="intent" value="saveLocale" />
-            <Stack gap="lg">
-              <Field.Root>
-                <LanguageSelect defaultValue={loaderData.locale} />
-                <Field.Description>{t("settings.languageHint")}</Field.Description>
-              </Field.Root>
-
-              <Button type="submit" variant="primary">
-                {t("common.save")}
-              </Button>
-            </Stack>
-          </fetcher.Form>
-        </CardSection>
-
-        <CardSection title={t("settings.cert.heading")}>
-          <CertificateSection
-            email={loaderData.email}
-            p12Password={loaderData.p12Password}
-            lastCertRenewalAt={loaderData.lastCertRenewalAt}
-            certificates={loaderData.certificates}
-          />
-        </CardSection>
-
-        <CardSection title={t("settings.apiKeys.heading")}>
-          <ApiKeysSection apiKeys={loaderData.apiKeys} />
-        </CardSection>
-
-        {loaderData.autheliaUrl && (
-          <CardSection title={t("settings.security.heading")}>
-            <Stack gap="sm">
-              <Text as="p" color="muted" variant="bodySm">
-                {t("settings.security.description")}
-              </Text>
-              <LinkButton href={loaderData.autheliaUrl} target="_blank" rel="noopener noreferrer" variant="secondary">
-                {t("settings.security.openPortal")}
-              </LinkButton>
-              <Text as="p" color="muted" variant="bodySm">
-                {t("settings.security.managedBy")}
-              </Text>
-            </Stack>
-          </CardSection>
-        )}
-      </Stack>
-    </PageShell>
+      <Drawer.Root open={navDrawerOpen} onOpenChange={setNavDrawerOpen} anchor="left">
+        <Drawer.Portal size="sm">
+          <Drawer.Header>
+            <Drawer.Title>{t("settings.nav.title", "Settings")}</Drawer.Title>
+            <Drawer.Close aria-label={t("common.close", "Close")} />
+          </Drawer.Header>
+          <Drawer.Body>{navContent}</Drawer.Body>
+        </Drawer.Portal>
+      </Drawer.Root>
+    </html.div>
   )
 }

@@ -20,6 +20,15 @@ export class PreferencesRepo extends Context.Tag("PreferencesRepo")<
     readonly getLastCertRenewal: (username: string) => Effect.Effect<{ at: Date | null; renewalId: string | null }>
     readonly setCertRenewal: (username: string, renewalId: string) => Effect.Effect<void, PreferencesError>
     readonly clearCertRenewalId: (username: string) => Effect.Effect<void, PreferencesError>
+    /** Display prefs used to render timestamps; null means "use the client
+     * default" (browser timezone / locale clock). */
+    readonly getDisplayPrefs: (
+      username: string,
+    ) => Effect.Effect<{ timezone: string | null; timeFormat: string | null }>
+    readonly setDisplayPrefs: (
+      username: string,
+      prefs: { timezone: string | null; timeFormat: string | null },
+    ) => Effect.Effect<void, PreferencesError>
   }
 >() {}
 
@@ -88,6 +97,29 @@ export const PreferencesRepoLive = Layer.effect(
         const stmt = sql`UPDATE user_preferences SET cert_renewal_id = NULL WHERE username = ${username}`
         return withErr(stmt.pipe(Effect.asVoid), "Failed to clear cert renewal ID")
       },
+
+      getDisplayPrefs: (username: string) =>
+        sql`SELECT timezone, time_format FROM user_preferences WHERE username = ${username}`.pipe(
+          Effect.map((rows) => {
+            // @effect/sql-pg camelCases column names → time_format = timeFormat.
+            const row = rows[0] as { timezone?: string | null; timeFormat?: string | null } | undefined
+            return {
+              timezone: typeof row?.timezone === "string" ? row.timezone : null,
+              timeFormat: typeof row?.timeFormat === "string" ? row.timeFormat : null,
+            }
+          }),
+          Effect.catchAll(() => Effect.succeed({ timezone: null, timeFormat: null })),
+        ),
+
+      setDisplayPrefs: (username: string, { timezone, timeFormat }) =>
+        withErr(
+          sql`INSERT INTO user_preferences (username, locale, updated_at, timezone, time_format)
+              VALUES (${username}, 'en', NOW(), ${timezone}, ${timeFormat})
+              ON CONFLICT(username) DO UPDATE SET timezone = ${timezone}, time_format = ${timeFormat}, updated_at = NOW()`.pipe(
+            Effect.asVoid,
+          ),
+          "Failed to set display preferences",
+        ),
     }
   }),
 )

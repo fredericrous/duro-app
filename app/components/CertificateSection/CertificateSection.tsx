@@ -20,7 +20,8 @@ function daysUntil(expiresAt: string): number {
   return Math.ceil((new Date(expiresAt).getTime() - Date.now()) / ONE_DAY_MS)
 }
 
-const API_URL = "/settings"
+// Cert actions live on the certificate settings sub-route now.
+const API_URL = "/settings/certificate"
 
 function CertRow({ cert }: { cert: UserCertificate }) {
   const { t } = useTranslation()
