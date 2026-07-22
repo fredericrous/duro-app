@@ -27,11 +27,13 @@ describe("Header", () => {
     })
   })
 
-  it("surfaces the primary verbs as persistent buttons", async () => {
+  it("surfaces the primary verbs as persistent links to the catalog and requests", async () => {
     renderHeader({ user: "alice", isAdmin: false })
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: t("header.requestAccess") })).toBeInTheDocument()
+      expect(screen.getByRole("link", { name: t("header.requestAccess") })).toBeInTheDocument()
     })
+    // "Request access" takes the user to the catalog to browse and request.
+    expect(screen.getByRole("link", { name: t("header.requestAccess") })).toHaveAttribute("href", "/catalog")
     // "My requests" is a visible link, not a dropdown row.
     expect(screen.getByRole("link", { name: new RegExp(t("header.myRequests")) })).toHaveAttribute("href", "/requests")
   })
@@ -42,7 +44,7 @@ describe("Header", () => {
       expect(screen.getByText(t("common.appTitle"))).toBeInTheDocument()
     })
     expect(screen.queryByText(t("header.welcome", undefined, { user: "alice" }))).not.toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: t("header.requestAccess") })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: t("header.requestAccess") })).not.toBeInTheDocument()
   })
 
   it("renders the account menu trigger with the welcome greeting for the user", async () => {

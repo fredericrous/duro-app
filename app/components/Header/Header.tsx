@@ -6,7 +6,6 @@ import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { typeScale } from "@duro-app/tokens/tokens/typography.css"
 import { css, html } from "react-strict-dom"
-import { RequestAccessDialog } from "~/components/RequestAccessDialog/RequestAccessDialog"
 
 const styles = css.create({
   row: {
@@ -50,7 +49,6 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [logoutOpen, setLogoutOpen] = useState(false)
-  const [requestOpen, setRequestOpen] = useState(false)
 
   // Badge "My requests" with the count of items awaiting the user (their own
   // in-flight requests + open invitations), loaded once by the dashboard
@@ -59,10 +57,9 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
   const dashboard = useRouteLoaderData("routes/dashboard") as { openRequestItems?: number } | undefined
   const openItems = dashboard?.openRequestItems ?? 0
 
-  // "Request access" is the primary verb, so it's a persistent primary button
-  // (not a menu row). The dialog fetches its own catalog from /api/catalog on
-  // open, so the Header pays no DB cost until the user actually clicks. The
-  // account menu keeps only identity actions — where people expect to find them.
+  // "Request access" is the primary verb, so it's a persistent primary control
+  // that takes the user to the catalog — where they browse and request. The
+  // account menu keeps only identity actions, where people expect to find them.
 
   return (
     <html.div style={styles.row}>
@@ -71,9 +68,9 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
       </Link>
       {showMenu && (
         <html.div style={styles.actions}>
-          <Button variant="primary" onClick={() => setRequestOpen(true)}>
+          <LinkButton href="/catalog" variant="primary">
             {t("header.requestAccess")}
-          </Button>
+          </LinkButton>
           <LinkButton href="/requests" variant="secondary">
             {t("header.myRequests")}
             {openItems > 0 && (
@@ -85,7 +82,6 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
           <Menu.Root>
             <Menu.Trigger>{t("header.welcome", { user })} &#9662;</Menu.Trigger>
             <Menu.Popup align="end">
-              <Menu.LinkItem href="/catalog">{t("header.getAccess")}</Menu.LinkItem>
               {isAdmin && <Menu.LinkItem href="/admin">{t("common.admin")}</Menu.LinkItem>}
               <Menu.LinkItem href="/settings">{t("common.settings")}</Menu.LinkItem>
               <Menu.Item onClick={() => setLogoutOpen(true)}>{t("common.logout")}</Menu.Item>
@@ -93,8 +89,6 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
           </Menu.Root>
         </html.div>
       )}
-
-      <RequestAccessDialog open={requestOpen} onOpenChange={setRequestOpen} />
 
       <Dialog.Root open={logoutOpen} onOpenChange={setLogoutOpen}>
         <Dialog.Portal size="sm">
