@@ -40,7 +40,6 @@
   "header": {
     "welcome": "Bienvenue, {{user}}",
     "requestAccess": "Demander l'acces",
-    "getAccess": "Obtenir un accès",
     "myRequests": "Mes demandes",
     "requestDialog": {
       "loading": "Chargement des applications disponibles…",
