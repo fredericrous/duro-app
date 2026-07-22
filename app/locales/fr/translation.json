@@ -123,7 +123,8 @@
     "action": {
       "availableOnHome": "Disponible sur l'Accueil",
       "askAdmin": "Demandez à un admin"
-    }
+    },
+    "learnMore": "En savoir plus"
   },
   "search": {
     "placeholder": "Rechercher des applications…",
