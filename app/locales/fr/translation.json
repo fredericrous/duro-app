@@ -35,7 +35,8 @@
     },
     "scratchToReveal": "Grattez ou appuyez sur Entrée pour révéler",
     "processing": "Traitement…",
-    "done": "Terminé"
+    "done": "Terminé",
+    "close": "Fermer"
   },
   "header": {
     "welcome": "Bienvenue, {{user}}",
@@ -290,6 +291,27 @@
         "warning": "Si vous utilisez cette cle dans un outil en ce moment (ex. Claude CLI), vous devrez mettre a jour sa configuration avec une nouvelle cle.",
         "confirm": "Oui, revoquer"
       }
+    },
+    "nav": {
+      "title": "Paramètres",
+      "general": "Général",
+      "certificate": "Certificat",
+      "apiKeys": "Clés API",
+      "security": "Sécurité",
+      "menu": "Menu"
+    },
+    "display": {
+      "heading": "Date et heure",
+      "saved": "Préférences d’affichage enregistrées.",
+      "timezoneLabel": "Fuseau horaire",
+      "timezoneAuto": "Automatique (votre appareil)",
+      "timeFormatLabel": "Format de l’heure",
+      "timeFormat": {
+        "auto": "Automatique (par défaut selon la langue)",
+        "24": "24 heures",
+        "12": "12 heures"
+      },
+      "preview": "Aperçu"
     }
   },
   "recover": {

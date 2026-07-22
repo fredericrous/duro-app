@@ -68,6 +68,24 @@ describe("parseSettingsMutation", () => {
     expect(result).toEqual({ intent: "renameCert", serialNumber: "abc-123", label: null, auth })
   })
 
+  it("parses saveDisplayPrefs, mapping the AUTO sentinel to null", () => {
+    const fd = new FormData()
+    fd.append("intent", "saveDisplayPrefs")
+    fd.append("timezone", "Europe/Paris")
+    fd.append("timeFormat", "auto")
+    const result = parseSettingsMutation(fd, auth)
+    expect(result).toEqual({ intent: "saveDisplayPrefs", timezone: "Europe/Paris", timeFormat: null, auth })
+  })
+
+  it("rejects saveDisplayPrefs with an unknown timezone", () => {
+    const fd = new FormData()
+    fd.append("intent", "saveDisplayPrefs")
+    fd.append("timezone", "Mars/Olympus")
+    fd.append("timeFormat", "24")
+    const result = parseSettingsMutation(fd, auth)
+    expect(result).toEqual({ error: "Invalid display preferences" })
+  })
+
   it("parses saveLocale as default", () => {
     const fd = new FormData()
     fd.append("locale", "fr")

@@ -241,6 +241,8 @@ const mockPreferencesRepo = () =>
     getLastCertRenewal: () => Effect.succeed({ at: null, renewalId: null }),
     setCertRenewal: () => Effect.void,
     clearCertRenewalId: () => Effect.void,
+    getDisplayPrefs: () => Effect.succeed({ timezone: null, timeFormat: null }),
+    setDisplayPrefs: () => Effect.void,
   })
 
 const mockEmailService = (sendShouldFail = false) =>
