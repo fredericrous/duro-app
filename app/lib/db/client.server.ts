@@ -32,6 +32,7 @@ import m0025 from "./migrations/pg/0025_seed_duro_governance"
 import m0026 from "./migrations/pg/0026_seed_app_access"
 import m0027 from "./migrations/pg/0027_add_display_preferences"
 import m0028 from "./migrations/pg/0028_seed_catalog_info"
+import m0029 from "./migrations/pg/0029_add_theme_preference"
 
 const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
@@ -102,6 +103,7 @@ const migrations: Array<
   [26, "seed_app_access", m0026],
   [27, "add_display_preferences", m0027],
   [28, "seed_catalog_info", m0028],
+  [29, "add_theme_preference", m0029],
 ]
 
 const runMigrations = Effect.gen(function* () {

@@ -313,6 +313,13 @@
         "12": "12 heures"
       },
       "preview": "Aperçu"
+    },
+    "theme": {
+      "heading": "Apparence",
+      "label": "Thème",
+      "hint": "Choisissez l’apparence de Duro. S’applique à toutes les pages.",
+      "dark": "Sombre",
+      "light": "Clair"
     }
   },
   "recover": {

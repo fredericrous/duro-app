@@ -94,6 +94,29 @@ describe("PreferencesRepo — display prefs", () => {
   })
 })
 
+describe("PreferencesRepo — theme", () => {
+  it.layer(TestLayer)("getTheme returns null for an unknown user", (it) => {
+    it.effect("missing row → null", () =>
+      Effect.gen(function* () {
+        const repo = yield* PreferencesRepo
+        expect(yield* repo.getTheme("nobody")).toBeNull()
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("setTheme + getTheme round-trip and upsert", (it) => {
+    it.effect("persists and overwrites", () =>
+      Effect.gen(function* () {
+        const repo = yield* PreferencesRepo
+        yield* repo.setTheme("frank", "light")
+        expect(yield* repo.getTheme("frank")).toBe("light")
+        yield* repo.setTheme("frank", "dark")
+        expect(yield* repo.getTheme("frank")).toBe("dark")
+      }),
+    )
+  })
+})
+
 describe("PreferencesRepo — cert renewal", () => {
   it.layer(TestLayer)("getLastCertRenewal returns nulls for an unknown user", (it) => {
     it.effect("missing row → {at:null, renewalId:null}", () =>
