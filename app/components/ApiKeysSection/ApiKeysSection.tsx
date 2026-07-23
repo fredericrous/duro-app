@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
+import { useDisplayFormat } from "~/hooks/useDisplayFormat"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
@@ -72,15 +73,6 @@ const styles = css.create({
   },
 })
 
-function formatDate(iso: string | null) {
-  if (!iso) return null
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
-  } catch {
-    return iso
-  }
-}
-
 type KeyStatus = "active" | "revoked" | "expired"
 function statusOf(key: ApiKey): KeyStatus {
   if (key.revokedAt) return "revoked"
@@ -96,6 +88,9 @@ function statusBadgeVariant(status: KeyStatus): "success" | "default" | "warning
 
 export function ApiKeysSection({ apiKeys }: Props) {
   const { t } = useTranslation()
+  const { formatDate: fmtDate } = useDisplayFormat()
+  // Null-safe: keep the old "no date → render nothing" behaviour.
+  const formatDate = (iso: string | null) => (iso ? fmtDate(iso) : null)
   const fetcher = useFetcher<{ apiKeys?: SettingsApiKeysResult }>({ key: "api-keys" })
   const result = fetcher.data as SettingsApiKeysResult | undefined
 

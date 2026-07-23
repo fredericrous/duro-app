@@ -7,6 +7,8 @@ import { checkAuthDecision } from "~/lib/auth-decision.server"
 import { isFirstRun } from "~/lib/governance/bootstrap.server"
 import { runEffect } from "~/lib/runtime.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
+import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
+import { DisplayPrefsProvider } from "~/hooks/useDisplayFormat"
 
 export async function loader({ request }: Route.LoaderArgs) {
   // First-run shortcut: if there are no human users yet, send the visitor
@@ -59,6 +61,16 @@ export async function loader({ request }: Route.LoaderArgs) {
     ).catch(() => 0)
   }
 
+  // Display prefs (timezone + clock) so every descendant can render timestamps
+  // the way the user chose — read via useDisplayFormat(). One cheap lookup;
+  // falls back to the client/locale defaults when unset or on error.
+  const displayPrefs = await runEffect(
+    Effect.gen(function* () {
+      const prefs = yield* PreferencesRepo
+      return yield* prefs.getDisplayPrefs(auth.user!)
+    }),
+  ).catch(() => ({ timezone: null, timeFormat: null }))
+
   return {
     user: auth.user,
     email: auth.email,
@@ -66,9 +78,15 @@ export async function loader({ request }: Route.LoaderArgs) {
     isAdmin: adminDecision.allow,
     currentPrincipalId,
     openRequestItems,
+    timezone: displayPrefs.timezone,
+    timeFormat: displayPrefs.timeFormat,
   }
 }
 
-export default function DashboardLayout() {
-  return <Outlet />
+export default function DashboardLayout({ loaderData }: Route.ComponentProps) {
+  return (
+    <DisplayPrefsProvider value={{ timezone: loaderData.timezone, timeFormat: loaderData.timeFormat }}>
+      <Outlet />
+    </DisplayPrefsProvider>
+  )
 }

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { useSearchParams } from "react-router"
 import { useTranslation } from "react-i18next"
+import { useDisplayFormat } from "~/hooks/useDisplayFormat"
 import { enumLabel } from "~/lib/enum-labels"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.audit"
@@ -163,7 +164,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 const columnHelper = createColumnHelper<AuditEventWithNames>()
 
-function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string) {
+function buildColumns(
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  formatDateTime: (value: string) => string,
+) {
   return [
     columnHelper.accessor("eventType", {
       header: t("admin.cols.eventType"),
@@ -201,17 +205,18 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
     columnHelper.accessor("createdAt", {
       header: t("admin.cols.timestamp"),
       enableSorting: true,
-      cell: ({ getValue }) => new Date(getValue()).toLocaleString(),
+      cell: ({ getValue }) => formatDateTime(getValue()),
     }),
   ]
 }
 
 export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
+  const { formatDateTime } = useDisplayFormat()
   const { events, page, pageSize, error } = loaderData as Awaited<ReturnType<typeof loader>>
   const [searchParams, setSearchParams] = useSearchParams()
   const [sorting, setSorting] = useState<SortingState>([])
-  const columns = useMemo(() => buildColumns(t), [t])
+  const columns = useMemo(() => buildColumns(t, formatDateTime), [t, formatDateTime])
 
   const table = useReactTable({
     data: events,
