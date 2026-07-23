@@ -107,6 +107,15 @@ database:
   # DURO_DB_PATH — which the app treats as the switch into embedded mode — so it
   # MUST NOT be set in postgres mode (see deployment.yaml).
   path: "/db/pgdata"
+  # Embedded mode replaces web.resources (postgres mode keeps those lean limits).
+  # PGlite's WASM init peaks high — 192Mi OOMKills, 512Mi OOMKills, 1Gi is safe.
+  embeddedResources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
 
 persistence:
   enabled: true

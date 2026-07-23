@@ -91,7 +91,13 @@ spec:
             {{- end }}
           {{- end }}
           resources:
+            {{- if ne .Values.database.mode "postgres" }}
+            {{- /* Embedded mode runs Postgres-in-WASM (PGlite) in-process; its
+                   init spikes memory well past the lean postgres-mode limit. */}}
+            {{- toYaml .Values.database.embeddedResources | nindent 12 }}
+            {{- else }}
             {{- toYaml .Values.web.resources | nindent 12 }}
+            {{- end }}
           livenessProbe:
             exec:
               command:
