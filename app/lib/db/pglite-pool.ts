@@ -175,10 +175,19 @@ class PglitePool extends EventEmitter {
 const GLOBAL_KEY = "__pglite_backend__"
 const isVitest = typeof process !== "undefined" && process.env.VITEST === "true"
 
-export async function createPglitePool() {
+export async function createPglitePool(opts?: { dataDir?: string }) {
   let backend: PgLiteBackend
 
-  if (isVitest) {
+  if (opts?.dataDir) {
+    // Embedded production mode: file-backed PGlite, in-process (no worker —
+    // the worker .mjs isn't shipped in the server bundle). PGlite persists to
+    // the given directory. Single-writer: the chart pins replicas=1 and runs
+    // no separate worker in this mode.
+    const { PGlite: PGliteCtor } = await import("@electric-sql/pglite")
+    const pglite = new PGliteCtor(opts.dataDir)
+    await pglite.waitReady
+    backend = new DirectBackend(pglite)
+  } else if (isVitest) {
     // vitest — load PGlite directly, each test suite gets its own instance
     const { PGlite: PGliteCtor } = await import("@electric-sql/pglite")
     const pglite = new PGliteCtor()

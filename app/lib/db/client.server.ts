@@ -332,6 +332,26 @@ const seedGovernanceData = (sql: SqlClient.SqlClient) =>
 export const DbDevLive = Layer.effect(MigrationsRan, seedDevData).pipe(Layer.provideMerge(PgLiteClientLayer))
 
 /**
+ * Embedded production layer: a file-backed PGlite (postgres-in-process) that
+ * persists to `dataDir`. Runs the real migrations — NO dev seed — so it's a
+ * genuine single-pod, zero-external-dependency deployment option (the chart's
+ * `database.mode: embedded`). Selected when DURO_DB_PATH is set.
+ */
+export const makeEmbeddedDbLayer = (dataDir: string) => {
+  const EmbeddedClientLayer = PgClient.layerFromPool({
+    acquire: Effect.acquireRelease(
+      Effect.promise(async () => {
+        const { createPglitePool } = await import("./pglite-pool")
+        return createPglitePool({ dataDir })
+      }),
+      (pool) => Effect.promise(() => pool.end()),
+    ),
+    transformResultNames: snakeToCamel,
+  })
+  return MigratorLive.pipe(Layer.provideMerge(EmbeddedClientLayer))
+}
+
+/**
  * Test layer: uses an in-memory PGlite instance (no external Postgres needed).
  * Runs migrations then truncates all data tables for a clean test state.
  */
