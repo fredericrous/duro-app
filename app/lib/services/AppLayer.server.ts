@@ -12,7 +12,7 @@ import { CertificateRepoLive } from "./CertificateRepo.server"
 import { CertRevealRepoLive } from "./CertRevealRepo.server"
 import { RecoveryRepoLive } from "./RecoveryRepo.server"
 import { DiscordNotifierLive } from "./DiscordNotifier.server"
-import { DbLive, DbDevLive } from "~/lib/db/client.server"
+import { DbLive, DbDevLive, makeEmbeddedDbLayer } from "~/lib/db/client.server"
 import { OtelLayer } from "~/lib/telemetry.server"
 
 // Governance services
@@ -39,6 +39,14 @@ import { PluginHostLive } from "~/lib/plugins/PluginHost.server"
 import { LldapClientLive } from "~/lib/services/LldapClient.server"
 
 const isDevServer = process.env.NODE_ENV === "development" && process.env.VITEST !== "true"
+
+// DB layer selection:
+//  - DURO_DB_PATH set  → embedded file-backed PGlite (chart's `mode: embedded`),
+//    a single-pod deployment with no external Postgres.
+//  - dev server        → in-memory PGlite + dev seed.
+//  - otherwise (prod)  → real Postgres via DATABASE_URL.
+const embeddedDbPath = process.env.DURO_DB_PATH
+const AppDbLive = embeddedDbPath ? makeEmbeddedDbLayer(embeddedDbPath) : isDevServer ? DbDevLive : DbLive
 
 // Shared governance repos — extracted as a single Layer value so both the
 // outer AppLayer merge and the PluginHostWired sub-provide resolve to the
@@ -94,8 +102,4 @@ export const AppLayer = Layer.mergeAll(
   // Plugin system
   PluginRegistryLive,
   isDevServer ? PluginHostWired : PluginHostWired,
-).pipe(
-  Layer.provideMerge(isDevServer ? DbDevLive : DbLive),
-  Layer.provide(OtelLayer),
-  Layer.provide(FetchHttpClient.layer),
-)
+).pipe(Layer.provideMerge(AppDbLive), Layer.provide(OtelLayer), Layer.provide(FetchHttpClient.layer))

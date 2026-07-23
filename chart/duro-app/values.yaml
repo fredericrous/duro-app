@@ -37,7 +37,6 @@ env:
   INVITE_BASE_URL: "https://join.daddyshome.fr"
   NAS_VAULT_ADDR: "https://nas-vault.vault.mesh:15443"
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy.monitoring.svc.cluster.local.:4318"
-  DURO_DB_PATH: "/db/duro.sqlite"
   APP_NAME: "Daddyshome"
   APP_DESCRIPTION: "a private platform for media, productivity, and more"
   ALLOWED_ORIGIN_SUFFIX: "daddyshome.fr"
@@ -100,7 +99,14 @@ worker:
       cpu: "200m"
 
 database:
-  mode: sqlite  # "sqlite" or "postgres"
+  # "embedded" runs a file-backed PGlite (Postgres-in-WASM) inside the app pod —
+  # zero external dependencies, single pod, no worker. "postgres" uses an
+  # external Postgres via DATABASE_URL (required for HA / a separate worker).
+  mode: embedded  # "embedded" or "postgres"
+  # Embedded mode only: directory for the PGlite data store. Injected as
+  # DURO_DB_PATH — which the app treats as the switch into embedded mode — so it
+  # MUST NOT be set in postgres mode (see deployment.yaml).
+  path: "/db/pgdata"
 
 persistence:
   enabled: true

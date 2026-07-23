@@ -67,6 +67,12 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+            {{- if ne .Values.database.mode "postgres" }}
+            # Embedded mode only — presence of DURO_DB_PATH switches the app to
+            # the file-backed PGlite store. Never rendered in postgres mode.
+            - name: DURO_DB_PATH
+              value: {{ .Values.database.path | quote }}
+            {{- end }}
             {{- range $key, $value := .Values.web.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
