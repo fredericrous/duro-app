@@ -1,13 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
 
 vi.mock("~/lib/runtime.server", () => ({
-  runEffect: vi.fn(),
+  runDbEffect: vi.fn(),
 }))
 
-import { runEffect } from "~/lib/runtime.server"
+import { runDbEffect } from "~/lib/runtime.server"
 import { loader } from "./health.ready"
 
-const mockRunEffect = vi.mocked(runEffect)
+const mockRunEffect = vi.mocked(runDbEffect)
 
 beforeEach(() => {
   vi.clearAllMocks()

@@ -46,7 +46,9 @@ const isDevServer = process.env.NODE_ENV === "development" && process.env.VITEST
 //  - dev server        → in-memory PGlite + dev seed.
 //  - otherwise (prod)  → real Postgres via DATABASE_URL.
 const embeddedDbPath = process.env.DURO_DB_PATH
-const AppDbLive = embeddedDbPath ? makeEmbeddedDbLayer(embeddedDbPath) : isDevServer ? DbDevLive : DbLive
+// Exported so the runtime can build a DB-only ManagedRuntime that shares this
+// exact layer (one pool) with the full app runtime — see runtime.server.ts.
+export const AppDbLive = embeddedDbPath ? makeEmbeddedDbLayer(embeddedDbPath) : isDevServer ? DbDevLive : DbLive
 
 // Shared governance repos — extracted as a single Layer value so both the
 // outer AppLayer merge and the PluginHostWired sub-provide resolve to the

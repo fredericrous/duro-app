@@ -1,6 +1,6 @@
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
-import { runEffect } from "~/lib/runtime.server"
+import { runDbEffect } from "~/lib/runtime.server"
 
 // Readiness probe: separate from /health (which doubles as the invite-flow
 // return-URL handler) so kubelet can use this for actual DB-aware
@@ -14,7 +14,9 @@ export async function loader() {
   }).pipe(Effect.timeout("3 seconds"))
 
   try {
-    await runEffect(ping)
+    // DB-only: readiness reflects database reachability, NOT whether every
+    // external-service secret (LLDAP/Vault/SMTP/OIDC) is configured.
+    await runDbEffect(ping)
     return Response.json({ status: "ready" })
   } catch (e) {
     return Response.json({ status: "not_ready", error: String(e) }, { status: 503 })
