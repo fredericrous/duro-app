@@ -62,6 +62,7 @@ export const mkApplication = (overrides: Partial<Application> = {}): Application
   ownerId: "p-admin",
   enabled: true,
   url: null,
+  homepage: null,
   lastSyncedAt: null,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",

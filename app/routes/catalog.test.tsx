@@ -126,7 +126,13 @@ import CatalogPage from "./catalog"
 import { renderRoute } from "~/test/render-route"
 
 const entry = (
-  overrides: Partial<{ slug: string; displayName: string; state: string; description: string | null }>,
+  overrides: Partial<{
+    slug: string
+    displayName: string
+    state: string
+    description: string | null
+    homepage: string | null
+  }>,
 ): AppCatalogEntry =>
   ({
     app: {
@@ -137,6 +143,7 @@ const entry = (
       accessMode: "request",
       enabled: true,
       url: null,
+      homepage: overrides.homepage ?? null,
       ownerId: "p-admin",
       createdAt: "2026-01-01T00:00:00Z",
       updatedAt: "2026-01-01T00:00:00Z",
@@ -202,6 +209,33 @@ describe("CatalogPage component — populated", () => {
     expect(chipLabels.some((l) => l.includes("Open"))).toBe(true)
     expect(chipLabels.some((l) => l.includes("Request access"))).toBe(true)
     expect(chipLabels.some((l) => l.includes("Pending"))).toBe(true)
+  })
+
+  it("shows the description and a Learn more link when the app has a homepage", async () => {
+    renderCatalog([
+      entry({
+        slug: "plex",
+        displayName: "Plex",
+        state: "requestable",
+        description: "Stream your movies, TV & music library",
+        homepage: "https://www.plex.tv",
+      }),
+    ])
+
+    await waitFor(() => {
+      expect(screen.getByText("Stream your movies, TV & music library")).toBeInTheDocument()
+    })
+    const learnMore = screen.getByRole("link", { name: /Learn more/i })
+    expect(learnMore).toHaveAttribute("href", "https://www.plex.tv")
+    expect(learnMore).toHaveAttribute("target", "_blank")
+  })
+
+  it("omits the Learn more link when the app has no homepage", async () => {
+    renderCatalog([entry({ slug: "internal", displayName: "Internal", state: "requestable", homepage: null })])
+    await waitFor(() => {
+      expect(screen.getByText("Internal")).toBeInTheDocument()
+    })
+    expect(screen.queryByRole("link", { name: /Learn more/i })).not.toBeInTheDocument()
   })
 
   it("surfaces the pending-requests banner when at least one row is pending", async () => {

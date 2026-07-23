@@ -116,6 +116,15 @@ const styles = css.create({
     flexShrink: 0,
     color: "#6aaffc",
   },
+  learnMore: {
+    fontSize: 12,
+    color: "#6aaffc",
+    textDecoration: {
+      default: "none",
+      ":hover": "underline",
+    },
+    width: "fit-content",
+  },
 })
 
 export default function AppsPage({ loaderData }: Route.ComponentProps) {
@@ -281,6 +290,16 @@ function CatalogBody({
                           <Text variant="bodySm" color="muted">
                             {entry.app.description}
                           </Text>
+                        )}
+                        {entry.app.homepage && (
+                          <html.a
+                            href={entry.app.homepage}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={styles.learnMore}
+                          >
+                            {t("apps.learnMore")} ↗
+                          </html.a>
                         )}
                       </Stack>
                     </Inline>

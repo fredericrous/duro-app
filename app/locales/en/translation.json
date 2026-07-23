@@ -123,7 +123,8 @@
     "action": {
       "availableOnHome": "Available on Home",
       "askAdmin": "Ask an admin"
-    }
+    },
+    "learnMore": "Learn more"
   },
   "search": {
     "placeholder": "Search apps…",
