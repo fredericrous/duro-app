@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 import type { SettingsResult } from "~/lib/mutations/settings"
 import { useAction } from "~/hooks/useAction"
+import { useDisplayFormat } from "~/hooks/useDisplayFormat"
 import { PasswordReveal } from "~/components/PasswordReveal/PasswordReveal"
 import { Alert, Badge, Button, Inline, Input, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
 
@@ -25,6 +26,7 @@ const API_URL = "/settings/certificate"
 
 function CertRow({ cert }: { cert: UserCertificate }) {
   const { t } = useTranslation()
+  const { formatDate } = useDisplayFormat()
   const [confirming, setConfirming] = useState(false)
   const [renaming, setRenaming] = useState(false)
   // Optimistic device label so the row reflects a rename immediately (useAction
@@ -89,10 +91,10 @@ function CertRow({ cert }: { cert: UserCertificate }) {
           {serialShort}
         </code>
       </Table.Cell>
-      <Table.Cell>{new Date(cert.issuedAt).toLocaleDateString()}</Table.Cell>
+      <Table.Cell>{formatDate(cert.issuedAt)}</Table.Cell>
       <Table.Cell>
         <Inline gap="sm">
-          <Text as="span">{new Date(cert.expiresAt).toLocaleDateString()}</Text>
+          <Text as="span">{formatDate(cert.expiresAt)}</Text>
           {(() => {
             const status = expiryStatus(cert.expiresAt)
             if (status === "expired") {
@@ -164,6 +166,7 @@ export function CertificateSection({
   certificates: UserCertificate[]
 }) {
   const { t } = useTranslation()
+  const { formatDateTime } = useDisplayFormat()
   const certAction = useAction<SettingsResult>(API_URL)
   const [confirming, setConfirming] = useState(false)
 
@@ -197,7 +200,7 @@ export function CertificateSection({
       const twentyFourHours = 24 * 60 * 60 * 1000
       if (elapsed < twentyFourHours) {
         cooldown = true
-        text = new Date(new Date(lastCertRenewalAt).getTime() + twentyFourHours).toLocaleString()
+        text = formatDateTime(new Date(lastCertRenewalAt).getTime() + twentyFourHours)
       }
     }
     return { cooldown, text }
@@ -205,7 +208,7 @@ export function CertificateSection({
   let { cooldown: cooldownRemaining, text: nextAvailableText } = cooldownState
   if (isRateLimited && certData.nextAvailable) {
     cooldownRemaining = true
-    nextAvailableText = new Date(certData.nextAvailable).toLocaleString()
+    nextAvailableText = formatDateTime(certData.nextAvailable)
   }
 
   return (

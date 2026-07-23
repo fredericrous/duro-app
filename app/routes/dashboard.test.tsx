@@ -44,6 +44,7 @@ describe("/dashboard loader", () => {
       .mockResolvedValueOnce(false as never) // isFirstRun
       .mockResolvedValueOnce("principal-1" as never) // principal lookup
       .mockResolvedValueOnce(2 as never) // open-request-items count
+      .mockResolvedValueOnce({ timezone: "Europe/Paris", timeFormat: "24" } as never) // display prefs
     mockRequireAuth.mockResolvedValue({
       user: "alice",
       email: "alice@example.com",
@@ -59,6 +60,8 @@ describe("/dashboard loader", () => {
       isAdmin: boolean
       currentPrincipalId: string | null
       openRequestItems: number
+      timezone: string | null
+      timeFormat: string | null
     }>(result)
 
     expect(data).toEqual({
@@ -68,6 +71,8 @@ describe("/dashboard loader", () => {
       isAdmin: true,
       currentPrincipalId: "principal-1",
       openRequestItems: 2,
+      timezone: "Europe/Paris",
+      timeFormat: "24",
     })
   })
 
@@ -76,6 +81,7 @@ describe("/dashboard loader", () => {
       .mockResolvedValueOnce(false as never) // isFirstRun
       .mockRejectedValueOnce(new Error("db down")) // principal lookup
       .mockResolvedValueOnce(undefined as never) // logWarning
+      .mockResolvedValueOnce({ timezone: null, timeFormat: null } as never) // display prefs
     mockRequireAuth.mockResolvedValue({
       user: "alice",
       email: "alice@example.com",
@@ -91,7 +97,9 @@ describe("/dashboard loader", () => {
   })
 
   it("currentPrincipalId stays null when auth.sub is missing", async () => {
-    mockRunEffect.mockResolvedValueOnce(false as never) // isFirstRun
+    mockRunEffect
+      .mockResolvedValueOnce(false as never) // isFirstRun
+      .mockResolvedValueOnce({ timezone: null, timeFormat: null } as never) // display prefs
     mockRequireAuth.mockResolvedValue({
       user: "alice",
       email: "alice@example.com",
@@ -103,7 +111,7 @@ describe("/dashboard loader", () => {
     const result = await callLoader(loader)
     const data = expectData<{ currentPrincipalId: string | null }>(result)
     expect(data.currentPrincipalId).toBeNull()
-    // runEffect called once (isFirstRun) — no second call for the principal.
-    expect(mockRunEffect).toHaveBeenCalledTimes(1)
+    // No principal lookup / count without a sub — just isFirstRun + display prefs.
+    expect(mockRunEffect).toHaveBeenCalledTimes(2)
   })
 })

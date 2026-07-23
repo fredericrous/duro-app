@@ -8,6 +8,7 @@ import { isOriginAllowed } from "~/lib/config.server"
 import { AccessRequestRepo, type AccessRequestEnriched } from "~/lib/governance/AccessRequestRepo.server"
 import { AccessInvitationRepo, type AccessInvitationEnriched } from "~/lib/governance/AccessInvitationRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
+import { useDisplayFormat } from "~/hooks/useDisplayFormat"
 import { cancelOwnAccessRequest } from "~/lib/workflows/access-request.server"
 import { acceptInvitation, declineInvitation } from "~/lib/workflows/access-invitation.server"
 import { Header } from "~/components/Header/Header"
@@ -153,6 +154,7 @@ const statusBadge = (status: string): "default" | "success" | "warning" | "error
 
 export default function MyRequestsPage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
+  const { formatDate } = useDisplayFormat()
   const { requests, invitations } = loaderData
   const fetcher = useFetcher<typeof action>()
   // The consequential row actions (cancel a request, decline an invitation)
@@ -302,7 +304,7 @@ export default function MyRequestsPage({ loaderData }: Route.ComponentProps) {
                                 <Text color="muted">—</Text>
                               )}
                             </Table.Cell>
-                            <Table.Cell>{new Date(r.createdAt).toLocaleDateString()}</Table.Cell>
+                            <Table.Cell>{formatDate(r.createdAt)}</Table.Cell>
                             <Table.Cell>
                               {r.status === "pending" && (
                                 <Button
