@@ -96,14 +96,15 @@ describe("GeneralSettings component", () => {
       route: {
         path: "/settings",
         Component: GeneralSettings as never,
-        loader: () => ({ locale: "en", timezone: null, timeFormat: null, currentLocale: "en" }),
+        loader: () => ({ locale: "en", timezone: null, timeFormat: null, currentLocale: "en", theme: "dark" }),
       },
     })
     await waitFor(() => {
       expect(screen.getByText(t("settings.display.heading"))).toBeInTheDocument()
     })
-    // Both the language form and the display form expose a Save button.
-    expect(screen.getAllByRole("button", { name: /save/i }).length).toBeGreaterThanOrEqual(2)
+    // Language, Appearance (theme), and Date & time each expose a Save button.
+    expect(screen.getByText(t("settings.theme.heading"))).toBeInTheDocument()
+    expect(screen.getAllByRole("button", { name: /save/i }).length).toBeGreaterThanOrEqual(3)
     expect(screen.getByText(new RegExp(t("settings.display.preview")))).toBeInTheDocument()
   })
 })

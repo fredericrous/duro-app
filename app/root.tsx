@@ -5,6 +5,7 @@ import { ActionBarProvider, ThemeProvider, ToastProvider } from "@duro-app/ui"
 import { DevToolbar } from "~/components/DevToolbar/DevToolbar"
 import type { Route } from "./+types/root"
 import { resolveLocale } from "~/lib/i18n.server"
+import { resolveTheme } from "~/lib/theme.server"
 import "@duro-app/ui/dist/index.css"
 import "./styles/global.css"
 import "./styles/strict.css"
@@ -13,7 +14,8 @@ const isDev = process.env.NODE_ENV === "development"
 
 export async function loader({ request }: Route.LoaderArgs) {
   const locale = resolveLocale(request)
-  return { locale }
+  const theme = resolveTheme(request)
+  return { locale, theme }
 }
 
 function MaybeDevToolbar({ children }: { children: ReactNode }) {
@@ -25,6 +27,7 @@ export function Layout({ children }: { children: ReactNode }) {
   "use no memo"
   const data = useRouteLoaderData<typeof loader>("root")
   const locale = data?.locale ?? "en"
+  const theme = data?.theme ?? "dark"
 
   return (
     <html lang={locale}>
@@ -36,7 +39,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <Links />
       </head>
       <body>
-        <ThemeProvider theme="dark">
+        <ThemeProvider theme={theme}>
           <ToastProvider>
             <ActionBarProvider>
               <MaybeDevToolbar>{children}</MaybeDevToolbar>

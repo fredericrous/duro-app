@@ -19,7 +19,7 @@ describe("root loader", () => {
       context: {},
     } as unknown as Parameters<typeof loader>[0]
     const data = await loader(fakeArgs)
-    expect(data).toEqual({ locale: "fr" })
+    expect(data).toEqual({ locale: "fr", theme: "dark" })
   })
 
   it("falls back to 'en' when no locale param is supplied", async () => {
@@ -29,7 +29,17 @@ describe("root loader", () => {
       context: {},
     } as unknown as Parameters<typeof loader>[0]
     const data = await loader(fakeArgs)
-    expect(data).toEqual({ locale: "en" })
+    expect(data).toEqual({ locale: "en", theme: "dark" })
+  })
+
+  it("resolves the theme from the cookie", async () => {
+    const fakeArgs = {
+      request: new Request("http://localhost/", { headers: { Cookie: "__duro_theme=light" } }),
+      params: {},
+      context: {},
+    } as unknown as Parameters<typeof loader>[0]
+    const data = await loader(fakeArgs)
+    expect(data.theme).toBe("light")
   })
 })
 

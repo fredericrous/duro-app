@@ -29,6 +29,9 @@ export class PreferencesRepo extends Context.Tag("PreferencesRepo")<
       username: string,
       prefs: { timezone: string | null; timeFormat: string | null },
     ) => Effect.Effect<void, PreferencesError>
+    /** Stored theme choice, or null when the user hasn't picked one. */
+    readonly getTheme: (username: string) => Effect.Effect<string | null>
+    readonly setTheme: (username: string, theme: string) => Effect.Effect<void, PreferencesError>
   }
 >() {}
 
@@ -119,6 +122,23 @@ export const PreferencesRepoLive = Layer.effect(
             Effect.asVoid,
           ),
           "Failed to set display preferences",
+        ),
+
+      getTheme: (username: string) =>
+        sql`SELECT theme FROM user_preferences WHERE username = ${username}`.pipe(
+          Effect.map((rows) => {
+            const theme = rows[0]?.theme
+            return typeof theme === "string" ? theme : null
+          }),
+          Effect.catchAll(() => Effect.succeed(null)),
+        ),
+
+      setTheme: (username: string, theme: string) =>
+        withErr(
+          sql`INSERT INTO user_preferences (username, locale, updated_at, theme)
+              VALUES (${username}, 'en', NOW(), ${theme})
+              ON CONFLICT(username) DO UPDATE SET theme = ${theme}, updated_at = NOW()`.pipe(Effect.asVoid),
+          "Failed to set theme",
         ),
     }
   }),

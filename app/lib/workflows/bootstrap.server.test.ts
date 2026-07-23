@@ -243,6 +243,8 @@ const mockPreferencesRepo = () =>
     clearCertRenewalId: () => Effect.void,
     getDisplayPrefs: () => Effect.succeed({ timezone: null, timeFormat: null }),
     setDisplayPrefs: () => Effect.void,
+    getTheme: () => Effect.succeed(null),
+    setTheme: () => Effect.void,
   })
 
 const mockEmailService = (sendShouldFail = false) =>

@@ -86,6 +86,20 @@ describe("parseSettingsMutation", () => {
     expect(result).toEqual({ error: "Invalid display preferences" })
   })
 
+  it("parses saveTheme with a valid theme", () => {
+    const fd = new FormData()
+    fd.append("intent", "saveTheme")
+    fd.append("theme", "light")
+    expect(parseSettingsMutation(fd, auth)).toEqual({ intent: "saveTheme", theme: "light", auth })
+  })
+
+  it("rejects saveTheme with an unknown theme", () => {
+    const fd = new FormData()
+    fd.append("intent", "saveTheme")
+    fd.append("theme", "neon")
+    expect(parseSettingsMutation(fd, auth)).toEqual({ error: "Invalid theme" })
+  })
+
   it("parses saveLocale as default", () => {
     const fd = new FormData()
     fd.append("locale", "fr")

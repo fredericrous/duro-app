@@ -7,6 +7,7 @@ import { requireAuth } from "~/lib/auth.server"
 import { runEffect } from "~/lib/runtime.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { resolveLocale } from "~/lib/i18n.server"
+import { resolveTheme } from "~/lib/theme.server"
 import { parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
 import { Alert, Button, Field, Select, Stack, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
@@ -32,7 +33,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       return { locale, timezone: display.timezone, timeFormat: display.timeFormat }
     }),
   )
-  return { locale, timezone, timeFormat, currentLocale: resolveLocale(request) }
+  return { locale, timezone, timeFormat, currentLocale: resolveLocale(request), theme: resolveTheme(request) }
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -56,6 +57,7 @@ export default function GeneralSettings({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
   const localeFetcher = useFetcher<typeof action>()
   const displayFetcher = useFetcher<typeof action>()
+  const themeFetcher = useFetcher<typeof action>()
 
   const [tz, setTz] = useState(prefToSelect(loaderData.timezone))
   const [tf, setTf] = useState(prefToSelect(loaderData.timeFormat))
@@ -78,6 +80,35 @@ export default function GeneralSettings({ loaderData }: Route.ComponentProps) {
             </Button>
           </Stack>
         </localeFetcher.Form>
+      </CardSection>
+
+      <CardSection title={t("settings.theme.heading")}>
+        <themeFetcher.Form method="post">
+          <input type="hidden" name="intent" value="saveTheme" />
+          <Stack gap="lg">
+            <Field.Root>
+              <Field.Label>{t("settings.theme.label")}</Field.Label>
+              <Select.Root name="theme" defaultValue={loaderData.theme}>
+                <Select.Trigger>
+                  <Select.Value placeholder={t("settings.theme.label")} />
+                  <Select.Icon />
+                </Select.Trigger>
+                <Select.Popup>
+                  <Select.Item value="dark">
+                    <Select.ItemText>{t("settings.theme.dark")}</Select.ItemText>
+                  </Select.Item>
+                  <Select.Item value="light">
+                    <Select.ItemText>{t("settings.theme.light")}</Select.ItemText>
+                  </Select.Item>
+                </Select.Popup>
+              </Select.Root>
+              <Field.Description>{t("settings.theme.hint")}</Field.Description>
+            </Field.Root>
+            <Button type="submit" variant="primary">
+              {t("common.save")}
+            </Button>
+          </Stack>
+        </themeFetcher.Form>
       </CardSection>
 
       <CardSection title={t("settings.display.heading")}>

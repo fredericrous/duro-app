@@ -6,6 +6,7 @@ import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { resendCert } from "~/lib/workflows/invite.server"
 import { supportedLngs } from "~/lib/i18n"
 import { localeCookieHeader } from "~/lib/i18n.server"
+import { isThemeChoice, themeCookieHeader } from "~/lib/theme.server"
 import { AUTO, TIMEZONE_OPTIONS, TIME_FORMAT_OPTIONS, selectToPref } from "~/lib/datetime"
 import type { AuthInfo } from "~/lib/auth.server"
 
@@ -20,6 +21,7 @@ export type SettingsMutation =
   | { intent: "renameCert"; serialNumber: string; label: string | null; auth: AuthInfo }
   | { intent: "saveLocale"; locale: string; auth: AuthInfo }
   | { intent: "saveDisplayPrefs"; timezone: string | null; timeFormat: string | null; auth: AuthInfo }
+  | { intent: "saveTheme"; theme: string; auth: AuthInfo }
 
 export type SettingsResult =
   | { certSent: true; p12Password: string | null }
@@ -136,6 +138,19 @@ function handleSaveDisplayPrefs(timezone: string | null, timeFormat: string | nu
   )
 }
 
+function handleSaveTheme(theme: string, auth: AuthInfo) {
+  return Effect.gen(function* () {
+    if (!isThemeChoice(theme)) {
+      return { error: "Invalid theme" } as SettingsResult
+    }
+    const prefs = yield* PreferencesRepo
+    yield* prefs.setTheme(auth.user!, theme)
+    // Redirect marker (like saveLocale): the route sets the theme cookie so the
+    // next render — and every future SSR paint — is already in the new theme.
+    return { _redirect: "/settings", _cookie: themeCookieHeader(theme) } as unknown as SettingsResult
+  })
+}
+
 function handleSaveLocale(locale: string, auth: AuthInfo) {
   return Effect.gen(function* () {
     if (!(supportedLngs as readonly string[]).includes(locale)) {
@@ -167,6 +182,8 @@ export function handleSettingsMutation(mutation: SettingsMutation) {
       return handleSaveLocale(mutation.locale, mutation.auth)
     case "saveDisplayPrefs":
       return handleSaveDisplayPrefs(mutation.timezone, mutation.timeFormat, mutation.auth)
+    case "saveTheme":
+      return handleSaveTheme(mutation.theme, mutation.auth)
   }
 }
 
@@ -199,6 +216,11 @@ export function parseSettingsMutation(formData: FormData, auth: AuthInfo): Setti
     const serialNumber = formData.get("serialNumber") as string
     if (!serialNumber) return { error: "Missing serial number" }
     return { intent, serialNumber, label: parseLabel(formData.get("label")), auth }
+  }
+  if (intent === "saveTheme") {
+    const theme = formData.get("theme") as string
+    if (!isThemeChoice(theme)) return { error: "Invalid theme" }
+    return { intent, theme, auth }
   }
   if (intent === "saveDisplayPrefs") {
     const tzRaw = (formData.get("timezone") as string) || AUTO
