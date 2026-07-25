@@ -83,6 +83,7 @@ jobs:
           MM=$(echo "$V" | awk -F. '{print $1"."$2}')
           printf '%s' "$NPM_TOKEN" > /tmp/npm_token
           buildah bud --storage-driver=vfs \
+            --build-arg NPM_REGISTRY=http://npm.packages.svc.cluster.local:4873/ \
             --secret id=npm_token,src=/tmp/npm_token \
             -t "$IMG:$V" -t "$IMG:$MM" .
           buildah login -u "$REG_USER" -p "$REG_PASS" ghcr.io

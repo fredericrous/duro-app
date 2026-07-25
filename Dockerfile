@@ -2,7 +2,10 @@ FROM node:24-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json .npmrc ./
-RUN npm ci
+# Base registry → in-cluster Verdaccio mirror in CI (all deps are public npm,
+# incl. @duro-app). Public default keeps local builds working.
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+RUN npm_config_registry="$NPM_REGISTRY" npm ci
 COPY . .
 RUN npm run build
 
@@ -11,7 +14,8 @@ RUN npm run build
 FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
-RUN npm ci --omit=dev
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+RUN npm_config_registry="$NPM_REGISTRY" npm ci --omit=dev
 
 FROM node:24-alpine
 RUN adduser -u 1001 -D appuser
