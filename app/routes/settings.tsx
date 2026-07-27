@@ -64,6 +64,7 @@ function deriveActiveValue(pathname: string): string {
 
 const navMap: Record<string, string> = {
   general: "/settings",
+  activity: "/settings/activity",
   certificate: "/settings/certificate",
   "api-keys": "/settings/api-keys",
   security: "/settings/security",
@@ -94,6 +95,9 @@ export default function SettingsLayout({ loaderData }: Route.ComponentProps) {
       <SideNav.Section label={t("settings.nav.title", "Settings")}>
         <SideNav.Item value="general" icon={<Icon name="user-plus" size={18} />}>
           {t("settings.nav.general", "General")}
+        </SideNav.Item>
+        <SideNav.Item value="activity" icon={<Icon name="clock" size={18} />}>
+          {t("settings.nav.activity", "Activity")}
         </SideNav.Item>
         <SideNav.Item value="certificate" icon={<Icon name="lock" size={18} />}>
           {t("settings.nav.certificate", "Certificate")}

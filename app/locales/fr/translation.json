@@ -302,7 +302,8 @@
       "certificate": "Certificat",
       "apiKeys": "Clés API",
       "security": "Sécurité",
-      "menu": "Menu"
+      "menu": "Menu",
+      "activity": "Activité"
     },
     "display": {
       "heading": "Date et heure",
@@ -324,6 +325,19 @@
       "dark": "Sombre",
       "light": "Clair",
       "system": "Système (suivre l’appareil)"
+    },
+    "activity": {
+      "recentTitle": "Activité récente",
+      "recentHint": "Connexions et changements de vos accès. Si quelque chose ici n’est pas de vous, contactez votre administrateur.",
+      "recentEmpty": "Aucune activité enregistrée pour le moment.",
+      "you": "Vous",
+      "accessTitle": "Vos accès",
+      "accessEmpty": "Aucun accès accordé pour le moment.",
+      "accessReason": "Motif : {{reason}}",
+      "accessGrantedOn": "accordé le {{date}}",
+      "accessExpires": "expire le {{date}}",
+      "groupsTitle": "Vos groupes",
+      "groupsEmpty": "Vous n’appartenez à aucun groupe."
     }
   },
   "recover": {
