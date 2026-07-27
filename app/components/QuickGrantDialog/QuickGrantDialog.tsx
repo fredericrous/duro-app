@@ -1,6 +1,6 @@
 import { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { Button, Combobox, Dialog, EmptyState, Field, Input, Select, Stack, Text } from "@duro-app/ui"
 import type { Principal, Role } from "~/lib/governance/types"
 
@@ -40,9 +40,14 @@ export function QuickGrantDialog({
     return out
   }, [visiblePrincipals])
 
-  // Close dialog after a successful submission
+  // Close dialog after a successful submission — exactly once per settled
+  // submission: dedup on the data object's identity (same ref pattern as
+  // useFetcherToast) so a re-run with stale success data can't re-close.
+  const handledDataRef = useRef<unknown>(null)
   useEffect(() => {
-    if (fetcher.state === "idle" && fetcher.data && "success" in fetcher.data) {
+    if (fetcher.state !== "idle" || fetcher.data == null || handledDataRef.current === fetcher.data) return
+    handledDataRef.current = fetcher.data
+    if ("success" in fetcher.data) {
       onOpenChange(false)
     }
   }, [fetcher.state, fetcher.data, onOpenChange])

@@ -29,12 +29,15 @@ function CertRow({ cert }: { cert: UserCertificate }) {
   const { formatDate } = useDisplayFormat()
   const [confirming, setConfirming] = useState(false)
   const [renaming, setRenaming] = useState(false)
-  // Optimistic device label so the row reflects a rename immediately (useAction
-  // is a plain fetch, no router revalidation); reverts on a full page reload.
-  const [label, setLabel] = useState(cert.label)
+  // Optimistic device label: the submitted value shows while the rename is in
+  // flight or once the server confirmed it — otherwise `cert.label` stays the
+  // source of truth, so a loader revalidation can never render a stale label.
+  const [pendingLabel, setPendingLabel] = useState<{ value: string | null } | null>(null)
   const action = useAction<SettingsResult>(API_URL)
-  const isSubmitting = action.state !== "idle"
-  const revoked = action.data && "certRevoked" in action.data
+  const isSubmitting = action.status._tag === "Submitting"
+  const renamed = action.status._tag === "Success" && "certRenamed" in action.status.data
+  const revoked = action.status._tag === "Success" && "certRevoked" in action.status.data
+  const label = pendingLabel && (isSubmitting || renamed) ? pendingLabel.value : cert.label
 
   if (revoked) return null
 
@@ -50,7 +53,7 @@ function CertRow({ cert }: { cert: UserCertificate }) {
               const fd = new FormData(e.currentTarget)
               const next = ((fd.get("label") as string) ?? "").trim() || null
               void action.submit(fd)
-              setLabel(next)
+              setPendingLabel({ value: next })
               setRenaming(false)
             }}
           >
@@ -125,13 +128,13 @@ function CertRow({ cert }: { cert: UserCertificate }) {
       <Table.Cell>
         {confirming ? (
           <Inline gap="sm">
-            <action.Form>
+            <form {...action.getFormProps()}>
               <input type="hidden" name="intent" value="revokeCert" />
               <input type="hidden" name="serialNumber" value={cert.serialNumber} />
               <Button type="submit" variant="danger" size="small" disabled={isSubmitting}>
                 {isSubmitting ? t("settings.cert.list.revoking") : t("settings.cert.list.revokeYes")}
               </Button>
-            </action.Form>
+            </form>
             <Button variant="secondary" size="small" onClick={() => setConfirming(false)}>
               {t("common.cancel")}
             </Button>
@@ -170,8 +173,8 @@ export function CertificateSection({
   const certAction = useAction<SettingsResult>(API_URL)
   const [confirming, setConfirming] = useState(false)
 
-  const certData = certAction.data
-  const isSubmitting = certAction.state !== "idle"
+  const certData = certAction.status._tag === "Success" ? certAction.status.data : undefined
+  const isSubmitting = certAction.status._tag === "Submitting"
 
   // Password from action response (immediate, no race) or from loader
   const effectivePassword =
@@ -190,26 +193,19 @@ export function CertificateSection({
 
   const justSent = certData && "certSent" in certData
 
-  // Rate limit check — computed once on mount to avoid impure Date.now() during render
-  const isRateLimited = certData && "rateLimited" in certData
-  const [cooldownState] = useState(() => {
-    let cooldown = false
-    let text = ""
-    if (lastCertRenewalAt) {
-      const elapsed = Date.now() - new Date(lastCertRenewalAt).getTime()
-      const twentyFourHours = 24 * 60 * 60 * 1000
-      if (elapsed < twentyFourHours) {
-        cooldown = true
-        text = formatDateTime(new Date(lastCertRenewalAt).getTime() + twentyFourHours)
-      }
-    }
-    return { cooldown, text }
-  })
-  let { cooldown: cooldownRemaining, text: nextAvailableText } = cooldownState
-  if (isRateLimited && certData.nextAvailable) {
-    cooldownRemaining = true
-    nextAvailableText = formatDateTime(certData.nextAvailable)
-  }
+  // Rate limit check — derived per render (Date.now() in render, same pattern
+  // as expiryStatus above) so a lapsed cooldown unlocks without a remount.
+  const isRateLimited = certData !== undefined && "rateLimited" in certData
+  const now = Date.now()
+  const twentyFourHours = 24 * 60 * 60 * 1000
+  const cooldownEndsAt = lastCertRenewalAt ? new Date(lastCertRenewalAt).getTime() + twentyFourHours : null
+  const inCooldown = cooldownEndsAt !== null && now < cooldownEndsAt
+  const cooldownRemaining = isRateLimited || inCooldown
+  const nextAvailableText = isRateLimited
+    ? formatDateTime(certData.nextAvailable)
+    : inCooldown
+      ? formatDateTime(cooldownEndsAt)
+      : ""
 
   return (
     <Stack gap="md">
@@ -269,7 +265,7 @@ export function CertificateSection({
       ) : confirming ? (
         <Stack gap="sm">
           <Text as="p">{t("settings.cert.confirm", { email })}</Text>
-          <certAction.Form>
+          <form {...certAction.getFormProps()}>
             <Stack gap="sm">
               <input type="hidden" name="intent" value="issueCert" />
               <Input name="label" placeholder={t("settings.cert.devicePlaceholder")} maxLength={64} />
@@ -282,7 +278,7 @@ export function CertificateSection({
                 </Button>
               </Inline>
             </Stack>
-          </certAction.Form>
+          </form>
         </Stack>
       ) : (
         !effectivePassword && (

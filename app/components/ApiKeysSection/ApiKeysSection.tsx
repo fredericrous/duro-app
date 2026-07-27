@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
 import { useDisplayFormat } from "~/hooks/useDisplayFormat"
+import { useCopyFeedback } from "~/hooks/useCopyFeedback"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
@@ -91,8 +92,8 @@ export function ApiKeysSection({ apiKeys }: Props) {
   const { formatDate: fmtDate } = useDisplayFormat()
   // Null-safe: keep the old "no date → render nothing" behaviour.
   const formatDate = (iso: string | null) => (iso ? fmtDate(iso) : null)
-  const fetcher = useFetcher<{ apiKeys?: SettingsApiKeysResult }>({ key: "api-keys" })
-  const result = fetcher.data as SettingsApiKeysResult | undefined
+  const fetcher = useFetcher<SettingsApiKeysResult>({ key: "api-keys" })
+  const result = fetcher.data
 
   // ---------- Create form state ----------
   const [name, setName] = useState("")
@@ -114,8 +115,7 @@ export function ApiKeysSection({ apiKeys }: Props) {
   // ---------- Reveal dialog (owned locally) ----------
   const [reveal, setReveal] = useState<RevealData | null>(null)
   const [savedAck, setSavedAck] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { copied, showCopied, resetCopied } = useCopyFeedback()
   const handledKeyIdRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -129,34 +129,32 @@ export function ApiKeysSection({ apiKeys }: Props) {
         expiresInDays: result.expiresInDays,
       })
       setSavedAck(false)
-      setCopied(false)
+      resetCopied()
       // Reset the form so submitting again doesn't reuse stale name.
       setName("")
       setSelectedScopes(new Set(KNOWN_SCOPES.filter((s) => s.recommended).map((s) => s.id)))
       setExpiresInDays("90")
       setAllowWildcard(false)
     }
-  }, [result])
+  }, [result, resetCopied])
 
   const closeReveal = useCallback(() => {
     setReveal(null)
     setSavedAck(false)
-    setCopied(false)
-  }, [])
+    resetCopied()
+  }, [resetCopied])
 
   const handleCopy = useCallback(async () => {
     if (!reveal) return
     try {
       await navigator.clipboard.writeText(reveal.rawKey)
-      setCopied(true)
-      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
-      copyTimerRef.current = setTimeout(() => setCopied(false), 2000)
+      showCopied()
     } catch {
       // Clipboard may be blocked under non-secure-context or Permissions-
       // Policy. The textarea below is the user-visible fallback.
-      setCopied(false)
+      resetCopied()
     }
-  }, [reveal])
+  }, [reveal, showCopied, resetCopied])
 
   // ---------- Revoke confirm dialog ----------
   const [revokeTarget, setRevokeTarget] = useState<ApiKey | null>(null)

@@ -1,6 +1,6 @@
-import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useScratchReveal } from "~/hooks/useScratchReveal"
+import { useCopyFeedback } from "~/hooks/useCopyFeedback"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
 import { Card, Heading, Icon, Input, InputGroup, Stack, Text } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
@@ -22,8 +22,7 @@ export function InvitePasswordReveal({ p12Password }: { p12Password: string | nu
   const { revealed, onReveal } = useScratchReveal(
     `scratch:${typeof window !== "undefined" ? window.location.pathname : ""}`,
   )
-  const [copied, setCopied] = useState(false)
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
+  const { copied, copy } = useCopyFeedback()
 
   if (!p12Password) {
     return (
@@ -66,16 +65,7 @@ export function InvitePasswordReveal({ p12Password }: { p12Password: string | nu
           >
             <Input defaultValue={p12Password} />
           </ScratchCard>
-          <InputGroup.Addon
-            disabled={!revealed}
-            minWidth={72}
-            onClick={() => {
-              navigator.clipboard.writeText(p12Password)
-              setCopied(true)
-              if (timerRef.current) clearTimeout(timerRef.current)
-              timerRef.current = setTimeout(() => setCopied(false), 2000)
-            }}
-          >
+          <InputGroup.Addon disabled={!revealed} minWidth={72} onClick={() => copy(p12Password)}>
             {copied ? t("invite.password.copied") : t("invite.password.copy")}
           </InputGroup.Addon>
         </InputGroup.Root>
