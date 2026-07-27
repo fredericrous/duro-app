@@ -5,6 +5,7 @@ import { Link, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
 import { Badge, Button, Callout, EmptyState, Inline, PageShell, Stack, Table, Text } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
+import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { Header } from "~/components/Header/Header"
 import { Icon } from "~/components/Icon"
 import { CardSection } from "~/components/CardSection/CardSection"
@@ -114,11 +115,11 @@ const styles = css.create({
     width: 32,
     height: 32,
     flexShrink: 0,
-    color: "#6aaffc",
+    color: colors.accent,
   },
   learnMore: {
     fontSize: 12,
-    color: "#6aaffc",
+    color: colors.accent,
     textDecoration: {
       default: "none",
       ":hover": "underline",
