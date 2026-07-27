@@ -1107,12 +1107,18 @@
         "enabled_apps_without_role_one": "{{count}} application activée n'a aucun rôle — aucun accès ne peut être accordé",
         "enabled_apps_without_role_other": "{{count}} applications activées n'ont aucun rôle — aucun accès ne peut être accordé",
         "stale_invitations_one": "{{count}} invitation en attente a expiré",
-        "stale_invitations_other": "{{count}} invitations en attente ont expiré"
+        "stale_invitations_other": "{{count}} invitations en attente ont expiré",
+        "failed_provisioning_one": "{{count}} tâche de provisionnement en échec",
+        "failed_provisioning_other": "{{count}} tâches de provisionnement en échec",
+        "connectors_with_errors_one": "{{count}} connecteur en erreur",
+        "connectors_with_errors_other": "{{count}} connecteurs en erreur"
       },
       "fix": {
         "apps_without_owner": "Attribuer des propriétaires",
         "enabled_apps_without_role": "Ajouter des rôles",
-        "stale_invitations": "Examiner"
+        "stale_invitations": "Examiner",
+        "failed_provisioning": "Ouvrir les plugins",
+        "connectors_with_errors": "Ouvrir les plugins"
       }
     },
     "dashboard": {
@@ -1125,6 +1131,34 @@
         "invitations_one": "{{count}} invitation en attente",
         "invitations_other": "{{count}} invitations en attente",
         "review": "Examiner"
+      },
+      "glance": {
+        "people": "Personnes",
+        "peopleHint_one": "+ {{count}} compte de service",
+        "peopleHint_other": "+ {{count}} comptes de service",
+        "applications": "Applications",
+        "applicationsHint": "{{enabled}} sur {{total}} activées",
+        "activeGrants": "Accès actifs",
+        "apiKeys": "Clés API actives"
+      },
+      "expiring": {
+        "title": "Expire bientôt",
+        "empty": "Rien n’expire dans les 30 prochains jours.",
+        "review": "Examiner",
+        "today": "aujourd’hui",
+        "inDays_one": "dans {{count}} jour",
+        "inDays_other": "dans {{count}} jours",
+        "kind": {
+          "grant": "Accès",
+          "certificate": "Certificat",
+          "apiKey": "Clé API",
+          "invitation": "Invitation"
+        }
+      },
+      "activity": {
+        "title": "Activité récente",
+        "viewAll": "Tout voir",
+        "empty": "Aucune activité enregistrée pour le moment."
       }
     }
   },
