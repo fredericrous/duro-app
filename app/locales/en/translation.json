@@ -1107,12 +1107,18 @@
         "enabled_apps_without_role_one": "{{count}} enabled application has no roles — nothing can be granted for it",
         "enabled_apps_without_role_other": "{{count}} enabled applications have no roles — nothing can be granted for them",
         "stale_invitations_one": "{{count}} pending invitation has expired",
-        "stale_invitations_other": "{{count}} pending invitations have expired"
+        "stale_invitations_other": "{{count}} pending invitations have expired",
+        "failed_provisioning_one": "{{count}} provisioning job failed",
+        "failed_provisioning_other": "{{count}} provisioning jobs failed",
+        "connectors_with_errors_one": "{{count}} connector reporting errors",
+        "connectors_with_errors_other": "{{count}} connectors reporting errors"
       },
       "fix": {
         "apps_without_owner": "Assign owners",
         "enabled_apps_without_role": "Add roles",
-        "stale_invitations": "Review"
+        "stale_invitations": "Review",
+        "failed_provisioning": "Open plugins",
+        "connectors_with_errors": "Open plugins"
       }
     },
     "dashboard": {
@@ -1125,6 +1131,34 @@
         "invitations_one": "{{count}} pending invitation",
         "invitations_other": "{{count}} pending invitations",
         "review": "Review"
+      },
+      "glance": {
+        "people": "People",
+        "peopleHint_one": "+ {{count}} service account",
+        "peopleHint_other": "+ {{count}} service accounts",
+        "applications": "Applications",
+        "applicationsHint": "{{enabled}} of {{total}} enabled",
+        "activeGrants": "Active grants",
+        "apiKeys": "Active API keys"
+      },
+      "expiring": {
+        "title": "Expiring soon",
+        "empty": "Nothing expires in the next 30 days.",
+        "review": "Review",
+        "today": "today",
+        "inDays_one": "in {{count}} day",
+        "inDays_other": "in {{count}} days",
+        "kind": {
+          "grant": "Grant",
+          "certificate": "Certificate",
+          "apiKey": "API key",
+          "invitation": "Invitation"
+        }
+      },
+      "activity": {
+        "title": "Recent activity",
+        "viewAll": "View all",
+        "empty": "No activity recorded yet."
       }
     }
   },

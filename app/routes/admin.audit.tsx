@@ -8,16 +8,7 @@ import type { Route } from "./+types/admin.audit"
 import { runEffect } from "~/lib/runtime.server"
 import { requireAdmin } from "~/lib/admin-guard.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
-import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
-import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
-import { RbacRepo } from "~/lib/governance/RbacRepo.server"
-import type { AuditEvent } from "~/lib/governance/types"
-
-type AuditEventWithNames = AuditEvent & {
-  actorName: string | null
-  applicationName: string | null
-  targetName: string | null
-}
+import { enrichAuditEvents, loadAuditNameMaps, type AuditEventWithNames } from "~/lib/governance/audit-naming"
 import {
   useReactTable,
   getCoreRowModel,
@@ -31,26 +22,6 @@ import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { Badge, Button, Combobox, EmptyState, Inline, Input, Stack, Table, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
-
-function safeParseMetadata(metadata: unknown): Record<string, unknown> {
-  if (metadata === null || metadata === undefined) return {}
-  if (typeof metadata === "string") {
-    try {
-      return JSON.parse(metadata) as Record<string, unknown>
-    } catch {
-      return { _raw: metadata }
-    }
-  }
-  if (typeof metadata === "object" && !Array.isArray(metadata)) {
-    try {
-      JSON.stringify(metadata)
-      return metadata as Record<string, unknown>
-    } catch {
-      return { _error: "non-serializable metadata" }
-    }
-  }
-  return {}
-}
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request)
@@ -71,79 +42,18 @@ export async function loader({ request }: Route.LoaderArgs) {
     events = await runEffect(
       Effect.gen(function* () {
         const svc = yield* AuditService
-        const principalRepo = yield* PrincipalRepo
-        const appRepo = yield* ApplicationRepo
-        const rbac = yield* RbacRepo
 
-        const [raw, principals, apps, roles, entitlements] = [
-          yield* svc.query({
-            eventType,
-            actorId,
-            targetType,
-            targetId,
-            applicationId,
-            limit: source ? pageSize * 5 : pageSize,
-            offset: source ? 0 : page * pageSize,
-          }),
-          yield* principalRepo.list(),
-          yield* appRepo.list(),
-          yield* rbac.listAllRoles(),
-          yield* rbac.listAllEntitlements(),
-        ]
-        const actorMap = new Map(principals.map((p) => [p.id, p.displayName]))
-        const appNameById = new Map(apps.map((a) => [a.id, a.displayName]))
-        const roleNameById = new Map(roles.map((r) => [r.id, r.displayName]))
-        const entNameById = new Map(entitlements.map((en) => [en.id, en.displayName]))
-
-        // Resolve a polymorphic audit target (targetType + targetId) to a name.
-        // Directly-nameable entities are looked up by id; grant/access_request
-        // rows have a UUID target but carry the meaningful role/entitlement (and
-        // recipient) in their metadata, so we describe them from that instead.
-        // Everything reuses the already-loaded maps — no extra queries. Types we
-        // can't name (user_certificate, api_key, recovery_request, …) keep their id.
-        const resolveTarget = (
-          type: string | null,
-          id: string | null,
-          meta: Record<string, unknown>,
-        ): string | null => {
-          if (!id) return null
-          switch (type) {
-            case "principal":
-              return actorMap.get(id) ?? null
-            case "application":
-              return appNameById.get(id) ?? null
-            case "role":
-              return roleNameById.get(id) ?? null
-            case "entitlement":
-              return entNameById.get(id) ?? null
-            case "grant":
-            case "access_request": {
-              const roleId = typeof meta.roleId === "string" ? meta.roleId : null
-              const entId = typeof meta.entitlementId === "string" ? meta.entitlementId : null
-              const principalId = typeof meta.principalId === "string" ? meta.principalId : null
-              const what = roleId ? roleNameById.get(roleId) : entId ? entNameById.get(entId) : null
-              const who = principalId ? actorMap.get(principalId) : null
-              if (what && who) return `${what} → ${who}`
-              return what ?? who ?? null
-            }
-            default:
-              return null
-          }
-        }
-
-        // Ensure metadata is always a plain serializable object so
-        // react-router's JSON serialization doesn't blow up on weird
-        // JSONB values (circular refs, cause objects, etc)
-        const sanitized = raw.map((e) => {
-          const metadata = safeParseMetadata(e.metadata)
-          return {
-            ...e,
-            metadata,
-            actorName: e.actorId ? (actorMap.get(e.actorId) ?? null) : null,
-            applicationName: e.applicationId ? (appNameById.get(e.applicationId) ?? null) : null,
-            targetName: resolveTarget(e.targetType, e.targetId, metadata),
-          }
+        const raw = yield* svc.query({
+          eventType,
+          actorId,
+          targetType,
+          targetId,
+          applicationId,
+          limit: source ? pageSize * 5 : pageSize,
+          offset: source ? 0 : page * pageSize,
         })
+        const maps = yield* loadAuditNameMaps
+        const sanitized = enrichAuditEvents(maps, raw)
 
         if (!source) return sanitized
 
