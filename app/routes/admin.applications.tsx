@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { Link, useFetcher, useNavigate, useSearchParams } from "react-router"
 import { useTranslation } from "react-i18next"
+import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { enumLabel } from "~/lib/enum-labels"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
@@ -79,7 +80,7 @@ function buildColumns(t: (key: string, opts?: Record<string, unknown>) => string
       cell: ({ row, getValue }) => (
         <Link
           to={`/admin/applications/${row.original.id}`}
-          style={{ color: "#6aaffc", fontWeight: 500, textDecoration: "none" }}
+          style={{ color: colors.accent, fontWeight: 500, textDecoration: "none" }}
           // Row onClick already navigates here; don't double-fire it.
           onClick={(e) => e.stopPropagation()}
         >

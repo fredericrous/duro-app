@@ -18,7 +18,7 @@ const styles = css.create({
     fontWeight: typography.fontWeightMedium,
     backgroundColor: {
       default: colors.warningBg,
-      ":hover": "rgba(251, 191, 36, 0.25)",
+      ":hover": colors.warningBorder,
     },
     color: colors.warning,
     borderWidth: 1,

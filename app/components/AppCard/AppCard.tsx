@@ -3,6 +3,7 @@ import type { AppDefinition } from "~/lib/apps"
 import { Card, Stack, Text } from "@duro-app/ui"
 import { Icon } from "../Icon"
 import { css, html } from "react-strict-dom"
+import { colors } from "@duro-app/tokens/tokens/colors.css"
 
 const styles = css.create({
   link: {
@@ -15,7 +16,7 @@ const styles = css.create({
     justifyContent: "center",
     width: 48,
     height: 48,
-    color: "#6aaffc", // tokens.colors.accent — can't use css.defineVars ref in Metro
+    color: colors.accent,
   },
 })
 

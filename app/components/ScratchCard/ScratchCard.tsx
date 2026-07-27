@@ -20,9 +20,12 @@ function paintCanvas(canvas: HTMLCanvasElement, width: number, height: number, l
   if (!ctx) return
   canvas.width = width
   canvas.height = height
-  ctx.fillStyle = "#333"
+  // Canvas can't read CSS variables — resolve the theme at draw time so the
+  // scratch foil matches light mode too (root.tsx keeps html[data-theme] live).
+  const light = document.documentElement.dataset.theme === "light"
+  ctx.fillStyle = light ? "#d4d4d4" : "#333"
   ctx.fillRect(0, 0, width, height)
-  ctx.fillStyle = "#999"
+  ctx.fillStyle = light ? "#4a4a4a" : "#999"
   ctx.font = "14px -apple-system, BlinkMacSystemFont, sans-serif"
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"

@@ -1,6 +1,7 @@
 import { useRef } from "react"
 import { Icon, Input, InputGroup, Stack, Toggle, ToggleGroup } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
+import { colors } from "@duro-app/tokens/tokens/colors.css"
 
 const styles = css.create({
   // Inline SVG wrapper for the leading magnifier — the DS Icon catalog only
@@ -139,13 +140,13 @@ const skeletonStyles = css.create({
   input: {
     height: 36,
     borderRadius: 6,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: colors.bgCard,
   },
   chip: {
     height: 28,
     width: 92,
     borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: colors.bgCard,
   },
   chipRow: {
     display: "flex",
