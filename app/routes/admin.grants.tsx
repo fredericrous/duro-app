@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.grants"
 import { runEffect } from "~/lib/runtime.server"
+import { requirePrincipal } from "~/lib/governance/current-principal.server"
 import { requireAdmin } from "~/lib/admin-guard.server"
 import { isOriginAllowed } from "~/lib/config.server"
 import { getAuth } from "~/lib/auth.server"
@@ -83,7 +84,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       }
 
       return { grants: allGrants }
-    }),
+    }).pipe(Effect.orDie),
   )
 
   return data
@@ -108,10 +109,10 @@ export async function action({ request }: Route.ActionArgs) {
       throw new Response("Forbidden", { status: 403 })
     }
     const principal = await runEffect(
-      Effect.gen(function* () {
-        const repo = yield* PrincipalRepo
-        return yield* repo.findByExternalId(auth.sub!)
-      }),
+      requirePrincipal(auth.sub!).pipe(
+        Effect.catchTag("PrincipalNotFound", () => Effect.succeed(null)),
+        Effect.orDie,
+      ),
     )
     if (!principal) {
       throw new Response("Principal not found for current session", { status: 403 })
@@ -131,7 +132,7 @@ export async function action({ request }: Route.ActionArgs) {
           })
           .pipe(Effect.catchAll(() => Effect.void))
         yield* deactivateGrant(grantId)
-      }),
+      }).pipe(Effect.orDie),
     )
     return { success: true }
   }

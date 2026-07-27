@@ -35,7 +35,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         const invite = yield* repo.findByTokenHash(tokenHash)
         const p12Password = invite ? yield* cert.getP12Password(invite.id) : null
         return { invite, p12Password }
-      }),
+      }).pipe(Effect.orDie),
     )
 
     if (!invite) {
@@ -49,7 +49,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       })
     }
 
-    if (invite.usedBy && invite.usedBy !== "__revoked__") {
+    // Claimed by a real user, or its revocation is still in flight — a fresh
+    // invite can't be issued either way. (Revoked invites CAN be re-issued.)
+    const status = invite.status
+    if ((status._tag === "Accepted" && status.usedBy !== null) || status._tag === "Revoking") {
       return {
         canReinvite: false as const,
         error: "already_used" as ReinviteErrorCode,
@@ -86,46 +89,55 @@ export async function action({ params }: Route.ActionArgs) {
     return { success: false as const, error: "missing_token" as ReinviteErrorCode }
   }
 
-  try {
-    const tokenHash = hashToken(token)
+  const tokenHash = hashToken(token)
 
-    const result = await runEffect(
-      Effect.gen(function* () {
-        const repo = yield* InviteRepo
-        const cert = yield* CertManager
+  const result = await runEffect(
+    Effect.gen(function* () {
+      const repo = yield* InviteRepo
+      const cert = yield* CertManager
 
-        const invite = yield* repo.findByTokenHash(tokenHash)
-        if (!invite) {
-          return { success: false as const, error: "invalid" as ReinviteErrorCode }
-        }
+      const invite = yield* repo.findByTokenHash(tokenHash)
+      if (!invite) {
+        return { success: false as const, error: "invalid" as ReinviteErrorCode }
+      }
 
-        if (invite.usedBy && invite.usedBy !== "__revoked__") {
-          return { success: false as const, error: "already_used" as ReinviteErrorCode }
-        }
+      const status = invite.status
+      if ((status._tag === "Accepted" && status.usedBy !== null) || status._tag === "Revoking") {
+        return { success: false as const, error: "already_used" as ReinviteErrorCode }
+      }
 
-        yield* repo.revoke(invite.id).pipe(Effect.catchAll(() => Effect.void))
-        yield* cert.deleteP12Secret(invite.id)
+      yield* repo.revoke(invite.id).pipe(Effect.catchAll(() => Effect.void))
+      yield* cert.deleteP12Secret(invite.id)
 
-        const groups = JSON.parse(invite.groups) as number[]
-        const groupNames = JSON.parse(invite.groupNames) as string[]
+      // Effect.try, not bare JSON.parse: a corrupted row must fail the typed
+      // channel (→ send_failed below), not escape as a defect.
+      const { groups, groupNames } = yield* Effect.try({
+        try: () => ({
+          groups: JSON.parse(invite.groups) as number[],
+          groupNames: JSON.parse(invite.groupNames) as string[],
+        }),
+        catch: () => new Error("Invalid groups JSON in invite"),
+      })
 
-        yield* queueInvite({
-          email: invite.email,
-          groups,
-          groupNames,
-          invitedBy: invite.invitedBy,
-          locale: invite.locale,
-        })
+      yield* queueInvite({
+        email: invite.email,
+        groups,
+        groupNames,
+        invitedBy: invite.invitedBy,
+        locale: invite.locale,
+      })
 
-        return { success: true as const, email: invite.email }
-      }),
-    )
+      return { success: true as const, email: invite.email }
+    }).pipe(
+      Effect.catchAll((e) =>
+        Effect.logError("[reinvite] action error", { error: String(e) }).pipe(
+          Effect.as({ success: false as const, error: "send_failed" as ReinviteErrorCode }),
+        ),
+      ),
+    ),
+  )
 
-    return result
-  } catch (e) {
-    console.error("[reinvite] action error:", e)
-    return { success: false as const, error: "send_failed" as ReinviteErrorCode }
-  }
+  return result
 }
 
 function reinviteErrorKey(code: ReinviteErrorCode): string {

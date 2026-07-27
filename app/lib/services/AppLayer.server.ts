@@ -76,6 +76,20 @@ const PluginHostWired = PluginHostLive.pipe(
   ),
 )
 
+// AppSyncServiceLive resolves its dependencies at layer build (Layer.effect),
+// so provide them here — mirrors PluginHostWired. Same-value layer references
+// (GovernanceRepos, ApplicationRepoLive, …) memoize to a single build.
+const AppSyncServiceWired = AppSyncServiceLive.pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      GovernanceRepos,
+      ApplicationRepoLive,
+      PluginRegistryLive,
+      isDevServer ? OperatorClientDev : OperatorClientLive,
+    ),
+  ),
+)
+
 export const AppLayer = Layer.mergeAll(
   // Existing services
   isDevServer ? UserManagerDev : LldapUserManagerLive,
@@ -100,8 +114,8 @@ export const AppLayer = Layer.mergeAll(
   GroupSyncServiceLive,
   GroupMappingRepoLive,
   isDevServer ? OperatorClientDev : OperatorClientLive,
-  AppSyncServiceLive,
+  AppSyncServiceWired,
   // Plugin system
   PluginRegistryLive,
-  isDevServer ? PluginHostWired : PluginHostWired,
+  PluginHostWired,
 ).pipe(Layer.provideMerge(AppDbLive), Layer.provide(OtelLayer), Layer.provide(FetchHttpClient.layer))

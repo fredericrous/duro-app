@@ -2,12 +2,8 @@
 import { describe, expect } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import {
-  submitBootstrapInviteWithCallerToken,
-  submitBootstrapInviteAuto,
-  __resetMutexForTests,
-} from "./bootstrap.server"
-import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
+import { submitBootstrapInviteWithCallerToken, submitBootstrapInviteAuto } from "./bootstrap.server"
+import { InviteRepo, type Invite, inviteStatus } from "~/lib/services/InviteRepo.server"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
@@ -26,7 +22,9 @@ const mockAudit = Layer.succeed(AuditService, {
 // ---------------------------------------------------------------------------
 
 function makeInvite(overrides: Partial<Invite> = {}): Invite {
-  return {
+  // status is derived from the merged flags exactly as the repo does,
+  // unless a test overrides it explicitly.
+  const base = {
     id: "inv-1",
     token: "tok-inv-1",
     tokenHash: "abc",
@@ -72,6 +70,7 @@ function makeInvite(overrides: Partial<Invite> = {}): Invite {
     deliveryDetail: null,
     ...overrides,
   }
+  return { ...base, status: overrides.status ?? inviteStatus(base) }
 }
 
 const mockInviteRepo = (store = new Map<string, Invite>()) =>
@@ -341,7 +340,6 @@ const VAULT_ADDR = "http://vault.test"
 
 describe("submitBootstrapInviteAuto", () => {
   it.effect("happy path: creates invite, deletes Vault token", () => {
-    __resetMutexForTests()
     const store = new Map<string, Invite>()
     const vault = makeFakeVault({ token: "vault-token", expires_at: Date.now() + 60_000 })
 
@@ -363,7 +361,6 @@ describe("submitBootstrapInviteAuto", () => {
   })
 
   it.effect("token expired: fails, Vault token NOT deleted", () => {
-    __resetMutexForTests()
     const store = new Map<string, Invite>()
     const vault = makeFakeVault({ token: "vault-token", expires_at: Date.now() - 1000 })
 
@@ -385,7 +382,6 @@ describe("submitBootstrapInviteAuto", () => {
   })
 
   it.effect("queueInvite failure (SMTP): fails, Vault token NOT deleted", () => {
-    __resetMutexForTests()
     const store = new Map<string, Invite>()
     const vault = makeFakeVault({ token: "vault-token", expires_at: Date.now() + 60_000 })
 
@@ -406,7 +402,6 @@ describe("submitBootstrapInviteAuto", () => {
   })
 
   it.effect("email already in LLDAP: re-sends mTLS cert, deletes Vault token, creates no invite", () => {
-    __resetMutexForTests()
     const store = new Map<string, Invite>()
     const vault = makeFakeVault({ token: "vault-token", expires_at: Date.now() + 60_000 })
 
@@ -434,7 +429,6 @@ describe("submitBootstrapInviteAuto", () => {
   })
 
   it.effect("no token in Vault: returns no_token", () => {
-    __resetMutexForTests()
     const store = new Map<string, Invite>()
     const vault = makeFakeVault(null)
 
@@ -455,7 +449,6 @@ describe("submitBootstrapInviteAuto", () => {
 
 describe("submitBootstrapInviteWithCallerToken", () => {
   it.effect("token mismatch: fails, Vault token NOT deleted", () => {
-    __resetMutexForTests()
     const store = new Map<string, Invite>()
     const vault = makeFakeVault({ token: "vault-token", expires_at: Date.now() + 60_000 })
 
@@ -477,7 +470,6 @@ describe("submitBootstrapInviteWithCallerToken", () => {
   })
 
   it.effect("matching token: creates invite, deletes Vault token", () => {
-    __resetMutexForTests()
     const store = new Map<string, Invite>()
     const vault = makeFakeVault({ token: "vault-token", expires_at: Date.now() + 60_000 })
 
@@ -499,7 +491,6 @@ describe("submitBootstrapInviteWithCallerToken", () => {
 
 describe("bootstrap mutex", () => {
   it.effect("rejects a concurrent submit with bootstrap_in_progress", () => {
-    __resetMutexForTests()
     const store = new Map<string, Invite>()
     const vault = makeFakeVault({ token: "vault-token", expires_at: Date.now() + 60_000 })
     const deps = { vaultAddr: VAULT_ADDR, fetchImpl: vault.fetchImpl, readSaToken: vault.readSaToken }

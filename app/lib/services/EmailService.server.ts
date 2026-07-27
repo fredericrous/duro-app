@@ -221,8 +221,8 @@ export const EmailServiceLive = Layer.scoped(
               subject: `[${config.appName}] Device recovery request from ${requesterEmail}`,
               html:
                 `<p>A device-recovery request is pending review.</p>` +
-                `<p><strong>From:</strong> ${requesterEmail}</p>` +
-                (note ? `<p><strong>Note:</strong> ${note.replace(/[<>&]/g, "")}</p>` : "") +
+                `<p><strong>From:</strong> ${escapeHtml(requesterEmail)}</p>` +
+                (note ? `<p><strong>Note:</strong> ${escapeHtml(note)}</p>` : "") +
                 `<p>Approve or deny it in the admin panel: ` +
                 `<a href="${config.homeUrl}/admin/recovery">${config.homeUrl}/admin/recovery</a></p>`,
             }),

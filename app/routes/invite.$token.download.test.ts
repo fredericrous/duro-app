@@ -1,10 +1,13 @@
 // @vitest-environment node
 import { describe, expect, it, vi, beforeEach } from "vitest"
+import { Effect } from "effect"
 
 vi.mock("~/lib/runtime.server", () => ({ runEffect: vi.fn() }))
 vi.mock("~/lib/crypto.server", () => ({ hashToken: vi.fn().mockReturnValue("hashed-token") }))
 
 import { runEffect } from "~/lib/runtime.server"
+import { InviteRepo, InviteError } from "~/lib/services/InviteRepo.server"
+import { CertManager } from "~/lib/services/CertManager.server"
 import { loader } from "./invite.$token.download"
 import { callLoader, expectData, expectResponse } from "~/test/route-utils"
 
@@ -35,11 +38,22 @@ describe("invite/:token/download loader", () => {
     expect(res.status).toBe(404)
   })
 
-  it("404s (not 500) when the underlying effect throws", async () => {
-    const err = vi.spyOn(console, "error").mockImplementation(() => {})
-    mockRunEffect.mockRejectedValueOnce(new Error("vault down") as never)
+  it("404s (not 500) when the underlying effect fails", async () => {
+    // Typed failures are caught INSIDE the effect (catchAll → logError → null).
+    // Run the real composed effect via a passthrough, with the repo failing,
+    // so the in-effect fallback actually executes.
+    mockRunEffect.mockImplementationOnce(
+      (eff) =>
+        Effect.runPromise(
+          (eff as Effect.Effect<unknown, never, InviteRepo | CertManager>).pipe(
+            Effect.provideService(InviteRepo, {
+              findByTokenHash: () => Effect.fail(new InviteError({ message: "vault down" })),
+            } as never),
+            Effect.provideService(CertManager, {} as never),
+          ),
+        ) as never,
+    )
     const res = expectResponse(await callLoader(loader, { params: { token: "tok" } }))
     expect(res.status).toBe(404)
-    err.mockRestore()
   })
 })

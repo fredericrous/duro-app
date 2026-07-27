@@ -155,6 +155,7 @@ describe("AdminInvitesPage component", () => {
           createdAt: "2026-01-01T00:00:00Z",
           expiresAt: "2026-01-08T00:00:00Z",
           usedAt: null,
+          status: { _tag: "Pending", certIssued: false, emailSent: false, certVerified: false },
         },
       ],
     })
@@ -214,6 +215,7 @@ describe("InviteFunnel delivery rendering", () => {
     certIssued: true,
     failedAt: null,
     certVerified: false,
+    status: { _tag: "Pending", certIssued: true, emailSent: true, certVerified: false },
     openCount: 0,
     clickCount: 0,
     ...overrides,

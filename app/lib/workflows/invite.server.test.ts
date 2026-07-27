@@ -3,7 +3,7 @@ import { describe, expect } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { queueInvite, acceptInvite, revokeInvite, revokeUser, resendCert } from "./invite.server"
-import { InviteRepo, InviteError, type Invite, type Revocation } from "~/lib/services/InviteRepo.server"
+import { InviteRepo, InviteError, type Invite, type Revocation, inviteStatus } from "~/lib/services/InviteRepo.server"
 import { UserManager, UserManagerError, type ManagedUser } from "~/lib/services/UserManager.server"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { EmailService, EmailError } from "~/lib/services/EmailService.server"
@@ -20,7 +20,9 @@ const mockAudit = Layer.succeed(AuditService, {
 // --- Mock helpers ---
 
 function makeInvite(overrides: Partial<Invite> = {}): Invite {
-  return {
+  // status is derived from the merged flags exactly as the repo does,
+  // unless a test overrides it explicitly.
+  const base = {
     id: "inv-1",
     token: "tok-inv-1",
     tokenHash: "abc123",
@@ -66,6 +68,7 @@ function makeInvite(overrides: Partial<Invite> = {}): Invite {
     deliveryDetail: null,
     ...overrides,
   }
+  return { ...base, status: overrides.status ?? inviteStatus(base) }
 }
 
 // --- Mock Layers ---

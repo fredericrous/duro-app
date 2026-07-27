@@ -38,19 +38,19 @@ export async function loader({ request }: Route.LoaderArgs) {
       Effect.gen(function* () {
         const users = yield* UserManager
         return yield* users.getGroups
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
         const repo = yield* InviteRepo
         return yield* repo.findPending()
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
         const repo = yield* InviteRepo
         return yield* repo.findFailed()
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
@@ -107,9 +107,9 @@ function fmtDate(ts: string | null): string | null {
 function InviteFunnel({ invite }: { invite: Invite }) {
   const { t } = useTranslation()
 
-  if (invite.failedAt) return <Badge variant="error">{t("admin.invites.badge.failed")}</Badge>
-  if (!invite.emailSent) {
-    return invite.certIssued ? (
+  if (invite.status._tag === "Failed") return <Badge variant="error">{t("admin.invites.badge.failed")}</Badge>
+  if (invite.status._tag === "Pending" && !invite.status.emailSent) {
+    return invite.status.certIssued ? (
       <Badge variant="success">{t("admin.invites.badge.certIssued")}</Badge>
     ) : (
       <Badge variant="warning">{t("admin.invites.badge.processing")}</Badge>

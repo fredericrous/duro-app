@@ -61,35 +61,29 @@ import { RevokedUserRow } from "~/components/admin/RevokedUserRow"
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request)
-  const [users, principals, revocations, certsByUser] = await Promise.all([
-    runEffect(
-      Effect.gen(function* () {
-        const um = yield* UserManager
-        return yield* um.getUsers
-      }),
-    ),
-    runEffect(
-      Effect.gen(function* () {
-        const repo = yield* PrincipalRepo
-        return yield* repo.list()
-      }),
-    ),
-    runEffect(
-      Effect.gen(function* () {
-        const repo = yield* InviteRepo
-        return yield* repo.findRevocations()
-      }),
-    ),
-    runEffect(
-      Effect.gen(function* () {
-        const um = yield* UserManager
-        const certRepo = yield* CertificateRepo
-        const allUsers = yield* um.getUsers
-        const usernames = allUsers.map((u: { id: string }) => u.id)
-        return yield* certRepo.listAllByUsernames(usernames).pipe(Effect.catchAll(() => Effect.succeed({})))
-      }),
-    ),
-  ])
+  const [users, principals, revocations, certsByUser] = await runEffect(
+    Effect.gen(function* () {
+      const um = yield* UserManager
+      const principalRepo = yield* PrincipalRepo
+      const inviteRepo = yield* InviteRepo
+      const certRepo = yield* CertificateRepo
+      const [[allUsers, certs], principalList, revocationList] = yield* Effect.all(
+        [
+          // Certs need the user list, so fetch users once and chain the lookup.
+          Effect.gen(function* () {
+            const us = yield* um.getUsers
+            const usernames = us.map((u: { id: string }) => u.id)
+            const byUser = yield* certRepo.listAllByUsernames(usernames).pipe(Effect.catchAll(() => Effect.succeed({})))
+            return [us, byUser] as const
+          }),
+          principalRepo.list(),
+          inviteRepo.findRevocations(),
+        ],
+        { concurrency: "unbounded" },
+      )
+      return [allUsers, principalList, revocationList, certs] as const
+    }).pipe(Effect.orDie),
+  )
 
   const systemUserIds = [...new Set(users.filter((u: any) => config.isSystemUser(u.id)).map((u: any) => u.id))]
   return { users, principals, revocations, systemUserIds, certsByUser }

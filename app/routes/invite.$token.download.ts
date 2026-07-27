@@ -27,11 +27,10 @@ export async function loader({ params }: Route.LoaderArgs) {
       const invite = yield* repo.findByTokenHash(hashToken(token))
       if (!invite || invite.usedAt || new Date(invite.expiresAt) < new Date()) return null
       return yield* cert.getP12(invite.id)
-    }),
-  ).catch((e) => {
-    console.error("[invite/download] error:", e)
-    return null
-  })
+    }).pipe(
+      Effect.catchAll((e) => Effect.logError("[invite/download] error", { error: String(e) }).pipe(Effect.as(null))),
+    ),
+  )
 
   if (!p12) throw new Response("Certificate not available or invite expired", { status: 404 })
 

@@ -1,5 +1,5 @@
 import { Suspense, use } from "react"
-import { Effect } from "effect"
+import { Effect, Either, Schema } from "effect"
 import type { Route } from "./+types/home"
 import { getVisibleApps, loadApps } from "~/lib/apps.server"
 import { config, isOriginAllowed } from "~/lib/config.server"
@@ -12,6 +12,8 @@ import { EmptyState, Inline, LinkButton, PageShell, Stack, Button } from "@duro-
 import { useFetcher, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
 import { runEffect } from "~/lib/runtime.server"
+import { requirePrincipal } from "~/lib/governance/current-principal.server"
+import { decodeForm, FormOptionalText } from "~/lib/form.server"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { AuthzEngine } from "~/lib/governance/AuthzEngine.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
@@ -46,66 +48,64 @@ async function loadHomeData(request: Request): Promise<HomeData> {
   let visibleApps = staticApps
 
   if (auth.user) {
-    try {
-      // Governance owns *visibility* (which apps a user may see); it does not
-      // store *presentation* (icon, category, launch URL — the operator/DB has
-      // none of these). Recover those from apps.json by slug so the grid keeps
-      // its icons, real categories, and working launch links. Apps not in
-      // apps.json still render (name from the DB), just unstyled + no link.
-      const staticBySlug = new Map(loadApps().map((a) => [a.id, a]))
-      const governedApps = await runEffect(
-        Effect.gen(function* () {
-          const appRepo = yield* ApplicationRepo
-          const engine = yield* AuthzEngine
-          const allApps = yield* appRepo.list()
-          const checks = allApps.map((a) => ({
-            subject: auth.sub!,
-            application: a.slug,
-            action: "access",
-          }))
-          const decisions = yield* engine.checkBulk(checks)
-          return allApps
-            .filter((_, i) => decisions[i].allow)
-            .map((a): AppDefinition => {
-              const s = staticBySlug.get(a.slug)
-              return {
-                id: a.slug,
-                name: a.displayName || s?.name || a.slug,
-                // Empty URL signals "no launch URL configured" — AppCard renders
-                // a non-link state with a help hint instead of a 404.
-                url: a.url ?? s?.url ?? "",
-                category: s?.category ?? "governance",
-                icon: s?.icon ?? "",
-                groups: [],
-                priority: s?.priority ?? 10,
-                description: a.description ?? s?.description ?? null,
-              }
-            })
-        }),
-      )
-
-      visibleApps = governedApps
-    } catch (err) {
-      await runEffect(
-        Effect.logWarning("governance app visibility failed, falling back to static", { error: String(err) }),
-      )
-    }
+    // Governance owns *visibility* (which apps a user may see); it does not
+    // store *presentation* (icon, category, launch URL — the operator/DB has
+    // none of these). Recover those from apps.json by slug so the grid keeps
+    // its icons, real categories, and working launch links. Apps not in
+    // apps.json still render (name from the DB), just unstyled + no link.
+    const staticBySlug = new Map(loadApps().map((a) => [a.id, a]))
+    visibleApps = await runEffect(
+      Effect.gen(function* () {
+        const appRepo = yield* ApplicationRepo
+        const engine = yield* AuthzEngine
+        const allApps = yield* appRepo.list()
+        const checks = allApps.map((a) => ({
+          subject: auth.sub!,
+          application: a.slug,
+          action: "access",
+        }))
+        const decisions = yield* engine.checkBulk(checks)
+        return allApps
+          .filter((_, i) => decisions[i].allow)
+          .map((a): AppDefinition => {
+            const s = staticBySlug.get(a.slug)
+            return {
+              id: a.slug,
+              name: a.displayName || s?.name || a.slug,
+              // Empty URL signals "no launch URL configured" — AppCard renders
+              // a non-link state with a help hint instead of a 404.
+              url: a.url ?? s?.url ?? "",
+              category: s?.category ?? "governance",
+              icon: s?.icon ?? "",
+              groups: [],
+              priority: s?.priority ?? 10,
+              description: a.description ?? s?.description ?? null,
+            }
+          })
+      }).pipe(
+        Effect.catchAll((e) =>
+          Effect.logWarning("governance app visibility failed, falling back to static", { error: String(e) }).pipe(
+            Effect.as(staticApps),
+          ),
+        ),
+      ),
+    )
   }
 
   let appsCatalog: AppCatalogEntry[] = []
   if (auth.user && visibleApps.length === 0) {
-    try {
-      appsCatalog = await runEffect(
-        Effect.gen(function* () {
-          const principalRepo = yield* PrincipalRepo
-          const principal = yield* principalRepo.findByExternalId(auth.sub!)
-          if (!principal) return [] as AppCatalogEntry[]
-          return yield* loadAppsCatalogForPrincipal(principal.id)
-        }),
-      )
-    } catch (err) {
-      await runEffect(Effect.logWarning("home catalog load failed", { error: String(err) }))
-    }
+    appsCatalog = await runEffect(
+      Effect.gen(function* () {
+        const principalRepo = yield* PrincipalRepo
+        const principal = yield* principalRepo.findByExternalId(auth.sub!)
+        if (!principal) return [] as AppCatalogEntry[]
+        return yield* loadAppsCatalogForPrincipal(principal.id)
+      }).pipe(
+        Effect.catchAll((e) =>
+          Effect.logWarning("home catalog load failed", { error: String(e) }).pipe(Effect.as([] as AppCatalogEntry[])),
+        ),
+      ),
+    )
   }
 
   return { visibleApps, appsCatalog }
@@ -120,6 +120,15 @@ export async function loader({ request }: Route.LoaderArgs) {
     categoryOrder: config.categoryOrder,
   }
 }
+
+// Boundary schema for the single supported intent. Unknown intents decode
+// (intent is just a string literal check below) — shape errors do not.
+const RequestAccessFormSchema = Schema.Struct({
+  intent: Schema.String,
+  applicationId: FormOptionalText,
+  roleId: FormOptionalText,
+  justification: FormOptionalText,
+})
 
 // Discriminated outcomes for the submit action — split clean states so the
 // form/dialog can branch on intent without overloading a `success` flag.
@@ -145,12 +154,15 @@ export async function action({ request }: Route.ActionArgs): Promise<SubmitOutco
   }
 
   const formData = await request.formData()
-  const intent = formData.get("intent") as string | null
+  const parsed = decodeForm(RequestAccessFormSchema)(formData)
+  if (Either.isLeft(parsed)) {
+    return { outcome: "error", error: "invalid_form" }
+  }
 
-  if (intent === "requestAccess") {
-    const applicationId = (formData.get("applicationId") as string)?.trim()
-    const roleId = ((formData.get("roleId") as string) ?? "").trim() || undefined
-    const justification = ((formData.get("justification") as string) ?? "").trim() || undefined
+  if (parsed.right.intent === "requestAccess") {
+    const { applicationId, roleId, justification } = parsed.right
+    // Presence is a domain rule (which field is required for this intent),
+    // kept explicit so each miss maps to its own outcome code.
     if (!applicationId) return { outcome: "error", error: "missing_application" }
     if (!roleId) return { outcome: "error", error: "missing_target" }
 
@@ -160,9 +172,7 @@ export async function action({ request }: Route.ActionArgs): Promise<SubmitOutco
     // production, so every workflow error collapsed to "submit_failed".
     const outcome = await runEffect(
       Effect.gen(function* () {
-        const principalRepo = yield* PrincipalRepo
-        const principal = yield* principalRepo.findByExternalId(auth.sub!)
-        if (!principal) return { _kind: "principal_not_found" as const }
+        const principal = yield* requirePrincipal(auth.sub!)
         const result = yield* submitAccessRequest({
           requesterId: principal.id,
           applicationId,
@@ -173,6 +183,7 @@ export async function action({ request }: Route.ActionArgs): Promise<SubmitOutco
         if (result.status === "approved") return { _kind: "auto_approved" as const, requestId: result.requestId }
         return { _kind: "submitted" as const, requestId: result.requestId }
       }).pipe(
+        Effect.catchTag("PrincipalNotFound", () => Effect.succeed({ _kind: "principal_not_found" as const })),
         Effect.catchTag("MissingRoleOrEntitlementError", () => Effect.succeed({ _kind: "missing_target" as const })),
         Effect.catchTag("BothRoleAndEntitlementError", () =>
           Effect.succeed({ _kind: "role_entitlement_conflict" as const }),

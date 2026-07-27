@@ -8,12 +8,18 @@ vi.mock("~/lib/runtime.server", () => ({
 }))
 // The stats module only exports Effect programs (evaluated via the mocked
 // runEffect), but importing it pulls the whole server graph — stub it.
-vi.mock("~/lib/governance/dashboard-stats.server", () => ({
-  loadGlanceStats: "loadGlanceStats",
-  loadExpiringSoon: vi.fn(() => "loadExpiringSoon"),
-  loadRecentActivity: vi.fn(() => "loadRecentActivity"),
-  loadHygieneExtras: "loadHygieneExtras",
-}))
+// Sentinel Effects: runEffect is mocked with a queued-resolve chain, so only
+// the SHAPE matters — the route pipes these through Effect.orDie, so they
+// must be genuine Effect values, not bare strings.
+vi.mock("~/lib/governance/dashboard-stats.server", async () => {
+  const { Effect } = await import("effect")
+  return {
+    loadGlanceStats: Effect.succeed("loadGlanceStats"),
+    loadExpiringSoon: vi.fn(() => Effect.succeed("loadExpiringSoon")),
+    loadRecentActivity: vi.fn(() => Effect.succeed("loadRecentActivity")),
+    loadHygieneExtras: Effect.succeed("loadHygieneExtras"),
+  }
+})
 
 import { requireAdmin } from "~/lib/admin-guard.server"
 import { runEffect } from "~/lib/runtime.server"

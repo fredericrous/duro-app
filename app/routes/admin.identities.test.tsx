@@ -24,14 +24,16 @@ beforeEach(() => vi.clearAllMocks())
 
 describe("/admin/identities loader", () => {
   it("returns users, principals, revocations, certs, and system ids", async () => {
-    mockRunEffect
-      .mockResolvedValueOnce([
+    // Single runEffect returning [users, principals, revocations, certsByUser]
+    mockRunEffect.mockResolvedValueOnce([
+      [
         { id: "alice", displayName: "Alice", email: "a@x.com", creationDate: "2024-01-01" },
         { id: "system", displayName: "system", email: "s@x.com", creationDate: "2024-01-01" },
-      ] as never)
-      .mockResolvedValueOnce([{ id: "g1", principalType: "group", displayName: "Eng", enabled: true }] as never)
-      .mockResolvedValueOnce([] as never)
-      .mockResolvedValueOnce({} as never)
+      ],
+      [{ id: "g1", principalType: "group", displayName: "Eng", enabled: true }],
+      [],
+      {},
+    ] as never)
 
     const data = (await loader({ request: req() } as never)) as {
       users: unknown[]

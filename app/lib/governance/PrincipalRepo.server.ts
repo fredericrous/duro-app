@@ -1,4 +1,4 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, ParseResult } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { MigrationsRan } from "~/lib/db/client.server"
@@ -9,7 +9,7 @@ export class PrincipalRepoError extends Data.TaggedError("PrincipalRepoError")<{
   readonly cause?: unknown
 }> {}
 
-const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError | ParseResult.ParseError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new PrincipalRepoError({ message, cause: e })))
 
 export class PrincipalRepo extends Context.Tag("PrincipalRepo")<
@@ -48,12 +48,12 @@ export const PrincipalRepoLive = Layer.effect(
                 SET display_name = ${displayName}, email = ${email}, updated_at = NOW()
                 WHERE external_id = ${externalId}
                 RETURNING *`
-              return decodePrincipal(rows[0])
+              return yield* decodePrincipal(rows[0])
             }
             const rows = yield* sql`INSERT INTO principals (id, principal_type, external_id, display_name, email)
               VALUES (gen_random_uuid(), 'user', ${externalId}, ${displayName}, ${email})
               RETURNING *`
-            return decodePrincipal(rows[0])
+            return yield* decodePrincipal(rows[0])
           }),
           "Failed to ensure user",
         ),
@@ -61,7 +61,7 @@ export const PrincipalRepoLive = Layer.effect(
       findById: (id) =>
         withErr(
           sql`SELECT * FROM principals WHERE id = ${id}`.pipe(
-            Effect.map((rows) => (rows[0] ? decodePrincipal(rows[0]) : null)),
+            Effect.flatMap((rows) => (rows[0] ? decodePrincipal(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find principal by id",
         ),
@@ -69,7 +69,7 @@ export const PrincipalRepoLive = Layer.effect(
       findByExternalId: (externalId) =>
         withErr(
           sql`SELECT * FROM principals WHERE external_id = ${externalId}`.pipe(
-            Effect.map((rows) => (rows[0] ? decodePrincipal(rows[0]) : null)),
+            Effect.flatMap((rows) => (rows[0] ? decodePrincipal(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find principal by external id",
         ),
@@ -77,7 +77,7 @@ export const PrincipalRepoLive = Layer.effect(
       list: () =>
         withErr(
           sql`SELECT * FROM principals ORDER BY display_name`.pipe(
-            Effect.map((rows) => rows.map((r) => decodePrincipal(r))),
+            Effect.flatMap((rows) => Effect.forEach(rows, decodePrincipal)),
           ),
           "Failed to list principals",
         ),
@@ -86,7 +86,7 @@ export const PrincipalRepoLive = Layer.effect(
         withErr(
           sql`INSERT INTO principals (id, principal_type, display_name, external_id)
               VALUES (gen_random_uuid(), 'group', ${displayName}, ${externalId ?? null})
-              RETURNING *`.pipe(Effect.map((rows) => decodePrincipal(rows[0]))),
+              RETURNING *`.pipe(Effect.flatMap((rows) => decodePrincipal(rows[0]))),
           "Failed to create group",
         ),
 
@@ -110,7 +110,9 @@ export const PrincipalRepoLive = Layer.effect(
         withErr(
           sql`SELECT p.* FROM principals p
               JOIN group_memberships gm ON gm.group_id = p.id
-              WHERE gm.member_id = ${principalId}`.pipe(Effect.map((rows) => rows.map((r) => decodePrincipal(r)))),
+              WHERE gm.member_id = ${principalId}`.pipe(
+            Effect.flatMap((rows) => Effect.forEach(rows, decodePrincipal)),
+          ),
           "Failed to list groups for principal",
         ),
 
@@ -118,7 +120,7 @@ export const PrincipalRepoLive = Layer.effect(
         withErr(
           sql`SELECT p.* FROM principals p
               JOIN group_memberships gm ON gm.member_id = p.id
-              WHERE gm.group_id = ${groupId}`.pipe(Effect.map((rows) => rows.map((r) => decodePrincipal(r)))),
+              WHERE gm.group_id = ${groupId}`.pipe(Effect.flatMap((rows) => Effect.forEach(rows, decodePrincipal))),
           "Failed to list group members",
         ),
 

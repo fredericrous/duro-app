@@ -10,7 +10,7 @@ export async function loader(_args: Route.LoaderArgs) {
     Effect.gen(function* () {
       const oidc = yield* OidcClient
       return yield* oidc.getEndSessionUrl()
-    }),
+    }).pipe(Effect.orDie),
   )
   const postLogoutUri = new URL(process.env.OIDC_REDIRECT_URI!).origin
 

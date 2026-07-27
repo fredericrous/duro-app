@@ -71,10 +71,12 @@ describe("/admin/grants/new action", () => {
     expect(data.error).toContain("required")
   })
 
-  it("captures runEffect errors into the error shape", async () => {
+  it("captures grant-creation failures into the error shape", async () => {
     mockGetAuth.mockResolvedValue({ user: "admin", sub: "admin-sub" } as never)
     mockCheckDecision.mockResolvedValue({ allow: true } as never)
-    mockRunEffect.mockRejectedValueOnce(new Error("grant rollback") as never)
+    // Failures are caught inside the effect (catchAll → { error }); runEffect
+    // resolves with that fallback outcome instead of rejecting.
+    mockRunEffect.mockResolvedValueOnce({ error: "grant rollback" } as never)
     const result = await callAction(action, {
       formData: { applicationId: "app-1", principalId: "p-1", roleId: "r-1" },
     })

@@ -11,7 +11,7 @@ export async function loader() {
   const ping = Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     yield* sql`SELECT 1`
-  }).pipe(Effect.timeout("3 seconds"))
+  }).pipe(Effect.timeout("3 seconds"), Effect.orDie)
 
   try {
     // DB-only: readiness reflects database reachability, NOT whether every

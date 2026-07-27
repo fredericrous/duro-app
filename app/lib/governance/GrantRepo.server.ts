@@ -1,4 +1,4 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, ParseResult } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { MigrationsRan } from "~/lib/db/client.server"
@@ -9,7 +9,7 @@ export class GrantRepoError extends Data.TaggedError("GrantRepoError")<{
   readonly cause?: unknown
 }> {}
 
-const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError | ParseResult.ParseError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new GrantRepoError({ message, cause: e })))
 
 export class GrantRepo extends Context.Tag("GrantRepo")<
@@ -65,7 +65,7 @@ export const GrantRepoLive = Layer.effect(
         withErr(
           sql`INSERT INTO grants (principal_id, role_id, resource_id, granted_by, reason, expires_at)
               VALUES (${input.principalId}, ${input.roleId}, ${input.resourceId ?? null}, ${input.grantedBy}, ${input.reason ?? null}, ${input.expiresAt ?? null})
-              RETURNING *`.pipe(Effect.map((rows) => decodeGrant(rows[0]) as Grant)),
+              RETURNING *`.pipe(Effect.flatMap((rows) => decodeGrant(rows[0]))),
           "Failed to grant role",
         ),
 
@@ -73,7 +73,7 @@ export const GrantRepoLive = Layer.effect(
         withErr(
           sql`INSERT INTO grants (principal_id, entitlement_id, resource_id, granted_by, reason, expires_at)
               VALUES (${input.principalId}, ${input.entitlementId}, ${input.resourceId ?? null}, ${input.grantedBy}, ${input.reason ?? null}, ${input.expiresAt ?? null})
-              RETURNING *`.pipe(Effect.map((rows) => decodeGrant(rows[0]) as Grant)),
+              RETURNING *`.pipe(Effect.flatMap((rows) => decodeGrant(rows[0]))),
           "Failed to grant entitlement",
         ),
 
@@ -86,7 +86,7 @@ export const GrantRepoLive = Layer.effect(
       findById: (id) =>
         withErr(
           sql`SELECT * FROM grants WHERE id = ${id}`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? (decodeGrant(rows[0]) as Grant) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? decodeGrant(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find grant",
         ),
@@ -97,7 +97,7 @@ export const GrantRepoLive = Layer.effect(
               WHERE principal_id = ${principalId}
                 AND revoked_at IS NULL
                 AND (expires_at IS NULL OR expires_at > NOW())`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeGrant(r) as Grant)),
+            Effect.flatMap((rows) => Effect.forEach(rows, decodeGrant)),
           ),
           "Failed to find active grants for principal",
         ),
@@ -111,7 +111,7 @@ export const GrantRepoLive = Layer.effect(
                 AND (
                   role_id IN (SELECT id FROM roles WHERE application_id = ${applicationId})
                   OR entitlement_id IN (SELECT id FROM entitlements WHERE application_id = ${applicationId})
-                )`.pipe(Effect.map((rows) => rows.map((r) => decodeGrant(r) as Grant))),
+                )`.pipe(Effect.flatMap((rows) => Effect.forEach(rows, decodeGrant))),
           "Failed to find active grants for principal and app",
         ),
 
@@ -123,7 +123,7 @@ export const GrantRepoLive = Layer.effect(
                 AND (
                   role_id IN (SELECT id FROM roles WHERE application_id = ${applicationId})
                   OR entitlement_id IN (SELECT id FROM entitlements WHERE application_id = ${applicationId})
-                )`.pipe(Effect.map((rows) => rows.map((r) => decodeGrant(r) as Grant))),
+                )`.pipe(Effect.flatMap((rows) => Effect.forEach(rows, decodeGrant))),
           "Failed to find active grants for app",
         ),
 
@@ -146,7 +146,7 @@ export const GrantRepoLive = Layer.effect(
           sql`SELECT * FROM grants
               WHERE revoked_at IS NULL
                 AND expires_at IS NOT NULL
-                AND expires_at <= NOW()`.pipe(Effect.map((rows) => rows.map((r) => decodeGrant(r) as Grant))),
+                AND expires_at <= NOW()`.pipe(Effect.flatMap((rows) => Effect.forEach(rows, decodeGrant))),
           "Failed to find expired grants",
         ),
     }

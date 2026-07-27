@@ -8,6 +8,7 @@ import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
+import { revokeSerialForUser } from "./cert-revocation.server"
 
 export interface InviteInput {
   email: string
@@ -207,7 +208,6 @@ export const revokeInvite = (inviteId: string) =>
     const inviteRepo = yield* InviteRepo
     const cert = yield* CertManager
     const certRepo = yield* CertificateRepo
-    const audit = yield* AuditService
 
     const invite = yield* inviteRepo.findById(inviteId)
     if (!invite) return
@@ -233,22 +233,9 @@ export const revokeInvite = (inviteId: string) =>
     const serials = yield* certRepo
       .revokeAllForUser(certUsername)
       .pipe(Effect.catchAll(() => Effect.succeed([] as string[])))
-    for (const serial of serials) {
-      yield* cert.revokeCert(serial).pipe(
-        Effect.tap(() => certRepo.markRevokeCompleted(serial)),
-        Effect.tap(() =>
-          audit
-            .emit({
-              eventType: "cert.revoked",
-              targetType: "user_certificate",
-              targetId: serial,
-              metadata: { username: certUsername },
-            })
-            .pipe(Effect.catchAll(() => Effect.void)),
-        ),
-        Effect.catchAll((e) => certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void))),
-      )
-    }
+    yield* Effect.forEach(serials, (serial) => revokeSerialForUser(serial, { auditUsername: certUsername }), {
+      concurrency: 4,
+    })
 
     yield* inviteRepo.revoke(inviteId)
   }).pipe(Effect.withSpan("revokeInvite", { attributes: { inviteId } }))
@@ -288,22 +275,9 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
     const serials = yield* certRepo
       .revokeAllForUser(username)
       .pipe(Effect.catchAll(() => Effect.succeed([] as string[])))
-    for (const serial of serials) {
-      yield* cert.revokeCert(serial).pipe(
-        Effect.tap(() => certRepo.markRevokeCompleted(serial)),
-        Effect.tap(() =>
-          audit
-            .emit({
-              eventType: "cert.revoked",
-              targetType: "user_certificate",
-              targetId: serial,
-              metadata: { username: certUsername },
-            })
-            .pipe(Effect.catchAll(() => Effect.void)),
-        ),
-        Effect.catchAll((e) => certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void))),
-      )
-    }
+    yield* Effect.forEach(serials, (serial) => revokeSerialForUser(serial, { auditUsername: certUsername }), {
+      concurrency: 4,
+    })
 
     // Record revocation in audit log
     yield* inviteRepo.recordRevocation(email, username, revokedBy, reason)

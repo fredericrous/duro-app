@@ -42,27 +42,38 @@ const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string
 // Implementation
 // ---------------------------------------------------------------------------
 
-const checkAccessImpl = (sql: SqlClient.SqlClient, check: AccessCheck) =>
-  Effect.gen(function* () {
-    const startMs = Date.now()
+interface ResolvedSubject {
+  readonly principalId: string
+  readonly groupIds: readonly string[]
+  readonly allIds: readonly string[]
+}
 
-    // 1. Resolve principal
+/**
+ * Resolve a subject (OIDC sub) to its principal + single-hop groups.
+ * null = unknown or disabled principal (the caller denies).
+ * Factored out so checkBulk resolves each unique subject exactly once.
+ */
+const resolveSubject = (sql: SqlClient.SqlClient, subject: string): Effect.Effect<ResolvedSubject | null, AuthzError> =>
+  Effect.gen(function* () {
     const principals = yield* withErr(
-      sql`SELECT id FROM principals WHERE external_id = ${check.subject} AND enabled = TRUE`,
+      sql<{ id: string }>`SELECT id FROM principals WHERE external_id = ${subject} AND enabled = TRUE`,
       "Failed to resolve principal",
     )
-    if (principals.length === 0) {
-      return deny("Principal not found or disabled")
-    }
-    const principalId = (principals[0] as any).id as string
+    if (principals.length === 0) return null
+    const principalId = principals[0].id
 
-    // 2. Resolve groups (single-hop)
     const memberships = yield* withErr(
-      sql`SELECT group_id FROM group_memberships WHERE member_id = ${principalId}`,
+      sql<{ groupId: string }>`SELECT group_id FROM group_memberships WHERE member_id = ${principalId}`,
       "Failed to resolve groups",
     )
-    const groupIds = memberships.map((r: any) => r.groupId as string)
-    const allIds = [principalId, ...groupIds]
+    const groupIds = memberships.map((r) => r.groupId)
+    return { principalId, groupIds, allIds: [principalId, ...groupIds] }
+  })
+
+const checkAccessImpl = (sql: SqlClient.SqlClient, check: AccessCheck, resolved: ResolvedSubject) =>
+  Effect.gen(function* () {
+    const startMs = Date.now()
+    const { principalId, groupIds, allIds } = resolved
 
     // 3. Resolve application
     const apps = yield* withErr(
@@ -161,56 +172,32 @@ const checkAccessImpl = (sql: SqlClient.SqlClient, check: AccessCheck) =>
     } satisfies AccessDecision
   })
 
+const checkAccessEntry = (sql: SqlClient.SqlClient, check: AccessCheck) =>
+  Effect.gen(function* () {
+    const resolved = yield* resolveSubject(sql, check.subject)
+    if (resolved === null) return deny("Principal not found or disabled")
+    return yield* checkAccessImpl(sql, check, resolved)
+  })
+
 // ---------------------------------------------------------------------------
-// Bulk implementation — deduplicate subjects
+// Bulk implementation — resolve each unique subject once, share the result
 // ---------------------------------------------------------------------------
 
 const checkBulkImpl = (sql: SqlClient.SqlClient, checks: readonly AccessCheck[]) =>
   Effect.gen(function* () {
-    // Deduplicate subjects and pre-resolve principal + groups once per unique subject
-    const subjectCache = new Map<string, { principalId: string; groupIds: string[]; allIds: string[] } | null>()
-
     const uniqueSubjects = [...new Set(checks.map((c) => c.subject))]
+    const resolutions = yield* Effect.forEach(
+      uniqueSubjects,
+      (subject) => Effect.map(resolveSubject(sql, subject), (r) => [subject, r] as const),
+      { concurrency: 4 },
+    )
+    const subjectCache = new Map(resolutions)
 
-    for (const subject of uniqueSubjects) {
-      const principals = yield* withErr(
-        sql`SELECT id FROM principals WHERE external_id = ${subject} AND enabled = TRUE`,
-        "Failed to resolve principal",
-      )
-      if (principals.length === 0) {
-        subjectCache.set(subject, null)
-        continue
-      }
-      const principalId = (principals[0] as any).id as string
-
-      const memberships = yield* withErr(
-        sql`SELECT group_id FROM group_memberships WHERE member_id = ${principalId}`,
-        "Failed to resolve groups",
-      )
-      const groupIds = memberships.map((r: any) => r.groupId as string)
-      subjectCache.set(subject, {
-        principalId,
-        groupIds,
-        allIds: [principalId, ...groupIds],
-      })
-    }
-
-    // Evaluate each check, reusing cached principal resolution
-    const results: AccessDecision[] = []
-    for (const check of checks) {
-      const cached = subjectCache.get(check.subject)
-      if (cached === null || cached === undefined) {
-        results.push(deny("Principal not found or disabled"))
-        continue
-      }
-      // Use the full checkAccessImpl for each check (it will re-resolve the principal
-      // but the SQL round-trip is cheap compared to the entitlement query).
-      // For a more optimized version we could inline the logic, but correctness first.
-      const decision = yield* checkAccessImpl(sql, check)
-      results.push(decision)
-    }
-
-    return results as readonly AccessDecision[]
+    return yield* Effect.forEach(checks, (check) => {
+      const resolved = subjectCache.get(check.subject)
+      if (resolved == null) return Effect.succeed(deny("Principal not found or disabled"))
+      return checkAccessImpl(sql, check, resolved)
+    })
   })
 
 // ---------------------------------------------------------------------------
@@ -224,7 +211,7 @@ export const AuthzEngineLive = Layer.effect(
     const sql = yield* SqlClient.SqlClient
 
     return {
-      checkAccess: (check) => checkAccessImpl(sql, check),
+      checkAccess: (check) => checkAccessEntry(sql, check),
       checkBulk: (checks) => checkBulkImpl(sql, checks),
     }
   }),

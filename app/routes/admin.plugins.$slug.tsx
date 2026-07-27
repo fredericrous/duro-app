@@ -59,7 +59,7 @@ export async function loader({ request, params }: { request: Request; params: { 
       )
 
       return { manifest: plugin.manifest, installs, recentEvents } satisfies LoaderData
-    }),
+    }).pipe(Effect.orDie),
   )
 
   return data

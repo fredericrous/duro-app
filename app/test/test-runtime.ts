@@ -57,6 +57,12 @@ const GovernanceRepos = Layer.mergeAll(
 // exercise plugin provisioning shouldn't be forced to set that. Tests that
 // need PluginHost can compose it via Layer.provideMerge over `TestAppLayer`.
 
+// AppSyncServiceLive resolves its dependencies at layer build (Layer.effect),
+// so provide them here — mirrors AppSyncServiceWired in AppLayer.server.ts.
+const AppSyncServiceWired = AppSyncServiceLive.pipe(
+  Layer.provide(Layer.mergeAll(GovernanceRepos, ApplicationRepoLive, PluginRegistryLive, OperatorClientDev)),
+)
+
 export const TestAppLayer = Layer.mergeAll(
   UserManagerDev,
   CertManagerDev,
@@ -79,7 +85,7 @@ export const TestAppLayer = Layer.mergeAll(
   GroupSyncServiceLive,
   GroupMappingRepoLive,
   OperatorClientDev,
-  AppSyncServiceLive,
+  AppSyncServiceWired,
   PluginRegistryLive,
 ).pipe(Layer.provideMerge(makeTestDbLayer()), Layer.provide(FetchHttpClient.layer))
 

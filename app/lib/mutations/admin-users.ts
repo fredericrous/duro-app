@@ -4,6 +4,7 @@ import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { revokeUser, resendCert } from "~/lib/workflows/invite.server"
+import { revokeSerialForUser } from "~/lib/workflows/cert-revocation.server"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,22 +28,6 @@ export type AdminUsersResult =
 // ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
-
-/**
- * Revoke one cert serial, recording completion or failure. Never fails: within
- * a batch a single failure must NOT abort the rest — revoke as many as possible
- * and record which failed (a security operation should not be blocked by one
- * bad serial; the admin can retry those). Shared by all three batch loops.
- */
-const revokeSerial = (serial: string) =>
-  Effect.gen(function* () {
-    const cert = yield* CertManager
-    const certRepo = yield* CertificateRepo
-    yield* cert.revokeCert(serial).pipe(
-      Effect.tap(() => certRepo.markRevokeCompleted(serial)),
-      Effect.catchAll((e) => certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void))),
-    )
-  })
 
 export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
   return Effect.gen(function* () {
@@ -76,9 +61,7 @@ export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
       case "revokeAllCerts": {
         const certRepo = yield* CertificateRepo
         const serials = yield* certRepo.revokeAllForUser(mutation.username)
-        for (const serial of serials) {
-          yield* revokeSerial(serial)
-        }
+        yield* Effect.forEach(serials, (serial) => revokeSerialForUser(serial), { concurrency: 4 })
         return { certsRevoked: true as const, count: serials.length }
       }
 
@@ -97,29 +80,34 @@ export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
 
       case "revokeCertsBatch": {
         const certRepo = yield* CertificateRepo
-        let count = 0
-        for (const serial of mutation.serialNumbers) {
-          const affected = yield* certRepo.markRevokePending(serial)
-          if (affected === 0) continue
-          // Continue on failure (was Effect.tapError, which aborted the whole
-          // batch on the first bad serial and reported total failure).
-          yield* revokeSerial(serial)
-          count++
-        }
-        return { certsRevoked: true as const, count }
+        const revoked = yield* Effect.forEach(
+          mutation.serialNumbers,
+          (serial) =>
+            // The markRevokePending gate stays paired with its revoke: a serial
+            // is only revoked (and counted) if the pending mark claimed it.
+            Effect.gen(function* () {
+              const affected = yield* certRepo.markRevokePending(serial)
+              if (affected === 0) return false
+              // Continue on failure (was Effect.tapError, which aborted the whole
+              // batch on the first bad serial and reported total failure).
+              yield* revokeSerialForUser(serial)
+              return true
+            }),
+          { concurrency: 4 },
+        )
+        return { certsRevoked: true as const, count: revoked.filter(Boolean).length }
       }
 
       case "revokeAllCertsBatch": {
         const certRepo = yield* CertificateRepo
-        let total = 0
-        for (const username of mutation.usernames) {
-          const serials = yield* certRepo.revokeAllForUser(username)
-          for (const serial of serials) {
-            yield* revokeSerial(serial)
-          }
-          total += serials.length
-        }
-        return { certsRevoked: true as const, count: total }
+        const counts = yield* Effect.forEach(mutation.usernames, (username) =>
+          Effect.gen(function* () {
+            const serials = yield* certRepo.revokeAllForUser(username)
+            yield* Effect.forEach(serials, (serial) => revokeSerialForUser(serial), { concurrency: 4 })
+            return serials.length
+          }),
+        )
+        return { certsRevoked: true as const, count: counts.reduce((a, b) => a + b, 0) }
       }
     }
   }).pipe(

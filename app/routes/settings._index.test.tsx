@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
+import { Effect } from "effect"
 
 vi.mock("~/lib/auth.server", () => ({
   requireAuth: vi.fn(),
@@ -58,7 +59,9 @@ describe("/settings general action", () => {
 
   it("returns the mutation result directly (e.g. saveDisplayPrefs)", async () => {
     mockParse.mockReturnValue({ intent: "saveDisplayPrefs" } as never)
-    mockHandle.mockReturnValue("effect" as never)
+    // The action pipes the handler through Effect.orDie, so the mock must
+    // return a real (pipeable) Effect; the mocked runEffect yields the result.
+    mockHandle.mockReturnValue(Effect.void as never)
     mockRunEffect.mockResolvedValue({ displayPrefsSaved: true } as never)
     const result = await callAction(action, { formData: { intent: "saveDisplayPrefs" } })
     const data = expectData<{ displayPrefsSaved?: boolean }>(result)
@@ -67,7 +70,7 @@ describe("/settings general action", () => {
 
   it("converts the saveLocale _redirect+_cookie marker into a 302 Response", async () => {
     mockParse.mockReturnValue({ intent: "saveLocale", locale: "fr" } as never)
-    mockHandle.mockReturnValue("effect" as never)
+    mockHandle.mockReturnValue(Effect.void as never)
     mockRunEffect.mockResolvedValue({
       _redirect: "/settings",
       _cookie: "duro_lng=fr; Path=/; Max-Age=31536000",

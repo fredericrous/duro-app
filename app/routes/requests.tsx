@@ -1,9 +1,11 @@
 import { useState } from "react"
-import { Effect } from "effect"
+import { Effect, Either, Schema } from "effect"
 import { useFetcher, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/requests"
 import { runEffect } from "~/lib/runtime.server"
+import { requirePrincipal } from "~/lib/governance/current-principal.server"
+import { decodeForm, FormOptionalText } from "~/lib/form.server"
 import { isOriginAllowed } from "~/lib/config.server"
 import { AccessRequestRepo, type AccessRequestEnriched } from "~/lib/governance/AccessRequestRepo.server"
 import { AccessInvitationRepo, type AccessInvitationEnriched } from "~/lib/governance/AccessInvitationRepo.server"
@@ -54,11 +56,19 @@ export async function loader({ request }: Route.LoaderArgs) {
       const requests = yield* reqRepo.listForRequesterEnriched(principal.id)
       const invitations = yield* invRepo.listPendingForPrincipalEnriched(principal.id)
       return { requests, invitations }
-    }),
+    }).pipe(Effect.orDie),
   )
 
   return { requests, invitations }
 }
+
+// Boundary schema: shape only; per-intent required fields stay explicit
+// domain checks below so each miss keeps its specific outcome code.
+const RequestsActionSchema = Schema.Struct({
+  intent: Schema.String,
+  requestId: FormOptionalText,
+  invitationId: FormOptionalText,
+})
 
 export async function action({ request }: Route.ActionArgs) {
   if (!isOriginAllowed(request.headers.get("Origin"))) {
@@ -72,10 +82,12 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const formData = await request.formData()
-  const intent = formData.get("intent") as string | null
+  const parsed = decodeForm(RequestsActionSchema)(formData)
+  if (Either.isLeft(parsed)) return { error: "invalid_form" as const }
+  const { intent } = parsed.right
 
   if (intent === "cancel") {
-    const requestId = (formData.get("requestId") as string)?.trim()
+    const { requestId } = parsed.right
     if (!requestId) return { error: "missing_request_id" as const }
 
     // Tagged-error handling has to happen INSIDE the Effect, before runPromise
@@ -85,12 +97,11 @@ export async function action({ request }: Route.ActionArgs) {
     // cancel error fell through to the generic "cancel_failed" outcome.
     const result = await runEffect(
       Effect.gen(function* () {
-        const principalRepo = yield* PrincipalRepo
-        const principal = yield* principalRepo.findByExternalId(auth.sub!)
-        if (!principal) return { _kind: "principal_not_found" as const }
+        const principal = yield* requirePrincipal(auth.sub!)
         yield* cancelOwnAccessRequest({ requestId, requesterId: principal.id })
         return { _kind: "ok" as const }
       }).pipe(
+        Effect.catchTag("PrincipalNotFound", () => Effect.succeed({ _kind: "principal_not_found" as const })),
         Effect.catchTag("AccessRequestNotOwnedError", () => Effect.succeed({ _kind: "not_owned" as const })),
         Effect.catchTag("AccessRequestNotCancellableError", () =>
           Effect.succeed({ _kind: "not_cancellable" as const }),
@@ -107,14 +118,12 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "acceptInvitation" || intent === "declineInvitation") {
-    const invitationId = (formData.get("invitationId") as string)?.trim()
+    const { invitationId } = parsed.right
     if (!invitationId) return { error: "missing_invitation_id" as const }
 
     const result = await runEffect(
       Effect.gen(function* () {
-        const principalRepo = yield* PrincipalRepo
-        const principal = yield* principalRepo.findByExternalId(auth.sub!)
-        if (!principal) return { _kind: "principal_not_found" as const }
+        const principal = yield* requirePrincipal(auth.sub!)
         if (intent === "acceptInvitation") {
           yield* acceptInvitation({ invitationId, principalId: principal.id })
         } else {
@@ -122,6 +131,7 @@ export async function action({ request }: Route.ActionArgs) {
         }
         return { _kind: "ok" as const, intent }
       }).pipe(
+        Effect.catchTag("PrincipalNotFound", () => Effect.succeed({ _kind: "principal_not_found" as const })),
         // Surface the invitation error code so the UI can show a specific,
         // translated message (expired / already resolved / not yours).
         Effect.catchTag("AccessInvitationError", (e) => Effect.succeed({ _kind: e.code })),

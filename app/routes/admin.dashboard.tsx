@@ -47,7 +47,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       ])
       const has = (r: readonly unknown[]) => Boolean((r[0] as { x?: boolean } | undefined)?.x)
       return { hasApp: has(apps), hasGrant: has(grants), hasInvite: has(invites) }
-    }),
+    }).pipe(Effect.orDie), // rejection handled by .catch below
   ).catch(() => ({ hasApp: true, hasGrant: true, hasInvite: true }))
 
   // Governance-health gaps an admin should clear.
@@ -63,16 +63,19 @@ export async function loader({ request }: Route.LoaderArgs) {
       ])
       const n = (r: readonly unknown[]) => ((r[0] as { n?: number } | undefined)?.n ?? 0) as number
       return { appsWithoutOwner: n(noOwner), enabledAppsWithoutRole: n(noRole), staleInvitations: n(staleInv) }
-    }),
+    }).pipe(Effect.orDie), // rejection handled by .catch below
   ).catch(() => ({ appsWithoutOwner: 0, enabledAppsWithoutRole: 0, staleInvitations: 0 }))
 
   // Estate data. Each aggregate degrades independently — a failing panel
   // renders empty, never breaks the page.
   const [glance, expiring, activity, hygieneExtras] = await Promise.all([
-    runEffect(loadGlanceStats).catch(() => EMPTY_GLANCE),
-    runEffect(loadExpiringSoon()).catch(() => [] as ExpiringItem[]),
-    runEffect(loadRecentActivity()).catch(() => []),
-    runEffect(loadHygieneExtras).catch(() => ({ failedProvisioningJobs: 0, connectorsWithErrors: 0 })),
+    runEffect(loadGlanceStats.pipe(Effect.orDie)).catch(() => EMPTY_GLANCE),
+    runEffect(loadExpiringSoon().pipe(Effect.orDie)).catch(() => [] as ExpiringItem[]),
+    runEffect(loadRecentActivity().pipe(Effect.orDie)).catch(() => []),
+    runEffect(loadHygieneExtras.pipe(Effect.orDie)).catch(() => ({
+      failedProvisioningJobs: 0,
+      connectorsWithErrors: 0,
+    })),
   ])
 
   // Keep the loader payload lean: the feed only needs display fields.

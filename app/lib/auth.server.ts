@@ -42,7 +42,7 @@ export async function requireAuth(request: Request): Promise<AuthInfo> {
     Effect.gen(function* () {
       const oidc = yield* OidcClient
       return yield* oidc.buildAuthRequest()
-    }),
+    }).pipe(Effect.orDie), // OIDC misconfig/outage → 500; no in-band fallback exists
   )
   const returnUrl = new URL(request.url).pathname
   const pkceCookie = await createPkceCookie({ codeVerifier, state, returnUrl })

@@ -35,39 +35,40 @@ export async function loader({ request }: Route.LoaderArgs) {
   const page = parseInt(url.searchParams.get("page") || "0", 10)
   const pageSize = 50
 
-  let events: AuditEventWithNames[] = []
-  let error: string | undefined
+  const { events, error } = await runEffect(
+    Effect.gen(function* () {
+      const svc = yield* AuditService
 
-  try {
-    events = await runEffect(
-      Effect.gen(function* () {
-        const svc = yield* AuditService
+      const raw = yield* svc.query({
+        eventType,
+        actorId,
+        targetType,
+        targetId,
+        applicationId,
+        limit: source ? pageSize * 5 : pageSize,
+        offset: source ? 0 : page * pageSize,
+      })
+      const maps = yield* loadAuditNameMaps
+      const sanitized = enrichAuditEvents(maps, raw)
 
-        const raw = yield* svc.query({
-          eventType,
-          actorId,
-          targetType,
-          targetId,
-          applicationId,
-          limit: source ? pageSize * 5 : pageSize,
-          offset: source ? 0 : page * pageSize,
+      if (!source) return sanitized
+
+      return sanitized
+        .filter((e) => {
+          const meta = (e.metadata ?? {}) as Record<string, unknown>
+          return meta.source === source
         })
-        const maps = yield* loadAuditNameMaps
-        const sanitized = enrichAuditEvents(maps, raw)
-
-        if (!source) return sanitized
-
-        return sanitized
-          .filter((e) => {
-            const meta = (e.metadata ?? {}) as Record<string, unknown>
-            return meta.source === source
-          })
-          .slice(0, pageSize)
-      }),
-    )
-  } catch (e) {
-    error = e instanceof Error ? e.message : String(e)
-  }
+        .slice(0, pageSize)
+    }).pipe(
+      Effect.map((events) => ({ events, error: undefined as string | undefined })),
+      Effect.catchAll((e) =>
+        Effect.succeed({
+          events: [] as AuditEventWithNames[],
+          error: e instanceof Error ? e.message : String(e),
+        }),
+      ),
+    ),
+  )
 
   return { events, page, pageSize, source, error }
 }

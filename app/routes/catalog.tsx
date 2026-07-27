@@ -33,19 +33,18 @@ async function loadCatalog(request: Request): Promise<AppCatalogEntry[]> {
   const auth = await getAuth(request)
   if (!auth.sub) return []
 
-  try {
-    return await runEffect(
-      Effect.gen(function* () {
-        const repo = yield* PrincipalRepo
-        const principal = yield* repo.findByExternalId(auth.sub!)
-        if (!principal) return [] as AppCatalogEntry[]
-        return yield* loadAppsCatalogForPrincipal(principal.id)
-      }),
-    )
-  } catch (err) {
-    await runEffect(Effect.logWarning("catalog page load failed", { error: String(err) }))
-    return []
-  }
+  return await runEffect(
+    Effect.gen(function* () {
+      const repo = yield* PrincipalRepo
+      const principal = yield* repo.findByExternalId(auth.sub!)
+      if (!principal) return [] as AppCatalogEntry[]
+      return yield* loadAppsCatalogForPrincipal(principal.id)
+    }).pipe(
+      Effect.catchAll((e) =>
+        Effect.logWarning("catalog page load failed", { error: String(e) }).pipe(Effect.as([] as AppCatalogEntry[])),
+      ),
+    ),
+  )
 }
 
 export async function loader({ request }: Route.LoaderArgs) {

@@ -25,7 +25,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     Effect.gen(function* () {
       const oidc = yield* OidcClient
       return yield* oidc.exchangeCode(callbackUrl, pkce.codeVerifier, pkce.state)
-    }),
+    }).pipe(Effect.orDie),
   )
 
   // Upsert principal + sync OIDC groups to the governance model (this is how

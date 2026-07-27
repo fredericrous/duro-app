@@ -22,11 +22,12 @@ export async function loader({ params }: Route.LoaderArgs) {
       const row = yield* revealRepo.findByTokenHash(hashToken(revealToken))
       if (!row || new Date(row.expiresAt) < new Date()) return null
       return yield* cert.getP12(row.renewalId)
-    }),
-  ).catch((e) => {
-    console.error("[cert-reveal/download] error:", e)
-    return null
-  })
+    }).pipe(
+      Effect.catchAll((e) =>
+        Effect.logError("[cert-reveal/download] error", { error: String(e) }).pipe(Effect.as(null)),
+      ),
+    ),
+  )
 
   if (!p12) throw new Response("Certificate not available or link expired", { status: 404 })
 

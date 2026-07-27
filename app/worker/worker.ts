@@ -74,17 +74,27 @@ const pollOnce = Effect.gen(function* () {
   )
 
   // 2. Retry failed jobs older than 5 minutes
-  const staleJobs = yield* sql`
+  const staleJobs = yield* sql<{ id: string }>`
     SELECT id FROM provisioning_jobs
     WHERE status = 'failed'
       AND created_at < NOW() - INTERVAL '300 seconds'
       AND attempts < 5
     ORDER BY created_at ASC
     LIMIT 3
-  `.pipe(Effect.catchAll(() => Effect.succeed([] as Array<{ id: string }>)))
+  `.pipe(
+    // Best-effort like every step here, but never SILENTLY so — a broken
+    // retry path must be distinguishable from a quiet one in the logs.
+    Effect.tapErrorCause((cause) =>
+      Effect.logError("worker: stale-failed query failed").pipe(Effect.annotateLogs({ cause: String(cause) })),
+    ),
+    Effect.catchAll(() => Effect.succeed([] as Array<{ id: string }>)),
+  )
 
   for (const job of staleJobs) {
-    yield* sql`UPDATE provisioning_jobs SET status = 'pending' WHERE id = ${(job as { id: string }).id}`.pipe(
+    yield* sql`UPDATE provisioning_jobs SET status = 'pending' WHERE id = ${job.id}`.pipe(
+      Effect.tapErrorCause((cause) =>
+        Effect.logError("worker: retry-requeue failed").pipe(Effect.annotateLogs({ cause: String(cause) })),
+      ),
       Effect.catchAll(() => Effect.void),
     )
   }
@@ -99,7 +109,12 @@ const pollOnce = Effect.gen(function* () {
     SET status = 'pending', last_error = 'recovered from stale running state'
     WHERE status = 'running'
       AND started_at < NOW() - INTERVAL '900 seconds'
-  `.pipe(Effect.catchAll(() => Effect.void))
+  `.pipe(
+    Effect.tapErrorCause((cause) =>
+      Effect.logError("worker: stale-running recovery failed").pipe(Effect.annotateLogs({ cause: String(cause) })),
+    ),
+    Effect.catchAll(() => Effect.void),
+  )
 
   // 4. Expire + deprovision grants whose expires_at has passed, so an expired
   //    grant doesn't leave real downstream access live.
@@ -111,12 +126,15 @@ const pollOnce = Effect.gen(function* () {
   )
 })
 
+// NB: no catchAll here — if the loop itself dies (a defect escaping pollOnce's
+// per-step recovery), the failure propagates to main and the process EXITS so
+// k8s restarts it. The previous version swallowed the crash and idled forever
+// with both health probes green: a permanently "healthy" worker doing nothing.
 const pollLoop = pollOnce.pipe(
   Effect.repeat(Schedule.spaced("30 seconds")),
   Effect.tapErrorCause((cause) =>
     Effect.logError("worker poll loop crashed").pipe(Effect.annotateLogs({ cause: String(cause) })),
   ),
-  Effect.catchAll(() => Effect.void),
 )
 
 // ---------------------------------------------------------------------------
@@ -130,35 +148,39 @@ const HEALTH_PORT = parseInt(process.env.WORKER_HEALTH_PORT ?? "3001", 10)
 // — the process being up does not imply the pool is healthy.
 const startHealthServer = Effect.gen(function* () {
   const runtime = yield* Effect.runtime<SqlClient.SqlClient>()
-  const runFork = (eff: Effect.Effect<unknown, unknown, SqlClient.SqlClient>) =>
+  const runProbe = (eff: Effect.Effect<unknown, unknown, SqlClient.SqlClient>) =>
     Effect.runPromise(Effect.provide(eff, runtime))
-  return yield* Effect.sync(() => {
-    const server = Http.createServer((req, res) => {
-      if (req.url === "/health/ready") {
-        runFork(
-          Effect.gen(function* () {
-            const sql = yield* SqlClient.SqlClient
-            yield* sql`SELECT 1`
-          }).pipe(Effect.timeout("3 seconds")),
-        ).then(
-          () => {
-            res.writeHead(200, { "Content-Type": "application/json" })
-            res.end(JSON.stringify({ status: "ready" }))
-          },
-          (err) => {
-            res.writeHead(503, { "Content-Type": "application/json" })
-            res.end(JSON.stringify({ status: "not_ready", error: String(err) }))
-          },
-        )
-        return
-      }
-      res.writeHead(200, { "Content-Type": "text/plain" })
-      res.end("ok")
-    })
-    server.listen(HEALTH_PORT, () => {
-      console.log(`worker health server on :${HEALTH_PORT}`)
-    })
-  })
+  return yield* Effect.acquireRelease(
+    Effect.sync(() => {
+      const server = Http.createServer((req, res) => {
+        if (req.url === "/health/ready") {
+          runProbe(
+            Effect.gen(function* () {
+              const sql = yield* SqlClient.SqlClient
+              yield* sql`SELECT 1`
+            }).pipe(Effect.timeout("3 seconds")),
+          ).then(
+            () => {
+              res.writeHead(200, { "Content-Type": "application/json" })
+              res.end(JSON.stringify({ status: "ready" }))
+            },
+            (err) => {
+              res.writeHead(503, { "Content-Type": "application/json" })
+              res.end(JSON.stringify({ status: "not_ready", error: String(err) }))
+            },
+          )
+          return
+        }
+        res.writeHead(200, { "Content-Type": "text/plain" })
+        res.end("ok")
+      })
+      server.listen(HEALTH_PORT, () => {
+        console.log(`worker health server on :${HEALTH_PORT}`)
+      })
+      return server
+    }),
+    (server) => Effect.sync(() => server.close()),
+  )
 })
 
 // ---------------------------------------------------------------------------
@@ -169,11 +191,16 @@ const main = Effect.gen(function* () {
   yield* Effect.log("duro worker starting")
   yield* startHealthServer
   yield* pollLoop
-})
+}).pipe(Effect.scoped)
 
-Effect.runFork(
+// runPromise (not runFork) + explicit exit: a fatal error tears the process
+// down so the orchestrator restarts it, instead of leaving a live process
+// with a dead loop behind green probes.
+void Effect.runPromise(
   main.pipe(
     Effect.provide(WorkerLayer),
     Effect.tapErrorCause((cause) => Effect.logError("worker fatal", { cause: String(cause) })),
   ),
-)
+).catch(() => {
+  process.exit(1)
+})

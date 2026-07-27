@@ -65,15 +65,21 @@ const stubOperatorClient = (apps: ClusterApp[]): OperatorClientService => ({
  * in makeTestDbLayer), so tests don't share state.
  */
 function layersFor(operatorApps: ClusterApp[]) {
-  return Layer.mergeAll(
-    Layer.succeed(OperatorClient, stubOperatorClient(operatorApps)),
-    AppSyncServiceLive,
-    ApplicationRepoLive,
-    RbacRepoLive,
-    ConnectedSystemRepoLive,
-    ConnectorMappingRepoLive,
-    PluginRegistryLive,
-  ).pipe(Layer.provideMerge(makeTestDbLayer()))
+  // AppSyncServiceLive resolves its dependencies at layer build (Layer.effect),
+  // so provideMerge them in — merged back so tests can still yield the repos.
+  return AppSyncServiceLive.pipe(
+    Layer.provideMerge(
+      Layer.mergeAll(
+        Layer.succeed(OperatorClient, stubOperatorClient(operatorApps)),
+        ApplicationRepoLive,
+        RbacRepoLive,
+        ConnectedSystemRepoLive,
+        ConnectorMappingRepoLive,
+        PluginRegistryLive,
+      ),
+    ),
+    Layer.provideMerge(makeTestDbLayer()),
+  )
 }
 
 /**
@@ -430,15 +436,19 @@ const FailingRbacRepo: RbacRepoService = {
 
 describe("AppSyncService — transactional seeding (real DB)", () => {
   it("rolls back app creation when starter rbac seed fails", { timeout: 30000 }, async () => {
-    const layers = Layer.mergeAll(
-      Layer.succeed(OperatorClient, stubOperatorClient([clusterApps[0]])),
-      AppSyncServiceLive,
-      ApplicationRepoLive,
-      Layer.succeed(RbacRepo, FailingRbacRepo),
-      ConnectedSystemRepoLive,
-      ConnectorMappingRepoLive,
-      PluginRegistryLive,
-    ).pipe(Layer.provideMerge(makeTestDbLayer()))
+    const layers = AppSyncServiceLive.pipe(
+      Layer.provideMerge(
+        Layer.mergeAll(
+          Layer.succeed(OperatorClient, stubOperatorClient([clusterApps[0]])),
+          ApplicationRepoLive,
+          Layer.succeed(RbacRepo, FailingRbacRepo),
+          ConnectedSystemRepoLive,
+          ConnectorMappingRepoLive,
+          PluginRegistryLive,
+        ),
+      ),
+      Layer.provideMerge(makeTestDbLayer()),
+    )
 
     const { syncResult, apps } = await Effect.gen(function* () {
       const sync = yield* AppSyncService

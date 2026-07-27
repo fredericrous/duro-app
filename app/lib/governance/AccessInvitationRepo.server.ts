@@ -1,4 +1,4 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, ParseResult } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { MigrationsRan } from "~/lib/db/client.server"
@@ -9,7 +9,7 @@ export class AccessInvitationRepoError extends Data.TaggedError("AccessInvitatio
   readonly cause?: unknown
 }> {}
 
-const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError | ParseResult.ParseError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new AccessInvitationRepoError({ message, cause: e })))
 
 /** An invitation joined with the display names its UI needs. */
@@ -100,14 +100,14 @@ export const AccessInvitationRepoLive = Layer.effect(
         withErr(
           sql`INSERT INTO access_invitations (application_id, role_id, entitlement_id, resource_id, invited_principal_id, invited_by, message, expires_at)
               VALUES (${input.applicationId}, ${input.roleId ?? null}, ${input.entitlementId ?? null}, ${input.resourceId ?? null}, ${input.invitedPrincipalId}, ${input.invitedBy}, ${input.message ?? null}, ${input.expiresAt ?? null})
-              RETURNING *`.pipe(Effect.map((rows) => decodeAccessInvitation(rows[0]) as AccessInvitation)),
+              RETURNING *`.pipe(Effect.flatMap((rows) => decodeAccessInvitation(rows[0]))),
           "Failed to create access invitation",
         ),
 
       findById: (id) =>
         withErr(
           sql`SELECT * FROM access_invitations WHERE id = ${id}`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? (decodeAccessInvitation(rows[0]) as AccessInvitation) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? decodeAccessInvitation(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find access invitation",
         ),
@@ -116,9 +116,7 @@ export const AccessInvitationRepoLive = Layer.effect(
         withErr(
           sql`SELECT * FROM access_invitations
               WHERE invited_principal_id = ${principalId}
-              ORDER BY created_at DESC`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeAccessInvitation(r) as AccessInvitation)),
-          ),
+              ORDER BY created_at DESC`.pipe(Effect.flatMap((rows) => Effect.forEach(rows, decodeAccessInvitation))),
           "Failed to list invitations for principal",
         ),
 
@@ -126,9 +124,7 @@ export const AccessInvitationRepoLive = Layer.effect(
         withErr(
           sql`SELECT * FROM access_invitations
               WHERE application_id = ${applicationId}
-              ORDER BY created_at DESC`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeAccessInvitation(r) as AccessInvitation)),
-          ),
+              ORDER BY created_at DESC`.pipe(Effect.flatMap((rows) => Effect.forEach(rows, decodeAccessInvitation))),
           "Failed to list invitations for application",
         ),
 

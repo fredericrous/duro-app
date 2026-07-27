@@ -44,8 +44,12 @@ export async function loader({ request }: Route.LoaderArgs) {
         ),
       ])
       return { principalId: principal.id, events, access, groups }
-    }),
-  ).catch(() => ({ principalId: undefined, events: [], access: [] as AccessRow[], groups: [] as string[] }))
+    }).pipe(
+      Effect.catchAll(() =>
+        Effect.succeed({ principalId: undefined, events: [], access: [] as AccessRow[], groups: [] as string[] }),
+      ),
+    ),
+  )
 
   const events: ActivityEntry[] = data.events.map((e) => ({
     id: e.id,

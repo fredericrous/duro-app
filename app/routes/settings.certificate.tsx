@@ -37,7 +37,7 @@ export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData()
   const parsed = parseSettingsMutation(formData as unknown as FormData, auth)
   if ("error" in parsed) return parsed
-  return await runEffect(handleSettingsMutation(parsed))
+  return await runEffect(handleSettingsMutation(parsed).pipe(Effect.orDie))
 }
 
 export default function CertificateSettings({ loaderData }: Route.ComponentProps) {

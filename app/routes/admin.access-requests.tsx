@@ -28,7 +28,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     Effect.gen(function* () {
       const repo = yield* AccessRequestRepo
       return yield* repo.listAllEnriched()
-    }),
+    }).pipe(Effect.orDie),
   )
   return { requests }
 }

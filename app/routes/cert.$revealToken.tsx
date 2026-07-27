@@ -48,25 +48,28 @@ export async function loader({ params }: Route.LoaderArgs) {
     return { valid: false as const, error: "invalid" as CertRevealError, appName: config.appName }
   }
 
-  try {
-    const result = await runEffect(resolve(revealToken))
-    if (result.state === "ok") {
-      return {
-        valid: true as const,
-        revealed: false as const,
-        email: result.row.email,
-        password: result.password,
-        appName: config.appName,
-      }
+  const result = await runEffect(
+    resolve(revealToken).pipe(
+      Effect.catchAll((e) =>
+        Effect.logError("[cert-reveal] loader error", { error: String(e) }).pipe(
+          Effect.as({ state: "unknown" as const }),
+        ),
+      ),
+    ),
+  )
+  if (result.state === "ok") {
+    return {
+      valid: true as const,
+      revealed: false as const,
+      email: result.row.email,
+      password: result.password,
+      appName: config.appName,
     }
-    if (result.state === "revealed") {
-      return { valid: true as const, revealed: true as const, email: result.row.email, appName: config.appName }
-    }
-    return { valid: false as const, error: result.state as CertRevealError, appName: config.appName }
-  } catch (e) {
-    console.error("[cert-reveal] loader error:", e)
-    return { valid: false as const, error: "unknown" as CertRevealError, appName: config.appName }
   }
+  if (result.state === "revealed") {
+    return { valid: true as const, revealed: true as const, email: result.row.email, appName: config.appName }
+  }
+  return { valid: false as const, error: result.state as CertRevealError, appName: config.appName }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -77,25 +80,24 @@ export async function action({ request, params }: Route.ActionArgs) {
   const formData = await request.formData()
   if (formData.get("intent") !== "reveal") return { revealed: false as const }
 
-  try {
-    const consumed = await runEffect(
-      Effect.gen(function* () {
-        const revealRepo = yield* CertRevealRepo
-        const cert = yield* CertManager
-        const result = yield* resolve(revealToken)
-        if (result.state !== "ok") return false
-        // One-time password: stamp the audit timestamp and strip the password
-        // from Vault. The .p12 bundle is left in place so it stays downloadable.
-        yield* revealRepo.markRevealed(result.row.id)
-        yield* cert.consumeP12Password(result.row.renewalId)
-        return true
-      }),
-    )
-    return { revealed: consumed }
-  } catch (e) {
-    console.error("[cert-reveal] action error:", e)
-    return { revealed: false as const }
-  }
+  const consumed = await runEffect(
+    Effect.gen(function* () {
+      const revealRepo = yield* CertRevealRepo
+      const cert = yield* CertManager
+      const result = yield* resolve(revealToken)
+      if (result.state !== "ok") return false
+      // One-time password: stamp the audit timestamp and strip the password
+      // from Vault. The .p12 bundle is left in place so it stays downloadable.
+      yield* revealRepo.markRevealed(result.row.id)
+      yield* cert.consumeP12Password(result.row.renewalId)
+      return true
+    }).pipe(
+      Effect.catchAll((e) =>
+        Effect.logError("[cert-reveal] action error", { error: String(e) }).pipe(Effect.as(false)),
+      ),
+    ),
+  )
+  return { revealed: consumed }
 }
 
 function PasswordCard({ password }: { password: string }) {

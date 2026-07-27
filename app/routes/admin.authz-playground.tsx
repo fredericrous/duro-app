@@ -23,25 +23,25 @@ export async function loader({ request }: Route.LoaderArgs) {
       Effect.gen(function* () {
         const repo = yield* PrincipalRepo
         return yield* repo.list()
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
         const repo = yield* ApplicationRepo
         return yield* repo.list()
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
         const repo = yield* RbacRepo
         return yield* repo.listAllEntitlements()
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
         const repo = yield* RbacRepo
         return yield* repo.listAllResources()
-      }),
+      }).pipe(Effect.orDie),
     ),
   ])
 
@@ -93,7 +93,7 @@ export async function action({ request }: Route.ActionArgs) {
           action: actionName,
           resourceId,
         })
-      }),
+      }).pipe(Effect.orDie),
     )
 
     return { decision }

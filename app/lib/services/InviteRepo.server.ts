@@ -1,9 +1,10 @@
-import { Context, Effect, Data, Layer, Schema } from "effect"
+import { Context, Effect, Data, Layer, ParseResult, Schema } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import * as crypto from "node:crypto"
 import { hashToken } from "~/lib/crypto.server"
 import { MigrationsRan } from "~/lib/db/client.server"
+import { Coerced } from "~/lib/governance/types"
 
 const now = () => new Date().toISOString()
 const addDays = (days: number) => {
@@ -11,8 +12,61 @@ const addDays = (days: number) => {
   d.setDate(d.getDate() + days)
   return d.toISOString()
 }
-const TRUE = true
-const FALSE = false
+// ---------------------------------------------------------------------------
+// Invite lifecycle
+// ---------------------------------------------------------------------------
+
+// Storage detail: revocation is encoded in the used_by column with sentinel
+// values (pre-dates this ADT; changing it needs a data migration). They are
+// parsed into `status` at the repo boundary and MUST NOT leak past this file.
+const USED_BY_REVOKED = "__revoked__"
+const USED_BY_REVOKING = "__revoking__"
+
+/**
+ * Lifecycle discriminant derived from the row's tracking columns, so callers
+ * branch on one field instead of reconstructing states from flag conjunctions
+ * (and illegal combinations are confined to this single derivation).
+ *
+ * Precedence: Revoking/Revoked win over Failed (a failed invite that was
+ * cleaned up is revoked), Failed wins over the pending funnel. Expiry is
+ * deliberately NOT a status — it is a function of the current time; compare
+ * `expiresAt` at the point of use.
+ */
+export type InviteStatus =
+  | {
+      readonly _tag: "Pending"
+      readonly certIssued: boolean
+      readonly emailSent: boolean
+      readonly certVerified: boolean
+    }
+  | { readonly _tag: "Failed"; readonly failedAt: string; readonly lastError: string | null }
+  | { readonly _tag: "Accepted"; readonly usedAt: string; readonly usedBy: string | null }
+  | { readonly _tag: "Revoking"; readonly revertPrNumber: number | null }
+  | { readonly _tag: "Revoked" }
+
+interface InviteLifecycleFields {
+  usedAt: string | null
+  usedBy: string | null
+  failedAt: string | null
+  lastError: string | null
+  certIssued: boolean
+  emailSent: boolean
+  certVerified: boolean
+  revertPrNumber: number | null
+}
+
+/** Pure derivation of the lifecycle status; exported for test factories. */
+export const inviteStatus = (r: InviteLifecycleFields): InviteStatus => {
+  if (r.usedBy === USED_BY_REVOKING) return { _tag: "Revoking", revertPrNumber: r.revertPrNumber }
+  if (r.usedBy === USED_BY_REVOKED) return { _tag: "Revoked" }
+  if (r.failedAt !== null) return { _tag: "Failed", failedAt: r.failedAt, lastError: r.lastError }
+  if (r.usedAt !== null) return { _tag: "Accepted", usedAt: r.usedAt, usedBy: r.usedBy }
+  return { _tag: "Pending", certIssued: r.certIssued, emailSent: r.emailSent, certVerified: r.certVerified }
+}
+
+/** True once the invite token can no longer be redeemed (accepted, revoked, or mid-revocation). */
+export const isConsumed = (s: InviteStatus): boolean =>
+  s._tag === "Accepted" || s._tag === "Revoked" || s._tag === "Revoking"
 
 export interface Invite {
   id: string
@@ -58,10 +112,13 @@ export interface Invite {
   bouncedAt: string | null
   lastDeliveryEventAt: string | null
   deliveryDetail: string | null
+  /** Derived lifecycle discriminant — see InviteStatus. */
+  status: InviteStatus
 }
 
 /** SMTP delivery outcome derived from Stalwart's outbound delivery events. */
 export type DeliveryStatus = "delivered" | "deferred" | "bounced"
+export const DeliveryStatusSchema = Schema.Literal("delivered", "deferred", "bounced")
 
 export interface Revocation {
   id: string
@@ -132,23 +189,6 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
   }
 >() {}
 
-const Coerced = {
-  Boolean: Schema.transform(Schema.Unknown, Schema.Boolean, {
-    decode: (v) => !!v,
-    encode: (v) => v,
-  }),
-  NullableString: Schema.NullOr(Schema.String),
-  NullableNumber: Schema.NullOr(Schema.Number),
-  DateString: Schema.transform(Schema.Unknown, Schema.String, {
-    decode: (v) => (v instanceof Date ? v.toISOString() : String(v)),
-    encode: (v) => v,
-  }),
-  NullableDateString: Schema.transform(Schema.Unknown, Schema.NullOr(Schema.String), {
-    decode: (v) => (v == null ? null : v instanceof Date ? v.toISOString() : String(v)),
-    encode: (v) => v,
-  }),
-}
-
 const InviteRow = Schema.Struct({
   id: Schema.String,
   token: Schema.String,
@@ -188,18 +228,20 @@ const InviteRow = Schema.Struct({
   clickCount: Schema.optionalWith(Schema.Number, { default: () => 0 }),
   lastClickUserAgent: Coerced.NullableString,
   messageId: Coerced.NullableString,
-  deliveryStatus: Coerced.NullableString,
+  deliveryStatus: Schema.NullOr(DeliveryStatusSchema),
   deliveredAt: Coerced.NullableDateString,
   bouncedAt: Coerced.NullableDateString,
   lastDeliveryEventAt: Coerced.NullableDateString,
   deliveryDetail: Coerced.NullableString,
 })
 
-const decodeInviteRow = Schema.decodeUnknownSync(InviteRow)
+const decodeInviteRow = Schema.decodeUnknown(InviteRow)
 
-function rowToInvite(row: unknown): Invite {
-  return decodeInviteRow(row) as Invite
-}
+// Parse-don't-validate at the repo boundary: decode the row AND derive the
+// lifecycle status in one place. A decode failure is a typed ParseError that
+// withErr maps into InviteError — never a thrown defect.
+const rowToInvite = (row: unknown): Effect.Effect<Invite, ParseResult.ParseError> =>
+  decodeInviteRow(row).pipe(Effect.map((r) => ({ ...r, status: inviteStatus(r) })))
 
 const RevocationRow = Schema.Struct({
   id: Schema.String,
@@ -210,13 +252,11 @@ const RevocationRow = Schema.Struct({
   revokedBy: Schema.String,
 })
 
-const decodeRevocationRow = Schema.decodeUnknownSync(RevocationRow)
+const decodeRevocationRow = Schema.decodeUnknown(RevocationRow)
 
-function rowToRevocation(row: unknown): Revocation {
-  return decodeRevocationRow(row) as Revocation
-}
+const rowToRevocation = (row: unknown): Effect.Effect<Revocation, ParseResult.ParseError> => decodeRevocationRow(row)
 
-const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError | ParseResult.ParseError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new InviteError({ message, cause: e })))
 
 export const InviteRepoLive = Layer.effect(
@@ -262,7 +302,7 @@ export const InviteRepoLive = Layer.effect(
       findByTokenHash: (tokenHash) =>
         withErr(
           sql`SELECT * FROM invites WHERE token_hash = ${tokenHash}`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? rowToInvite(rows[0]) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? rowToInvite(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find invite",
         ),
@@ -307,7 +347,7 @@ export const InviteRepoLive = Layer.effect(
       findByMessageId: (messageId) =>
         withErr(
           sql`SELECT * FROM invites WHERE message_id = ${messageId} ORDER BY created_at DESC LIMIT 1`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? rowToInvite(rows[0]) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? rowToInvite(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find invite by message id",
         ),
@@ -315,7 +355,7 @@ export const InviteRepoLive = Layer.effect(
       findLatestByEmail: (email) =>
         withErr(
           sql`SELECT * FROM invites WHERE email = ${email} ORDER BY created_at DESC LIMIT 1`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? rowToInvite(rows[0]) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? rowToInvite(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find latest invite by email",
         ),
@@ -357,7 +397,7 @@ export const InviteRepoLive = Layer.effect(
             })
           }
 
-          return rowToInvite(rows[0])
+          return yield* withErr(rowToInvite(rows[0]), "Failed to decode consumed invite")
         }),
 
       markUsedBy: (id, username) =>
@@ -369,7 +409,7 @@ export const InviteRepoLive = Layer.effect(
       findPending: () =>
         withErr(
           sql`SELECT * FROM invites WHERE used_at IS NULL AND expires_at > ${now()} ORDER BY created_at DESC`.pipe(
-            Effect.map((rows) => rows.map(rowToInvite)),
+            Effect.flatMap((rows) => Effect.forEach(rows, rowToInvite)),
           ),
           "Failed to find pending invites",
         ),
@@ -384,33 +424,33 @@ export const InviteRepoLive = Layer.effect(
 
       markCertIssued: (id) =>
         withErr(
-          sql`UPDATE invites SET cert_issued = ${TRUE} WHERE id = ${id}`.pipe(Effect.asVoid),
+          sql`UPDATE invites SET cert_issued = ${true} WHERE id = ${id}`.pipe(Effect.asVoid),
           "Failed to mark cert issued",
         ),
 
       markPRCreated: (id, prNumber) =>
         withErr(
-          sql`UPDATE invites SET pr_created = ${TRUE}, pr_number = ${prNumber} WHERE id = ${id}`.pipe(Effect.asVoid),
+          sql`UPDATE invites SET pr_created = ${true}, pr_number = ${prNumber} WHERE id = ${id}`.pipe(Effect.asVoid),
           "Failed to mark PR created",
         ),
 
       markPRMerged: (id) =>
         withErr(
-          sql`UPDATE invites SET pr_merged = ${TRUE} WHERE id = ${id}`.pipe(Effect.asVoid),
+          sql`UPDATE invites SET pr_merged = ${true} WHERE id = ${id}`.pipe(Effect.asVoid),
           "Failed to mark PR merged",
         ),
 
       markEmailSent: (id) =>
         withErr(
-          sql`UPDATE invites SET email_sent = ${TRUE} WHERE id = ${id}`.pipe(Effect.asVoid),
+          sql`UPDATE invites SET email_sent = ${true} WHERE id = ${id}`.pipe(Effect.asVoid),
           "Failed to mark email sent",
         ),
 
       findAwaitingMerge: () =>
         withErr(
           sql`SELECT * FROM invites
-              WHERE pr_created = ${TRUE} AND email_sent = ${FALSE} AND pr_number IS NOT NULL AND used_at IS NULL AND failed_at IS NULL`.pipe(
-            Effect.map((rows) => rows.map(rowToInvite)),
+              WHERE pr_created = ${true} AND email_sent = ${false} AND pr_number IS NOT NULL AND used_at IS NULL AND failed_at IS NULL`.pipe(
+            Effect.flatMap((rows) => Effect.forEach(rows, rowToInvite)),
           ),
           "Failed to find invites awaiting merge",
         ),
@@ -418,7 +458,7 @@ export const InviteRepoLive = Layer.effect(
       revoke: (id) =>
         Effect.gen(function* () {
           const rows = yield* withErr(
-            sql`UPDATE invites SET used_at = ${now()}, used_by = '__revoked__'
+            sql`UPDATE invites SET used_at = ${now()}, used_by = ${USED_BY_REVOKED}
                 WHERE id = ${id} AND used_at IS NULL
                 RETURNING id`,
             "Failed to revoke invite",
@@ -436,7 +476,7 @@ export const InviteRepoLive = Layer.effect(
       findById: (id) =>
         withErr(
           sql`SELECT * FROM invites WHERE id = ${id}`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? rowToInvite(rows[0]) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? rowToInvite(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find invite",
         ),
@@ -466,7 +506,7 @@ export const InviteRepoLive = Layer.effect(
       findFailed: () =>
         withErr(
           sql`SELECT * FROM invites WHERE failed_at IS NOT NULL AND used_at IS NULL ORDER BY failed_at DESC`.pipe(
-            Effect.map((rows) => rows.map(rowToInvite)),
+            Effect.flatMap((rows) => Effect.forEach(rows, rowToInvite)),
           ),
           "Failed to find failed invites",
         ),
@@ -479,7 +519,7 @@ export const InviteRepoLive = Layer.effect(
 
       markCertVerified: (id) =>
         withErr(
-          sql`UPDATE invites SET cert_verified = ${TRUE}, cert_verified_at = ${now()} WHERE id = ${id}`.pipe(
+          sql`UPDATE invites SET cert_verified = ${true}, cert_verified_at = ${now()} WHERE id = ${id}`.pipe(
             Effect.asVoid,
           ),
           "Failed to mark cert verified",
@@ -487,15 +527,17 @@ export const InviteRepoLive = Layer.effect(
 
       findAwaitingCertVerification: () =>
         withErr(
-          sql`SELECT * FROM invites WHERE email_sent = ${TRUE} AND cert_verified = ${FALSE} AND cert_username IS NOT NULL AND used_at IS NULL AND failed_at IS NULL`.pipe(
-            Effect.map((rows) => rows.map(rowToInvite)),
+          sql`SELECT * FROM invites WHERE email_sent = ${true} AND cert_verified = ${false} AND cert_username IS NOT NULL AND used_at IS NULL AND failed_at IS NULL`.pipe(
+            Effect.flatMap((rows) => Effect.forEach(rows, rowToInvite)),
           ),
           "Failed to find invites awaiting cert verification",
         ),
 
       markRevoking: (id) =>
         withErr(
-          sql`UPDATE invites SET used_at = ${now()}, used_by = '__revoking__' WHERE id = ${id}`.pipe(Effect.asVoid),
+          sql`UPDATE invites SET used_at = ${now()}, used_by = ${USED_BY_REVOKING} WHERE id = ${id}`.pipe(
+            Effect.asVoid,
+          ),
           "Failed to mark invite as revoking",
         ),
 
@@ -507,7 +549,7 @@ export const InviteRepoLive = Layer.effect(
 
       markRevertPRMerged: (id) =>
         withErr(
-          sql`UPDATE invites SET revert_pr_merged = ${TRUE}, used_by = '__revoked__' WHERE id = ${id}`.pipe(
+          sql`UPDATE invites SET revert_pr_merged = ${true}, used_by = ${USED_BY_REVOKED} WHERE id = ${id}`.pipe(
             Effect.asVoid,
           ),
           "Failed to mark revert PR merged",
@@ -515,8 +557,8 @@ export const InviteRepoLive = Layer.effect(
 
       findAwaitingRevertMerge: () =>
         withErr(
-          sql`SELECT * FROM invites WHERE used_by = '__revoking__' AND revert_pr_number IS NOT NULL AND revert_pr_merged = ${FALSE}`.pipe(
-            Effect.map((rows) => rows.map(rowToInvite)),
+          sql`SELECT * FROM invites WHERE used_by = ${USED_BY_REVOKING} AND revert_pr_number IS NOT NULL AND revert_pr_merged = ${false}`.pipe(
+            Effect.flatMap((rows) => Effect.forEach(rows, rowToInvite)),
           ),
           "Failed to find invites awaiting revert merge",
         ),
@@ -533,7 +575,7 @@ export const InviteRepoLive = Layer.effect(
       findRevocations: () =>
         withErr(
           sql`SELECT * FROM user_revocations ORDER BY revoked_at DESC`.pipe(
-            Effect.map((rows) => rows.map(rowToRevocation)),
+            Effect.flatMap((rows) => Effect.forEach(rows, rowToRevocation)),
           ),
           "Failed to find revocations",
         ),
@@ -544,7 +586,7 @@ export const InviteRepoLive = Layer.effect(
       findRevocationByEmail: (email) =>
         withErr(
           sql`SELECT * FROM user_revocations WHERE email = ${email}`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? rowToRevocation(rows[0]) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? rowToRevocation(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find revocation by email",
         ),

@@ -17,7 +17,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     Effect.gen(function* () {
       const repo = yield* RecoveryRepo
       return yield* repo.listByStatus("pending")
-    }),
+    }).pipe(Effect.orDie),
   )
   return { pending }
 }
@@ -33,21 +33,31 @@ export async function action({ request }: Route.ActionArgs) {
   const requestId = fd.get("requestId") as string | null
   if (!requestId) return { error: "Missing request id" }
 
-  try {
-    if (intent === "approve") {
-      const revokeOthers = fd.get("revokeOthers") === "on"
-      const r = await runEffect(approveRecovery(requestId, auth.user ?? auth.sub ?? "admin", revokeOthers))
-      return { approved: true as const, email: r.email, revokedCount: r.revokedCount }
-    }
-    if (intent === "deny") {
-      await runEffect(denyRecovery(requestId, auth.user ?? auth.sub ?? "admin"))
-      return { denied: true as const }
-    }
-    return { error: "Unknown action" }
-  } catch (e: any) {
-    const cause = e?.cause ?? e
-    return { error: typeof cause?.message === "string" ? cause.message : "Action failed" }
+  // Typed errors map to the toast INSIDE the Effect — no FiberFailure
+  // cause-sniffing on the rejection (the pattern that silently broke twice).
+  const toToastError = (e: unknown) =>
+    Effect.succeed({
+      error: e instanceof Error && typeof e.message === "string" && e.message !== "" ? e.message : "Action failed",
+    })
+
+  if (intent === "approve") {
+    const revokeOthers = fd.get("revokeOthers") === "on"
+    return await runEffect(
+      approveRecovery(requestId, auth.user ?? auth.sub ?? "admin", revokeOthers).pipe(
+        Effect.map((r) => ({ approved: true as const, email: r.email, revokedCount: r.revokedCount })),
+        Effect.catchAll(toToastError),
+      ),
+    )
   }
+  if (intent === "deny") {
+    return await runEffect(
+      denyRecovery(requestId, auth.user ?? auth.sub ?? "admin").pipe(
+        Effect.as({ denied: true as const }),
+        Effect.catchAll(toToastError),
+      ),
+    )
+  }
+  return { error: "Unknown action" }
 }
 
 function RequestRow({ req }: { req: RecoveryRequest }) {

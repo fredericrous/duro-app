@@ -1,4 +1,8 @@
-import { Schema } from "effect"
+import { Effect, ParseResult, Schema } from "effect"
+
+// Enum literals below mirror the CHECK constraints in the migrations
+// (0007/0009/0010/0012) — decode failures mean real schema drift, and they
+// surface as typed repo errors (each repo's withErr), never as defects.
 
 // ---------------------------------------------------------------------------
 // Shared coercions (PGlite returns booleans as 0/1 and dates as Date objects)
@@ -46,7 +50,8 @@ export type ApprovalScopeType = typeof ApprovalScopeType.Type
 export const InvitationStatus = Schema.Literal("pending", "accepted", "declined", "expired")
 export type InvitationStatus = typeof InvitationStatus.Type
 
-export const ConnectorType = Schema.Literal("http", "ldap", "scim", "webhook")
+// NB: 'plugin' was added to the connector_type CHECK by migration 0012.
+export const ConnectorType = Schema.Literal("http", "ldap", "scim", "webhook", "plugin")
 export type ConnectorType = typeof ConnectorType.Type
 
 export const ConnectorStatus = Schema.Literal("active", "disabled", "error")
@@ -67,7 +72,7 @@ export type JobStatus = typeof JobStatus.Type
 
 export const PrincipalRow = Schema.Struct({
   id: Schema.String,
-  principalType: Schema.String,
+  principalType: PrincipalType,
   externalId: Coerced.NullableString,
   displayName: Schema.String,
   email: Coerced.NullableString,
@@ -82,7 +87,7 @@ export const ApplicationRow = Schema.Struct({
   slug: Schema.String,
   displayName: Schema.String,
   description: Coerced.NullableString,
-  accessMode: Schema.String,
+  accessMode: AccessMode,
   ownerId: Coerced.NullableString,
   enabled: Coerced.Boolean,
   url: Coerced.NullableString,
@@ -150,7 +155,7 @@ export const AccessRequestRow = Schema.Struct({
   resourceId: Coerced.NullableString,
   justification: Coerced.NullableString,
   requestedDurationHours: Coerced.NullableNumber,
-  status: Schema.String,
+  status: RequestStatus,
   resolvedAt: Coerced.NullableDateString,
   grantId: Coerced.NullableString,
   createdAt: Coerced.DateString,
@@ -162,7 +167,7 @@ export const RequestApprovalRow = Schema.Struct({
   id: Schema.String,
   requestId: Schema.String,
   approverId: Schema.String,
-  decision: Coerced.NullableString,
+  decision: Schema.NullOr(ApprovalDecision),
   comment: Coerced.NullableString,
   decidedAt: Coerced.NullableDateString,
 })
@@ -171,9 +176,9 @@ export type RequestApproval = typeof RequestApprovalRow.Type
 export const ApprovalPolicyRow = Schema.Struct({
   id: Schema.String,
   applicationId: Schema.String,
-  scopeType: Schema.String,
+  scopeType: ApprovalScopeType,
   scopeId: Coerced.NullableString,
-  mode: Schema.String,
+  mode: ApprovalMode,
   rules: Schema.Unknown, // JSONB
   createdAt: Coerced.DateString,
   updatedAt: Coerced.DateString,
@@ -189,7 +194,7 @@ export const AccessInvitationRow = Schema.Struct({
   invitedPrincipalId: Schema.String,
   invitedBy: Schema.String,
   message: Coerced.NullableString,
-  status: Schema.String,
+  status: InvitationStatus,
   grantId: Coerced.NullableString,
   createdAt: Coerced.DateString,
   expiresAt: Coerced.NullableDateString,
@@ -236,9 +241,9 @@ export type GroupMapping = typeof GroupMappingRow.Type
 export const ConnectedSystemRow = Schema.Struct({
   id: Schema.String,
   applicationId: Schema.String,
-  connectorType: Schema.String,
+  connectorType: ConnectorType,
   config: Schema.Unknown, // JSONB
-  status: Schema.String,
+  status: ConnectorStatus,
   pluginSlug: Coerced.NullableString,
   pluginVersion: Coerced.NullableString,
   lastSyncAt: Coerced.NullableDateString,
@@ -254,7 +259,7 @@ export const ConnectorMappingRow = Schema.Struct({
   localRoleId: Coerced.NullableString,
   localEntitlementId: Coerced.NullableString,
   externalRoleIdentifier: Schema.String,
-  direction: Schema.String,
+  direction: ConnectorDirection,
   createdAt: Coerced.DateString,
 })
 export type ConnectorMapping = typeof ConnectorMappingRow.Type
@@ -263,8 +268,8 @@ export const ProvisioningJobRow = Schema.Struct({
   id: Schema.String,
   connectedSystemId: Schema.String,
   grantId: Schema.String,
-  operation: Schema.String,
-  status: Schema.String,
+  operation: JobOperation,
+  status: JobStatus,
   attempts: Schema.optionalWith(Schema.Number, { default: () => 0 }),
   lastError: Coerced.NullableString,
   startedAt: Coerced.NullableDateString,
@@ -274,37 +279,49 @@ export const ProvisioningJobRow = Schema.Struct({
 export type ProvisioningJob = typeof ProvisioningJobRow.Type
 
 // ---------------------------------------------------------------------------
-// Row decoders
+// Row decoders — effectful: a decode failure is a typed ParseError the caller
+// maps into its repo error (see each repo's withErr), NOT a thrown defect.
+// The previous decodeUnknownSync versions threw inside Effect.map, so a row
+// drifting from the schema bypassed every catchAll downstream.
 // ---------------------------------------------------------------------------
 
-export const decodePrincipal = Schema.decodeUnknownSync(PrincipalRow)
-export const decodeApplication = Schema.decodeUnknownSync(ApplicationRow)
-export const decodeResource = Schema.decodeUnknownSync(ResourceRow)
-export const decodeRole = Schema.decodeUnknownSync(RoleRow)
-export const decodeEntitlement = Schema.decodeUnknownSync(EntitlementRow)
-export const decodeGrant = Schema.decodeUnknownSync(GrantRow)
-export const decodeAccessRequest = Schema.decodeUnknownSync(AccessRequestRow)
-export const decodeRequestApproval = Schema.decodeUnknownSync(RequestApprovalRow)
-export const decodeApprovalPolicy = Schema.decodeUnknownSync(ApprovalPolicyRow)
-export const decodeAccessInvitation = Schema.decodeUnknownSync(AccessInvitationRow)
-export const decodeAuditEvent = Schema.decodeUnknownSync(AuditEventRow)
-export const decodeApiKey = Schema.decodeUnknownSync(ApiKeyRow)
-export const decodeGroupMapping = Schema.decodeUnknownSync(GroupMappingRow)
-export const decodeConnectedSystem = Schema.decodeUnknownSync(ConnectedSystemRow)
-export const decodeConnectorMapping = Schema.decodeUnknownSync(ConnectorMappingRow)
-export const decodeProvisioningJob = Schema.decodeUnknownSync(ProvisioningJobRow)
+/** Unary effectful decoder (safe to pass point-free to Effect.forEach). */
+const rowDecoder = <A, I>(
+  schema: Schema.Schema<A, I>,
+): ((row: unknown) => Effect.Effect<A, ParseResult.ParseError>) => {
+  const decode = Schema.decodeUnknown(schema)
+  return (row) => decode(row)
+}
+
+export const decodePrincipal = rowDecoder(PrincipalRow)
+export const decodeApplication = rowDecoder(ApplicationRow)
+export const decodeResource = rowDecoder(ResourceRow)
+export const decodeRole = rowDecoder(RoleRow)
+export const decodeEntitlement = rowDecoder(EntitlementRow)
+export const decodeGrant = rowDecoder(GrantRow)
+export const decodeAccessRequest = rowDecoder(AccessRequestRow)
+export const decodeRequestApproval = rowDecoder(RequestApprovalRow)
+export const decodeApprovalPolicy = rowDecoder(ApprovalPolicyRow)
+export const decodeAccessInvitation = rowDecoder(AccessInvitationRow)
+export const decodeAuditEvent = rowDecoder(AuditEventRow)
+export const decodeApiKey = rowDecoder(ApiKeyRow)
+export const decodeGroupMapping = rowDecoder(GroupMappingRow)
+export const decodeConnectedSystem = rowDecoder(ConnectedSystemRow)
+export const decodeConnectorMapping = rowDecoder(ConnectorMappingRow)
+export const decodeProvisioningJob = rowDecoder(ProvisioningJobRow)
 
 // ---------------------------------------------------------------------------
 // AuthzEngine types
 // ---------------------------------------------------------------------------
 
-export interface AccessCheck {
-  readonly subject: string
-  readonly application: string
-  readonly action: string
-  readonly resourceId?: string
-  readonly context?: Record<string, string>
-}
+export const AccessCheckSchema = Schema.Struct({
+  subject: Schema.NonEmptyString,
+  application: Schema.NonEmptyString,
+  action: Schema.NonEmptyString,
+  resourceId: Schema.optional(Schema.String),
+  context: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
+})
+export type AccessCheck = typeof AccessCheckSchema.Type
 
 export interface AccessDecision {
   readonly allow: boolean

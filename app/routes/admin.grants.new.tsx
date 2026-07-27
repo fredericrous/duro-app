@@ -5,6 +5,7 @@ import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import type { Route } from "./+types/admin.grants.new"
 import { runEffect } from "~/lib/runtime.server"
+import { requirePrincipal } from "~/lib/governance/current-principal.server"
 import { isOriginAllowed } from "~/lib/config.server"
 import { getAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"
@@ -48,7 +49,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       }
 
       return { applications, principals, rolesByApp, ldapAppIds }
-    }),
+    }).pipe(Effect.orDie),
   )
 
   return data
@@ -86,43 +87,41 @@ export async function action({ request }: Route.ActionArgs) {
     return { error: "Application, principal, and role are required" }
   }
 
-  try {
-    await runEffect(
-      Effect.gen(function* () {
-        const principalRepo = yield* PrincipalRepo
-        const actor = yield* principalRepo.findByExternalId(auth.sub!)
-        if (!actor) return yield* Effect.fail(new Error("Principal not found for current session"))
+  const failure = await runEffect(
+    Effect.gen(function* () {
+      const actor = yield* requirePrincipal(auth.sub!).pipe(
+        Effect.mapError(() => new Error("Principal not found for current session")),
+      )
 
-        const sql = yield* SqlClient.SqlClient
-        const grantRepo = yield* GrantRepo
-        const audit = yield* AuditService
-        const grantId = yield* sql.withTransaction(
-          Effect.gen(function* () {
-            const grant = yield* grantRepo.grantRole({
-              principalId,
-              roleId,
-              grantedBy: actor.id,
-              reason,
-              expiresAt,
-            })
-            yield* audit.emit({
-              eventType: "grant.created",
-              actorId: actor.id,
-              targetType: "grant",
-              targetId: grant.id,
-              applicationId,
-              metadata: { roleId, principalId, reason, expiresAt },
-            })
-            return grant.id
-          }),
-        )
-        yield* activateGrant(grantId)
-      }),
-    )
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "Failed to create grant"
-    return { error: message }
-  }
+      const sql = yield* SqlClient.SqlClient
+      const grantRepo = yield* GrantRepo
+      const audit = yield* AuditService
+      const grantId = yield* sql.withTransaction(
+        Effect.gen(function* () {
+          const grant = yield* grantRepo.grantRole({
+            principalId,
+            roleId,
+            grantedBy: actor.id,
+            reason,
+            expiresAt,
+          })
+          yield* audit.emit({
+            eventType: "grant.created",
+            actorId: actor.id,
+            targetType: "grant",
+            targetId: grant.id,
+            applicationId,
+            metadata: { roleId, principalId, reason, expiresAt },
+          })
+          return grant.id
+        }),
+      )
+      yield* activateGrant(grantId)
+    }).pipe(
+      Effect.catchAll((e) => Effect.succeed({ error: e instanceof Error ? e.message : "Failed to create grant" })),
+    ),
+  )
+  if (failure) return failure
 
   return redirect("/admin/grants")
 }

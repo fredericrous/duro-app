@@ -1,4 +1,4 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, ParseResult } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { MigrationsRan } from "~/lib/db/client.server"
@@ -9,7 +9,7 @@ export class ConnectedSystemRepoError extends Data.TaggedError("ConnectedSystemR
   readonly cause?: unknown
 }> {}
 
-const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError | ParseResult.ParseError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new ConnectedSystemRepoError({ message, cause: e })))
 
 export class ConnectedSystemRepo extends Context.Tag("ConnectedSystemRepo")<
@@ -59,13 +59,13 @@ export const ConnectedSystemRepoLive = Layer.effect(
                 RETURNING *`,
             "Failed to create connected system",
           )
-          return decodeConnectedSystem(rows[0]) as ConnectedSystem
+          return yield* withErr(decodeConnectedSystem(rows[0]), "Failed to create connected system")
         }),
 
       findById: (id) =>
         withErr(
           sql`SELECT * FROM connected_systems WHERE id = ${id}`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? (decodeConnectedSystem(rows[0]) as ConnectedSystem) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? decodeConnectedSystem(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find connected system by id",
         ),
@@ -76,7 +76,7 @@ export const ConnectedSystemRepoLive = Layer.effect(
               WHERE application_id = ${applicationId}
                 AND connector_type = ${connectorType}
               LIMIT 1`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? (decodeConnectedSystem(rows[0]) as ConnectedSystem) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? decodeConnectedSystem(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find connected system by application and type",
         ),
@@ -87,7 +87,7 @@ export const ConnectedSystemRepoLive = Layer.effect(
               WHERE application_id = ${applicationId}
                 AND plugin_slug = ${pluginSlug}
               LIMIT 1`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? (decodeConnectedSystem(rows[0]) as ConnectedSystem) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? decodeConnectedSystem(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find connected system by application and plugin",
         ),
@@ -106,7 +106,7 @@ export const ConnectedSystemRepoLive = Layer.effect(
       listByApplication: (applicationId) =>
         withErr(
           sql`SELECT * FROM connected_systems WHERE application_id = ${applicationId}`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeConnectedSystem(r) as ConnectedSystem)),
+            Effect.flatMap((rows) => Effect.forEach(rows, decodeConnectedSystem)),
           ),
           "Failed to list connected systems for application",
         ),

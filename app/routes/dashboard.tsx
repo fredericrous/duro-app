@@ -26,17 +26,19 @@ export async function loader({ request }: Route.LoaderArgs) {
   // GET /api/catalog endpoint so it doesn't fire on every navigation.
   let currentPrincipalId: string | null = null
   if (auth.sub) {
-    try {
-      currentPrincipalId = await runEffect(
-        Effect.gen(function* () {
-          const repo = yield* PrincipalRepo
-          const principal = yield* repo.findByExternalId(auth.sub!)
-          return principal?.id ?? null
-        }),
-      )
-    } catch (err) {
-      await runEffect(Effect.logWarning("dashboard principal load failed", { error: String(err) }))
-    }
+    currentPrincipalId = await runEffect(
+      Effect.gen(function* () {
+        const repo = yield* PrincipalRepo
+        const principal = yield* repo.findByExternalId(auth.sub!)
+        return principal?.id ?? null
+      }).pipe(
+        Effect.catchAll((e) =>
+          Effect.logWarning("dashboard principal load failed", { error: String(e) }).pipe(
+            Effect.as<string | null>(null),
+          ),
+        ),
+      ),
+    )
   }
 
   // Count the items awaiting the user on their "My requests" page — their own
@@ -57,8 +59,8 @@ export async function loader({ request }: Route.LoaderArgs) {
         ])
         const n = (r: readonly unknown[]) => ((r[0] as { n?: number } | undefined)?.n ?? 0) as number
         return n(reqs) + n(invs)
-      }),
-    ).catch(() => 0)
+      }).pipe(Effect.catchAll(() => Effect.succeed(0))),
+    )
   }
 
   // Display prefs (timezone + clock) so every descendant can render timestamps
