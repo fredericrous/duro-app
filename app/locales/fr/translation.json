@@ -319,7 +319,8 @@
       "label": "Thème",
       "hint": "Choisissez l’apparence de Duro. S’applique à toutes les pages.",
       "dark": "Sombre",
-      "light": "Clair"
+      "light": "Clair",
+      "system": "Système (suivre l’appareil)"
     }
   },
   "recover": {

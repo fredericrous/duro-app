@@ -319,7 +319,8 @@
       "label": "Theme",
       "hint": "Choose how Duro looks. Applies to every page.",
       "dark": "Dark",
-      "light": "Light"
+      "light": "Light",
+      "system": "System (match device)"
     }
   },
   "recover": {

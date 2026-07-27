@@ -9,37 +9,56 @@ vi.mock("~/lib/i18n.server", () => ({
   }),
 }))
 
+const getSessionMock = vi.fn(async (_req: Request) => null as { name: string } | null)
+vi.mock("~/lib/session.server", () => ({
+  getSession: (req: Request) => getSessionMock(req),
+}))
+
+const runEffectMock = vi.fn(async () => null as string | null)
+vi.mock("~/lib/runtime.server", () => ({
+  runEffect: () => runEffectMock(),
+}))
+
 import { loader, ErrorBoundary } from "./root"
+
+const fakeArgs = (request: Request) => ({ request, params: {}, context: {} }) as unknown as Parameters<typeof loader>[0]
 
 describe("root loader", () => {
   it("resolves the locale from the incoming request", async () => {
-    const fakeArgs = {
-      request: new Request("http://localhost/?locale=fr"),
-      params: {},
-      context: {},
-    } as unknown as Parameters<typeof loader>[0]
-    const data = await loader(fakeArgs)
-    expect(data).toEqual({ locale: "fr", theme: "dark" })
+    const data = await loader(fakeArgs(new Request("http://localhost/?locale=fr")))
+    expect(data).toEqual({ locale: "fr", theme: "dark", themePreference: "dark" })
   })
 
   it("falls back to 'en' when no locale param is supplied", async () => {
-    const fakeArgs = {
-      request: new Request("http://localhost/"),
-      params: {},
-      context: {},
-    } as unknown as Parameters<typeof loader>[0]
-    const data = await loader(fakeArgs)
-    expect(data).toEqual({ locale: "en", theme: "dark" })
+    const data = await loader(fakeArgs(new Request("http://localhost/")))
+    expect(data).toEqual({ locale: "en", theme: "dark", themePreference: "dark" })
   })
 
   it("resolves the theme from the cookie", async () => {
-    const fakeArgs = {
-      request: new Request("http://localhost/", { headers: { Cookie: "__duro_theme=light" } }),
-      params: {},
-      context: {},
-    } as unknown as Parameters<typeof loader>[0]
-    const data = await loader(fakeArgs)
-    expect(data.theme).toBe("light")
+    const data = await loader(fakeArgs(new Request("http://localhost/", { headers: { Cookie: "__duro_theme=light" } })))
+    expect(data).toMatchObject({ theme: "light", themePreference: "light" })
+  })
+
+  it("resolves 'system' against the device scheme cookie", async () => {
+    const data = await loader(
+      fakeArgs(new Request("http://localhost/", { headers: { Cookie: "__duro_theme=system; __duro_scheme=light" } })),
+    )
+    expect(data).toMatchObject({ theme: "light", themePreference: "system" })
+  })
+
+  it("reads the stored preference for a signed-in user without a theme cookie", async () => {
+    getSessionMock.mockResolvedValueOnce({ name: "daddy" })
+    runEffectMock.mockResolvedValueOnce("light")
+    const result = await loader(fakeArgs(new Request("http://localhost/", { headers: { Cookie: "__duro_session=x" } })))
+    // Read-through returns a data() response carrying the theme cookie.
+    const response = result as unknown as { data: { theme: string; themePreference: string }; init?: ResponseInit }
+    expect(response.data ?? result).toMatchObject({ theme: "light", themePreference: "light" })
+  })
+
+  it("never throws for anonymous requests (public routes)", async () => {
+    getSessionMock.mockResolvedValueOnce(null)
+    const data = await loader(fakeArgs(new Request("http://localhost/recover")))
+    expect(data).toMatchObject({ theme: "dark" })
   })
 })
 

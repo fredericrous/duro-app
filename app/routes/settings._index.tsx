@@ -7,7 +7,7 @@ import { requireAuth } from "~/lib/auth.server"
 import { runEffect } from "~/lib/runtime.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { resolveLocale } from "~/lib/i18n.server"
-import { resolveTheme } from "~/lib/theme.server"
+import { resolveThemePreference } from "~/lib/theme.server"
 import { parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
 import { Alert, Button, Field, Select, Stack, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
@@ -33,7 +33,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       return { locale, timezone: display.timezone, timeFormat: display.timeFormat }
     }),
   )
-  return { locale, timezone, timeFormat, currentLocale: resolveLocale(request), theme: resolveTheme(request) }
+  return { locale, timezone, timeFormat, currentLocale: resolveLocale(request), theme: resolveThemePreference(request) }
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -88,12 +88,23 @@ export default function GeneralSettings({ loaderData }: Route.ComponentProps) {
           <Stack gap="lg">
             <Field.Root>
               <Field.Label>{t("settings.theme.label")}</Field.Label>
-              <Select.Root name="theme" defaultValue={loaderData.theme}>
+              <Select.Root
+                name="theme"
+                defaultValue={loaderData.theme}
+                initialLabels={{
+                  dark: t("settings.theme.dark"),
+                  light: t("settings.theme.light"),
+                  system: t("settings.theme.system"),
+                }}
+              >
                 <Select.Trigger>
                   <Select.Value placeholder={t("settings.theme.label")} />
                   <Select.Icon />
                 </Select.Trigger>
                 <Select.Popup>
+                  <Select.Item value="system">
+                    <Select.ItemText>{t("settings.theme.system")}</Select.ItemText>
+                  </Select.Item>
                   <Select.Item value="dark">
                     <Select.ItemText>{t("settings.theme.dark")}</Select.ItemText>
                   </Select.Item>

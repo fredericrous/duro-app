@@ -93,6 +93,13 @@ describe("parseSettingsMutation", () => {
     expect(parseSettingsMutation(fd, auth)).toEqual({ intent: "saveTheme", theme: "light", auth })
   })
 
+  it("parses saveTheme with the system preference", () => {
+    const fd = new FormData()
+    fd.append("intent", "saveTheme")
+    fd.append("theme", "system")
+    expect(parseSettingsMutation(fd, auth)).toEqual({ intent: "saveTheme", theme: "system", auth })
+  })
+
   it("rejects saveTheme with an unknown theme", () => {
     const fd = new FormData()
     fd.append("intent", "saveTheme")
