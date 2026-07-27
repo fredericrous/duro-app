@@ -27,7 +27,7 @@ describe("Header", () => {
     })
   })
 
-  it("surfaces the primary verbs as persistent links to the catalog and requests", async () => {
+  it("surfaces the access verbs as persistent links to the catalog and requests", async () => {
     renderHeader({ user: "alice", isAdmin: false })
     await waitFor(() => {
       expect(screen.getByRole("link", { name: t("header.requestAccess") })).toBeInTheDocument()

@@ -435,6 +435,12 @@ describe("HomePage component — populated grid", () => {
     await waitFor(() => {
       expect(screen.getByText(/No matching apps/i)).toBeInTheDocument()
     })
+    // No-results promotes its own "Request access" CTA (the app may just not
+    // be granted) — one in the header + one in the EmptyState, both → catalog.
+    const requestLinks = screen.getAllByRole("link", { name: /Request access/i })
+    expect(requestLinks).toHaveLength(2)
+    for (const link of requestLinks) expect(link).toHaveAttribute("href", "/catalog")
+    expect(screen.getByRole("button", { name: /Clear filters/i })).toBeInTheDocument()
   })
 
   it("hydrates the search input + selected chips from URL params", async () => {

@@ -8,7 +8,7 @@ import { AppGrid } from "~/components/AppGrid/AppGrid"
 import { NoAccess } from "~/components/NoAccess/NoAccess"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { AppSearchBar, AppSearchBarSkeleton } from "~/components/AppSearchBar/AppSearchBar"
-import { EmptyState, PageShell, Stack, Button } from "@duro-app/ui"
+import { EmptyState, Inline, LinkButton, PageShell, Stack, Button } from "@duro-app/ui"
 import { useFetcher, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
 import { runEffect } from "~/lib/runtime.server"
@@ -285,9 +285,17 @@ function HomeBody({
         <EmptyState
           message={t("search.noResults")}
           action={
-            <Button variant="secondary" onClick={clearAll}>
-              {t("search.clearFilters")}
-            </Button>
+            // The one place the dashboard promotes "Request access" to primary:
+            // when nothing matches, the app the user is looking for may simply
+            // not be granted yet, so requesting it is the genuine next step.
+            <Inline gap="sm">
+              <LinkButton href="/catalog" variant="primary">
+                {t("header.requestAccess")}
+              </LinkButton>
+              <Button variant="secondary" onClick={clearAll}>
+                {t("search.clearFilters")}
+              </Button>
+            </Inline>
           }
         />
       ) : (

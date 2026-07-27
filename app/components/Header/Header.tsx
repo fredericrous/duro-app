@@ -26,9 +26,9 @@ const styles = css.create({
     textDecoration: "none",
     color: colors.text,
   },
-  // The primary verbs (Request access, My requests) live here as visible
-  // controls rather than buried in the account dropdown — hidden actions get
-  // forgotten. The cluster wraps on narrow viewports so nothing overflows.
+  // Request access / My requests live here as visible controls rather than
+  // buried in the account dropdown — hidden actions get forgotten. The cluster
+  // wraps on narrow viewports so nothing overflows.
   actions: {
     display: "flex",
     alignItems: "center",
@@ -57,8 +57,10 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
   const dashboard = useRouteLoaderData("routes/dashboard") as { openRequestItems?: number } | undefined
   const openItems = dashboard?.openRequestItems ?? 0
 
-  // "Request access" is the primary verb, so it's a persistent primary control
-  // that takes the user to the catalog — where they browse and request. The
+  // Both header actions are secondary: on a populated dashboard the primary
+  // action is launching an app, so no header control competes with the grid
+  // for attention. Empty states (NoAccess, search no-results) promote their
+  // own primary "request access" CTA where it genuinely is the next step. The
   // account menu keeps only identity actions, where people expect to find them.
 
   return (
@@ -68,7 +70,7 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
       </Link>
       {showMenu && (
         <html.div style={styles.actions}>
-          <LinkButton href="/catalog" variant="primary">
+          <LinkButton href="/catalog" variant="secondary">
             {t("header.requestAccess")}
           </LinkButton>
           <LinkButton href="/requests" variant="secondary">
