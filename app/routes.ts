@@ -5,6 +5,7 @@ export default [
     index("routes/home.tsx"),
     route("settings", "routes/settings.tsx", [
       index("routes/settings._index.tsx"),
+      route("activity", "routes/settings.activity.tsx"),
       route("certificate", "routes/settings.certificate.tsx"),
       route("api-keys", "routes/settings.api-keys.tsx"),
       route("security", "routes/settings.security.tsx"),

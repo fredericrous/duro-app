@@ -52,6 +52,7 @@ describe("SettingsLayout component", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: t("settings.nav.general", "General") })).toBeInTheDocument()
     })
+    expect(screen.getByRole("button", { name: t("settings.nav.activity", "Activity") })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: t("settings.nav.certificate", "Certificate") })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: t("settings.nav.apiKeys", "API keys") })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: t("settings.nav.security", "Security") })).toBeInTheDocument()
