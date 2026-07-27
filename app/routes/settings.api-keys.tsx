@@ -23,7 +23,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       return principal
         ? yield* apiKeyRepo.listForPrincipal(principal.id).pipe(Effect.catchAll(() => Effect.succeed([])))
         : []
-    }),
+    }).pipe(Effect.orDie),
   )
   return { apiKeys }
 }

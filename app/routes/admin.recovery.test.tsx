@@ -35,6 +35,9 @@ const adminAuth = { sub: "admin", user: "admin", email: "admin@test", groups: ["
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Default: passthrough — run the real composed effect so in-Effect
+  // catchAll/map logic is exercised; loader tests override per-call.
+  mockRunEffect.mockImplementation((eff) => Effect.runPromise(eff as never) as never)
   vi.mocked(requireAdmin).mockResolvedValue(adminAuth)
   vi.mocked(requireAdminAction).mockResolvedValue(adminAuth)
   mockApprove.mockImplementation(() => Effect.succeed({ email: "bob@example.com", revokedCount: 2 }) as never)
@@ -68,7 +71,6 @@ describe("admin.recovery action", () => {
   })
 
   it("approves a request, revoking other devices when checked", async () => {
-    mockRunEffect.mockResolvedValue({ email: "bob@example.com", revokedCount: 2 } as never)
     const data = expectData<{ approved?: boolean; email?: string; revokedCount?: number }>(
       await callAction(action, { formData: { intent: "approve", requestId: "r1", revokeOthers: "on" } }),
     )
@@ -79,7 +81,6 @@ describe("admin.recovery action", () => {
   })
 
   it("denies a request", async () => {
-    mockRunEffect.mockResolvedValue(undefined as never)
     const data = expectData<{ denied?: boolean }>(
       await callAction(action, { formData: { intent: "deny", requestId: "r1" } }),
     )
@@ -95,7 +96,7 @@ describe("admin.recovery action", () => {
   })
 
   it("surfaces a workflow failure message", async () => {
-    mockRunEffect.mockRejectedValue({ cause: { message: "issue failed" } } as never)
+    mockApprove.mockImplementation(() => Effect.fail(new Error("issue failed")) as never)
     const data = expectData<{ error?: string }>(
       await callAction(action, { formData: { intent: "approve", requestId: "r1" } }),
     )

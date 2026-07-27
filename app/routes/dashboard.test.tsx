@@ -79,8 +79,9 @@ describe("/dashboard loader", () => {
   it("currentPrincipalId is null when the governance lookup throws", async () => {
     mockRunEffect
       .mockResolvedValueOnce(false as never) // isFirstRun
-      .mockRejectedValueOnce(new Error("db down")) // principal lookup
-      .mockResolvedValueOnce(undefined as never) // logWarning
+      // Principal lookup failure is caught inside the effect (catchAll →
+      // logWarning → null), so runEffect resolves null instead of rejecting.
+      .mockResolvedValueOnce(null as never) // principal lookup
       .mockResolvedValueOnce({ timezone: null, timeFormat: null } as never) // display prefs
     mockRequireAuth.mockResolvedValue({
       user: "alice",

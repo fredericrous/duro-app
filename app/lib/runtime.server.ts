@@ -23,17 +23,27 @@ type DbServices = ManagedRuntime.ManagedRuntime.Context<typeof dbRuntime>
  * level (loader/action). Never call runEffect from inside an Effect.gen — use
  * `yield*` to compose effects instead. Nesting runEffect creates a second
  * runtime context which can double-initialize services.
+ *
+ * The error channel is constrained to `never`: every typed error must be
+ * handled INSIDE the Effect (Effect.catchTag / catchAll mapping to an outcome
+ * value), or explicitly converted to a defect with Effect.orDie when the
+ * intent is "let it reject and hit the route error boundary / try-catch".
+ * runPromise wraps failures in FiberFailure, which erases `_tag` — catching
+ * the rejection and matching on tags never works (it silently collapsed all
+ * domain errors to generic failures twice in production). This signature
+ * makes that bug a compile error instead of a code-review catch.
  */
-export function runEffect<A, E>(effect: Effect.Effect<A, E, AppServices>): Promise<A> {
-  return appRuntime.runPromise(effect) as Promise<A>
+export function runEffect<A>(effect: Effect.Effect<A, never, AppServices>): Promise<A> {
+  return appRuntime.runPromise(effect)
 }
 
 /**
  * Run an Effect that needs only the database (e.g. the readiness probe's
  * `SELECT 1`). Shares the app's single connection pool via the MemoMap above.
+ * Same `E = never` discipline as runEffect.
  */
-export function runDbEffect<A, E>(effect: Effect.Effect<A, E, DbServices>): Promise<A> {
-  return dbRuntime.runPromise(effect) as Promise<A>
+export function runDbEffect<A>(effect: Effect.Effect<A, never, DbServices>): Promise<A> {
+  return dbRuntime.runPromise(effect)
 }
 
 // NB: we deliberately do NOT crash the process when the DB is unreachable at

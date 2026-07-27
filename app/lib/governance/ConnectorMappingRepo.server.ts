@@ -1,4 +1,4 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, ParseResult } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { MigrationsRan } from "~/lib/db/client.server"
@@ -9,7 +9,7 @@ export class ConnectorMappingRepoError extends Data.TaggedError("ConnectorMappin
   readonly cause?: unknown
 }> {}
 
-const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError | ParseResult.ParseError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new ConnectorMappingRepoError({ message, cause: e })))
 
 export class ConnectorMappingRepo extends Context.Tag("ConnectorMappingRepo")<
@@ -61,7 +61,7 @@ export const ConnectorMappingRepoLive = Layer.effect(
               ${input.externalRoleIdentifier},
               ${input.direction ?? "push"}
             )
-            RETURNING *`.pipe(Effect.map((rows) => decodeConnectorMapping(rows[0]) as ConnectorMapping)),
+            RETURNING *`.pipe(Effect.flatMap((rows) => decodeConnectorMapping(rows[0]))),
         "Failed to create connector mapping",
       )
 
@@ -71,7 +71,7 @@ export const ConnectorMappingRepoLive = Layer.effect(
             WHERE connected_system_id = ${connectedSystemId}
               AND local_role_id = ${localRoleId}
             LIMIT 1`.pipe(
-          Effect.map((rows) => (rows.length > 0 ? (decodeConnectorMapping(rows[0]) as ConnectorMapping) : null)),
+          Effect.flatMap((rows) => (rows.length > 0 ? decodeConnectorMapping(rows[0]) : Effect.succeed(null))),
         ),
         "Failed to find connector mapping",
       )
@@ -84,7 +84,7 @@ export const ConnectorMappingRepoLive = Layer.effect(
       listByConnectedSystem: (connectedSystemId) =>
         withErr(
           sql`SELECT * FROM connector_mappings WHERE connected_system_id = ${connectedSystemId}`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeConnectorMapping(r) as ConnectorMapping)),
+            Effect.flatMap((rows) => Effect.forEach(rows, decodeConnectorMapping)),
           ),
           "Failed to list connector mappings",
         ),

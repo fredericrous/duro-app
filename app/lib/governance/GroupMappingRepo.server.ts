@@ -1,4 +1,4 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, ParseResult } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { MigrationsRan } from "~/lib/db/client.server"
@@ -9,7 +9,7 @@ export class GroupMappingRepoError extends Data.TaggedError("GroupMappingRepoErr
   readonly cause?: unknown
 }> {}
 
-const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError | ParseResult.ParseError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new GroupMappingRepoError({ message, cause: e })))
 
 export interface GroupMappingWithNames extends GroupMapping {
@@ -50,13 +50,15 @@ export const GroupMappingRepoLive = Layer.effect(
               LEFT JOIN roles r       ON r.id = gm.role_id
               LEFT JOIN applications a ON a.id = gm.application_id
               ORDER BY gm.created_at DESC`.pipe(
-            Effect.map((rows) =>
-              rows.map((r) => ({
-                ...decodeGroupMapping(r),
-                principalGroupName: (r as any).principalGroupName ?? null,
-                roleName: (r as any).roleName ?? null,
-                applicationName: (r as any).applicationName ?? null,
-              })),
+            Effect.flatMap((rows) =>
+              Effect.forEach(rows, (r) =>
+                Effect.map(decodeGroupMapping(r), (mapping) => ({
+                  ...mapping,
+                  principalGroupName: (r as any).principalGroupName ?? null,
+                  roleName: (r as any).roleName ?? null,
+                  applicationName: (r as any).applicationName ?? null,
+                })),
+              ),
             ),
           ),
           "Failed to list group mappings",
@@ -66,7 +68,7 @@ export const GroupMappingRepoLive = Layer.effect(
         withErr(
           sql`INSERT INTO group_mappings (oidc_group_name, principal_group_id, role_id, application_id)
               VALUES (${input.oidcGroupName}, ${input.principalGroupId ?? null}, ${input.roleId ?? null}, ${input.applicationId ?? null})
-              RETURNING *`.pipe(Effect.map((rows) => decodeGroupMapping(rows[0]) as GroupMapping)),
+              RETURNING *`.pipe(Effect.flatMap((rows) => decodeGroupMapping(rows[0]))),
           "Failed to create group mapping",
         ),
 

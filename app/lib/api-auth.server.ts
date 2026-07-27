@@ -24,7 +24,7 @@ export async function requireApiAuth(request: Request): Promise<ApiAuthResult> {
         // principals.external_id is keyed on the OIDC subject, not the display
         // name — matching on session.name is a principal-confusion bug.
         return yield* repo.findByExternalId(session.sub)
-      }),
+      }).pipe(Effect.orDie), // repo failure = infra outage → 500, not "unauthenticated"
     )
     if (principal) {
       return { principalId: principal.id, scopes: ["*"], source: "session" }
@@ -39,7 +39,7 @@ export async function requireApiAuth(request: Request): Promise<ApiAuthResult> {
       Effect.gen(function* () {
         const repo = yield* ApiKeyRepo
         return yield* repo.verify(rawKey)
-      }),
+      }).pipe(Effect.orDie), // repo failure = infra outage → 500, not "invalid key"
     )
     if (keyInfo) {
       return { principalId: keyInfo.principalId, scopes: keyInfo.scopes, source: "api_key" }

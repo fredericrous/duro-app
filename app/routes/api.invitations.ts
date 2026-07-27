@@ -29,7 +29,7 @@ export async function action({ request }: Route.ActionArgs) {
           invitedBy: auth.principalId,
           message,
         })
-      }),
+      }).pipe(Effect.orDie),
     )
 
     return Response.json(invitation)

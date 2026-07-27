@@ -42,7 +42,7 @@ export async function action({ request }: Route.ActionArgs) {
   const parsed = parseSettingsMutation(formData as unknown as FormData, auth)
   if ("error" in parsed) return parsed
 
-  const result = await runEffect(handleSettingsMutation(parsed))
+  const result = await runEffect(handleSettingsMutation(parsed).pipe(Effect.orDie))
   // saveLocale returns a redirect marker (it must set the locale cookie and
   // reload so the new language takes effect); convert it to a real redirect.
   if (result && typeof result === "object" && "_redirect" in result) {

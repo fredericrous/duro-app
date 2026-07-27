@@ -49,6 +49,7 @@ describe("/invite/:token loader", () => {
         usedAt: "2026-01-01T00:00:00Z",
         expiresAt: new Date(Date.now() + 86400000).toISOString(),
         locale: null,
+        status: { _tag: "Accepted", usedAt: "2026-01-01T00:00:00Z", usedBy: "alice" },
       },
       p12Password: "pw",
     } as never)
@@ -66,6 +67,7 @@ describe("/invite/:token loader", () => {
         usedAt: null,
         expiresAt: new Date(Date.now() - 86400000).toISOString(),
         locale: null,
+        status: { _tag: "Pending", certIssued: true, emailSent: true, certVerified: false },
       },
       p12Password: "pw",
     } as never)
@@ -84,6 +86,7 @@ describe("/invite/:token loader", () => {
         usedAt: null,
         expiresAt: new Date(Date.now() + 86400000).toISOString(),
         locale: null,
+        status: { _tag: "Pending", certIssued: true, emailSent: true, certVerified: false },
         groups: "[1, 2]",
         groupNames: '["family", "media"]',
       },

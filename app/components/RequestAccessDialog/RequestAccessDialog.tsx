@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { useFetcher, useRevalidator } from "react-router"
 import { useTranslation } from "react-i18next"
 import { Alert, Button, Dialog, Inline, LinkButton, Spinner, Stack, Text } from "@duro-app/ui"
@@ -52,9 +52,18 @@ export function RequestAccessDialog({
   // up the new pending/granted row. We deliberately DON'T auto-close on success
   // anymore — the dialog shows a completion moment (see OutcomePanel) that the
   // user dismisses (or acts on via "Open app").
+  //
+  // Revalidate once per SETTLED submission, deduped on the data object's
+  // identity (same contract as useFetcherToast). Keying on `isFreshSuccess`
+  // alone would loop: revalidating cycles the revalidator identity while the
+  // success panel is still open, re-firing the effect indefinitely.
+  const revalidatedFor = useRef<unknown>(null)
   useEffect(() => {
-    if (isFreshSuccess && open) revalidator.revalidate()
-  }, [isFreshSuccess, open, revalidator])
+    if (!isFreshSuccess || !open) return
+    if (revalidatedFor.current === submitFetcher.data) return
+    revalidatedFor.current = submitFetcher.data
+    revalidator.revalidate()
+  }, [isFreshSuccess, open, submitFetcher.data, revalidator])
 
   const sourceApps: ReadonlyArray<AppCatalogEntry> = apps ?? catalogFetcher.data?.apps ?? []
   const requestedApp = terminal ? sourceApps.find((e) => e.app.id === terminal.applicationId)?.app : undefined

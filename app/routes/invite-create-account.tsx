@@ -3,7 +3,7 @@ import { redirect, useParams } from "react-router"
 import { Trans, useTranslation } from "react-i18next"
 import type { Route } from "./+types/invite-create-account"
 import { runEffect } from "~/lib/runtime.server"
-import { InviteRepo } from "~/lib/services/InviteRepo.server"
+import { InviteRepo, isConsumed } from "~/lib/services/InviteRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { config, isOriginAllowed } from "~/lib/config.server"
 import { hashToken } from "~/lib/crypto.server"
@@ -46,7 +46,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
           yield* cert.consumeP12Password(inv.id).pipe(Effect.ignore)
         }
         return inv
-      }),
+      }).pipe(Effect.orDie),
     )
 
     if (!invite) {
@@ -65,7 +65,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       })
     }
 
-    if (invite.usedAt) {
+    if (isConsumed(invite.status)) {
       return {
         valid: false as const,
         error: "already_used" as InviteErrorCode,
@@ -143,7 +143,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         const repo = yield* InviteRepo
         yield* repo.incrementAttempt(tokenHash).pipe(Effect.ignore)
         yield* acceptInvite(token, { username, password })
-      }),
+      }).pipe(Effect.orDie),
     )
     return { success: true as const, username, homeUrl: config.homeUrl }
   } catch (e: any) {

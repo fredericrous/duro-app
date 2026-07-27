@@ -4,9 +4,9 @@ import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.access-requests.$id"
 import { runEffect } from "~/lib/runtime.server"
+import { requirePrincipal } from "~/lib/governance/current-principal.server"
 import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { AccessRequestRepo } from "~/lib/governance/AccessRequestRepo.server"
-import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { handleAdminAccessRequestsMutation } from "~/lib/mutations/admin-access-requests"
 import { enumLabel } from "~/lib/enum-labels"
 import { css, html } from "react-strict-dom"
@@ -35,13 +35,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       Effect.gen(function* () {
         const repo = yield* AccessRequestRepo
         return yield* repo.findByIdEnriched(requestId)
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
         const repo = yield* AccessRequestRepo
         return yield* repo.getApprovals(requestId)
-      }),
+      }).pipe(Effect.orDie),
     ),
   ])
 
@@ -63,10 +63,10 @@ export async function action({ request, params }: Route.ActionArgs) {
   // tables (request_approvals.approver_id, audit_events.actor_id) are FK to
   // principals(id), so passing the username string would FK-violate.
   const approver = await runEffect(
-    Effect.gen(function* () {
-      const repo = yield* PrincipalRepo
-      return yield* repo.findByExternalId(auth.sub!)
-    }),
+    requirePrincipal(auth.sub!).pipe(
+      Effect.catchTag("PrincipalNotFound", () => Effect.succeed(null)),
+      Effect.orDie,
+    ),
   )
   if (!approver) return { error: "principal_not_found" as const }
 

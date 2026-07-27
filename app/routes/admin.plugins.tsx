@@ -43,7 +43,7 @@ export async function loader({ request }: { request: Request }) {
           installCount: countMap.get(m.slug) ?? 0,
         }),
       )
-    }),
+    }).pipe(Effect.orDie),
   )
 
   return { plugins: data }

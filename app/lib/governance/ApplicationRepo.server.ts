@@ -1,4 +1,4 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, ParseResult } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { MigrationsRan } from "~/lib/db/client.server"
@@ -52,7 +52,7 @@ export class ApplicationRepo extends Context.Tag("ApplicationRepo")<
 // Helpers
 // ---------------------------------------------------------------------------
 
-const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError | ParseResult.ParseError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new ApplicationRepoError({ message, cause: e })))
 
 // ---------------------------------------------------------------------------
@@ -82,13 +82,13 @@ export const ApplicationRepoLive = Layer.effect(
             "Failed to create application",
           )
 
-          return decodeApplication(rows[0])
+          return yield* withErr(decodeApplication(rows[0]), "Failed to create application")
         }),
 
       findById: (id) =>
         withErr(
           sql`SELECT * FROM applications WHERE id = ${id}`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? decodeApplication(rows[0]) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? decodeApplication(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find application by id",
         ),
@@ -96,7 +96,7 @@ export const ApplicationRepoLive = Layer.effect(
       findBySlug: (slug) =>
         withErr(
           sql`SELECT * FROM applications WHERE slug = ${slug}`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? decodeApplication(rows[0]) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? decodeApplication(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find application by slug",
         ),
@@ -104,7 +104,7 @@ export const ApplicationRepoLive = Layer.effect(
       list: () =>
         withErr(
           sql`SELECT * FROM applications ORDER BY created_at DESC`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeApplication(r))),
+            Effect.flatMap((rows) => Effect.forEach(rows, decodeApplication)),
           ),
           "Failed to list applications",
         ),

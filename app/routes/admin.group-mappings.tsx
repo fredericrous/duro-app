@@ -34,19 +34,19 @@ export async function loader({ request }: Route.LoaderArgs) {
       Effect.gen(function* () {
         const repo = yield* GroupMappingRepo
         return yield* repo.list()
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
         const repo = yield* ApplicationRepo
         return yield* repo.list()
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
         const repo = yield* PrincipalRepo
         return yield* repo.list()
-      }),
+      }).pipe(Effect.orDie),
     ),
   ])
 
@@ -57,7 +57,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       Effect.gen(function* () {
         const repo = yield* RbacRepo
         return yield* repo.listRoles(app.id)
-      }),
+      }).pipe(Effect.orDie),
     )
   }
 
@@ -96,7 +96,7 @@ export async function action({ request }: Route.ActionArgs) {
         return yield* repo.create(
           mappingType === "group" ? { oidcGroupName, principalGroupId } : { oidcGroupName, roleId, applicationId },
         )
-      }),
+      }).pipe(Effect.orDie),
     )
     return { success: true }
   }
@@ -109,7 +109,7 @@ export async function action({ request }: Route.ActionArgs) {
       Effect.gen(function* () {
         const repo = yield* GroupMappingRepo
         return yield* repo.remove(id)
-      }),
+      }).pipe(Effect.orDie),
     )
     return { success: true }
   }

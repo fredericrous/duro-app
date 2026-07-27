@@ -69,7 +69,7 @@ export const loadAppsCatalogForPrincipal = (principalId: string) =>
       const roleRows =
         yield* sql`SELECT * FROM roles WHERE application_id IN ${sql.in(appIds)} ORDER BY display_name ASC`
       for (const row of roleRows) {
-        const role = decodeRole(row) as Role
+        const role = yield* decodeRole(row)
         const list = rolesByApp.get(role.applicationId) ?? []
         list.push(role)
         rolesByApp.set(role.applicationId, list)

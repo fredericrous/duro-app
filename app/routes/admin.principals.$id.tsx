@@ -24,43 +24,43 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       Effect.gen(function* () {
         const repo = yield* PrincipalRepo
         return yield* repo.findById(principalId)
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
         const repo = yield* GrantRepo
         return yield* repo.findActiveForPrincipal(principalId)
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
         const repo = yield* PrincipalRepo
         return yield* repo.listGroupsFor(principalId)
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
         const repo = yield* RbacRepo
         return yield* repo.listAllRoles()
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
         const repo = yield* RbacRepo
         return yield* repo.listAllEntitlements()
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
         const repo = yield* PrincipalRepo
         return yield* repo.list()
-      }),
+      }).pipe(Effect.orDie),
     ),
     runEffect(
       Effect.gen(function* () {
         const repo = yield* ApplicationRepo
         return yield* repo.list()
-      }),
+      }).pipe(Effect.orDie),
     ),
   ])
 

@@ -10,9 +10,11 @@ vi.mock("~/lib/runtime.server", async () => {
   const mod = await import("~/test/test-runtime")
   return { runEffect: mod.testRunEffect }
 })
-// requireAdminPrincipal is a local function in admin.applications.$id.tsx
-// (not from auth.server) — it composes getAuth + checkAuthDecision +
-// PrincipalRepo internally. Mock only the real boundary modules below.
+// The action self-gates via requireAdminAction (admin-guard.server), which
+// composes getAuth + checkAuthDecision + isOriginAllowed; the principal is
+// resolved via requirePrincipal against the real test DB. Mock only the
+// boundary modules below — action tests must send an Origin header, since
+// the shared guard denies mutations with a missing Origin.
 vi.mock("~/lib/auth.server", () => ({
   getAuth: vi.fn(),
 }))
@@ -87,6 +89,7 @@ describe("/admin/applications/:id action — origin guard", () => {
     mockOrigin.mockReturnValue(false)
     const result = await callAction(action, {
       params: { id: "app-1" },
+      headers: { Origin: "http://localhost" },
       formData: { intent: "createRole" },
     })
     expect(expectResponse(result).status).toBe(403)
@@ -96,7 +99,7 @@ describe("/admin/applications/:id action — origin guard", () => {
 describe("/admin/applications/:id action — createRole (real DB)", () => {
   beforeEach(() => {
     // Auth wiring: getAuth + checkAuthDecision pass, principal exists in
-    // the seeded DB so requireAdminPrincipal's findByExternalId resolves.
+    // the seeded DB so requirePrincipal's findByExternalId resolves.
     mockGetAuth.mockResolvedValue({ user: "admin", sub: "admin-sub" } as never)
     mockCheckDecision.mockResolvedValue({ allow: true } as never)
   })
@@ -106,6 +109,7 @@ describe("/admin/applications/:id action — createRole (real DB)", () => {
 
     const result = await callAction(action, {
       params: { id: "app-1" },
+      headers: { Origin: "http://localhost" },
       formData: {
         intent: "createRole",
         slug: "editor",
@@ -131,6 +135,7 @@ describe("/admin/applications/:id action — createRole (real DB)", () => {
     await seedTestDb(seedApp)
     const result = await callAction(action, {
       params: { id: "app-1" },
+      headers: { Origin: "http://localhost" },
       formData: { intent: "createRole", slug: "", displayName: "" },
     })
     const data = expectData<{ error?: string }>(result)
@@ -148,6 +153,7 @@ describe("/admin/applications/:id action — createEntitlement (real DB)", () =>
     await seedTestDb(seedApp)
     const result = await callAction(action, {
       params: { id: "app-1" },
+      headers: { Origin: "http://localhost" },
       formData: {
         intent: "createEntitlement",
         slug: "download",
@@ -171,6 +177,7 @@ describe("/admin/applications/:id action — createEntitlement (real DB)", () =>
     await seedTestDb(seedApp)
     const result = await callAction(action, {
       params: { id: "app-1" },
+      headers: { Origin: "http://localhost" },
       formData: { intent: "createEntitlement", slug: "", displayName: "X" },
     })
     const data = expectData<{ error?: string }>(result)
@@ -188,6 +195,7 @@ describe("/admin/applications/:id action — updateSettings (real DB)", () => {
     await seedTestDb(seedApp)
     const result = await callAction(action, {
       params: { id: "app-1" },
+      headers: { Origin: "http://localhost" },
       formData: {
         intent: "updateSettings",
         accessMode: "open",
@@ -221,6 +229,7 @@ describe("/admin/applications/:id action — unknown intent", () => {
     await seedTestDb(seedApp)
     const result = await callAction(action, {
       params: { id: "app-1" },
+      headers: { Origin: "http://localhost" },
       formData: { intent: "doesNotExist" },
     })
     const data = expectData<{ error?: string }>(result)
@@ -238,6 +247,7 @@ describe("/admin/applications/:id action — createResource (real DB)", () => {
     await seedTestDb(seedApp)
     const result = await callAction(action, {
       params: { id: "app-1" },
+      headers: { Origin: "http://localhost" },
       formData: {
         intent: "createResource",
         resourceType: "folder",

@@ -1,4 +1,4 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, ParseResult, Ref } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { MigrationsRan } from "~/lib/db/client.server"
@@ -9,7 +9,7 @@ export class AuditError extends Data.TaggedError("AuditError")<{
   readonly cause?: unknown
 }> {}
 
-const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError | ParseResult.ParseError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new AuditError({ message, cause: e })))
 
 // ---------------------------------------------------------------------------
@@ -36,35 +36,41 @@ export interface AuditEventInput {
 
 export type AuditSink = (event: AuditEventInput) => Effect.Effect<void, never>
 
-const sinks: AuditSink[] = []
+// The registry lives in a Ref created at layer build — no module-level
+// mutable state, no test-only reset hook: each layer build starts empty.
+const makeSinkRegistry = Effect.gen(function* () {
+  const sinksRef = yield* Ref.make<ReadonlyArray<AuditSink>>([])
 
-/** Register a sink. Returns an unsubscribe function. */
-export function registerAuditSink(sink: AuditSink): () => void {
-  sinks.push(sink)
-  return () => {
-    const i = sinks.indexOf(sink)
-    if (i >= 0) sinks.splice(i, 1)
-  }
-}
+  const subscribe = (sink: AuditSink): Effect.Effect<() => void> =>
+    Ref.update(sinksRef, (xs) => [...xs, sink]).pipe(
+      Effect.as(() => {
+        // Unsubscribe callback for non-Effect call sites (e.g. an SSE route's
+        // cleanup); runSync is safe — Ref.update is synchronous.
+        Effect.runSync(Ref.update(sinksRef, (xs) => xs.filter((x) => x !== sink)))
+      }),
+    )
 
-/** Test-only escape hatch — clears the registry between tests. */
-export function _resetAuditSinksForTesting(): void {
-  sinks.length = 0
-}
-
-const fanoutToSinks = (event: AuditEventInput): Effect.Effect<void, never> =>
-  Effect.forEach(
-    sinks,
-    (sink) =>
-      sink(event).pipe(
-        // Sinks are typed as Effect<void, never>, but a misbehaving sink could
-        // still throw (defects). Swallow defects so emit never fails.
-        Effect.catchAllDefect((d) =>
-          Effect.logWarning("audit sink defect", { error: String(d), eventType: event.eventType }),
+  const fanout = (event: AuditEventInput): Effect.Effect<void, never> =>
+    Ref.get(sinksRef).pipe(
+      Effect.flatMap((sinks) =>
+        Effect.forEach(
+          sinks,
+          (sink) =>
+            sink(event).pipe(
+              // Sinks are typed as Effect<void, never>, but a misbehaving sink
+              // could still throw (defects). Swallow so emit never fails.
+              Effect.catchAllDefect((d) =>
+                Effect.logWarning("audit sink defect", { error: String(d), eventType: event.eventType }),
+              ),
+            ),
+          { concurrency: "unbounded" },
         ),
       ),
-    { concurrency: "unbounded" },
-  ).pipe(Effect.asVoid)
+      Effect.asVoid,
+    )
+
+  return { subscribe, fanout }
+})
 
 export class AuditService extends Context.Tag("AuditService")<
   AuditService,
@@ -87,6 +93,8 @@ export class AuditService extends Context.Tag("AuditService")<
       limit?: number
       offset?: number
     }) => Effect.Effect<AuditEvent[], AuditError>
+    /** Register a best-effort sink; resolves to an unsubscribe callback. */
+    readonly subscribe: (sink: AuditSink) => Effect.Effect<() => void>
   }
 >() {}
 
@@ -95,8 +103,10 @@ export const AuditServiceLive = Layer.effect(
   Effect.gen(function* () {
     yield* MigrationsRan
     const sql = yield* SqlClient.SqlClient
+    const { subscribe, fanout } = yield* makeSinkRegistry
 
     return {
+      subscribe,
       emit: (event) =>
         withErr(
           sql`INSERT INTO audit_events (event_type, actor_id, target_type, target_id, application_id, metadata, ip_address)
@@ -104,7 +114,7 @@ export const AuditServiceLive = Layer.effect(
             Effect.asVoid,
           ),
           "Failed to emit audit event",
-        ).pipe(Effect.zipLeft(fanoutToSinks(event))),
+        ).pipe(Effect.zipLeft(fanout(event))),
 
       query: (filters) => {
         const eventType = filters.eventType ?? null
@@ -123,7 +133,7 @@ export const AuditServiceLive = Layer.effect(
                 AND (${targetType}::text IS NULL OR target_type = ${targetType}::text)
                 AND (${targetId}::text IS NULL OR target_id = ${targetId}::text)
               ORDER BY created_at DESC
-              LIMIT ${limit} OFFSET ${offset}`.pipe(Effect.map((rows) => rows.map((r) => decodeAuditEvent(r)))),
+              LIMIT ${limit} OFFSET ${offset}`.pipe(Effect.flatMap((rows) => Effect.forEach(rows, decodeAuditEvent))),
           "Failed to query audit events",
         )
       },
@@ -131,15 +141,22 @@ export const AuditServiceLive = Layer.effect(
   }),
 )
 
-export const AuditServiceDev = Layer.succeed(AuditService, {
-  emit: (event) =>
-    Effect.log(`[AuditService/dev] emit ${event.eventType}`, {
-      actorId: event.actorId,
-      targetType: event.targetType,
-      targetId: event.targetId,
-    })
-      .pipe(Effect.asVoid)
-      .pipe(Effect.zipLeft(fanoutToSinks(event))),
+export const AuditServiceDev = Layer.effect(
+  AuditService,
+  Effect.gen(function* () {
+    const { subscribe, fanout } = yield* makeSinkRegistry
+    return {
+      subscribe,
+      emit: (event) =>
+        Effect.log(`[AuditService/dev] emit ${event.eventType}`, {
+          actorId: event.actorId,
+          targetType: event.targetType,
+          targetId: event.targetId,
+        })
+          .pipe(Effect.asVoid)
+          .pipe(Effect.zipLeft(fanout(event))),
 
-  query: (_filters) => Effect.log("[AuditService/dev] query").pipe(Effect.as([] as AuditEvent[])),
-})
+      query: (_filters) => Effect.log("[AuditService/dev] query").pipe(Effect.as([] as AuditEvent[])),
+    }
+  }),
+)

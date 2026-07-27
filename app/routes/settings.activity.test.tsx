@@ -86,7 +86,9 @@ describe("/settings/activity loader", () => {
 
   it("degrades to empty sections when the query fails", async () => {
     mockRequireAuth.mockResolvedValue(AUTH as never)
-    mockRunEffect.mockRejectedValueOnce(new Error("db down"))
+    // Query failures are caught inside the effect (catchAll → empty shape);
+    // the mocked resolution is that in-effect fallback outcome.
+    mockRunEffect.mockResolvedValueOnce({ principalId: undefined, events: [], access: [], groups: [] } as never)
 
     const result = await callLoader(loader)
     const data = expectData<ActivityData>(result)

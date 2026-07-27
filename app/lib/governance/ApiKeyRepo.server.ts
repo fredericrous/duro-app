@@ -1,4 +1,4 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, ParseResult } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import * as crypto from "node:crypto"
@@ -11,7 +11,7 @@ export class ApiKeyRepoError extends Data.TaggedError("ApiKeyRepoError")<{
   readonly cause?: unknown
 }> {}
 
-const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError | ParseResult.ParseError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new ApiKeyRepoError({ message, cause: e })))
 
 export interface CreateApiKeyInput {
@@ -82,17 +82,18 @@ export const ApiKeyRepoLive = Layer.effect(
               WHERE key_hash = ${keyHash}
                 AND revoked_at IS NULL
                 AND (expires_at IS NULL OR expires_at > NOW())`.pipe(
-            Effect.map((rows) => {
-              if (!rows[0]) return null
-              const row = decodeApiKey(rows[0])
-              // scopes is JSONB; the pg driver returns it pre-parsed as an
-              // array, so we just narrow the Unknown to string[]. The old
-              // `JSON.parse(row.scopes as string)` here double-decoded:
-              // `JSON.parse(["read","write"])` coerced via toString to
-              // `"read,write"`, which JSON.parse then rejected. That broke
-              // verification for every multi-scope key — and even the default
-              // `["*"]` would throw via `JSON.parse("*")`.
-              return { principalId: row.principalId, scopes: row.scopes as string[] }
+            Effect.flatMap((rows) => {
+              if (!rows[0]) return Effect.succeed(null)
+              return Effect.map(decodeApiKey(rows[0]), (row) => {
+                // scopes is JSONB; the pg driver returns it pre-parsed as an
+                // array, so we just narrow the Unknown to string[]. The old
+                // `JSON.parse(row.scopes as string)` here double-decoded:
+                // `JSON.parse(["read","write"])` coerced via toString to
+                // `"read,write"`, which JSON.parse then rejected. That broke
+                // verification for every multi-scope key — and even the default
+                // `["*"]` would throw via `JSON.parse("*")`.
+                return { principalId: row.principalId, scopes: row.scopes as string[] }
+              })
             }),
           ),
           "Failed to verify API key",
@@ -108,7 +109,7 @@ export const ApiKeyRepoLive = Layer.effect(
       listForPrincipal: (principalId) =>
         withErr(
           sql`SELECT * FROM api_keys WHERE principal_id = ${principalId} ORDER BY created_at DESC`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeApiKey(r))),
+            Effect.flatMap((rows) => Effect.forEach(rows, decodeApiKey)),
           ),
           "Failed to list API keys for principal",
         ),

@@ -1,4 +1,4 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, ParseResult } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { MigrationsRan } from "~/lib/db/client.server"
@@ -25,7 +25,7 @@ export class AccessRequestRepoError extends Data.TaggedError("AccessRequestRepoE
   readonly cause?: unknown
 }> {}
 
-const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError | ParseResult.ParseError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new AccessRequestRepoError({ message, cause: e })))
 
 export class AccessRequestRepo extends Context.Tag("AccessRequestRepo")<
@@ -91,14 +91,14 @@ export const AccessRequestRepoLive = Layer.effect(
         withErr(
           sql`INSERT INTO access_requests (requester_id, application_id, role_id, entitlement_id, resource_id, justification, requested_duration_hours)
               VALUES (${input.requesterId}, ${input.applicationId}, ${input.roleId ?? null}, ${input.entitlementId ?? null}, ${input.resourceId ?? null}, ${input.justification ?? null}, ${input.requestedDurationHours ?? null})
-              RETURNING *`.pipe(Effect.map((rows) => decodeAccessRequest(rows[0]) as AccessRequest)),
+              RETURNING *`.pipe(Effect.flatMap((rows) => decodeAccessRequest(rows[0]))),
           "Failed to create access request",
         ),
 
       findById: (id) =>
         withErr(
           sql`SELECT * FROM access_requests WHERE id = ${id}`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? (decodeAccessRequest(rows[0]) as AccessRequest) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? decodeAccessRequest(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find access request",
         ),
@@ -108,9 +108,7 @@ export const AccessRequestRepoLive = Layer.effect(
           sql`SELECT * FROM access_requests
               WHERE status = 'pending'
                 AND (${applicationId ?? null}::text IS NULL OR application_id = ${applicationId ?? null})
-              ORDER BY created_at ASC`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeAccessRequest(r) as AccessRequest)),
-          ),
+              ORDER BY created_at ASC`.pipe(Effect.flatMap((rows) => Effect.forEach(rows, decodeAccessRequest))),
           "Failed to list pending access requests",
         ),
 
@@ -118,9 +116,7 @@ export const AccessRequestRepoLive = Layer.effect(
         withErr(
           sql`SELECT * FROM access_requests
               WHERE requester_id = ${requesterId}
-              ORDER BY created_at DESC`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeAccessRequest(r) as AccessRequest)),
-          ),
+              ORDER BY created_at DESC`.pipe(Effect.flatMap((rows) => Effect.forEach(rows, decodeAccessRequest))),
           "Failed to list access requests for requester",
         ),
 
@@ -138,17 +134,16 @@ export const AccessRequestRepoLive = Layer.effect(
               LEFT JOIN entitlements e ON e.id = ar.entitlement_id
               WHERE ar.requester_id = ${requesterId}
               ORDER BY ar.created_at DESC`.pipe(
-            Effect.map((rows) =>
-              rows.map((row) => {
+            Effect.flatMap((rows) =>
+              Effect.forEach(rows, (row) => {
                 const r = row as Record<string, unknown>
-                const base = decodeAccessRequest(r) as AccessRequest
-                return {
+                return Effect.map(decodeAccessRequest(r), (base) => ({
                   ...base,
                   applicationName: (r.applicationName as string) ?? "",
                   applicationSlug: (r.applicationSlug as string) ?? "",
                   roleName: (r.roleName as string | null) ?? null,
                   entitlementName: (r.entitlementName as string | null) ?? null,
-                }
+                }))
               }),
             ),
           ),
@@ -162,9 +157,7 @@ export const AccessRequestRepoLive = Layer.effect(
                 AND (${filters?.applicationId ?? null}::text IS NULL OR application_id = ${filters?.applicationId ?? null})
               ORDER BY created_at DESC
               LIMIT ${filters?.limit ?? 100}
-              OFFSET ${filters?.offset ?? 0}`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeAccessRequest(r) as AccessRequest)),
-          ),
+              OFFSET ${filters?.offset ?? 0}`.pipe(Effect.flatMap((rows) => Effect.forEach(rows, decodeAccessRequest))),
           "Failed to list access requests",
         ),
 
@@ -187,18 +180,17 @@ export const AccessRequestRepoLive = Layer.effect(
               ORDER BY ar.created_at DESC
               LIMIT ${filters?.limit ?? 100}
               OFFSET ${filters?.offset ?? 0}`.pipe(
-            Effect.map((rows) =>
-              rows.map((row) => {
+            Effect.flatMap((rows) =>
+              Effect.forEach(rows, (row) => {
                 const r = row as Record<string, unknown>
-                const base = decodeAccessRequest(r) as AccessRequest
-                return {
+                return Effect.map(decodeAccessRequest(r), (base) => ({
                   ...base,
                   applicationName: (r.applicationName as string) ?? "",
                   applicationSlug: (r.applicationSlug as string) ?? "",
                   requesterName: (r.requesterName as string | null) ?? null,
                   roleName: (r.roleName as string | null) ?? null,
                   entitlementName: (r.entitlementName as string | null) ?? null,
-                }
+                }))
               }),
             ),
           ),
@@ -220,18 +212,17 @@ export const AccessRequestRepoLive = Layer.effect(
               LEFT JOIN roles r ON r.id = ar.role_id
               LEFT JOIN entitlements e ON e.id = ar.entitlement_id
               WHERE ar.id = ${id}`.pipe(
-            Effect.map((rows) => {
-              if (rows.length === 0) return null
+            Effect.flatMap((rows) => {
+              if (rows.length === 0) return Effect.succeed(null)
               const r = rows[0] as Record<string, unknown>
-              const base = decodeAccessRequest(r) as AccessRequest
-              return {
+              return Effect.map(decodeAccessRequest(r), (base) => ({
                 ...base,
                 applicationName: (r.applicationName as string) ?? "",
                 applicationSlug: (r.applicationSlug as string) ?? "",
                 requesterName: (r.requesterName as string | null) ?? null,
                 roleName: (r.roleName as string | null) ?? null,
                 entitlementName: (r.entitlementName as string | null) ?? null,
-              }
+              }))
             }),
           ),
           "Failed to find enriched access request",
@@ -248,7 +239,7 @@ export const AccessRequestRepoLive = Layer.effect(
       getApprovals: (requestId) =>
         withErr(
           sql`SELECT * FROM request_approvals WHERE request_id = ${requestId}`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeRequestApproval(r) as RequestApproval)),
+            Effect.flatMap((rows) => Effect.forEach(rows, decodeRequestApproval)),
           ),
           "Failed to get approvals",
         ),
@@ -289,7 +280,7 @@ export const AccessRequestRepoLive = Layer.effect(
                 )
               ORDER BY CASE scope_type WHEN 'entitlement' THEN 1 WHEN 'role' THEN 2 ELSE 3 END
               LIMIT 1`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? (decodeApprovalPolicy(rows[0]) as ApprovalPolicy) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? decodeApprovalPolicy(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find approval policy",
         ),

@@ -26,7 +26,9 @@ beforeEach(() => {
 describe("/admin/audit loader", () => {
   it("returns the audit event list via the service", async () => {
     const events = [{ id: "e1", eventType: "grant.created" }]
-    mockRunEffect.mockResolvedValue(events as never)
+    // The loader's effect resolves the full outcome object (events + error);
+    // failures are caught inside the effect, so runEffect never rejects.
+    mockRunEffect.mockResolvedValue({ events, error: undefined } as never)
 
     const result = await callLoader(loader)
     const data = expectData<{ events: unknown[]; page: number; pageSize: number; error?: string }>(result)
@@ -37,14 +39,16 @@ describe("/admin/audit loader", () => {
   })
 
   it("parses ?page=N as the offset", async () => {
-    mockRunEffect.mockResolvedValue([] as never)
+    mockRunEffect.mockResolvedValue({ events: [], error: undefined } as never)
     const result = await callLoader(loader, { url: "http://localhost/admin/audit?page=3" })
     const data = expectData<{ page: number }>(result)
     expect(data.page).toBe(3)
   })
 
-  it("surfaces an error string when runEffect throws", async () => {
-    mockRunEffect.mockRejectedValueOnce(new Error("audit service down") as never)
+  it("surfaces an error string when the audit query fails", async () => {
+    // Failures are caught inside the effect (catchAll → { events: [], error });
+    // the mocked resolution is that in-effect fallback outcome.
+    mockRunEffect.mockResolvedValueOnce({ events: [], error: "audit service down" } as never)
     const result = await callLoader(loader)
     const data = expectData<{ events: unknown[]; error?: string }>(result)
     expect(data.events).toEqual([])
@@ -52,7 +56,7 @@ describe("/admin/audit loader", () => {
   })
 
   it("threads filter params (eventType, actorId, targetType, targetId, applicationId) through to the loader output", async () => {
-    mockRunEffect.mockResolvedValueOnce([] as never)
+    mockRunEffect.mockResolvedValueOnce({ events: [], error: undefined } as never)
     const result = await callLoader(loader, {
       url: "http://localhost/admin/audit?eventType=grant.created&actorId=p1&targetType=grant&targetId=g1&applicationId=app1&source=plugin:gitea",
     })

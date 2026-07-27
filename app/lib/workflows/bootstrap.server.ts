@@ -1,4 +1,4 @@
-import { Data, Effect } from "effect"
+import { Data, Effect, Option, Config } from "effect"
 import * as fs from "node:fs/promises"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
@@ -193,35 +193,38 @@ export const createAdminInvite = (email: string) =>
   })
 
 // ---------------------------------------------------------------------------
-// Process-local mutex — protects against concurrent bootstrap submits within
-// a single replica. Multi-replica deployments during first-run remain a
+// Process-local semaphore — protects against concurrent bootstrap submits
+// within a single replica. Try-acquire semantics: a second concurrent submit
+// is rejected (bootstrap_in_progress), never queued. Release is structural
+// (withPermitsIfAvailable), so a failure/interruption mid-submit cannot leak
+// the permit — which is what let the old `let inFlight` flag + test-reset
+// hook be deleted. Multi-replica deployments during first-run remain a
 // documented caveat (Vault read-then-delete is not atomic across processes).
 // ---------------------------------------------------------------------------
 
-let inFlight = false
+const submitPermit = Effect.unsafeMakeSemaphore(1)
 
 const withMutex = <R, E, A>(eff: Effect.Effect<A, E, R>) =>
-  Effect.gen(function* () {
-    if (inFlight) {
-      return yield* new BootstrapError({ code: "bootstrap_in_progress" })
-    }
-    inFlight = true
-    return yield* eff.pipe(
-      Effect.ensuring(
-        Effect.sync(() => {
-          inFlight = false
+  submitPermit
+    .withPermitsIfAvailable(1)(eff)
+    .pipe(
+      Effect.flatMap(
+        Option.match({
+          onNone: () => Effect.fail(new BootstrapError({ code: "bootstrap_in_progress" })),
+          onSome: (a: A) => Effect.succeed(a),
         }),
       ),
     )
-  })
 
 // ---------------------------------------------------------------------------
 // Public submit helpers
 // ---------------------------------------------------------------------------
 
-const vaultDepsFromEnv = (): VaultDeps => ({
-  vaultAddr: process.env.VAULT_ADDR ?? "",
-})
+// Config (not process.env) so the read is uniform with the rest of the app;
+// empty default preserves the explicit vault_unreachable error below.
+const vaultDepsFromEnv: Effect.Effect<VaultDeps> = Effect.orDie(
+  Effect.map(Config.string("VAULT_ADDR").pipe(Config.withDefault("")), (vaultAddr): VaultDeps => ({ vaultAddr })),
+)
 
 /**
  * Used by the existing /api/bootstrap-invite endpoint — caller supplies
@@ -233,7 +236,7 @@ export const submitBootstrapInviteWithCallerToken = (
 ) =>
   withMutex(
     Effect.gen(function* () {
-      const deps = depsOverride ?? vaultDepsFromEnv()
+      const deps = depsOverride ?? (yield* vaultDepsFromEnv)
       if (!deps.vaultAddr) {
         return yield* new BootstrapError({ code: "vault_unreachable", message: "VAULT_ADDR not configured" })
       }
@@ -264,7 +267,7 @@ export const submitBootstrapInviteWithCallerToken = (
 export const submitBootstrapInviteAuto = (input: { email: string }, depsOverride?: VaultDeps) =>
   withMutex(
     Effect.gen(function* () {
-      const deps = depsOverride ?? vaultDepsFromEnv()
+      const deps = depsOverride ?? (yield* vaultDepsFromEnv)
       if (!deps.vaultAddr) {
         return yield* new BootstrapError({ code: "vault_unreachable", message: "VAULT_ADDR not configured" })
       }
@@ -284,12 +287,3 @@ export const submitBootstrapInviteAuto = (input: { email: string }, depsOverride
       return result
     }),
   )
-
-// ---------------------------------------------------------------------------
-// Test helpers — exported so tests can reset module state between cases.
-// ---------------------------------------------------------------------------
-
-/** @internal */
-export const __resetMutexForTests = () => {
-  inFlight = false
-}

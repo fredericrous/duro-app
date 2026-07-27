@@ -104,7 +104,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         accessRequests: ((accessRequests[0] as { n?: number } | undefined)?.n ?? 0) as number,
         accessInvitations: ((accessInvitations[0] as { n?: number } | undefined)?.n ?? 0) as number,
       }
-    }),
+    }).pipe(Effect.orDie), // rejection handled by .catch below
   ).catch(() => ({ accessRequests: 0, accessInvitations: 0 }))
 
   // First-run + governance-health data lives on the admin index (dashboard)

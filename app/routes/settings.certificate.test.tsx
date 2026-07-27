@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
+import { Effect } from "effect"
 
 vi.mock("~/lib/auth.server", () => ({
   requireAuth: vi.fn(),
@@ -53,7 +54,9 @@ describe("/settings/certificate action", () => {
 
   it("returns the mutation result on success", async () => {
     mockParse.mockReturnValue({ intent: "revokeCert", serialNumber: "AB", auth: {} } as never)
-    mockHandle.mockReturnValue("effect" as never)
+    // The action pipes the handler through Effect.orDie, so the mock must
+    // return a real (pipeable) Effect; the mocked runEffect yields the result.
+    mockHandle.mockReturnValue(Effect.void as never)
     mockRunEffect.mockResolvedValue({ certRevoked: true } as never)
     const result = await callAction(action, { formData: { intent: "revokeCert", serialNumber: "AB" } })
     const data = expectData<{ certRevoked?: boolean }>(result)

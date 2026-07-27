@@ -1,4 +1,4 @@
-import { Context, Effect, Data, Layer } from "effect"
+import { Context, Effect, Data, Layer, ParseResult } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import * as crypto from "node:crypto"
@@ -85,7 +85,7 @@ export class RbacRepo extends Context.Tag("RbacRepo")<
 // Helper
 // ---------------------------------------------------------------------------
 
-const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError | ParseResult.ParseError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new RbacRepoError({ message, cause: e })))
 
 // ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ export const RbacRepoLive = Layer.effect(
                 RETURNING *`,
             "Failed to create role",
           )
-          return decodeRole(rows[0])
+          return yield* withErr(decodeRole(rows[0]), "Failed to create role")
         }),
 
       ensureRole: (appId, slug, displayName, description?, maxDurationHours?) =>
@@ -123,32 +123,32 @@ export const RbacRepoLive = Layer.effect(
                 RETURNING *`,
             "Failed to ensure role",
           )
-          if (inserted.length > 0) return decodeRole(inserted[0])
+          if (inserted.length > 0) return yield* withErr(decodeRole(inserted[0]), "Failed to ensure role")
           const existing = yield* withErr(
             sql`SELECT * FROM roles WHERE application_id = ${appId} AND slug = ${slug}`,
             "Failed to look up existing role",
           )
-          return decodeRole(existing[0])
+          return yield* withErr(decodeRole(existing[0]), "Failed to ensure role")
         }),
 
       listRoles: (appId) =>
         withErr(
           sql`SELECT * FROM roles WHERE application_id = ${appId} ORDER BY slug`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeRole(r))),
+            Effect.flatMap((rows) => Effect.forEach(rows, decodeRole)),
           ),
           "Failed to list roles",
         ),
 
       listAllRoles: () =>
         withErr(
-          sql`SELECT * FROM roles ORDER BY slug`.pipe(Effect.map((rows) => rows.map((r) => decodeRole(r)))),
+          sql`SELECT * FROM roles ORDER BY slug`.pipe(Effect.flatMap((rows) => Effect.forEach(rows, decodeRole))),
           "Failed to list all roles",
         ),
 
       findRoleById: (id) =>
         withErr(
           sql`SELECT * FROM roles WHERE id = ${id}`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? decodeRole(rows[0]) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? decodeRole(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find role",
         ),
@@ -166,7 +166,7 @@ export const RbacRepoLive = Layer.effect(
                 RETURNING *`,
             "Failed to create entitlement",
           )
-          return decodeEntitlement(rows[0])
+          return yield* withErr(decodeEntitlement(rows[0]), "Failed to create entitlement")
         }),
 
       ensureEntitlement: (appId, slug, displayName, description?) =>
@@ -179,18 +179,18 @@ export const RbacRepoLive = Layer.effect(
                 RETURNING *`,
             "Failed to ensure entitlement",
           )
-          if (inserted.length > 0) return decodeEntitlement(inserted[0])
+          if (inserted.length > 0) return yield* withErr(decodeEntitlement(inserted[0]), "Failed to ensure entitlement")
           const existing = yield* withErr(
             sql`SELECT * FROM entitlements WHERE application_id = ${appId} AND slug = ${slug}`,
             "Failed to look up existing entitlement",
           )
-          return decodeEntitlement(existing[0])
+          return yield* withErr(decodeEntitlement(existing[0]), "Failed to ensure entitlement")
         }),
 
       listEntitlements: (appId) =>
         withErr(
           sql`SELECT * FROM entitlements WHERE application_id = ${appId} ORDER BY slug`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeEntitlement(r))),
+            Effect.flatMap((rows) => Effect.forEach(rows, decodeEntitlement)),
           ),
           "Failed to list entitlements",
         ),
@@ -198,7 +198,7 @@ export const RbacRepoLive = Layer.effect(
       listAllEntitlements: () =>
         withErr(
           sql`SELECT * FROM entitlements ORDER BY slug`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeEntitlement(r))),
+            Effect.flatMap((rows) => Effect.forEach(rows, decodeEntitlement)),
           ),
           "Failed to list all entitlements",
         ),
@@ -206,7 +206,7 @@ export const RbacRepoLive = Layer.effect(
       findEntitlementById: (id) =>
         withErr(
           sql`SELECT * FROM entitlements WHERE id = ${id}`.pipe(
-            Effect.map((rows) => (rows.length > 0 ? decodeEntitlement(rows[0]) : null)),
+            Effect.flatMap((rows) => (rows.length > 0 ? decodeEntitlement(rows[0]) : Effect.succeed(null))),
           ),
           "Failed to find entitlement",
         ),
@@ -236,7 +236,7 @@ export const RbacRepoLive = Layer.effect(
           sql`SELECT e.* FROM entitlements e
               JOIN role_entitlements re ON re.entitlement_id = e.id
               WHERE re.role_id = ${roleId}
-              ORDER BY e.slug`.pipe(Effect.map((rows) => rows.map((r) => decodeEntitlement(r)))),
+              ORDER BY e.slug`.pipe(Effect.flatMap((rows) => Effect.forEach(rows, decodeEntitlement))),
           "Failed to list role entitlements",
         ),
 
@@ -251,13 +251,13 @@ export const RbacRepoLive = Layer.effect(
                 RETURNING *`,
             "Failed to create resource",
           )
-          return decodeResource(rows[0])
+          return yield* withErr(decodeResource(rows[0]), "Failed to create resource")
         }),
 
       listResources: (appId) =>
         withErr(
           sql`SELECT * FROM resources WHERE application_id = ${appId} ORDER BY display_name`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeResource(r))),
+            Effect.flatMap((rows) => Effect.forEach(rows, decodeResource)),
           ),
           "Failed to list resources",
         ),
@@ -265,23 +265,27 @@ export const RbacRepoLive = Layer.effect(
       listAllResources: () =>
         withErr(
           sql`SELECT * FROM resources ORDER BY display_name`.pipe(
-            Effect.map((rows) => rows.map((r) => decodeResource(r))),
+            Effect.flatMap((rows) => Effect.forEach(rows, decodeResource)),
           ),
           "Failed to list all resources",
         ),
 
-      getResourceAncestors: (resourceId) =>
-        Effect.gen(function* () {
+      getResourceAncestors: (resourceId) => {
+        const fetchResource = (id: string): Effect.Effect<Resource | null, RbacRepoError> =>
+          withErr(
+            sql`SELECT * FROM resources WHERE id = ${id}`.pipe(
+              Effect.flatMap((rows) => (rows.length > 0 ? decodeResource(rows[0]) : Effect.succeed(null))),
+            ),
+            "Failed to fetch resource ancestor",
+          )
+
+        return Effect.gen(function* () {
           const ancestors: Resource[] = []
           let currentId: string | null = resourceId
 
           for (let hop = 0; hop < 10 && currentId !== null; hop++) {
-            const rows = yield* withErr(
-              sql`SELECT * FROM resources WHERE id = ${currentId}`,
-              "Failed to fetch resource ancestor",
-            )
-            if (rows.length === 0) break
-            const resource = decodeResource(rows[0])
+            const resource: Resource | null = yield* fetchResource(currentId)
+            if (resource === null) break
             // Skip the starting resource itself — only collect ancestors
             if (hop > 0) {
               ancestors.push(resource)
@@ -290,7 +294,8 @@ export const RbacRepoLive = Layer.effect(
           }
 
           return ancestors
-        }),
+        })
+      },
     }
   }),
 )

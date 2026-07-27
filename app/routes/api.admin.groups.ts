@@ -13,7 +13,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       Effect.gen(function* () {
         const um = yield* UserManager
         return yield* um.getGroups
-      }),
+      }).pipe(Effect.orDie),
     )
 
     return Response.json({

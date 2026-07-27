@@ -1,3 +1,4 @@
+import { Effect } from "effect"
 import type { Route } from "./+types/api.access-requests"
 import { requireApiAuth, requireScope } from "~/lib/api-auth.server"
 import { submitAccessRequest } from "~/lib/workflows/access-request.server"
@@ -25,7 +26,7 @@ export async function action({ request }: Route.ActionArgs) {
         entitlementId,
         justification,
         requestedDurationHours,
-      }),
+      }).pipe(Effect.orDie),
     )
 
     return Response.json(result)

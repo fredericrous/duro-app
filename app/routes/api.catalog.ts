@@ -22,8 +22,8 @@ export async function loader({ request }: Route.LoaderArgs) {
       const principal = yield* repo.findByExternalId(auth.sub!)
       if (!principal) return [] as AppCatalogEntry[]
       return yield* loadAppsCatalogForPrincipal(principal.id)
-    }),
-  ).catch(() => [] as AppCatalogEntry[])
+    }).pipe(Effect.catchAll(() => Effect.succeed([] as AppCatalogEntry[]))),
+  )
 
   return Response.json({ apps })
 }

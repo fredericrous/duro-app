@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
 import type { Route } from "./+types/admin.invitations"
 import { runEffect } from "~/lib/runtime.server"
+import { normalizeDateInput } from "~/lib/form.server"
+import { requirePrincipal } from "~/lib/governance/current-principal.server"
 import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { AccessInvitationRepo, type AccessInvitationEnriched } from "~/lib/governance/AccessInvitationRepo.server"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
@@ -56,7 +58,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
       const invitations = yield* invRepo.listAllEnriched()
       return { invitations, applications, principals, rolesByApp, entitlementsByApp }
-    }),
+    }).pipe(Effect.orDie),
   )
 
   return data
@@ -71,10 +73,10 @@ export async function action({ request }: Route.ActionArgs) {
   const auth = await getAuth(request)
   const admin = auth.sub
     ? await runEffect(
-        Effect.gen(function* () {
-          const repo = yield* PrincipalRepo
-          return yield* repo.findByExternalId(auth.sub!)
-        }),
+        requirePrincipal(auth.sub).pipe(
+          Effect.catchTag("PrincipalNotFound", () => Effect.succeed(null)),
+          Effect.orDie,
+        ),
       )
     : null
   if (!admin) return { error: "principal_not_found" as const }
@@ -97,9 +99,7 @@ export async function action({ request }: Route.ActionArgs) {
     if (roleId && entitlementId) return { error: "target_exclusive" as const }
 
     const expiresAt = expiresAtRaw
-      ? /^\d{4}-\d{2}-\d{2}$/.test(expiresAtRaw)
-        ? `${expiresAtRaw}T00:00:00.000Z`
-        : expiresAtRaw
+      ? normalizeDateInput(expiresAtRaw)
       : new Date(Date.now() + DEFAULT_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
     const result = await runEffect(

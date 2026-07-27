@@ -1,4 +1,4 @@
-import { Cause, Context, Data, Effect, Exit, Layer } from "effect"
+import { Cause, Context, Data, Effect, Exit, Layer, ParseResult } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { MigrationsRan } from "~/lib/db/client.server"
@@ -14,7 +14,7 @@ export class ProvisioningError extends Data.TaggedError("ProvisioningError")<{
   readonly cause?: unknown
 }> {}
 
-const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
+const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError | ParseResult.ParseError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new ProvisioningError({ message, cause: e })))
 
 // ---------------------------------------------------------------------------
@@ -274,10 +274,7 @@ export const ProvisioningServiceLive = Layer.effect(
         Effect.flatMap((rows) =>
           rows.length === 0
             ? new ProvisioningError({ message: `Job ${jobId} not found` })
-            : Effect.try({
-                try: () => decodeProvisioningJob(rows[0]) as ProvisioningJob,
-                catch: (e) => new ProvisioningError({ message: "Failed to decode job row", cause: e }),
-              }),
+            : withErr(decodeProvisioningJob(rows[0]), "Failed to decode job row"),
         ),
       )
 
@@ -298,10 +295,7 @@ export const ProvisioningServiceLive = Layer.effect(
             "Failed to fetch next pending job",
           )
           if (rows.length === 0) return
-          const job = yield* Effect.try({
-            try: () => decodeProvisioningJob(rows[0]) as ProvisioningJob,
-            catch: (e) => new ProvisioningError({ message: "Failed to decode job row", cause: e }),
-          })
+          const job = yield* withErr(decodeProvisioningJob(rows[0]), "Failed to decode job row")
           yield* processJobInternal(sql, job)
         }),
 

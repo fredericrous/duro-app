@@ -18,7 +18,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       Effect.gen(function* () {
         const repo = yield* GrantRepo
         return yield* repo.findActiveForPrincipal(principalId)
-      }),
+      }).pipe(Effect.orDie),
     )
 
     return Response.json({ grants })
