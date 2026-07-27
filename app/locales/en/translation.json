@@ -31,6 +31,9 @@
         "pending": "Pending",
         "accepted": "Accepted",
         "declined": "Declined"
+      },
+      "eventType": {
+        "auth.login": "Signed in"
       }
     },
     "scratchToReveal": "Scratch or press Enter to reveal",

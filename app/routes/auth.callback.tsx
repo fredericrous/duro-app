@@ -5,8 +5,7 @@ import type { Route } from "./+types/auth.callback"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { runEffect } from "~/lib/runtime.server"
 import { OidcClient } from "~/lib/services/OidcClient.server"
-import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
-import { GroupSyncService } from "~/lib/governance/GroupSyncService.server"
+import { syncLogin } from "~/lib/governance/login-sync.server"
 import { getPkceData, createSessionCookie, clearPkceCookie } from "~/lib/session.server"
 import { Effect } from "effect"
 
@@ -29,16 +28,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     }),
   )
 
-  // Upsert principal + sync OIDC groups to the governance model. This is how a
-  // user's grants materialize on login (group-mappings → grants), so it must
-  // always run.
+  // Upsert principal + sync OIDC groups to the governance model (this is how
+  // a user's grants materialize on login, so it must always run) and record
+  // the auth.login audit event.
   await runEffect(
-    Effect.gen(function* () {
-      const principalRepo = yield* PrincipalRepo
-      const groupSync = yield* GroupSyncService
-      const principal = yield* principalRepo.ensureUser(user.sub, user.name, user.email)
-      yield* groupSync.syncGroups(principal.id, user.groups)
-    }).pipe(Effect.catchAll((e) => Effect.logWarning("auth callback: governance sync failed", { error: String(e) }))),
+    syncLogin(user, request.headers.get("x-forwarded-for") ?? undefined).pipe(
+      Effect.catchAll((e) => Effect.logWarning("auth callback: governance sync failed", { error: String(e) })),
+    ),
   )
 
   const sessionCookie = await createSessionCookie({

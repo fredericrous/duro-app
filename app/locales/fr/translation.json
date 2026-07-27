@@ -31,6 +31,9 @@
         "pending": "En attente",
         "accepted": "Acceptée",
         "declined": "Refusée"
+      },
+      "eventType": {
+        "auth.login": "Connexion"
       }
     },
     "scratchToReveal": "Grattez ou appuyez sur Entrée pour révéler",
