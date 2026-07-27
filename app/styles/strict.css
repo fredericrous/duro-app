@@ -1,6 +1,11 @@
 @react-strict-dom;
 
+/*
+ * Use the app-owned theme vars (flipped by html[data-theme]) rather than the
+ * hashed DS vars — those are only re-themed inside the ThemeProvider div, so
+ * they would leave the body dark in light mode (overscroll gutters).
+ */
 body {
-  background-color: var(--bg-xqkwqtp);
-  color: var(--text-xlpbogt);
+  background-color: var(--color-bg);
+  color: var(--color-text);
 }

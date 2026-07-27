@@ -96,7 +96,7 @@ describe("GeneralSettings component", () => {
       route: {
         path: "/settings",
         Component: GeneralSettings as never,
-        loader: () => ({ locale: "en", timezone: null, timeFormat: null, currentLocale: "en", theme: "dark" }),
+        loader: () => ({ locale: "en", timezone: null, timeFormat: null, currentLocale: "en", theme: "system" }),
       },
     })
     await waitFor(() => {
@@ -106,5 +106,8 @@ describe("GeneralSettings component", () => {
     expect(screen.getByText(t("settings.theme.heading"))).toBeInTheDocument()
     expect(screen.getAllByRole("button", { name: /save/i }).length).toBeGreaterThanOrEqual(3)
     expect(screen.getByText(new RegExp(t("settings.display.preview")))).toBeInTheDocument()
+    // The system (follow device) preference renders both as the selected
+    // trigger label (via initialLabels) and as a popup option.
+    expect(screen.getAllByText(t("settings.theme.system")).length).toBeGreaterThanOrEqual(1)
   })
 })

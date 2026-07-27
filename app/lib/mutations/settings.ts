@@ -6,7 +6,7 @@ import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { resendCert } from "~/lib/workflows/invite.server"
 import { supportedLngs } from "~/lib/i18n"
 import { localeCookieHeader } from "~/lib/i18n.server"
-import { isThemeChoice, themeCookieHeader } from "~/lib/theme.server"
+import { isThemePreference, themeCookieHeader } from "~/lib/theme.server"
 import { AUTO, TIMEZONE_OPTIONS, TIME_FORMAT_OPTIONS, selectToPref } from "~/lib/datetime"
 import type { AuthInfo } from "~/lib/auth.server"
 
@@ -140,7 +140,7 @@ function handleSaveDisplayPrefs(timezone: string | null, timeFormat: string | nu
 
 function handleSaveTheme(theme: string, auth: AuthInfo) {
   return Effect.gen(function* () {
-    if (!isThemeChoice(theme)) {
+    if (!isThemePreference(theme)) {
       return { error: "Invalid theme" } as SettingsResult
     }
     const prefs = yield* PreferencesRepo
@@ -219,7 +219,7 @@ export function parseSettingsMutation(formData: FormData, auth: AuthInfo): Setti
   }
   if (intent === "saveTheme") {
     const theme = formData.get("theme") as string
-    if (!isThemeChoice(theme)) return { error: "Invalid theme" }
+    if (!isThemePreference(theme)) return { error: "Invalid theme" }
     return { intent, theme, auth }
   }
   if (intent === "saveDisplayPrefs") {
