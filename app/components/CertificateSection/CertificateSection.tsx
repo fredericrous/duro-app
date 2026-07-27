@@ -17,6 +17,21 @@ function expiryStatus(expiresAt: string): "ok" | "soon" | "imminent" | "expired"
   return "ok"
 }
 
+/**
+ * 24h renewal cooldown, derived from the wall clock at call time (module
+ * level, like expiryStatus, so components stay compiler-pure and a lapsed
+ * cooldown unlocks on the next render without a remount).
+ */
+function cooldownState(
+  lastCertRenewalAt: string | null | undefined,
+): { inCooldown: true; cooldownEndsAt: number } | { inCooldown: false } {
+  const twentyFourHours = 24 * 60 * 60 * 1000
+  const cooldownEndsAt = lastCertRenewalAt ? new Date(lastCertRenewalAt).getTime() + twentyFourHours : null
+  return cooldownEndsAt !== null && Date.now() < cooldownEndsAt
+    ? { inCooldown: true, cooldownEndsAt }
+    : { inCooldown: false }
+}
+
 function daysUntil(expiresAt: string): number {
   return Math.ceil((new Date(expiresAt).getTime() - Date.now()) / ONE_DAY_MS)
 }
@@ -193,18 +208,15 @@ export function CertificateSection({
 
   const justSent = certData && "certSent" in certData
 
-  // Rate limit check — derived per render (Date.now() in render, same pattern
+  // Rate limit check — derived per render (module-level helper, same pattern
   // as expiryStatus above) so a lapsed cooldown unlocks without a remount.
   const isRateLimited = certData !== undefined && "rateLimited" in certData
-  const now = Date.now()
-  const twentyFourHours = 24 * 60 * 60 * 1000
-  const cooldownEndsAt = lastCertRenewalAt ? new Date(lastCertRenewalAt).getTime() + twentyFourHours : null
-  const inCooldown = cooldownEndsAt !== null && now < cooldownEndsAt
-  const cooldownRemaining = isRateLimited || inCooldown
+  const cooldown = cooldownState(lastCertRenewalAt)
+  const cooldownRemaining = isRateLimited || cooldown.inCooldown
   const nextAvailableText = isRateLimited
     ? formatDateTime(certData.nextAvailable)
-    : inCooldown
-      ? formatDateTime(cooldownEndsAt)
+    : cooldown.inCooldown
+      ? formatDateTime(cooldown.cooldownEndsAt)
       : ""
 
   return (
