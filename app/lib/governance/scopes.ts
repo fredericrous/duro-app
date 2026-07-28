@@ -29,7 +29,8 @@ export const KNOWN_SCOPES = [
   {
     id: "grants:read",
     label: "Read grants",
-    description: "List active grants for a principal (GET /api/principals/:id/grants).",
+    description:
+      "List active grants for a principal (GET /api/principals/:id/grants) or export all active grants with names resolved (GET /api/grants/export).",
     recommended: false,
   },
   {

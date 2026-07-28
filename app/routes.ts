@@ -54,6 +54,7 @@ export default [
   route("api/authz/check", "routes/api.authz.check.ts"),
   route("api/authz/check-bulk", "routes/api.authz.check-bulk.ts"),
   route("api/principals/:id/grants", "routes/api.principals.$id.grants.ts"),
+  route("api/grants/export", "routes/api.grants.export.ts"),
   route("api/access-requests", "routes/api.access-requests.ts"),
   route("api/catalog", "routes/api.catalog.ts"),
   route("api/invitations", "routes/api.invitations.ts"),
