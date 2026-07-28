@@ -18,7 +18,8 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Badge, EmptyState, Stack, Table, Tooltip } from "@duro-app/ui"
+import { Badge, EmptyState, Stack, Tooltip } from "@duro-app/ui"
+import { Table } from "@duro-app/ui/table"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 
