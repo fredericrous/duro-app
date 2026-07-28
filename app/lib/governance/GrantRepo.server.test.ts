@@ -159,6 +159,148 @@ describe("GrantRepo", () => {
     )
   })
 
+  it.layer(TestLayer)("exportActive resolves names in one joined shape", (it) => {
+    it.effect("returns grant with principal, application, role, resource and grantedBy resolved", () =>
+      Effect.gen(function* () {
+        const repo = yield* GrantRepo
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        yield* sql`INSERT INTO resources (id, application_id, resource_type, external_id, display_name)
+                   VALUES ('res-export-test', ${ids.appId}, 'repo', 'repo-42', 'Repo 42')`
+
+        yield* repo.grantRole({
+          principalId: ids.principalId,
+          roleId: ids.roleId,
+          resourceId: "res-export-test",
+          grantedBy: ids.principalId,
+          reason: "export test",
+        })
+
+        const rows = yield* repo.exportActive()
+        expect(rows).toHaveLength(1)
+        const row = rows[0]
+        expect(row.principalId).toBe(ids.principalId)
+        expect(row.principalExternalId).toBe("grantuser")
+        expect(row.principalDisplayName).toBe("Grant User")
+        expect(row.principalEmail).toBe("grant@example.com")
+        expect(row.principalType).toBe("user")
+        expect(row.applicationSlug).toBe("grant-app")
+        expect(row.applicationDisplayName).toBe("Grant App")
+        expect(row.roleSlug).toBe("editor")
+        expect(row.roleDisplayName).toBe("Editor")
+        expect(row.entitlementSlug).toBeNull()
+        expect(row.resourceExternalId).toBe("repo-42")
+        expect(row.resourceDisplayName).toBe("Repo 42")
+        expect(row.grantedById).toBe(ids.principalId)
+        expect(row.grantedByExternalId).toBe("grantuser")
+        expect(row.grantedByDisplayName).toBe("Grant User")
+        expect(row.reason).toBe("export test")
+        expect(row.expiresAt).toBeNull()
+        expect(row.createdAt).toBeDefined()
+        expect(row.members).toBeNull() // user grantee → no members array
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("exportActive expands group grantees", (it) => {
+    it.effect("group grant carries single-hop members; entitlement side resolved", () =>
+      Effect.gen(function* () {
+        const repo = yield* GrantRepo
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        yield* sql`INSERT INTO principals (id, principal_type, display_name)
+                   VALUES ('p-team', 'group', 'Team')`
+        yield* sql`INSERT INTO principals (id, principal_type, external_id, display_name, email)
+                   VALUES ('p-member', 'user', 'memberuser', 'Member User', 'member@example.com')`
+        yield* sql`INSERT INTO group_memberships (group_id, member_id) VALUES ('p-team', 'p-member')`
+
+        yield* repo.grantEntitlement({
+          principalId: "p-team",
+          entitlementId: ids.entitlementId,
+          grantedBy: ids.principalId,
+        })
+
+        const rows = yield* repo.exportActive()
+        expect(rows).toHaveLength(1)
+        const row = rows[0]
+        expect(row.principalType).toBe("group")
+        expect(row.roleSlug).toBeNull()
+        expect(row.entitlementSlug).toBe("edit")
+        expect(row.entitlementDisplayName).toBe("Edit")
+        expect(row.members).toEqual([
+          {
+            id: "p-member",
+            externalId: "memberuser",
+            displayName: "Member User",
+            email: "member@example.com",
+            principalType: "user",
+          },
+        ])
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("exportActive returns only active grants", (it) => {
+    it.effect("revoked and expired grants are excluded", () =>
+      Effect.gen(function* () {
+        const repo = yield* GrantRepo
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        const keeper = yield* repo.grantRole({
+          principalId: ids.principalId,
+          roleId: ids.roleId,
+          grantedBy: ids.principalId,
+        })
+
+        const revoked = yield* repo.grantEntitlement({
+          principalId: ids.principalId,
+          entitlementId: ids.entitlementId,
+          grantedBy: ids.principalId,
+        })
+        yield* repo.revoke(revoked.id, ids.principalId)
+
+        yield* sql`INSERT INTO grants (id, principal_id, role_id, granted_by, expires_at)
+                   VALUES ('grant-export-expired', ${ids.principalId}, ${ids.roleId}, ${ids.principalId}, NOW() - INTERVAL '1 day')`
+
+        const rows = yield* repo.exportActive()
+        expect(rows).toHaveLength(1)
+        expect(rows[0].id).toBe(keeper.id)
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("exportActive filters by application slug", (it) => {
+    it.effect("only grants on the requested app are returned", () =>
+      Effect.gen(function* () {
+        const repo = yield* GrantRepo
+        const ids = yield* seedTestData
+        const sql = yield* SqlClient.SqlClient
+
+        yield* sql`INSERT INTO applications (id, slug, display_name, access_mode)
+                   VALUES ('app-other-test', 'other-app', 'Other App', 'request')`
+        yield* sql`INSERT INTO roles (id, application_id, slug, display_name)
+                   VALUES ('role-other-test', 'app-other-test', 'viewer', 'Viewer')`
+
+        yield* repo.grantRole({ principalId: ids.principalId, roleId: ids.roleId, grantedBy: ids.principalId })
+        yield* repo.grantRole({ principalId: ids.principalId, roleId: "role-other-test", grantedBy: ids.principalId })
+
+        const filtered = yield* repo.exportActive({ applicationSlug: "other-app" })
+        expect(filtered).toHaveLength(1)
+        expect(filtered[0].applicationSlug).toBe("other-app")
+        expect(filtered[0].roleSlug).toBe("viewer")
+
+        const all = yield* repo.exportActive()
+        expect(all).toHaveLength(2)
+
+        const none = yield* repo.exportActive({ applicationSlug: "no-such-app" })
+        expect(none).toHaveLength(0)
+      }),
+    )
+  })
+
   it.layer(TestLayer)("findExpired returns expired grants", (it) => {
     it.effect("only expired non-revoked grants are returned", () =>
       Effect.gen(function* () {

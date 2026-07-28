@@ -146,6 +146,55 @@ export const GrantRow = Schema.Struct({
 })
 export type Grant = typeof GrantRow.Type
 
+/** Principal summary embedded in a grants-export row (group members). */
+export const GrantExportMember = Schema.Struct({
+  id: Schema.String,
+  externalId: Schema.NullOr(Schema.String),
+  displayName: Schema.String,
+  email: Schema.NullOr(Schema.String),
+  principalType: PrincipalType,
+})
+export type GrantExportMember = typeof GrantExportMember.Type
+
+// json_agg column: PGlite hands back a parsed array, node-postgres may hand
+// back the raw JSON string — normalize before validating the member shape.
+const GrantExportMembersColumn = Schema.transform(Schema.Unknown, Schema.NullOr(Schema.Array(GrantExportMember)), {
+  strict: false,
+  decode: (v) => (typeof v === "string" ? JSON.parse(v) : v),
+  encode: (v) => v,
+})
+
+/**
+ * One row of GrantRepo.exportActive() — a grant joined to its grantee,
+ * application (via role XOR entitlement), optional resource and the granting
+ * principal, with group members pre-aggregated (single-hop, JSON column).
+ */
+export const GrantExportRow = Schema.Struct({
+  id: Schema.String,
+  principalId: Schema.String,
+  principalExternalId: Coerced.NullableString,
+  principalDisplayName: Schema.String,
+  principalEmail: Coerced.NullableString,
+  principalType: PrincipalType,
+  applicationSlug: Schema.String,
+  applicationDisplayName: Schema.String,
+  roleSlug: Coerced.NullableString,
+  roleDisplayName: Coerced.NullableString,
+  entitlementSlug: Coerced.NullableString,
+  entitlementDisplayName: Coerced.NullableString,
+  resourceExternalId: Coerced.NullableString,
+  resourceDisplayName: Coerced.NullableString,
+  grantedById: Schema.String,
+  grantedByExternalId: Coerced.NullableString,
+  grantedByDisplayName: Schema.String,
+  reason: Coerced.NullableString,
+  expiresAt: Coerced.NullableDateString,
+  createdAt: Coerced.DateString,
+  /** Non-null iff the grantee is a group ('[]' for an empty group). */
+  members: GrantExportMembersColumn,
+})
+export type GrantExportRow = typeof GrantExportRow.Type
+
 export const AccessRequestRow = Schema.Struct({
   id: Schema.String,
   requesterId: Schema.String,
@@ -299,6 +348,7 @@ export const decodeResource = rowDecoder(ResourceRow)
 export const decodeRole = rowDecoder(RoleRow)
 export const decodeEntitlement = rowDecoder(EntitlementRow)
 export const decodeGrant = rowDecoder(GrantRow)
+export const decodeGrantExportRow = rowDecoder(GrantExportRow)
 export const decodeAccessRequest = rowDecoder(AccessRequestRow)
 export const decodeRequestApproval = rowDecoder(RequestApprovalRow)
 export const decodeApprovalPolicy = rowDecoder(ApprovalPolicyRow)
