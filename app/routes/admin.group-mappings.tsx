@@ -20,7 +20,8 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Badge, Button, ConfirmDialog, Dialog, EmptyState, Field, Input, Select, Stack, Table } from "@duro-app/ui"
+import { Badge, Button, ConfirmDialog, Dialog, EmptyState, Field, Input, Select, Stack } from "@duro-app/ui"
+import { Table } from "@duro-app/ui/table"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"

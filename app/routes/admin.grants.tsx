@@ -26,7 +26,8 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Button, ConfirmDialog, EmptyState, LinkButton, Stack, Table } from "@duro-app/ui"
+import { Button, ConfirmDialog, EmptyState, LinkButton, Stack } from "@duro-app/ui"
+import { Table } from "@duro-app/ui/table"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"

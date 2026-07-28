@@ -33,10 +33,10 @@ import {
   Select,
   Stack,
   Tabs,
-  Table,
   Text,
   useToast,
 } from "@duro-app/ui"
+import { Table } from "@duro-app/ui/table"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { AnimatedNumber } from "~/components/motion/AnimatedNumber"
 import { AppOverview } from "~/components/AppOverview/AppOverview"

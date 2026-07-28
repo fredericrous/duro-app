@@ -45,11 +45,11 @@ import {
   Input,
   LinkButton,
   Stack,
-  Table,
   Text,
   Toggle,
   ToggleGroup,
 } from "@duro-app/ui"
+import { Table } from "@duro-app/ui/table"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 import { useFetcherToast } from "~/lib/useFetcherToast"
