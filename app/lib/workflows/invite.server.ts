@@ -288,7 +288,19 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
 /** How long an emailed cert-reveal link stays valid. */
 const REVEAL_TTL_MS = 24 * 60 * 60 * 1000
 
-export const resendCert = (email: string, username: string, label?: string | null) =>
+export interface ResendCertOptions {
+  /** Device name carried onto the new cert. */
+  label?: string | null
+  /**
+   * Serial of the cert this issuance replaces. Recorded on both the cert row
+   * and the reveal token; the old cert is revoked when the reveal is consumed,
+   * never before — the user must have the replacement in hand first, or a
+   * renewal would lock them out of an mTLS-gated app.
+   */
+  renewedFromSerial?: string | null
+}
+
+export const resendCert = (email: string, username: string, opts: ResendCertOptions = {}) =>
   Effect.gen(function* () {
     const cert = yield* CertManager
     const emailService = yield* EmailService
@@ -310,7 +322,7 @@ export const resendCert = (email: string, username: string, label?: string | nul
         eventType: "cert.issued",
         targetType: "user_certificate",
         targetId: certResult.serialNumber,
-        metadata: { email, username },
+        metadata: { email, username, renewedFrom: opts.renewedFromSerial ?? null },
       })
       .pipe(Effect.catchAll(() => Effect.void))
 
@@ -321,10 +333,11 @@ export const resendCert = (email: string, username: string, label?: string | nul
         userId: username,
         username,
         email,
-        label: label ?? null,
+        label: opts.label ?? null,
         serialNumber: certResult.serialNumber,
         issuedAt: new Date(),
         expiresAt: certResult.notAfter,
+        renewedFromSerial: opts.renewedFromSerial ?? null,
       })
       .pipe(Effect.catchAll((e) => Effect.logWarning("resendCert: failed to store cert record", { error: String(e) })))
 
@@ -336,6 +349,7 @@ export const resendCert = (email: string, username: string, label?: string | nul
       email,
       username,
       expiresAt: new Date(Date.now() + REVEAL_TTL_MS),
+      renewedFromSerial: opts.renewedFromSerial ?? null,
     })
 
     // Send the link-only renewal email (no P12 attachment — the cert is

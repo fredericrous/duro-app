@@ -53,9 +53,10 @@ describe("SettingsLayout component", () => {
       expect(screen.getByRole("button", { name: t("settings.nav.general", "General") })).toBeInTheDocument()
     })
     expect(screen.getByRole("button", { name: t("settings.nav.activity", "Activity") })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: t("settings.nav.certificate", "Certificate") })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: t("settings.nav.apiKeys", "API keys") })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: t("settings.nav.security", "Security") })).toBeInTheDocument()
+    // Certificates moved out of settings to the top-level Devices page.
+    expect(screen.queryByRole("button", { name: /certificate/i })).not.toBeInTheDocument()
   })
 
   it("hides the Security item when no portal is configured", async () => {

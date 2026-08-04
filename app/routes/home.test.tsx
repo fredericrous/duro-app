@@ -436,9 +436,10 @@ describe("HomePage component — populated grid", () => {
       expect(screen.getByText(/No matching apps/i)).toBeInTheDocument()
     })
     // No-results promotes its own "Request access" CTA (the app may just not
-    // be granted) — one in the header + one in the EmptyState, both → catalog.
+    // be granted). It is the only one on screen — the header carries Devices
+    // and My requests now, not this.
     const requestLinks = screen.getAllByRole("link", { name: /Request access/i })
-    expect(requestLinks).toHaveLength(2)
+    expect(requestLinks).toHaveLength(1)
     for (const link of requestLinks) expect(link).toHaveAttribute("href", "/catalog")
     expect(screen.getByRole("button", { name: /Clear filters/i })).toBeInTheDocument()
   })

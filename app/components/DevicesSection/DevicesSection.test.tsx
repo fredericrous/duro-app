@@ -1,0 +1,177 @@
+import { describe, expect, it } from "vitest"
+import { screen, waitFor, fireEvent } from "@testing-library/react"
+import { DevicesSection } from "./DevicesSection"
+import { renderRoute } from "~/test/render-route"
+import { t } from "~/test/test-utils"
+import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
+
+// Helper: build a cert that's N days from expiring.
+const certExpiringIn = (days: number, serialNumber = "AABBCC11", over: Partial<UserCertificate> = {}) => {
+  const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
+  const issuedAt = new Date(Date.now() - (365 - days) * 24 * 60 * 60 * 1000).toISOString()
+  return {
+    id: `cert-${serialNumber}`,
+    userId: "p-alice",
+    label: null,
+    serialNumber,
+    issuedAt,
+    expiresAt,
+    revokedAt: null,
+    renewedFromSerial: null,
+    ...over,
+  } as UserCertificate
+}
+
+type SectionProps = Parameters<typeof DevicesSection>[0]
+
+// The section submits through `useFetcher`, so it needs a real data router (and
+// the ToastProvider that renderRoute mounts) — plain `render` can't host it.
+function renderSection(props: Partial<SectionProps> = {}, actionResult: unknown = { certSent: true }) {
+  return renderRoute({
+    route: {
+      path: "/devices",
+      Component: () => (
+        <DevicesSection email="alice@example.com" lastCertRenewalAt={null} certificates={[]} {...props} />
+      ),
+      loader: () => null,
+      action: () => actionResult,
+    },
+    url: "/devices",
+  })
+}
+
+describe("DevicesSection", () => {
+  it("renders the empty-state copy when there are no devices", async () => {
+    renderSection()
+    expect(await screen.findByText(t("devices.list.empty"))).toBeInTheDocument()
+    // Add-a-device button is visible (no cooldown).
+    expect(screen.getByRole("button", { name: t("devices.newCert") })).toBeInTheDocument()
+  })
+
+  it("renders the device row when one is present", async () => {
+    renderSection({ certificates: [certExpiringIn(60)] })
+    // The serial number's trailing 8 chars are rendered in <code>.
+    expect(await screen.findByText("AABBCC11")).toBeInTheDocument()
+  })
+
+  it("renders the imminent-expiry badge when within 7 days", async () => {
+    renderSection({ certificates: [certExpiringIn(3, "EXPIRES7")] })
+    // The badge uses the plural-aware devices.list.expiresInDays key. Day count
+    // is computed off Date.now() with Math.ceil, so we don't know the exact
+    // number — resolve the template with count=3 and match the non-numeric
+    // portion of the rendered output.
+    const sample = t("devices.list.expiresInDays", undefined, { count: 3 })
+    const stableFragment = sample.replace(/\d+/, "").trim().split(/\s+/).slice(0, 2).join(" ")
+    expect(await screen.findByText(new RegExp(stableFragment, "i"))).toBeInTheDocument()
+  })
+
+  it("renders the expired badge for a lapsed certificate", async () => {
+    // Expired certs reach this list (the loader lists unrevoked, not valid)
+    // precisely so they can still be renewed.
+    renderSection({ certificates: [certExpiringIn(-5, "GONE1234")] })
+    expect(await screen.findByText(t("devices.list.expired"))).toBeInTheDocument()
+  })
+
+  it("disables the add-a-device button when the user is in cooldown", async () => {
+    // lastCertRenewalAt < 24h ago → cooldown active.
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    renderSection({ lastCertRenewalAt: oneHourAgo })
+    const button = await screen.findByRole("button", { name: t("devices.newCert") })
+    expect(button).toBeDisabled()
+  })
+
+  it("never renders a scratch card — the password is revealed from the email only", async () => {
+    renderSection({ certificates: [certExpiringIn(60)] })
+    await screen.findByText("AABBCC11")
+    expect(screen.queryByRole("button", { name: t("common.scratchToReveal") })).not.toBeInTheDocument()
+  })
+
+  describe("issuing a certificate", () => {
+    const submit = async () => {
+      fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
+      fireEvent.click(await screen.findByRole("button", { name: t("devices.confirmButton") }))
+    }
+
+    it("closes the confirm form and points the user at their email", async () => {
+      renderSection()
+      await submit()
+      // The toast auto-dismisses, so the "check your email" pointer also
+      // persists inline, next to the button that produced it.
+      expect(await screen.findByText(t("devices.success"))).toBeInTheDocument()
+      expect(screen.queryByRole("button", { name: t("devices.confirmButton") })).not.toBeInTheDocument()
+      expect(screen.queryByRole("button", { name: t("common.cancel") })).not.toBeInTheDocument()
+    })
+
+    it("toasts the success where the user is looking", async () => {
+      renderSection()
+      await submit()
+      const toast = await waitFor(() => screen.getByRole("status"))
+      expect(toast).toHaveTextContent(t("devices.success"))
+    })
+
+    it("surfaces a failure without closing the form", async () => {
+      renderSection({}, { certError: "Vault unreachable" })
+      await submit()
+      const toast = await waitFor(() => screen.getByRole("alert"))
+      expect(toast).toHaveTextContent("Vault unreachable")
+      expect(screen.getByRole("button", { name: t("devices.confirmButton") })).toBeInTheDocument()
+    })
+  })
+
+  it("toasts when a certificate is revoked", async () => {
+    renderSection({ certificates: [certExpiringIn(60)] }, { certRevoked: true })
+    fireEvent.click(await screen.findByRole("button", { name: t("devices.list.revoke") }))
+    fireEvent.click(await screen.findByRole("button", { name: t("devices.list.revokeYes") }))
+    const toast = await waitFor(() => screen.getByRole("status"))
+    expect(toast).toHaveTextContent(t("devices.list.revoked"))
+  })
+
+  describe("renewing a device", () => {
+    it("submits and points the user at their email", async () => {
+      renderSection({ certificates: [certExpiringIn(5, "RENEWME1")] })
+      fireEvent.click(await screen.findByRole("button", { name: t("devices.renew") }))
+      const toast = await waitFor(() => screen.getByRole("status"))
+      expect(toast).toHaveTextContent(t("devices.success"))
+    })
+
+    it("announces the server's per-cert rate limit", async () => {
+      renderSection({ certificates: [certExpiringIn(5, "TOOSOON1")] }, { rateLimited: true, nextAvailable: "later" })
+      fireEvent.click(await screen.findByRole("button", { name: t("devices.renew") }))
+      const toast = await waitFor(() => screen.getByRole("alert"))
+      expect(toast).toHaveTextContent(t("devices.renewTooSoon"))
+    })
+
+    it("disables renew on a device renewed within the last 24h", async () => {
+      // After a renewal the button sits on the NEW cert, which has no successor
+      // of its own — the limit has to come from its own age, or a chain could be
+      // extended one cert at a time with no cooldown at all.
+      const old = certExpiringIn(5, "OLDSERIAL")
+      const replacement = certExpiringIn(90, "NEWSERIAL", {
+        renewedFromSerial: "OLDSERIAL",
+        issuedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      })
+      renderSection({ certificates: [old, replacement] })
+      const renew = await screen.findByRole("button", { name: t("devices.renew") })
+      expect(renew).toBeDisabled()
+      // ...and the row says when it unlocks, so the disabled button isn't a dead end.
+      const prefix = t("devices.renewNextAvailable", undefined, { time: "" }).trim()
+      expect(screen.getByText(new RegExp(prefix.split(/\s+/).slice(0, 2).join("\\s+"), "i"))).toBeInTheDocument()
+    })
+
+    it("shows the superseded cert beneath its device, without its own renew button", async () => {
+      const old = certExpiringIn(5, "OLDSERIAL", { label: "MacBook Pro" })
+      const replacement = certExpiringIn(90, "NEWSERIAL", {
+        label: "MacBook Pro",
+        renewedFromSerial: "OLDSERIAL",
+        issuedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      })
+      renderSection({ certificates: [old, replacement] })
+      expect(await screen.findByText(t("devices.replaced"))).toBeInTheDocument()
+      // One device, so one renew button — the superseded row offers revoke only.
+      expect(screen.getAllByRole("button", { name: t("devices.renew") })).toHaveLength(1)
+      expect(screen.getAllByRole("button", { name: t("devices.list.revoke") })).toHaveLength(2)
+      // Both certs belong to the same device, so the label is not repeated.
+      expect(screen.getAllByText("MacBook Pro")).toHaveLength(1)
+    })
+  })
+})

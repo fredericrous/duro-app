@@ -59,8 +59,15 @@ export const EmailServiceDev = Layer.succeed(EmailService, {
     Effect.log(`[DEV] Would send invite email to ${email} (locale=${locale ?? "en"})`).pipe(
       Effect.as(`<invite-${inviteId ?? "dev"}@${config.allowedOriginSuffix}>`),
     ),
-  sendCertRenewalEmail: (email, locale, _revealToken) =>
-    Effect.log(`[DEV] Would send cert renewal email to ${email} (locale=${locale ?? "en"})`),
+  // The reveal URL is logged rather than dropped: only the token's hash is
+  // persisted, so without this there is no way to follow issuance or renewal
+  // past the email locally — including the revoke-on-reveal step. Dev layer
+  // only; the live sender never logs the URL.
+  sendCertRenewalEmail: (email, locale, revealToken) =>
+    Effect.log(
+      `[DEV] Would send cert renewal email to ${email} (locale=${locale ?? "en"})` +
+        (revealToken ? ` — reveal at ${config.inviteBaseUrl}/cert/${revealToken}` : ""),
+    ),
   sendRecoveryNotificationEmail: (adminEmail, requesterEmail) =>
     Effect.log(`[DEV] Would notify admin ${adminEmail} of recovery request for ${requesterEmail}`),
   sendNotificationEmail: (to, subject) => Effect.log(`[DEV] Would send notification email to ${to}: ${subject}`),

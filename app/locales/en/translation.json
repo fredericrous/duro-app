@@ -44,6 +44,7 @@
   "header": {
     "welcome": "Welcome, {{user}}",
     "requestAccess": "Request access",
+    "devices": "Devices",
     "myRequests": "My requests",
     "requestDialog": {
       "loading": "Loading available apps…",
@@ -188,6 +189,46 @@
     "cancelConfirmTitle": "Cancel this request?",
     "cancelConfirmBody": "This withdraws your access request. You can submit a new one later if you still need access."
   },
+  "devices": {
+    "heading": "Devices",
+    "description": "Each device you use gets its own certificate. Add a device to set one up, or renew one that is expiring.",
+    "renew": "Renew",
+    "newCert": "Add a device",
+    "renewing": "Sending...",
+    "issuing": "Sending...",
+    "devicePlaceholder": "Device name (e.g. MacBook Pro)",
+    "confirm": "A certificate for your new device will be sent to {{email}}. Continue?",
+    "confirmButton": "Yes, send it",
+    "success": "Certificate sent to your email. Open the link in that email to reveal the install password.",
+    "nextAvailable": "You can add another device {{time}}",
+    "list": {
+      "device": "Device",
+      "unnamed": "Unnamed device",
+      "rename": "Rename",
+      "renamed": "Device renamed.",
+      "serial": "Serial",
+      "issued": "Issued",
+      "expires": "Expires",
+      "revoke": "Revoke",
+      "revoking": "Revoking...",
+      "revokeConfirm": "Revoke this certificate?",
+      "revokeYes": "Yes, revoke",
+      "revoked": "Certificate revoked.",
+      "revokeFailed": "Revocation failed. Retry?",
+      "empty": "No devices yet.",
+      "expired": "Expired",
+      "expiresInDays_one": "Expires in {{count}} day",
+      "expiresInDays_other": "Expires in {{count}} days"
+    },
+    "renewTooSoon": "This device was renewed recently. Try again later.",
+    "renewNextAvailable": "Renewable again {{time}}",
+    "replaced": "Replaced — revoked once you open the link in the email",
+    "sort": {
+      "label": "Sort by",
+      "name": "Name",
+      "expiry": "Expiry"
+    }
+  },
   "categories": {
     "media": "Media",
     "ai": "AI",
@@ -202,38 +243,6 @@
     "languageLabel": "Language",
     "languageHint": "Choose your preferred language for the interface.",
     "saved": "Settings saved.",
-    "cert": {
-      "heading": "Certificates",
-      "description": "Manage your security certificates. Add a new certificate to set up a new device.",
-      "renew": "New Certificate",
-      "newCert": "New Certificate",
-      "renewing": "Sending...",
-      "issuing": "Sending...",
-      "devicePlaceholder": "Device name (e.g. MacBook Pro)",
-      "confirm": "A new certificate will be sent to {{email}}. Continue?",
-      "confirmButton": "Yes, send it",
-      "success": "Certificate sent to your email. Open the link in that email to reveal the install password.",
-      "nextAvailable": "Next certificate available {{time}}",
-      "list": {
-        "device": "Device",
-        "unnamed": "Unnamed device",
-        "rename": "Rename",
-        "renamed": "Device renamed.",
-        "serial": "Serial",
-        "issued": "Issued",
-        "expires": "Expires",
-        "revoke": "Revoke",
-        "revoking": "Revoking...",
-        "revokeConfirm": "Revoke this certificate?",
-        "revokeYes": "Yes, revoke",
-        "revoked": "Certificate revoked.",
-        "revokeFailed": "Revocation failed. Retry?",
-        "empty": "No certificates yet.",
-        "expired": "Expired",
-        "expiresInDays_one": "Expires in {{count}} day",
-        "expiresInDays_other": "Expires in {{count}} days"
-      }
-    },
     "security": {
       "heading": "Account & security",
       "description": "Your password, multi-factor authentication, sessions, and email are managed by your identity provider.",
@@ -295,7 +304,6 @@
     "nav": {
       "title": "Settings",
       "general": "General",
-      "certificate": "Certificate",
       "apiKeys": "API keys",
       "security": "Security",
       "menu": "Menu",

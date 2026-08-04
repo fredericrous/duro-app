@@ -8,10 +8,13 @@ import { t } from "~/test/test-utils"
 // data-router context — supply one via renderRoute/createRoutesStub. The
 // "My requests" badge reads openRequestItems from the "routes/dashboard"
 // layout loader, so pass one when a test needs the badge to render.
-const renderHeader = (props: { user: string; isAdmin: boolean; showMenu?: boolean }, openRequestItems?: number) =>
+const renderHeader = (
+  props: { user: string; isAdmin: boolean; showMenu?: boolean },
+  dashboard?: { openRequestItems?: number; certAlerts?: number },
+) =>
   renderRoute({
-    parentLoaderId: openRequestItems === undefined ? undefined : "routes/dashboard",
-    parentLoader: openRequestItems === undefined ? undefined : () => ({ openRequestItems }),
+    parentLoaderId: dashboard === undefined ? undefined : "routes/dashboard",
+    parentLoader: dashboard === undefined ? undefined : () => dashboard,
     route: {
       path: "/",
       Component: (() => <Header {...props} />) as never,
@@ -27,15 +30,22 @@ describe("Header", () => {
     })
   })
 
-  it("surfaces the access verbs as persistent links to the catalog and requests", async () => {
+  it("surfaces the account-upkeep surfaces as persistent links", async () => {
     renderHeader({ user: "alice", isAdmin: false })
     await waitFor(() => {
-      expect(screen.getByRole("link", { name: t("header.requestAccess") })).toBeInTheDocument()
+      expect(screen.getByRole("link", { name: new RegExp(t("header.devices")) })).toBeInTheDocument()
     })
-    // "Request access" takes the user to the catalog to browse and request.
-    expect(screen.getByRole("link", { name: t("header.requestAccess") })).toHaveAttribute("href", "/catalog")
+    expect(screen.getByRole("link", { name: new RegExp(t("header.devices")) })).toHaveAttribute("href", "/devices")
     // "My requests" is a visible link, not a dropdown row.
     expect(screen.getByRole("link", { name: new RegExp(t("header.myRequests")) })).toHaveAttribute("href", "/requests")
+  })
+
+  it("no longer carries a Request access button — that CTA lives where it is the next step", async () => {
+    renderHeader({ user: "alice", isAdmin: false })
+    await waitFor(() => {
+      expect(screen.getByText(t("common.appTitle"))).toBeInTheDocument()
+    })
+    expect(screen.queryByRole("link", { name: t("header.requestAccess") })).not.toBeInTheDocument()
   })
 
   it("hides the actions and menu trigger when showMenu is false", async () => {
@@ -44,7 +54,8 @@ describe("Header", () => {
       expect(screen.getByText(t("common.appTitle"))).toBeInTheDocument()
     })
     expect(screen.queryByText(t("header.welcome", undefined, { user: "alice" }))).not.toBeInTheDocument()
-    expect(screen.queryByRole("link", { name: t("header.requestAccess") })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: new RegExp(t("header.devices")) })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: new RegExp(t("header.myRequests")) })).not.toBeInTheDocument()
   })
 
   it("renders the account menu trigger with the welcome greeting for the user", async () => {
@@ -58,7 +69,7 @@ describe("Header", () => {
   })
 
   it("badges My requests with the count of open items", async () => {
-    renderHeader({ user: "alice", isAdmin: false }, 3)
+    renderHeader({ user: "alice", isAdmin: false }, { openRequestItems: 3 })
     await waitFor(() => {
       expect(screen.getByRole("link", { name: new RegExp(t("header.myRequests")) })).toBeInTheDocument()
     })
@@ -67,9 +78,27 @@ describe("Header", () => {
   })
 
   it("omits the badge when nothing is awaiting the user", async () => {
-    renderHeader({ user: "alice", isAdmin: false }, 0)
+    renderHeader({ user: "alice", isAdmin: false }, { openRequestItems: 0 })
     await waitFor(() => {
       expect(screen.getByRole("link", { name: new RegExp(t("header.myRequests")) })).toBeInTheDocument()
+    })
+    expect(screen.queryByText("0")).not.toBeInTheDocument()
+  })
+
+  it("badges Devices when a certificate needs attention", async () => {
+    renderHeader({ user: "alice", isAdmin: false }, { certAlerts: 2 })
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: new RegExp(t("header.devices")) })).toBeInTheDocument()
+    })
+    // An expiring cert only announces itself as a lockout, so the count rides
+    // in the link's accessible name.
+    expect(screen.getByRole("link", { name: /Devices.*2/ })).toBeInTheDocument()
+  })
+
+  it("omits the Devices badge when every certificate is healthy", async () => {
+    renderHeader({ user: "alice", isAdmin: false }, { certAlerts: 0 })
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: new RegExp(t("header.devices")) })).toBeInTheDocument()
     })
     expect(screen.queryByText("0")).not.toBeInTheDocument()
   })

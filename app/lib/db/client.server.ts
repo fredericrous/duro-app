@@ -33,6 +33,7 @@ import m0026 from "./migrations/pg/0026_seed_app_access"
 import m0027 from "./migrations/pg/0027_add_display_preferences"
 import m0028 from "./migrations/pg/0028_seed_catalog_info"
 import m0029 from "./migrations/pg/0029_add_theme_preference"
+import m0030 from "./migrations/pg/0030_add_cert_renewal_lineage"
 
 const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
@@ -104,6 +105,7 @@ const migrations: Array<
   [27, "add_display_preferences", m0027],
   [28, "seed_catalog_info", m0028],
   [29, "add_theme_preference", m0029],
+  [30, "add_cert_renewal_lineage", m0030],
 ]
 
 const runMigrations = Effect.gen(function* () {
@@ -365,7 +367,8 @@ export const makeTestDbLayer = () => {
       request_approvals, access_requests, approval_policies,
       grants, role_entitlements, entitlements, roles, resources,
       group_mappings, applications, group_memberships, principals,
-      invites, user_revocations, user_preferences, user_certificates
+      invites, user_revocations, user_preferences, user_certificates,
+      cert_reveal_tokens
       RESTART IDENTITY CASCADE`
   }).pipe(Effect.as(true as const))
 

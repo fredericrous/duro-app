@@ -222,6 +222,8 @@ const mockCertificateRepo = () =>
     store: () => Effect.void,
     setLabel: () => Effect.succeed(1),
     listValid: () => Effect.succeed([]),
+    listUnrevoked: () => Effect.succeed([]),
+    findLatestRenewalOf: () => Effect.succeed(null),
     listAllByUsernames: () => Effect.succeed({}),
     findBySerial: () => Effect.succeed(null),
     markRevokePending: () => Effect.succeed(1),

@@ -130,7 +130,7 @@ export function truncateAll(): Promise<void> {
         grants, role_entitlements, entitlements, roles, resources,
         group_mappings, applications, group_memberships, principals,
         invites, user_revocations, user_preferences, user_certificates,
-        recovery_requests
+        recovery_requests, cert_reveal_tokens
         RESTART IDENTITY CASCADE`
     }) as Effect.Effect<void, never, never>,
   )

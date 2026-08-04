@@ -15,7 +15,8 @@ import type { AuthInfo } from "~/lib/auth.server"
 // ---------------------------------------------------------------------------
 
 export type SettingsMutation =
-  | { intent: "issueCert" | "renewCert"; label?: string | null; auth: AuthInfo }
+  | { intent: "issueCert"; label?: string | null; auth: AuthInfo }
+  | { intent: "renewCert"; serialNumber: string; auth: AuthInfo }
   | { intent: "revokeCert"; serialNumber: string; auth: AuthInfo }
   | { intent: "renameCert"; serialNumber: string; label: string | null; auth: AuthInfo }
   | { intent: "saveLocale"; locale: string; auth: AuthInfo }
@@ -53,9 +54,67 @@ function handleIssueCert(auth: AuthInfo, label?: string | null) {
       }
     }
 
-    const result = yield* resendCert(auth.email, auth.user!, label)
+    const result = yield* resendCert(auth.email, auth.user!, { label })
 
     yield* prefs.setCertRenewal(auth.user!, result.renewalId)
+
+    return { certSent: true as const }
+  }).pipe(
+    Effect.catchAll((e) => {
+      const message = errorMessage(e, "Failed to send certificate")
+      return Effect.succeed({ certError: message } as SettingsResult)
+    }),
+  )
+}
+
+/** One renewal per device per day. */
+const RENEW_COOLDOWN_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Renew one device's certificate.
+ *
+ * Unlike issueCert this does not spend the per-user 24h budget: that limit
+ * exists to cap unbounded issuance of NEW devices, and applying it here would
+ * mean a user with several devices could only rescue one expiring cert per day.
+ * A renewal is rate-limited per device instead, bounded from both ends — the
+ * cert being replaced must have settled for 24h, AND must not already have a
+ * replacement younger than that. The first condition is what actually bounds a
+ * renewal chain: each renewal produces a fresh cert with no successor, so a
+ * successor-only check would let the chain be extended indefinitely.
+ *
+ * The old cert is not touched here. It is revoked when the new cert's reveal
+ * link is opened (see consumeReveal), so a renewal the user never completes
+ * cannot lock them out.
+ */
+function handleRenewCert(serialNumber: string, auth: AuthInfo) {
+  return Effect.gen(function* () {
+    if (!auth.email) {
+      return { certError: "No email associated with your account." } as SettingsResult
+    }
+
+    const certRepo = yield* CertificateRepo
+    const existing = yield* certRepo.findBySerial(serialNumber)
+    // One answer for missing, not-yours, and already-revoked: never confirm the
+    // existence of someone else's serial.
+    if (!existing || existing.username !== auth.user || existing.revokedAt) {
+      return { certError: "Certificate not found" } as SettingsResult
+    }
+
+    const successor = yield* certRepo.findLatestRenewalOf(serialNumber)
+    const newestIssuedAt = Math.max(
+      new Date(existing.issuedAt).getTime(),
+      successor ? new Date(successor.issuedAt).getTime() : 0,
+    )
+    if (Date.now() - newestIssuedAt < RENEW_COOLDOWN_MS) {
+      return {
+        rateLimited: true as const,
+        nextAvailable: new Date(newestIssuedAt + RENEW_COOLDOWN_MS).toISOString(),
+      }
+    }
+
+    // The device name follows the certificate, so the row keeps its identity in
+    // the list across a renewal rather than reappearing as "Unnamed device".
+    yield* resendCert(auth.email, auth.user!, { label: existing.label, renewedFromSerial: serialNumber })
 
     return { certSent: true as const }
   }).pipe(
@@ -148,8 +207,9 @@ function handleSaveLocale(locale: string, auth: AuthInfo) {
 export function handleSettingsMutation(mutation: SettingsMutation) {
   switch (mutation.intent) {
     case "issueCert":
-    case "renewCert":
       return handleIssueCert(mutation.auth, mutation.label)
+    case "renewCert":
+      return handleRenewCert(mutation.serialNumber, mutation.auth)
     case "revokeCert":
       return handleRevokeCert(mutation.serialNumber, mutation.auth)
     case "renameCert":
@@ -177,8 +237,15 @@ function parseLabel(raw: FormDataEntryValue | null): string | null {
 export function parseSettingsMutation(formData: FormData, auth: AuthInfo): SettingsMutation | { error: string } {
   const intent = formData.get("intent") as string | null
 
-  if (intent === "issueCert" || intent === "renewCert") {
+  if (intent === "issueCert") {
     return { intent, label: parseLabel(formData.get("label")), auth }
+  }
+  if (intent === "renewCert") {
+    // No label from the form — a renewal inherits the device name of the cert
+    // it replaces, which the handler reads server-side.
+    const serialNumber = formData.get("serialNumber") as string
+    if (!serialNumber) return { error: "Missing serial number" }
+    return { intent, serialNumber, auth }
   }
   if (intent === "revokeCert") {
     const serialNumber = formData.get("serialNumber") as string

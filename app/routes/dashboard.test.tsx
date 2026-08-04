@@ -45,6 +45,7 @@ describe("/dashboard loader", () => {
       .mockResolvedValueOnce("principal-1" as never) // principal lookup
       .mockResolvedValueOnce(2 as never) // open-request-items count
       .mockResolvedValueOnce({ timezone: "Europe/Paris", timeFormat: "24" } as never) // display prefs
+      .mockResolvedValueOnce(1 as never) // expiring-certificate count
     mockRequireAuth.mockResolvedValue({
       user: "alice",
       email: "alice@example.com",
@@ -60,6 +61,7 @@ describe("/dashboard loader", () => {
       isAdmin: boolean
       currentPrincipalId: string | null
       openRequestItems: number
+      certAlerts: number
       timezone: string | null
       timeFormat: string | null
     }>(result)
@@ -71,6 +73,7 @@ describe("/dashboard loader", () => {
       isAdmin: true,
       currentPrincipalId: "principal-1",
       openRequestItems: 2,
+      certAlerts: 1,
       timezone: "Europe/Paris",
       timeFormat: "24",
     })
@@ -83,6 +86,7 @@ describe("/dashboard loader", () => {
       // logWarning → null), so runEffect resolves null instead of rejecting.
       .mockResolvedValueOnce(null as never) // principal lookup
       .mockResolvedValueOnce({ timezone: null, timeFormat: null } as never) // display prefs
+      .mockResolvedValueOnce(0 as never) // expiring-certificate count
     mockRequireAuth.mockResolvedValue({
       user: "alice",
       email: "alice@example.com",
@@ -101,6 +105,7 @@ describe("/dashboard loader", () => {
     mockRunEffect
       .mockResolvedValueOnce(false as never) // isFirstRun
       .mockResolvedValueOnce({ timezone: null, timeFormat: null } as never) // display prefs
+      .mockResolvedValueOnce(0 as never) // expiring-certificate count
     mockRequireAuth.mockResolvedValue({
       user: "alice",
       email: "alice@example.com",
@@ -112,7 +117,8 @@ describe("/dashboard loader", () => {
     const result = await callLoader(loader)
     const data = expectData<{ currentPrincipalId: string | null }>(result)
     expect(data.currentPrincipalId).toBeNull()
-    // No principal lookup / count without a sub — just isFirstRun + display prefs.
-    expect(mockRunEffect).toHaveBeenCalledTimes(2)
+    // No principal lookup / request count without a sub — isFirstRun, display
+    // prefs, and the cert-alert count (which keys off auth.user, not sub).
+    expect(mockRunEffect).toHaveBeenCalledTimes(3)
   })
 })

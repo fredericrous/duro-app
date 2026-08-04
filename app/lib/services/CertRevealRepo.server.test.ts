@@ -60,6 +60,21 @@ describe("CertRevealRepo", () => {
     )
   })
 
+  it.layer(TestLayer)("renewal lineage", (it) => {
+    it.effect("carries the superseded serial, defaulting to null", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertRevealRepo
+        // The reveal token is what tells the reveal handler which cert to
+        // revoke, so the serial has to survive the round-trip on its own.
+        const renewal = yield* repo.create(input({ renewalId: "renew-4", renewedFromSerial: "SN-OLD" }))
+        const plain = yield* repo.create(input({ renewalId: "renew-5" }))
+
+        expect((yield* repo.findByTokenHash(hashToken(renewal.token)))!.renewedFromSerial).toBe("SN-OLD")
+        expect((yield* repo.findByTokenHash(hashToken(plain.token)))!.renewedFromSerial).toBeNull()
+      }),
+    )
+  })
+
   it.layer(TestLayer)("expiry", (it) => {
     it.effect("an expired token is still found (caller enforces expiry, not the repo)", () =>
       Effect.gen(function* () {

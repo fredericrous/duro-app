@@ -44,6 +44,7 @@
   "header": {
     "welcome": "Bienvenue, {{user}}",
     "requestAccess": "Demander l'acces",
+    "devices": "Appareils",
     "myRequests": "Mes demandes",
     "requestDialog": {
       "loading": "Chargement des applications disponibles…",
@@ -188,6 +189,46 @@
     "cancelConfirmTitle": "Annuler cette demande ?",
     "cancelConfirmBody": "Cela retire votre demande d'accès. Vous pourrez en soumettre une nouvelle plus tard si nécessaire."
   },
+  "devices": {
+    "heading": "Appareils",
+    "description": "Chaque appareil que vous utilisez a son propre certificat. Ajoutez un appareil pour en configurer un, ou renouvelez celui qui expire.",
+    "renew": "Renouveler",
+    "newCert": "Ajouter un appareil",
+    "renewing": "Envoi...",
+    "issuing": "Envoi...",
+    "devicePlaceholder": "Nom de l'appareil (ex. MacBook Pro)",
+    "confirm": "Un certificat pour votre nouvel appareil sera envoye a {{email}}. Continuer ?",
+    "confirmButton": "Oui, envoyer",
+    "success": "Certificat envoye a votre e-mail. Ouvrez le lien dans cet e-mail pour reveler le mot de passe d'installation.",
+    "nextAvailable": "Vous pourrez ajouter un autre appareil {{time}}",
+    "list": {
+      "device": "Appareil",
+      "unnamed": "Appareil sans nom",
+      "rename": "Renommer",
+      "renamed": "Appareil renomme.",
+      "serial": "N° de serie",
+      "issued": "Emis le",
+      "expires": "Expire le",
+      "revoke": "Revoquer",
+      "revoking": "Revocation...",
+      "revokeConfirm": "Revoquer ce certificat ?",
+      "revokeYes": "Oui, revoquer",
+      "revoked": "Certificat revoque.",
+      "revokeFailed": "La revocation a echoue. Reessayer ?",
+      "empty": "Aucun appareil.",
+      "expired": "Expire",
+      "expiresInDays_one": "Expire dans {{count}} jour",
+      "expiresInDays_other": "Expire dans {{count}} jours"
+    },
+    "renewTooSoon": "Cet appareil a ete renouvele recemment. Reessayez plus tard.",
+    "renewNextAvailable": "Renouvelable a nouveau {{time}}",
+    "replaced": "Remplace — revoque des que vous ouvrez le lien de l'e-mail",
+    "sort": {
+      "label": "Trier par",
+      "name": "Nom",
+      "expiry": "Expiration"
+    }
+  },
   "categories": {
     "media": "Medias",
     "ai": "IA",
@@ -202,38 +243,6 @@
     "languageLabel": "Langue",
     "languageHint": "Choisissez votre langue preferee pour l'interface.",
     "saved": "Parametres enregistres.",
-    "cert": {
-      "heading": "Certificats",
-      "description": "Gerez vos certificats de securite. Ajoutez un nouveau certificat pour configurer un nouvel appareil.",
-      "renew": "Nouveau certificat",
-      "newCert": "Nouveau certificat",
-      "renewing": "Envoi...",
-      "issuing": "Envoi...",
-      "devicePlaceholder": "Nom de l'appareil (ex. MacBook Pro)",
-      "confirm": "Un nouveau certificat sera envoye a {{email}}. Continuer ?",
-      "confirmButton": "Oui, envoyer",
-      "success": "Certificat envoye a votre e-mail. Ouvrez le lien dans cet e-mail pour reveler le mot de passe d'installation.",
-      "nextAvailable": "Prochain certificat disponible {{time}}",
-      "list": {
-        "device": "Appareil",
-        "unnamed": "Appareil sans nom",
-        "rename": "Renommer",
-        "renamed": "Appareil renomme.",
-        "serial": "N° de serie",
-        "issued": "Emis le",
-        "expires": "Expire le",
-        "revoke": "Revoquer",
-        "revoking": "Revocation...",
-        "revokeConfirm": "Revoquer ce certificat ?",
-        "revokeYes": "Oui, revoquer",
-        "revoked": "Certificat revoque.",
-        "revokeFailed": "La revocation a echoue. Reessayer ?",
-        "empty": "Aucun certificat.",
-        "expired": "Expire",
-        "expiresInDays_one": "Expire dans {{count}} jour",
-        "expiresInDays_other": "Expire dans {{count}} jours"
-      }
-    },
     "security": {
       "heading": "Compte et securite",
       "description": "Votre mot de passe, l'authentification multifacteur, les sessions et l'e-mail sont geres par votre fournisseur d'identite.",
@@ -295,7 +304,6 @@
     "nav": {
       "title": "Paramètres",
       "general": "Général",
-      "certificate": "Certificat",
       "apiKeys": "Clés API",
       "security": "Sécurité",
       "menu": "Menu",

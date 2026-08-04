@@ -22,6 +22,8 @@ export interface UserCertificate {
   revokedAt: string | null
   revokeState: string | null
   revokeError: string | null
+  /** Serial of the cert this one replaces; null unless issued by a renewal. */
+  renewedFromSerial: string | null
 }
 
 export interface StoreCertInput {
@@ -33,6 +35,7 @@ export interface StoreCertInput {
   serialNumber: string
   issuedAt: Date
   expiresAt: Date
+  renewedFromSerial?: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -59,6 +62,16 @@ export class CertificateRepo extends Context.Tag("CertificateRepo")<
       label: string | null,
     ) => Effect.Effect<number, CertificateRepoError>
     readonly listValid: (username: string) => Effect.Effect<UserCertificate[], CertificateRepoError>
+    /**
+     * Every non-revoked cert, INCLUDING expired ones — an expired device still
+     * has to be visible so its owner can renew it (listValid hides those).
+     */
+    readonly listUnrevoked: (username: string) => Effect.Effect<UserCertificate[], CertificateRepoError>
+    /**
+     * Newest cert issued as a replacement for `serialNumber`. The renewal
+     * cooldown is derived from its issued_at.
+     */
+    readonly findLatestRenewalOf: (serialNumber: string) => Effect.Effect<UserCertificate | null, CertificateRepoError>
     readonly listAllByUsernames: (
       usernames: string[],
     ) => Effect.Effect<Record<string, UserCertificate[]>, CertificateRepoError>
@@ -94,6 +107,7 @@ const toRow = (r: any): UserCertificate => ({
   revokedAt: r.revokedAt ?? null,
   revokeState: r.revokeState ?? null,
   revokeError: r.revokeError ?? null,
+  renewedFromSerial: r.renewedFromSerial ?? null,
 })
 
 // ---------------------------------------------------------------------------
@@ -114,9 +128,10 @@ export const CertificateRepoLive = Layer.effect(
         const label = cert.label ?? null
         const issuedAt = cert.issuedAt.toISOString()
         const expiresAt = cert.expiresAt.toISOString()
+        const renewedFromSerial = cert.renewedFromSerial ?? null
         return withErr(
-          sql`INSERT INTO user_certificates (id, invite_id, user_id, username, email, label, serial_number, issued_at, expires_at)
-              VALUES (${id}, ${inviteId}, ${userId}, ${cert.username}, ${cert.email}, ${label}, ${cert.serialNumber}, ${issuedAt}, ${expiresAt})`.pipe(
+          sql`INSERT INTO user_certificates (id, invite_id, user_id, username, email, label, serial_number, issued_at, expires_at, renewed_from_serial)
+              VALUES (${id}, ${inviteId}, ${userId}, ${cert.username}, ${cert.email}, ${label}, ${cert.serialNumber}, ${issuedAt}, ${expiresAt}, ${renewedFromSerial})`.pipe(
             Effect.asVoid,
           ),
           "Failed to store certificate",
@@ -139,6 +154,24 @@ export const CertificateRepoLive = Layer.effect(
               WHERE username = ${username} AND revoked_at IS NULL AND expires_at > NOW()
               ORDER BY issued_at DESC`.pipe(Effect.map((rows) => rows.map(toRow))),
           "Failed to list valid certificates",
+        ),
+
+      listUnrevoked: (username: string) =>
+        withErr(
+          sql`SELECT * FROM user_certificates
+              WHERE username = ${username} AND revoked_at IS NULL
+              ORDER BY issued_at DESC`.pipe(Effect.map((rows) => rows.map(toRow))),
+          "Failed to list unrevoked certificates",
+        ),
+
+      findLatestRenewalOf: (serialNumber: string) =>
+        withErr(
+          // Revoked successors count too: otherwise "renew, revoke the new one,
+          // renew again" is an unbounded bypass of the renewal rate limit.
+          sql`SELECT * FROM user_certificates
+              WHERE renewed_from_serial = ${serialNumber}
+              ORDER BY issued_at DESC LIMIT 1`.pipe(Effect.map((rows) => (rows[0] ? toRow(rows[0]) : null))),
+          "Failed to find latest renewal",
         ),
 
       listAllByUsernames: (usernames: string[]) =>
@@ -169,15 +202,16 @@ export const CertificateRepoLive = Layer.effect(
 
       markRevokePending: (serialNumber: string, username?: string) =>
         withErr(
+          // RETURNING + rows.length, same as setLabel: the bare affected-count
+          // property differs between pg and PGlite and read as 0 on both here,
+          // which made every ownership-checked revoke report "not found".
           username
             ? sql`UPDATE user_certificates SET revoke_state = 'pending'
-                  WHERE serial_number = ${serialNumber} AND username = ${username} AND revoked_at IS NULL`.pipe(
-                Effect.map((rows) => (rows as any).count ?? (rows as any).changes ?? 0),
-              )
+                  WHERE serial_number = ${serialNumber} AND username = ${username} AND revoked_at IS NULL
+                  RETURNING serial_number`.pipe(Effect.map((rows) => rows.length))
             : sql`UPDATE user_certificates SET revoke_state = 'pending'
-                  WHERE serial_number = ${serialNumber} AND revoked_at IS NULL`.pipe(
-                Effect.map((rows) => (rows as any).count ?? (rows as any).changes ?? 0),
-              ),
+                  WHERE serial_number = ${serialNumber} AND revoked_at IS NULL
+                  RETURNING serial_number`.pipe(Effect.map((rows) => rows.length)),
           "Failed to mark certificate as revoke-pending",
         ),
 

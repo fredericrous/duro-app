@@ -324,6 +324,8 @@ const mockCertificateRepo = (calls: { method: string; args: unknown[] }[] = []) 
     },
     setLabel: (_serial, _username, _label) => Effect.succeed(1),
     listValid: () => Effect.succeed([]),
+    listUnrevoked: () => Effect.succeed([]),
+    findLatestRenewalOf: () => Effect.succeed(null),
     listAllByUsernames: () => Effect.succeed({}),
     findBySerial: () => Effect.succeed(null),
     markRevokePending: (_serial, _username?) => {

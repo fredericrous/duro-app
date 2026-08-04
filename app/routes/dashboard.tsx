@@ -8,6 +8,8 @@ import { isFirstRun } from "~/lib/governance/bootstrap.server"
 import { runEffect } from "~/lib/runtime.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
+import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
+import { expiryStatus } from "~/lib/cert-status"
 import { DisplayPrefsProvider } from "~/hooks/useDisplayFormat"
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -73,6 +75,23 @@ export async function loader({ request }: Route.LoaderArgs) {
     }),
   ).catch(() => ({ timezone: null, timeFormat: null }))
 
+  // Certificates that are expired or expire within a week, so the header can
+  // badge "Devices". A cert lapsing is the one piece of account upkeep nobody
+  // goes looking for — unbadged, the first sign of it is being locked out.
+  let certAlerts = 0
+  if (auth.user) {
+    certAlerts = await runEffect(
+      Effect.gen(function* () {
+        const certRepo = yield* CertificateRepo
+        const certs = yield* certRepo.listUnrevoked(auth.user!)
+        return certs.filter((c) => {
+          const status = expiryStatus(c.expiresAt)
+          return status === "expired" || status === "imminent"
+        }).length
+      }).pipe(Effect.catchAll(() => Effect.succeed(0))),
+    )
+  }
+
   return {
     user: auth.user,
     email: auth.email,
@@ -80,6 +99,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     isAdmin: adminDecision.allow,
     currentPrincipalId,
     openRequestItems,
+    certAlerts,
     timezone: displayPrefs.timezone,
     timeFormat: displayPrefs.timeFormat,
   }

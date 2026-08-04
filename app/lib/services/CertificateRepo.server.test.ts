@@ -274,3 +274,91 @@ describe("CertificateRepo — device label", () => {
     )
   })
 })
+
+describe("CertificateRepo — renewal lineage", () => {
+  it.layer(TestLayer)("store round-trips renewed_from_serial", (it) => {
+    it.effect("lineage survives the insert", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        yield* repo.store(sample({ serialNumber: "SN-OLD", username: "alice" }))
+        yield* repo.store(sample({ serialNumber: "SN-NEW", username: "alice", renewedFromSerial: "SN-OLD" }))
+
+        expect((yield* repo.findBySerial("SN-NEW"))?.renewedFromSerial).toBe("SN-OLD")
+        expect((yield* repo.findBySerial("SN-OLD"))?.renewedFromSerial).toBeNull()
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("findLatestRenewalOf returns the newest successor", (it) => {
+    it.effect("newest wins", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        yield* repo.store(sample({ serialNumber: "SN-R0", username: "alice" }))
+        yield* repo.store(
+          sample({
+            serialNumber: "SN-R1",
+            username: "alice",
+            renewedFromSerial: "SN-R0",
+            issuedAt: new Date("2026-01-01T00:00:00Z"),
+          }),
+        )
+        yield* repo.store(
+          sample({
+            serialNumber: "SN-R2",
+            username: "alice",
+            renewedFromSerial: "SN-R0",
+            issuedAt: new Date("2026-02-01T00:00:00Z"),
+          }),
+        )
+
+        expect((yield* repo.findLatestRenewalOf("SN-R0"))?.serialNumber).toBe("SN-R2")
+        expect(yield* repo.findLatestRenewalOf("SN-R2")).toBeNull()
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("findLatestRenewalOf still sees a revoked successor", (it) => {
+    it.effect("revoking the replacement does not reopen the rate limit", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        yield* repo.store(sample({ serialNumber: "SN-V0", username: "alice" }))
+        yield* repo.store(sample({ serialNumber: "SN-V1", username: "alice", renewedFromSerial: "SN-V0" }))
+        yield* repo.markRevokeCompleted("SN-V1")
+
+        expect((yield* repo.findLatestRenewalOf("SN-V0"))?.serialNumber).toBe("SN-V1")
+      }),
+    )
+  })
+})
+
+describe("CertificateRepo — listUnrevoked", () => {
+  it.layer(TestLayer)("keeps expired certs and drops revoked ones", (it) => {
+    it.effect("an expired device stays visible so it can be renewed", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        yield* repo.store(sample({ serialNumber: "SN-U-OK", username: "carol", expiresAt: inDays(30) }))
+        yield* repo.store(sample({ serialNumber: "SN-U-EXP", username: "carol", expiresAt: inDays(-1) }))
+        yield* repo.store(sample({ serialNumber: "SN-U-REV", username: "carol", expiresAt: inDays(30) }))
+        yield* repo.markRevokeCompleted("SN-U-REV")
+        yield* repo.store(sample({ serialNumber: "SN-U-OTHER", username: "dave" }))
+
+        const serials = (yield* repo.listUnrevoked("carol")).map((c) => c.serialNumber).sort()
+        expect(serials).toEqual(["SN-U-EXP", "SN-U-OK"])
+      }),
+    )
+  })
+})
+
+describe("CertificateRepo — markRevokePending affected count", () => {
+  it.layer(TestLayer)("reports the row it updated", (it) => {
+    it.effect("count drives the user-facing 'Certificate not found' check", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        yield* repo.store(sample({ serialNumber: "SN-CNT", username: "alice" }))
+
+        expect(yield* repo.markRevokePending("SN-CNT", "alice")).toBe(1)
+        expect(yield* repo.markRevokePending("SN-MISSING", "alice")).toBe(0)
+      }),
+    )
+  })
+})

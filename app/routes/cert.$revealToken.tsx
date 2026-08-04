@@ -3,10 +3,8 @@ import { Trans, useTranslation } from "react-i18next"
 import { useFetcher, useParams } from "react-router"
 import type { Route } from "./+types/cert.$revealToken"
 import { runEffect } from "~/lib/runtime.server"
-import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
-import { CertManager } from "~/lib/services/CertManager.server"
+import { consumeReveal, resolveReveal } from "~/lib/workflows/cert-reveal.server"
 import { config, isOriginAllowed } from "~/lib/config.server"
-import { hashToken } from "~/lib/crypto.server"
 import { Effect } from "effect"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
@@ -21,28 +19,6 @@ export function meta({ data }: Route.MetaArgs) {
   return [{ title: data?.appName ? `Your certificate — ${data.appName}` : "Your certificate" }]
 }
 
-/**
- * Resolve the reveal token to its current state. Shared by the loader, action
- * and download route. The loader/download only READ; the password is burned
- * (one-time) only on the explicit reveal POST, so a link-scanner's prefetch GET
- * cannot consume it. The cert (.p12) stays downloadable for the token's 24h
- * lifetime — it's the password that is single-use.
- */
-const resolve = (revealToken: string) =>
-  Effect.gen(function* () {
-    const revealRepo = yield* CertRevealRepo
-    const cert = yield* CertManager
-    const row = yield* revealRepo.findByTokenHash(hashToken(revealToken))
-    if (!row) return { state: "invalid" as const }
-    if (new Date(row.expiresAt) < new Date()) return { state: "expired" as const, row }
-    const password = yield* cert.getP12Password(row.renewalId)
-    const p12 = yield* cert.getP12(row.renewalId)
-    if (!password && !p12) return { state: "consumed" as const, row }
-    // Password already burned but the cert is still downloadable.
-    if (!password) return { state: "revealed" as const, row }
-    return { state: "ok" as const, row, password }
-  })
-
 export async function loader({ params }: Route.LoaderArgs) {
   const revealToken = params.revealToken
   if (!revealToken) {
@@ -50,7 +26,7 @@ export async function loader({ params }: Route.LoaderArgs) {
   }
 
   const result = await runEffect(
-    resolve(revealToken).pipe(
+    resolveReveal(revealToken).pipe(
       Effect.catchAll((e) =>
         Effect.logError("[cert-reveal] loader error", { error: String(e) }).pipe(
           Effect.as({ state: "unknown" as const }),
@@ -82,17 +58,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (formData.get("intent") !== "reveal") return { revealed: false as const }
 
   const consumed = await runEffect(
-    Effect.gen(function* () {
-      const revealRepo = yield* CertRevealRepo
-      const cert = yield* CertManager
-      const result = yield* resolve(revealToken)
-      if (result.state !== "ok") return false
-      // One-time password: stamp the audit timestamp and strip the password
-      // from Vault. The .p12 bundle is left in place so it stays downloadable.
-      yield* revealRepo.markRevealed(result.row.id)
-      yield* cert.consumeP12Password(result.row.renewalId)
-      return true
-    }).pipe(
+    consumeReveal(revealToken).pipe(
       Effect.catchAll((e) =>
         Effect.logError("[cert-reveal] action error", { error: String(e) }).pipe(Effect.as(false)),
       ),

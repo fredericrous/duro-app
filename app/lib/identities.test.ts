@@ -32,6 +32,7 @@ const cert = (over: Partial<UserCertificate> & { serialNumber: string; username:
   revokedAt: null,
   revokeState: null,
   revokeError: null,
+  renewedFromSerial: null,
   ...over,
 })
 

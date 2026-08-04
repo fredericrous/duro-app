@@ -35,3 +35,28 @@ export const revokeSerialForUser = (serial: string, opts: { auditUsername?: stri
       Effect.catchAll((e) => certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void))),
     )
   })
+
+/**
+ * Retire the cert a renewal replaced, once the replacement has actually been
+ * revealed to its owner. Best-effort by construction: the user must still get
+ * their new certificate even if revoking the old one fails, so every error is
+ * swallowed here. A failure leaves revoke_state='failed' on the row, which the
+ * device list surfaces with a retry button — the only recovery path, since
+ * nothing sweeps stuck revocations in the background.
+ *
+ * Ownership is re-checked by reading the row rather than trusting an UPDATE's
+ * affected-row count, which is driver-dependent here (see setLabel's note).
+ */
+export const revokeSupersededCert = (serial: string, username: string) =>
+  Effect.gen(function* () {
+    const certRepo = yield* CertificateRepo
+    const existing = yield* certRepo.findBySerial(serial)
+    // Already gone, never existed, or not this user's to revoke.
+    if (!existing || existing.revokedAt || existing.username !== username) return
+    yield* certRepo.markRevokePending(serial, username)
+    yield* revokeSerialForUser(serial, { auditUsername: username })
+  }).pipe(
+    Effect.catchAll((e) =>
+      Effect.logWarning("[cert-renewal] failed to revoke superseded cert", { serial, error: String(e) }),
+    ),
+  )

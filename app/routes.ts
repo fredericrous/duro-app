@@ -12,6 +12,7 @@ export default [
     ]),
     route("catalog", "routes/catalog.tsx"),
     route("requests", "routes/requests.tsx"),
+    route("devices", "routes/devices.tsx"),
     route("admin", "routes/admin.tsx", [
       index("routes/admin.dashboard.tsx"),
       route("invites", "routes/admin.invites.tsx"),

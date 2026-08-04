@@ -23,6 +23,7 @@ import {
   ConfirmDialog,
   EmptyState,
   Inline,
+  LinkButton,
   PageShell,
   ScrollArea,
   Stack,
@@ -274,10 +275,26 @@ export default function MyRequestsPage({ loaderData }: Route.ComponentProps) {
               <HelpPopover termKey="glossary.myRequests" />
             </>
           }
+          // With requests on screen the CTA is a way back to the catalog, not
+          // the point of the page — the empty state below promotes its own.
+          action={
+            requests.length > 0 ? (
+              <LinkButton href="/catalog" variant="secondary">
+                {t("header.requestAccess")}
+              </LinkButton>
+            ) : undefined
+          }
         >
           <Stack gap="md">
             {requests.length === 0 ? (
-              <EmptyState message={t("requests.empty")} />
+              <EmptyState
+                message={t("requests.empty")}
+                action={
+                  <LinkButton href="/catalog" variant="primary">
+                    {t("header.requestAccess")}
+                  </LinkButton>
+                }
+              />
             ) : (
               <ScrollArea.Root>
                 <ScrollArea.Viewport>

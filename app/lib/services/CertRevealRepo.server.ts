@@ -17,6 +17,12 @@ export interface CertRevealToken {
   createdAt: string
   expiresAt: string
   revealedAt: string | null
+  /**
+   * Serial of the cert this reveal's certificate replaces, revoked once the
+   * reveal is consumed. Carried on the token rather than looked up from the new
+   * cert row because storing that row is best-effort (see resendCert).
+   */
+  renewedFromSerial: string | null
 }
 
 export interface CreateRevealInput {
@@ -24,6 +30,7 @@ export interface CreateRevealInput {
   email: string
   username: string
   expiresAt: Date
+  renewedFromSerial?: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -65,6 +72,7 @@ const toRow = (r: any): CertRevealToken => ({
   createdAt: r.createdAt,
   expiresAt: r.expiresAt,
   revealedAt: r.revealedAt ?? null,
+  renewedFromSerial: r.renewedFromSerial ?? null,
 })
 
 // ---------------------------------------------------------------------------
@@ -83,9 +91,10 @@ export const CertRevealRepoLive = Layer.effect(
         const token = crypto.randomBytes(32).toString("base64url")
         const tokenHash = hashToken(token)
         const expiresAt = input.expiresAt.toISOString()
+        const renewedFromSerial = input.renewedFromSerial ?? null
         return withErr(
-          sql`INSERT INTO cert_reveal_tokens (id, token_hash, renewal_id, email, username, expires_at)
-              VALUES (${id}, ${tokenHash}, ${input.renewalId}, ${input.email}, ${input.username}, ${expiresAt})`.pipe(
+          sql`INSERT INTO cert_reveal_tokens (id, token_hash, renewal_id, email, username, expires_at, renewed_from_serial)
+              VALUES (${id}, ${tokenHash}, ${input.renewalId}, ${input.email}, ${input.username}, ${expiresAt}, ${renewedFromSerial})`.pipe(
             Effect.as({ id, token }),
           ),
           "Failed to create cert reveal token",

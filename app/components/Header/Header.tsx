@@ -26,9 +26,10 @@ const styles = css.create({
     textDecoration: "none",
     color: colors.text,
   },
-  // Request access / My requests live here as visible controls rather than
-  // buried in the account dropdown — hidden actions get forgotten. The cluster
-  // wraps on narrow viewports so nothing overflows.
+  // Devices / My requests live here as visible controls rather than buried in
+  // the account dropdown — both can badge for something needing attention, and
+  // a badge nobody sees is pointless. The cluster wraps on narrow viewports so
+  // nothing overflows.
   actions: {
     display: "flex",
     alignItems: "center",
@@ -54,14 +55,21 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
   // in-flight requests + open invitations), loaded once by the dashboard
   // layout. Reading it here keeps every caller from having to thread the count
   // through as a prop; it falls back to 0 outside that layout (e.g. tests).
-  const dashboard = useRouteLoaderData("routes/dashboard") as { openRequestItems?: number } | undefined
+  const dashboard = useRouteLoaderData("routes/dashboard") as
+    | { openRequestItems?: number; certAlerts?: number }
+    | undefined
   const openItems = dashboard?.openRequestItems ?? 0
+  // Certificates that are expired or expiring within a week. Badged here
+  // because a cert expiring is the one piece of account upkeep nobody thinks
+  // to go looking for — it only surfaces as being locked out.
+  const certAlerts = dashboard?.certAlerts ?? 0
 
   // Both header actions are secondary: on a populated dashboard the primary
   // action is launching an app, so no header control competes with the grid
-  // for attention. Empty states (NoAccess, search no-results) promote their
-  // own primary "request access" CTA where it genuinely is the next step. The
-  // account menu keeps only identity actions, where people expect to find them.
+  // for attention. Requesting access is reached from where people already look
+  // for it — the catalog, the empty dashboard, and /requests, each promoting
+  // its own primary CTA where it genuinely is the next step. The account menu
+  // keeps only identity actions, where people expect to find them.
 
   return (
     <html.div style={styles.row}>
@@ -70,8 +78,13 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
       </Link>
       {showMenu && (
         <html.div style={styles.actions}>
-          <LinkButton href="/catalog" variant="secondary">
-            {t("header.requestAccess")}
+          <LinkButton href="/devices" variant="secondary">
+            {t("header.devices")}
+            {certAlerts > 0 && (
+              <Badge variant="warning" size="sm">
+                {certAlerts}
+              </Badge>
+            )}
           </LinkButton>
           <LinkButton href="/requests" variant="secondary">
             {t("header.myRequests")}

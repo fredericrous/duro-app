@@ -256,6 +256,7 @@ import type { AccessRequestEnriched } from "~/lib/governance/AccessRequestRepo.s
 import type { AccessInvitationEnriched } from "~/lib/governance/AccessInvitationRepo.server"
 import MyRequestsPage from "./requests"
 import { renderRoute } from "~/test/render-route"
+import { t } from "~/test/test-utils"
 
 const invRow = (overrides: Partial<AccessInvitationEnriched>): AccessInvitationEnriched => ({
   id: overrides.id ?? "inv-1",
@@ -379,5 +380,23 @@ describe("MyRequestsPage component", () => {
       expect(screen.getByText("App 1")).toBeInTheDocument()
     })
     expect(screen.queryByRole("button", { name: /Accept/i })).not.toBeInTheDocument()
+  })
+
+  it("promotes requesting access in the empty state, where it is the only next step", async () => {
+    renderRequests([])
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: t("header.requestAccess") })).toBeInTheDocument()
+    })
+    // Without this the empty state is a dead end — the header no longer
+    // carries a Request access button.
+    expect(screen.getByRole("link", { name: t("header.requestAccess") })).toHaveAttribute("href", "/catalog")
+  })
+
+  it("keeps a way back to the catalog once requests exist", async () => {
+    renderRequests([reqRow({ id: "r1", status: "pending" })])
+    await waitFor(() => {
+      expect(screen.getByText("App 1")).toBeInTheDocument()
+    })
+    expect(screen.getByRole("link", { name: t("header.requestAccess") })).toHaveAttribute("href", "/catalog")
   })
 })
