@@ -16,13 +16,27 @@ const cssCreate = (styles: Record<string, any>) => {
   return result
 }
 
-// html.* elements forward to native HTML elements
+// html.* elements forward to native HTML elements.
+//
+// The component per tag is created ONCE and cached. Minting a fresh
+// forwardRef on every property access would hand React a new element *type*
+// on every render, which it can only reconcile by unmounting the old subtree
+// and mounting a new one — so any re-render of a component using html.*
+// silently remounts its whole subtree, resetting child state. On a page whose
+// subtree registers a router fetcher, that remount loop never terminates: the
+// new fetcher updates router state, which re-renders, which remounts again.
+const htmlComponents = new Map<string, React.ElementType>()
 const htmlHandler: ProxyHandler<any> = {
   get(_target, prop: string) {
-    return React.forwardRef((props: any, ref: any) => {
+    const cached = htmlComponents.get(prop)
+    if (cached) return cached
+    const component = React.forwardRef((props: any, ref: any) => {
       const { style: _style, ...rest } = props
       return React.createElement(prop, { ...rest, ref })
     })
+    component.displayName = `html.${prop}`
+    htmlComponents.set(prop, component)
+    return component
   },
 }
 

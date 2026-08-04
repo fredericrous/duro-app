@@ -119,7 +119,7 @@ describe("/cert/:revealToken/download loader", () => {
 // Component-render tests (CertRevealPage + PasswordCard)
 // ===========================================================================
 
-import { screen, waitFor } from "@testing-library/react"
+import { fireEvent, screen, waitFor } from "@testing-library/react"
 import CertRevealPage from "./cert.$revealToken"
 import { renderRoute } from "~/test/render-route"
 import { t } from "~/test/test-utils"
@@ -182,5 +182,36 @@ describe("CertRevealPage component", () => {
     expect(screen.getByText(t("invite.password.copy"))).toBeInTheDocument()
     expect(screen.getByText(t("invite.password.oneTime"))).toBeInTheDocument()
     expect(screen.getByRole("link", { name: t("certReveal.download") })).toHaveAttribute("href", "/cert/tok/download")
+  })
+
+  // Drives the whole reveal through a real router: scratch → burn POST →
+  // revalidation. Until the react-strict-dom mock cached its element types this
+  // could not be tested at all — each re-render remounted the card, which
+  // registered a fresh fetcher, which re-rendered, forever.
+  it("survives the reveal round-trip when the burn takes the password away", async () => {
+    let loaderCalls = 0
+    renderRoute({
+      route: {
+        path: "/cert/:revealToken",
+        Component: CertRevealPage as never,
+        loader: () =>
+          loaderCalls++ === 0
+            ? { valid: true, revealed: false, email: "user@example.com", password: "s3cret-pw", appName: "Duro" }
+            : { valid: true, revealed: true, email: "user@example.com", appName: "Duro" },
+        action: () => ({ revealed: true }),
+      },
+      url: "/cert/tok",
+    })
+
+    await screen.findByDisplayValue("s3cret-pw")
+    fireEvent.click(screen.getByTestId("scratch-card"))
+
+    // The reveal POST ran and the loader re-ran with the password already burned.
+    await waitFor(() => expect(loaderCalls).toBeGreaterThan(1))
+
+    // The password and its copy button are still on screen for the user to use.
+    expect(screen.getByDisplayValue("s3cret-pw")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: t("invite.password.copy") })).toBeEnabled()
+    expect(screen.queryByText(t("certReveal.revealed.title"))).not.toBeInTheDocument()
   })
 })
