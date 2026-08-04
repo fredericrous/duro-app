@@ -302,7 +302,7 @@ export const resendCert = (email: string, username: string, label?: string | nul
 
     // Issue fresh cert. The P12 password is stored in Vault keyed by tempId and
     // is NOT deleted here — it must survive until the recipient reveals it via
-    // the emailed scratch-card link (or the settings page consumes it).
+    // the emailed scratch-card link, the only surface that hands it out.
     const certResult = yield* cert.issueCertAndP12(email, tempId)
 
     yield* audit

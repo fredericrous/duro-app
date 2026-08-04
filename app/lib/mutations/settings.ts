@@ -16,7 +16,6 @@ import type { AuthInfo } from "~/lib/auth.server"
 
 export type SettingsMutation =
   | { intent: "issueCert" | "renewCert"; label?: string | null; auth: AuthInfo }
-  | { intent: "consumePassword"; auth: AuthInfo }
   | { intent: "revokeCert"; serialNumber: string; auth: AuthInfo }
   | { intent: "renameCert"; serialNumber: string; label: string | null; auth: AuthInfo }
   | { intent: "saveLocale"; locale: string; auth: AuthInfo }
@@ -24,10 +23,9 @@ export type SettingsMutation =
   | { intent: "saveTheme"; theme: string; auth: AuthInfo }
 
 export type SettingsResult =
-  | { certSent: true; p12Password: string | null }
+  | { certSent: true }
   | { certError: string }
   | { rateLimited: true; nextAvailable: string }
-  | { consumed: true }
   | { certRevoked: true }
   | { certRenamed: true }
   | { displayPrefsSaved: true }
@@ -57,35 +55,15 @@ function handleIssueCert(auth: AuthInfo, label?: string | null) {
 
     const result = yield* resendCert(auth.email, auth.user!, label)
 
-    const cert = yield* CertManager
-    const p12Password = yield* cert.getP12Password(result.renewalId).pipe(Effect.catchAll(() => Effect.succeed(null)))
-
     yield* prefs.setCertRenewal(auth.user!, result.renewalId)
 
-    return { certSent: true as const, p12Password }
+    return { certSent: true as const }
   }).pipe(
     Effect.catchAll((e) => {
       const message = errorMessage(e, "Failed to send certificate")
       return Effect.succeed({ certError: message } as SettingsResult)
     }),
   )
-}
-
-function handleConsumePassword(auth: AuthInfo) {
-  return Effect.gen(function* () {
-    const prefs = yield* PreferencesRepo
-    const cert = yield* CertManager
-    const { renewalId } = yield* prefs.getLastCertRenewal(auth.user!)
-    if (renewalId) {
-      yield* cert
-        .deleteP12Secret(renewalId)
-        .pipe(
-          Effect.catchAll((e) => Effect.logWarning("consumePassword: failed to delete secret", { error: String(e) })),
-        )
-      yield* prefs.clearCertRenewalId(auth.user!)
-    }
-    return { consumed: true as const } as SettingsResult
-  })
 }
 
 function handleRevokeCert(serialNumber: string, auth: AuthInfo) {
@@ -172,8 +150,6 @@ export function handleSettingsMutation(mutation: SettingsMutation) {
     case "issueCert":
     case "renewCert":
       return handleIssueCert(mutation.auth, mutation.label)
-    case "consumePassword":
-      return handleConsumePassword(mutation.auth)
     case "revokeCert":
       return handleRevokeCert(mutation.serialNumber, mutation.auth)
     case "renameCert":
@@ -203,9 +179,6 @@ export function parseSettingsMutation(formData: FormData, auth: AuthInfo): Setti
 
   if (intent === "issueCert" || intent === "renewCert") {
     return { intent, label: parseLabel(formData.get("label")), auth }
-  }
-  if (intent === "consumePassword") {
-    return { intent, auth }
   }
   if (intent === "revokeCert") {
     const serialNumber = formData.get("serialNumber") as string

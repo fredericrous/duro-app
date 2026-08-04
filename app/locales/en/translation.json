@@ -212,12 +212,8 @@
       "devicePlaceholder": "Device name (e.g. MacBook Pro)",
       "confirm": "A new certificate will be sent to {{email}}. Continue?",
       "confirmButton": "Yes, send it",
-      "success": "Certificate sent to your email. Scratch below to reveal the install password.",
+      "success": "Certificate sent to your email. Open the link in that email to reveal the install password.",
       "nextAvailable": "Next certificate available {{time}}",
-      "passwordTitle": "Certificate Password",
-      "passwordWarning": "Save this password — you'll need it to install the certificate from your email.",
-      "copy": "Copy",
-      "copied": "Copied!",
       "list": {
         "device": "Device",
         "unnamed": "Unnamed device",

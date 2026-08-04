@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { useFetcher } from "react-router"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 import type { SettingsResult } from "~/lib/mutations/settings"
-import { useAction } from "~/hooks/useAction"
+import { useFetcherToast } from "~/lib/useFetcherToast"
 import { useDisplayFormat } from "~/hooks/useDisplayFormat"
-import { PasswordReveal } from "~/components/PasswordReveal/PasswordReveal"
-import { Alert, Badge, Button, Inline, Input, ScrollArea, Stack, Table, Text } from "@duro-app/ui"
+import { Alert, Badge, Button, Inline, Input, ScrollArea, Stack, Table, Text, type ToastOptions } from "@duro-app/ui"
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
@@ -36,6 +36,24 @@ function daysUntil(expiresAt: string): number {
   return Math.ceil((new Date(expiresAt).getTime() - Date.now()) / ONE_DAY_MS)
 }
 
+/**
+ * Toast copy for a settled cert mutation. The list can be long enough that a
+ * given row — or the section's own alerts — sits well off-screen from whatever
+ * the user just clicked, so outcomes are announced where they're looking.
+ * `rateLimited` is the exception: it renders inline as the cooldown text right
+ * under the disabled button.
+ */
+function certToast(raw: unknown, t: (key: string) => string): ToastOptions | null {
+  const d = raw as SettingsResult | null
+  if (!d) return null
+  if ("certSent" in d) return { variant: "success", message: t("settings.cert.success") }
+  if ("certRevoked" in d) return { variant: "success", message: t("settings.cert.list.revoked") }
+  if ("certRenamed" in d) return { variant: "success", message: t("settings.cert.list.renamed") }
+  if ("certError" in d) return { variant: "error", message: d.certError }
+  if ("error" in d) return { variant: "error", message: d.error }
+  return null
+}
+
 // Cert actions live on the certificate settings sub-route now.
 const API_URL = "/settings/certificate"
 
@@ -48,12 +66,15 @@ function CertRow({ cert }: { cert: UserCertificate }) {
   // flight or once the server confirmed it — otherwise `cert.label` stays the
   // source of truth, so a loader revalidation can never render a stale label.
   const [pendingLabel, setPendingLabel] = useState<{ value: string | null } | null>(null)
-  const action = useAction<SettingsResult>(API_URL)
-  const isSubmitting = action.status._tag === "Submitting"
-  const renamed = action.status._tag === "Success" && "certRenamed" in action.status.data
-  const revoked = action.status._tag === "Success" && "certRevoked" in action.status.data
+  const fetcher = useFetcher<SettingsResult>()
+  useFetcherToast(fetcher, { render: (d) => certToast(d, t) })
+  const isSubmitting = fetcher.state !== "idle"
+  const renamed = fetcher.data != null && "certRenamed" in fetcher.data
+  const revoked = fetcher.data != null && "certRevoked" in fetcher.data
   const label = pendingLabel && (isSubmitting || renamed) ? pendingLabel.value : cert.label
 
+  // The revalidation a revoke triggers drops this row from the loader data
+  // anyway; hiding it here just covers the gap until that lands.
   if (revoked) return null
 
   const serialShort = cert.serialNumber.slice(-8)
@@ -67,7 +88,7 @@ function CertRow({ cert }: { cert: UserCertificate }) {
               e.preventDefault()
               const fd = new FormData(e.currentTarget)
               const next = ((fd.get("label") as string) ?? "").trim() || null
-              void action.submit(fd)
+              void fetcher.submit(fd, { method: "post", action: API_URL })
               setPendingLabel({ value: next })
               setRenaming(false)
             }}
@@ -143,13 +164,13 @@ function CertRow({ cert }: { cert: UserCertificate }) {
       <Table.Cell>
         {confirming ? (
           <Inline gap="sm">
-            <form {...action.getFormProps()}>
+            <fetcher.Form method="post" action={API_URL}>
               <input type="hidden" name="intent" value="revokeCert" />
               <input type="hidden" name="serialNumber" value={cert.serialNumber} />
               <Button type="submit" variant="danger" size="small" disabled={isSubmitting}>
                 {isSubmitting ? t("settings.cert.list.revoking") : t("settings.cert.list.revokeYes")}
               </Button>
-            </form>
+            </fetcher.Form>
             <Button variant="secondary" size="small" onClick={() => setConfirming(false)}>
               {t("common.cancel")}
             </Button>
@@ -174,47 +195,41 @@ function CertRow({ cert }: { cert: UserCertificate }) {
 
 export function CertificateSection({
   email,
-  p12Password,
   lastCertRenewalAt,
   certificates,
 }: {
   email: string | null
-  p12Password: string | null
   lastCertRenewalAt: string | null
   certificates: UserCertificate[]
 }) {
   const { t } = useTranslation()
   const { formatDateTime } = useDisplayFormat()
-  const certAction = useAction<SettingsResult>(API_URL)
+  const fetcher = useFetcher<SettingsResult>()
+  useFetcherToast(fetcher, { render: (d) => certToast(d, t) })
   const [confirming, setConfirming] = useState(false)
 
-  const certData = certAction.status._tag === "Success" ? certAction.status.data : undefined
-  const isSubmitting = certAction.status._tag === "Submitting"
+  const result = fetcher.data
+  const isSubmitting = fetcher.state !== "idle"
+  const justSent = result != null && "certSent" in result
 
-  // Password from action response (immediate, no race) or from loader
-  const effectivePassword =
-    certData && "p12Password" in certData && certData.p12Password ? certData.p12Password : p12Password
-
-  // After successful issuance, clear scratch state so card is fresh
-  useEffect(() => {
-    if (certData && "certSent" in certData) {
-      try {
-        localStorage.removeItem("scratch:/settings")
-      } catch {
-        // localStorage may be unavailable
-      }
-    }
-  }, [certData])
-
-  const justSent = certData && "certSent" in certData
+  // Collapse the form once the certificate is on its way — an open form sitting
+  // under a list that just grew a row reads as "nothing happened, try again".
+  // Adjusted during render (React's state-derived-from-data pattern) rather
+  // than in an effect, which would be a cascading-render hazard. Keying off the
+  // result's identity means reopening the form later doesn't re-close it.
+  const [handledResult, setHandledResult] = useState<SettingsResult | undefined>(undefined)
+  if (result !== handledResult) {
+    setHandledResult(result)
+    if (justSent) setConfirming(false)
+  }
 
   // Rate limit check — derived per render (module-level helper, same pattern
   // as expiryStatus above) so a lapsed cooldown unlocks without a remount.
-  const isRateLimited = certData !== undefined && "rateLimited" in certData
+  const isRateLimited = result != null && "rateLimited" in result
   const cooldown = cooldownState(lastCertRenewalAt)
   const cooldownRemaining = isRateLimited || cooldown.inCooldown
   const nextAvailableText = isRateLimited
-    ? formatDateTime(certData.nextAvailable)
+    ? formatDateTime(result.nextAvailable)
     : cooldown.inCooldown
       ? formatDateTime(cooldown.cooldownEndsAt)
       : ""
@@ -224,14 +239,6 @@ export function CertificateSection({
       <Text as="p" color="muted">
         {t("settings.cert.description")}
       </Text>
-
-      {certData && "certError" in certData && <Alert variant="error">{certData.certError}</Alert>}
-
-      {justSent && <Alert variant="success">{t("settings.cert.success")}</Alert>}
-
-      {certData && "certRevoked" in certData && <Alert variant="success">{t("settings.cert.list.revoked")}</Alert>}
-
-      {effectivePassword && <PasswordReveal p12Password={effectivePassword} />}
 
       {certificates.length > 0 && (
         <ScrollArea.Root>
@@ -261,13 +268,20 @@ export function CertificateSection({
         </ScrollArea.Root>
       )}
 
-      {certificates.length === 0 && !effectivePassword && (
+      {certificates.length === 0 && (
         <Text as="p" color="muted" variant="bodySm">
           {t("settings.cert.list.empty")}
         </Text>
       )}
 
-      {cooldownRemaining && !effectivePassword ? (
+      {/* Feedback lives with the controls that produced it. The list above can
+          run long, so an alert at the top of the section is off-screen for
+          anyone working at the bottom of it — which is where the button is. */}
+      {result && "certError" in result && <Alert variant="error">{result.certError}</Alert>}
+
+      {justSent && <Alert variant="success">{t("settings.cert.success")}</Alert>}
+
+      {cooldownRemaining ? (
         <Stack gap="sm">
           <Button disabled>{t("settings.cert.newCert")}</Button>
           <Text as="p" variant="bodySm" color="muted">
@@ -277,7 +291,7 @@ export function CertificateSection({
       ) : confirming ? (
         <Stack gap="sm">
           <Text as="p">{t("settings.cert.confirm", { email })}</Text>
-          <form {...certAction.getFormProps()}>
+          <fetcher.Form method="post" action={API_URL}>
             <Stack gap="sm">
               <input type="hidden" name="intent" value="issueCert" />
               <Input name="label" placeholder={t("settings.cert.devicePlaceholder")} maxLength={64} />
@@ -290,14 +304,12 @@ export function CertificateSection({
                 </Button>
               </Inline>
             </Stack>
-          </form>
+          </fetcher.Form>
         </Stack>
       ) : (
-        !effectivePassword && (
-          <Button variant="primary" onClick={() => setConfirming(true)}>
-            {t("settings.cert.newCert")}
-          </Button>
-        )
+        <Button variant="primary" onClick={() => setConfirming(true)}>
+          {t("settings.cert.newCert")}
+        </Button>
       )}
     </Stack>
   )

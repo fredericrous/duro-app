@@ -32,14 +32,16 @@ describe("/settings/certificate loader", () => {
   it("packages email + cert renewal + certificates", async () => {
     mockRunEffect.mockResolvedValue({
       lastCertRenewalAt: "2026-01-01T00:00:00.000Z",
-      p12Password: "pw",
       certificates: [{ id: "c1" }],
     } as never)
     const result = await callLoader(loader)
-    const data = expectData<{ email: string; lastCertRenewalAt: string | null; p12Password: string | null }>(result)
+    const data = expectData<{ email: string; lastCertRenewalAt: string | null; certificates: unknown[] }>(result)
     expect(data.email).toBe("a@example.com")
     expect(data.lastCertRenewalAt).toBe("2026-01-01T00:00:00.000Z")
-    expect(data.p12Password).toBe("pw")
+    expect(data.certificates).toEqual([{ id: "c1" }])
+    // The one-time password is never handed to this page — it is revealed from
+    // the emailed link only.
+    expect(data).not.toHaveProperty("p12Password")
   })
 })
 
@@ -81,7 +83,6 @@ describe("CertificateSettings component", () => {
         loader: () => ({
           email: "a@example.com",
           lastCertRenewalAt: null,
-          p12Password: null,
           certificates: [
             {
               id: "c1",

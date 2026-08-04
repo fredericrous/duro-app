@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useState } from "react"
 import { Trans, useTranslation } from "react-i18next"
 import { useFetcher, useParams } from "react-router"
 import type { Route } from "./+types/cert.$revealToken"
@@ -11,6 +11,7 @@ import { Effect } from "effect"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { useScratchReveal } from "~/hooks/useScratchReveal"
+import { useCopyFeedback } from "~/hooks/useCopyFeedback"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
 import { Heading, Input, InputGroup, LinkButton, Stack, Text } from "@duro-app/ui"
 
@@ -106,34 +107,7 @@ function PasswordCard({ password }: { password: string }) {
   const { revealed, onReveal } = useScratchReveal(
     `scratch:${typeof window !== "undefined" ? window.location.pathname : ""}`,
   )
-  const [copied, setCopied] = useState(false)
-  const [copyFailed, setCopyFailed] = useState(false)
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
-
-  // Copy can reject (denied permission) or be unavailable entirely (insecure
-  // context / older browser). Reflect the real outcome instead of always
-  // claiming success, and fall back to a "copy it manually" hint.
-  const copyPassword = useCallback(() => {
-    const clip = typeof navigator !== "undefined" ? navigator.clipboard : undefined
-    const flash = (setter: (v: boolean) => void, ms: number) => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-      setter(true)
-      timerRef.current = setTimeout(() => setter(false), ms)
-    }
-    const onOk = () => {
-      setCopyFailed(false)
-      flash(setCopied, 2000)
-    }
-    const onFail = () => {
-      setCopied(false)
-      flash(setCopyFailed, 5000)
-    }
-    if (!clip?.writeText) {
-      onFail()
-      return
-    }
-    clip.writeText(password).then(onOk, onFail)
-  }, [password])
+  const { copied, copyFailed, copy } = useCopyFeedback()
 
   const handleReveal = useCallback(() => {
     onReveal()
@@ -154,7 +128,7 @@ function PasswordCard({ password }: { password: string }) {
         >
           <Input defaultValue={password} />
         </ScratchCard>
-        <InputGroup.Addon disabled={!revealed} minWidth={72} onClick={copyPassword}>
+        <InputGroup.Addon disabled={!revealed} minWidth={72} onClick={() => copy(password)}>
           {copied ? t("invite.password.copied") : t("invite.password.copy")}
         </InputGroup.Addon>
       </InputGroup.Root>
@@ -172,6 +146,13 @@ export default function CertRevealPage({ loaderData }: Route.ComponentProps) {
   const params = useParams()
   const downloadHref = `/cert/${params.revealToken}/download`
 
+  // Scratching burns the password server-side, so the revalidation that follows
+  // the reveal POST returns `revealed: true` — within a round-trip of the
+  // scratch, and long before anyone can hit Copy. Hold on to what this page
+  // load was handed so the password and its Copy button survive that flip; a
+  // fresh load has nothing captured and still gets the "already revealed" card.
+  const [sessionPassword] = useState(() => (loaderData.valid && !loaderData.revealed ? loaderData.password : null))
+
   if (!loaderData.valid) {
     const key =
       loaderData.error === "invalid"
@@ -186,7 +167,9 @@ export default function CertRevealPage({ loaderData }: Route.ComponentProps) {
     return <ErrorCard icon={icon} tone={tone} title={t("certReveal.error.title")} message={t(key)} />
   }
 
-  if (loaderData.revealed) {
+  const password = sessionPassword ?? (loaderData.revealed ? null : loaderData.password)
+
+  if (!password) {
     return (
       <CenteredCardPage>
         <Stack gap="lg">
@@ -219,7 +202,7 @@ export default function CertRevealPage({ loaderData }: Route.ComponentProps) {
             />
           </Text>
         </Stack>
-        <PasswordCard password={loaderData.password} />
+        <PasswordCard password={password} />
         <Text as="p" variant="bodySm" color="muted">
           {t("invite.password.oneTime")}
         </Text>

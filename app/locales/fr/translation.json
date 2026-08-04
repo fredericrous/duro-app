@@ -212,12 +212,8 @@
       "devicePlaceholder": "Nom de l'appareil (ex. MacBook Pro)",
       "confirm": "Un nouveau certificat sera envoye a {{email}}. Continuer ?",
       "confirmButton": "Oui, envoyer",
-      "success": "Certificat envoye a votre e-mail. Grattez ci-dessous pour reveler le mot de passe d'installation.",
+      "success": "Certificat envoye a votre e-mail. Ouvrez le lien dans cet e-mail pour reveler le mot de passe d'installation.",
       "nextAvailable": "Prochain certificat disponible {{time}}",
-      "passwordTitle": "Mot de passe du certificat",
-      "passwordWarning": "Sauvegardez ce mot de passe — vous en aurez besoin pour installer le certificat joint a votre e-mail.",
-      "copy": "Copier",
-      "copied": "Copie !",
       "list": {
         "device": "Appareil",
         "unnamed": "Appareil sans nom",

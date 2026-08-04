@@ -24,7 +24,12 @@ const mockRunEffect = vi.mocked(runEffect)
 const now = Date.now()
 const future = new Date(now + 3600_000).toISOString()
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  // useScratchReveal persists "scratch:/cert/tok" — without this, a card
+  // revealed in one test mounts already-open in the next.
+  localStorage.clear()
+})
 
 describe("/cert/:revealToken loader", () => {
   it("state=ok → returns the password + email for the scratch card", async () => {

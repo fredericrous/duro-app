@@ -28,13 +28,6 @@ describe("parseSettingsMutation", () => {
     expect(result).toEqual({ intent: "issueCert", label: "MacBook Pro", auth })
   })
 
-  it("parses consumePassword", () => {
-    const fd = new FormData()
-    fd.append("intent", "consumePassword")
-    const result = parseSettingsMutation(fd, auth)
-    expect(result).toEqual({ intent: "consumePassword", auth })
-  })
-
   it("parses revokeCert with serialNumber", () => {
     const fd = new FormData()
     fd.append("intent", "revokeCert")
@@ -126,14 +119,6 @@ describe("parseSettingsMutation", () => {
 // =============================================================================
 
 describe("handleSettingsMutation", () => {
-  it("consumePassword is a no-op when there's no renewal in flight", async () => {
-    // Empty preferences row → renewalId is null → handler short-circuits.
-    const result = await testRunEffect(
-      handleSettingsMutation({ intent: "consumePassword", auth }) as Effect.Effect<unknown, unknown, never>,
-    )
-    expect(result).toEqual({ consumed: true })
-  })
-
   it("saveLocale persists the new locale to preferences and returns a redirect marker", async () => {
     const result = await testRunEffect(
       handleSettingsMutation({ intent: "saveLocale", locale: "fr", auth }) as Effect.Effect<unknown, unknown, never>,
