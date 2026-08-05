@@ -382,21 +382,33 @@ describe("MyRequestsPage component", () => {
     expect(screen.queryByRole("button", { name: /Accept/i })).not.toBeInTheDocument()
   })
 
-  it("promotes requesting access in the empty state, where it is the only next step", async () => {
+  it("offers Request access from the section header when there are no requests", async () => {
     renderRequests([])
     await waitFor(() => {
       expect(screen.getByRole("link", { name: t("header.requestAccess") })).toBeInTheDocument()
     })
-    // Without this the empty state is a dead end — the header no longer
-    // carries a Request access button.
+    // Without this the page is a dead end — the app header no longer carries
+    // a Request access button.
     expect(screen.getByRole("link", { name: t("header.requestAccess") })).toHaveAttribute("href", "/catalog")
   })
 
-  it("keeps a way back to the catalog once requests exist", async () => {
+  it("keeps Request access in the same spot once requests exist", async () => {
     renderRequests([reqRow({ id: "r1", status: "pending" })])
     await waitFor(() => {
       expect(screen.getByText("App 1")).toBeInTheDocument()
     })
-    expect(screen.getByRole("link", { name: t("header.requestAccess") })).toHaveAttribute("href", "/catalog")
+    // Same single control in both states — it must not move into or out of
+    // the list as requests come and go.
+    const links = screen.getAllByRole("link", { name: t("header.requestAccess") })
+    expect(links).toHaveLength(1)
+    expect(links[0]).toHaveAttribute("href", "/catalog")
+  })
+
+  it("shows exactly one Request access control when empty", async () => {
+    renderRequests([])
+    await waitFor(() => {
+      expect(screen.getByText(/haven't requested access/i)).toBeInTheDocument()
+    })
+    expect(screen.getAllByRole("link", { name: t("header.requestAccess") })).toHaveLength(1)
   })
 })

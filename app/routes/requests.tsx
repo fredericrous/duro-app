@@ -275,26 +275,19 @@ export default function MyRequestsPage({ loaderData }: Route.ComponentProps) {
               <HelpPopover termKey="glossary.myRequests" />
             </>
           }
-          // With requests on screen the CTA is a way back to the catalog, not
-          // the point of the page — the empty state below promotes its own.
+          // Requesting access is what this page is for, so its control sits in
+          // the section header where it is always in the same place — not
+          // inside the list, where it would move or vanish as requests come
+          // and go. The header no longer carries this action at all.
           action={
-            requests.length > 0 ? (
-              <LinkButton href="/catalog" variant="secondary">
-                {t("header.requestAccess")}
-              </LinkButton>
-            ) : undefined
+            <LinkButton href="/catalog" variant="primary">
+              {t("header.requestAccess")}
+            </LinkButton>
           }
         >
           <Stack gap="md">
             {requests.length === 0 ? (
-              <EmptyState
-                message={t("requests.empty")}
-                action={
-                  <LinkButton href="/catalog" variant="primary">
-                    {t("header.requestAccess")}
-                  </LinkButton>
-                }
-              />
+              <EmptyState message={t("requests.empty")} />
             ) : (
               <ScrollArea.Root>
                 <ScrollArea.Viewport>
