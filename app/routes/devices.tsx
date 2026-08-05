@@ -1,4 +1,3 @@
-import { useTranslation } from "react-i18next"
 import { useRouteLoaderData } from "react-router"
 import { Effect } from "effect"
 import type { Route } from "./+types/devices"
@@ -9,7 +8,6 @@ import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
 import { Header } from "~/components/Header/Header"
-import { CardSection } from "~/components/CardSection/CardSection"
 import { DevicesSection } from "~/components/DevicesSection/DevicesSection"
 import { PageShell } from "@duro-app/ui"
 
@@ -45,20 +43,17 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function DevicesPage({ loaderData }: Route.ComponentProps) {
-  const { t } = useTranslation()
   const dashboardData = useRouteLoaderData("routes/dashboard") as { user?: string; isAdmin?: boolean } | undefined
   const user = dashboardData?.user ?? ""
   const isAdmin = dashboardData?.isAdmin ?? false
 
   return (
     <PageShell maxWidth="lg" header={<Header user={user} isAdmin={isAdmin} />}>
-      <CardSection title={t("devices.heading")}>
-        <DevicesSection
-          email={loaderData.email}
-          lastCertRenewalAt={loaderData.lastCertRenewalAt}
-          certificates={loaderData.certificates}
-        />
-      </CardSection>
+      <DevicesSection
+        email={loaderData.email}
+        lastCertRenewalAt={loaderData.lastCertRenewalAt}
+        certificates={loaderData.certificates}
+      />
     </PageShell>
   )
 }

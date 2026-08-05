@@ -7,6 +7,7 @@ import { useFetcherToast } from "~/lib/useFetcherToast"
 import { useDisplayFormat } from "~/hooks/useDisplayFormat"
 import { daysUntil, expiryStatus } from "~/lib/cert-status"
 import { buildDeviceRows, renewalCooldownUntil, sortDeviceRows, type DeviceSort } from "~/lib/devices"
+import { CardSection } from "~/components/CardSection/CardSection"
 import {
   Alert,
   Badge,
@@ -334,98 +335,105 @@ export function DevicesSection({
       : ""
 
   return (
-    <Stack gap="md">
-      <Text as="p" color="muted">
-        {t("devices.description")}
-      </Text>
-
-      {rows.length > 0 && (
-        <>
-          <Inline gap="sm" align="center">
-            <Text as="span" variant="bodySm" color="muted">
-              {t("devices.sort.label")}
-            </Text>
-            <ToggleGroup size="small" value={[sort]} onValueChange={(v) => setSort((v[0] as DeviceSort) ?? "name")}>
-              <Toggle value="name">{t("devices.sort.name")}</Toggle>
-              <Toggle value="expiry">{t("devices.sort.expiry")}</Toggle>
-            </ToggleGroup>
-          </Inline>
-          <ScrollArea.Root>
-            <ScrollArea.Viewport>
-              <ScrollArea.Content>
-                <Table.Root>
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.HeaderCell>{t("devices.list.device")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("devices.list.serial")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("devices.list.issued")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("devices.list.expires")}</Table.HeaderCell>
-                      <Table.HeaderCell>{t("common.actions")}</Table.HeaderCell>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {rows.map((row) => (
-                      <Fragment key={row.current.id}>
-                        <DeviceRow cert={row.current} certificates={certificates} />
-                        {row.superseded.map((old) => (
-                          <SupersededRow key={old.id} cert={old} />
-                        ))}
-                      </Fragment>
-                    ))}
-                  </Table.Body>
-                </Table.Root>
-              </ScrollArea.Content>
-            </ScrollArea.Viewport>
-            <ScrollArea.Scrollbar orientation="horizontal">
-              <ScrollArea.Thumb orientation="horizontal" />
-            </ScrollArea.Scrollbar>
-          </ScrollArea.Root>
-        </>
-      )}
-
-      {rows.length === 0 && (
-        <Text as="p" color="muted" variant="bodySm">
-          {t("devices.list.empty")}
+    <CardSection
+      title={t("devices.heading")}
+      // Adding a device is what this page is for, so its control sits in the
+      // section header where it is always in the same place — not under a list
+      // whose length varies, where it drifts off-screen as devices accumulate.
+      action={
+        <Button variant="primary" disabled={cooldownRemaining || confirming} onClick={() => setConfirming(true)}>
+          {t("devices.newCert")}
+        </Button>
+      }
+    >
+      <Stack gap="md">
+        <Text as="p" color="muted">
+          {t("devices.description")}
         </Text>
-      )}
 
-      {/* Feedback lives with the controls that produced it. The list above can
-          run long, so an alert at the top of the section is off-screen for
-          anyone working at the bottom of it — which is where the button is. */}
-      {result && "certError" in result && <Alert variant="error">{result.certError}</Alert>}
+        {/* Feedback and the form the header button opens stay directly under
+            it, so an outcome is never announced somewhere the user isn't
+            looking — the list below can run long. */}
+        {result && "certError" in result && <Alert variant="error">{result.certError}</Alert>}
 
-      {justSent && <Alert variant="success">{t("devices.success")}</Alert>}
+        {justSent && <Alert variant="success">{t("devices.success")}</Alert>}
 
-      {cooldownRemaining ? (
-        <Stack gap="sm">
-          <Button disabled>{t("devices.newCert")}</Button>
+        {cooldownRemaining && (
           <Text as="p" variant="bodySm" color="muted">
             {t("devices.nextAvailable", { time: nextAvailableText })}
           </Text>
-        </Stack>
-      ) : confirming ? (
-        <Stack gap="sm">
-          <Text as="p">{t("devices.confirm", { email })}</Text>
-          <fetcher.Form method="post" action={API_URL}>
-            <Stack gap="sm">
-              <input type="hidden" name="intent" value="issueCert" />
-              <Input name="label" placeholder={t("devices.devicePlaceholder")} maxLength={64} />
-              <Inline gap="sm">
-                <Button type="submit" variant="primary" disabled={isSubmitting}>
-                  {isSubmitting ? t("devices.issuing") : t("devices.confirmButton")}
-                </Button>
-                <Button type="button" variant="secondary" onClick={() => setConfirming(false)}>
-                  {t("common.cancel")}
-                </Button>
-              </Inline>
-            </Stack>
-          </fetcher.Form>
-        </Stack>
-      ) : (
-        <Button variant="primary" onClick={() => setConfirming(true)}>
-          {t("devices.newCert")}
-        </Button>
-      )}
-    </Stack>
+        )}
+
+        {confirming && !cooldownRemaining && (
+          <Stack gap="sm">
+            <Text as="p">{t("devices.confirm", { email })}</Text>
+            <fetcher.Form method="post" action={API_URL}>
+              <Stack gap="sm">
+                <input type="hidden" name="intent" value="issueCert" />
+                <Input name="label" placeholder={t("devices.devicePlaceholder")} maxLength={64} />
+                <Inline gap="sm">
+                  <Button type="submit" variant="primary" disabled={isSubmitting}>
+                    {isSubmitting ? t("devices.issuing") : t("devices.confirmButton")}
+                  </Button>
+                  <Button type="button" variant="secondary" onClick={() => setConfirming(false)}>
+                    {t("common.cancel")}
+                  </Button>
+                </Inline>
+              </Stack>
+            </fetcher.Form>
+          </Stack>
+        )}
+
+        {rows.length > 0 && (
+          <>
+            <Inline gap="sm" align="center">
+              <Text as="span" variant="bodySm" color="muted">
+                {t("devices.sort.label")}
+              </Text>
+              <ToggleGroup size="small" value={[sort]} onValueChange={(v) => setSort((v[0] as DeviceSort) ?? "name")}>
+                <Toggle value="name">{t("devices.sort.name")}</Toggle>
+                <Toggle value="expiry">{t("devices.sort.expiry")}</Toggle>
+              </ToggleGroup>
+            </Inline>
+            <ScrollArea.Root>
+              <ScrollArea.Viewport>
+                <ScrollArea.Content>
+                  <Table.Root>
+                    <Table.Header>
+                      <Table.Row>
+                        <Table.HeaderCell>{t("devices.list.device")}</Table.HeaderCell>
+                        <Table.HeaderCell>{t("devices.list.serial")}</Table.HeaderCell>
+                        <Table.HeaderCell>{t("devices.list.issued")}</Table.HeaderCell>
+                        <Table.HeaderCell>{t("devices.list.expires")}</Table.HeaderCell>
+                        <Table.HeaderCell>{t("common.actions")}</Table.HeaderCell>
+                      </Table.Row>
+                    </Table.Header>
+                    <Table.Body>
+                      {rows.map((row) => (
+                        <Fragment key={row.current.id}>
+                          <DeviceRow cert={row.current} certificates={certificates} />
+                          {row.superseded.map((old) => (
+                            <SupersededRow key={old.id} cert={old} />
+                          ))}
+                        </Fragment>
+                      ))}
+                    </Table.Body>
+                  </Table.Root>
+                </ScrollArea.Content>
+              </ScrollArea.Viewport>
+              <ScrollArea.Scrollbar orientation="horizontal">
+                <ScrollArea.Thumb orientation="horizontal" />
+              </ScrollArea.Scrollbar>
+            </ScrollArea.Root>
+          </>
+        )}
+
+        {rows.length === 0 && (
+          <Text as="p" color="muted" variant="bodySm">
+            {t("devices.list.empty")}
+          </Text>
+        )}
+      </Stack>
+    </CardSection>
   )
 }

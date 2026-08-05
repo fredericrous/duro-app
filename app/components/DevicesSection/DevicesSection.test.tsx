@@ -78,6 +78,28 @@ describe("DevicesSection", () => {
     renderSection({ lastCertRenewalAt: oneHourAgo })
     const button = await screen.findByRole("button", { name: t("devices.newCert") })
     expect(button).toBeDisabled()
+    // The button stays put in the header, so the reason it is disabled has to
+    // be stated in the body rather than under the button.
+    const prefix = t("devices.nextAvailable", undefined, { time: "" }).trim()
+    expect(screen.getByText(new RegExp(prefix.split(/\s+/).slice(0, 2).join("\\s+"), "i"))).toBeInTheDocument()
+  })
+
+  it("keeps a single add-a-device control in the same spot whether or not devices exist", async () => {
+    const { unmount } = renderSection()
+    expect(await screen.findByRole("button", { name: t("devices.newCert") })).toBeInTheDocument()
+    expect(screen.getAllByRole("button", { name: t("devices.newCert") })).toHaveLength(1)
+    unmount()
+
+    renderSection({ certificates: [certExpiringIn(60), certExpiringIn(20, "SECOND01")] })
+    await screen.findByText("AABBCC11")
+    expect(screen.getAllByRole("button", { name: t("devices.newCert") })).toHaveLength(1)
+  })
+
+  it("disables the header button while its own form is open, so it cannot re-trigger", async () => {
+    renderSection()
+    fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
+    expect(await screen.findByRole("button", { name: t("devices.confirmButton") })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: t("devices.newCert") })).toBeDisabled()
   })
 
   it("never renders a scratch card — the password is revealed from the email only", async () => {
