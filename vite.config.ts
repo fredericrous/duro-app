@@ -34,7 +34,20 @@ export default defineConfig({
         ],
       },
     }),
-    // react-strict-dom source: compile its internal stylex.create calls for SSR
+    // react-strict-dom source: compile its internal stylex.create calls for SSR.
+    //
+    // runtimeInjection is deliberately OFF. It emits each rule from JS as
+    // `.cls:not(#\#){...}` — unlayered, with a specificity hack — and unlayered
+    // rules beat every cascade layer. react-strict-dom's element reset includes
+    // shorthands like `padding:0`, so those injected copies outranked the
+    // longhands in @duro-app/ui's `@layer priority5` and every DS component
+    // rendered with its padding, background and weight stripped. It only showed
+    // up in dev: the production bundle has no runtime injection, so there the
+    // same rules stay layered and win correctly.
+    //
+    // The classnames this generates are already defined — layered — in
+    // @duro-app/ui/dist/index.css, which root.tsx imports, so dropping the
+    // injection loses no styles.
     babel({
       filter: /node_modules\/react-strict-dom/,
       babelConfig: {
@@ -43,7 +56,7 @@ export default defineConfig({
             "@stylexjs/babel-plugin",
             {
               dev: true,
-              runtimeInjection: true,
+              runtimeInjection: false,
             },
           ],
         ],
