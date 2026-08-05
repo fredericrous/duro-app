@@ -3,6 +3,7 @@ import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { Context, Config, Duration, Effect, Layer } from "effect"
 import * as crypto from "node:crypto"
+import { statSync } from "node:fs"
 
 import m0001 from "./migrations/pg/0001_create_schema"
 import m0002 from "./migrations/pg/0002_create_user_revocations"
@@ -339,10 +340,35 @@ export const DbDevLive = Layer.effect(MigrationsRan, seedDevData).pipe(Layer.pro
  * genuine single-pod, zero-external-dependency deployment option (the chart's
  * `database.mode: embedded`). Selected when DURO_DB_PATH is set.
  */
+/**
+ * DURO_DB_PATH names a PGlite *data directory*. Handed a regular file, PGlite
+ * aborts inside WASM with a bare `Program terminated with exit(1)` that names
+ * neither the path nor the reason. The variable used to point at a SQLite file
+ * before the Postgres migration, so a leftover `duro-dev.sqlite` from that era
+ * lands exactly here — say so instead.
+ *
+ * A missing path is fine: PGlite creates it.
+ */
+export function assertUsableDataDir(dataDir: string): void {
+  let stats
+  try {
+    stats = statSync(dataDir)
+  } catch {
+    return
+  }
+  if (!stats.isDirectory()) {
+    throw new Error(
+      `DURO_DB_PATH must point at a directory for the PGlite data store, but "${dataDir}" is a file. ` +
+        `If it is a leftover SQLite database from before the Postgres migration, move it aside and restart.`,
+    )
+  }
+}
+
 export const makeEmbeddedDbLayer = (dataDir: string) => {
   const EmbeddedClientLayer = PgClient.layerFromPool({
     acquire: Effect.acquireRelease(
       Effect.promise(async () => {
+        assertUsableDataDir(dataDir)
         const { createPglitePool } = await import("./pglite-pool")
         return createPglitePool({ dataDir })
       }),
