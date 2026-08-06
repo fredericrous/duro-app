@@ -79,7 +79,8 @@ describe("/settings general action", () => {
     const res = expectData<Response>(result)
     expect(res).toBeInstanceOf(Response)
     expect(res.status).toBeGreaterThanOrEqual(300)
-    expect(res.headers.get("location")).toBe("/settings")
+    // ?saved=1 carries the acknowledgement across the reload the cookie needs.
+    expect(res.headers.get("location")).toBe("/settings?saved=1")
     expect(res.headers.get("set-cookie")).toContain("duro_lng=fr")
   })
 })
@@ -88,7 +89,7 @@ describe("/settings general action", () => {
 // Component-render test
 // ===========================================================================
 
-import { screen, waitFor } from "@testing-library/react"
+import { fireEvent, screen, waitFor } from "@testing-library/react"
 import GeneralSettings from "./settings._index"
 import { renderRoute } from "~/test/render-route"
 import { t } from "~/test/test-utils"
@@ -105,12 +106,71 @@ describe("GeneralSettings component", () => {
     await waitFor(() => {
       expect(screen.getByText(t("settings.display.heading"))).toBeInTheDocument()
     })
-    // Language, Appearance (theme), and Date & time each expose a Save button.
+    // Preferences save on change — no Save buttons anywhere on the page.
     expect(screen.getByText(t("settings.theme.heading"))).toBeInTheDocument()
-    expect(screen.getAllByRole("button", { name: /save/i }).length).toBeGreaterThanOrEqual(3)
+    expect(screen.queryAllByRole("button", { name: /save/i })).toHaveLength(0)
     expect(screen.getByText(new RegExp(t("settings.display.preview")))).toBeInTheDocument()
     // The system (follow device) preference renders both as the selected
     // trigger label (via initialLabels) and as a popup option.
     expect(screen.getAllByText(t("settings.theme.system")).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it("saves a display preference as soon as it changes, and says so", async () => {
+    const submitted: Record<string, string>[] = []
+    renderRoute({
+      route: {
+        path: "/settings",
+        Component: GeneralSettings as never,
+        loader: () => ({ locale: "en", timezone: null, timeFormat: null, currentLocale: "en", theme: "system" }),
+        action: async ({ request }: { request: Request }) => {
+          const fd = await request.formData()
+          submitted.push(Object.fromEntries(fd) as Record<string, string>)
+          return { displayPrefsSaved: true }
+        },
+      },
+    })
+    await waitFor(() => {
+      expect(screen.getByText(t("settings.display.heading"))).toBeInTheDocument()
+    })
+
+    // Open the time-format select and pick the 24h option.
+    fireEvent.click(screen.getByText(t("settings.display.timeFormatLabel")).closest("div")!.querySelector("button")!)
+    const option = await screen.findByText(t("settings.display.timeFormat.24"))
+    fireEvent.click(option)
+
+    // No Save button was involved — the change itself is the submit.
+    await waitFor(() => expect(submitted.length).toBeGreaterThan(0))
+    expect(submitted[0].intent).toBe("saveDisplayPrefs")
+    expect(submitted[0].timeFormat).toBe("24")
+
+    expect(await screen.findByText(t("settings.saved"))).toBeInTheDocument()
+  })
+
+  it("announces the save that language and theme complete after their reload", async () => {
+    renderRoute({
+      route: {
+        path: "/settings",
+        Component: GeneralSettings as never,
+        loader: () => ({ locale: "en", timezone: null, timeFormat: null, currentLocale: "en", theme: "system" }),
+      },
+      url: "/settings?saved=1",
+    })
+    // Those two set a cookie and reload the document, so the acknowledgement
+    // rides in the URL — nothing queued client-side survives that navigation.
+    expect(await screen.findByText(t("settings.saved"))).toBeInTheDocument()
+  })
+
+  it("stays quiet until something is actually saved", async () => {
+    renderRoute({
+      route: {
+        path: "/settings",
+        Component: GeneralSettings as never,
+        loader: () => ({ locale: "en", timezone: null, timeFormat: null, currentLocale: "en", theme: "system" }),
+      },
+    })
+    await waitFor(() => {
+      expect(screen.getByText(t("settings.display.heading"))).toBeInTheDocument()
+    })
+    expect(screen.queryByText(t("settings.saved"))).not.toBeInTheDocument()
   })
 })

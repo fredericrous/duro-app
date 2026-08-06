@@ -9,11 +9,12 @@ const languageNames: Record<string, string> = {
 interface LanguageSelectProps {
   name?: string
   defaultValue?: string
+  onValueChange?: (value: string | null) => void
 }
 
-export function LanguageSelect({ name = "locale", defaultValue = "en" }: LanguageSelectProps) {
+export function LanguageSelect({ name = "locale", defaultValue = "en", onValueChange }: LanguageSelectProps) {
   return (
-    <Select.Root name={name} defaultValue={defaultValue} initialLabels={languageNames}>
+    <Select.Root name={name} defaultValue={defaultValue} initialLabels={languageNames} onValueChange={onValueChange}>
       <Select.Trigger>
         <Select.Value placeholder="Language" />
         <Select.Icon />
