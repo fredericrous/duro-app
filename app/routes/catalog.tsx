@@ -17,7 +17,7 @@ import { loadApps } from "~/lib/apps.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { loadAppsCatalogForPrincipal, type AppCatalogEntry, type AppCatalogState } from "~/lib/apps-catalog.server"
 import { filterByQuery } from "~/lib/search"
-import { useAppSearchParams } from "~/hooks/useAppSearchParams"
+import { useAppSearchParams, shouldRevalidateAppSearch } from "~/hooks/useAppSearchParams"
 
 export function meta() {
   return [{ title: "Catalog - Duro" }]
@@ -70,6 +70,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     iconBySlug,
   }
 }
+
+// `q` and `state` are filtered client-side out of the catalog this loader
+// already returned, so a keystroke must not refetch it. See the hook.
+export const shouldRevalidate = shouldRevalidateAppSearch
 
 const stateBadgeVariant: Record<AppCatalogState, "default" | "success" | "warning" | "info"> = {
   open: "info",

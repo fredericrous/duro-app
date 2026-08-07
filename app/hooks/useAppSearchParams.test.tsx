@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { act, renderHook } from "@testing-library/react"
 import { MemoryRouter, Route, Routes, useLocation } from "react-router"
 import type { ReactNode } from "react"
-import { useAppSearchParams } from "./useAppSearchParams"
+import { useAppSearchParams, shouldRevalidateAppSearch } from "./useAppSearchParams"
 
 /**
  * Wrap renderHook in a MemoryRouter so useSearchParams resolves. Tests run
@@ -102,6 +102,32 @@ describe("useAppSearchParams", () => {
     expect(params.get("page")).toBe("2")
   })
 
+  it("echoes typing immediately, without waiting on the URL", () => {
+    const { result } = renderHook(() => useWithLocation("cat"), {
+      wrapper: withRouter("/"),
+    })
+    // The field reads from local state, so the character is there in the same
+    // commit as the keystroke — it never waits for a navigation to land.
+    act(() => result.current.hook.setQuery("p"))
+    expect(result.current.hook.query).toBe("p")
+    act(() => result.current.hook.setQuery("pl"))
+    expect(result.current.hook.query).toBe("pl")
+    expect(result.current.location.search).toBe("?q=pl")
+  })
+
+  it("follows the URL when q changes from outside the field", () => {
+    const { result, rerender } = renderHook(() => useWithLocation("cat"), {
+      wrapper: withRouter("/?q=plex"),
+    })
+    expect(result.current.hook.query).toBe("plex")
+
+    // Back/forward or a link into the page carrying its own query: local state
+    // must not win over that.
+    act(() => result.current.hook.clearAll())
+    rerender()
+    expect(result.current.hook.query).toBe("")
+  })
+
   it("uses the chipParam argument to scope reads + writes", () => {
     const { result } = renderHook(() => useWithLocation("state"), {
       wrapper: withRouter("/?cat=media&state=requestable"),
@@ -114,5 +140,38 @@ describe("useAppSearchParams", () => {
     // Foreign cat= is left untouched
     expect(params.get("cat")).toBe("media")
     expect(params.getAll("state")).toEqual(["pending"])
+  })
+})
+
+describe("shouldRevalidateAppSearch", () => {
+  const args = (current: string, next: string, extra: Record<string, unknown> = {}) =>
+    ({
+      currentUrl: new URL(current, "https://duro.test"),
+      nextUrl: new URL(next, "https://duro.test"),
+      defaultShouldRevalidate: true,
+      ...extra,
+    }) as never
+
+  it("skips the refetch when only the query changed", () => {
+    expect(shouldRevalidateAppSearch(args("/catalog", "/catalog?q=p"))).toBe(false)
+    expect(shouldRevalidateAppSearch(args("/catalog?q=p", "/catalog?q=pl"))).toBe(false)
+  })
+
+  it("skips the refetch when only chip selection changed", () => {
+    expect(shouldRevalidateAppSearch(args("/home?cat=media", "/home?cat=tools"))).toBe(false)
+    expect(shouldRevalidateAppSearch(args("/catalog", "/catalog?state=pending&state=open"))).toBe(false)
+  })
+
+  it("still refetches when any other param changes", () => {
+    expect(shouldRevalidateAppSearch(args("/catalog?q=p", "/catalog?q=p&page=2"))).toBe(true)
+  })
+
+  it("still refetches when the path changes", () => {
+    expect(shouldRevalidateAppSearch(args("/home?q=p", "/catalog?q=p"))).toBe(true)
+  })
+
+  it("never suppresses the revalidation that follows a mutation", () => {
+    // Requesting access POSTs to the same URL — that result has to land.
+    expect(shouldRevalidateAppSearch(args("/home?q=p", "/home?q=p", { formMethod: "POST" }))).toBe(true)
   })
 })

@@ -22,7 +22,7 @@ import { loadAppsCatalogForPrincipal, type AppCatalogEntry } from "~/lib/apps-ca
 import type { AppDefinition } from "~/lib/apps"
 import { formatCategory, getCategoryOrder } from "~/lib/apps"
 import { filterByQuery } from "~/lib/search"
-import { useAppSearchParams } from "~/hooks/useAppSearchParams"
+import { useAppSearchParams, shouldRevalidateAppSearch } from "~/hooks/useAppSearchParams"
 
 export function meta() {
   return [{ title: "Home - Duro" }, { name: "description", content: "Your personal app dashboard" }]
@@ -120,6 +120,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     categoryOrder: config.categoryOrder,
   }
 }
+
+// `q` and `cat` are filtered client-side out of the apps this loader already
+// returned, so a keystroke must not refetch them. See the hook for the rest.
+export const shouldRevalidate = shouldRevalidateAppSearch
 
 // Boundary schema for the single supported intent. Unknown intents decode
 // (intent is just a string literal check below) — shape errors do not.
