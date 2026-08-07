@@ -9,7 +9,7 @@ import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { resolveLocale } from "~/lib/i18n.server"
 import { resolveThemePreference } from "~/lib/theme.server"
 import { parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
-import { Alert, Field, Select, Stack } from "@duro-app/ui"
+import { Alert, Field, Select, Spinner, Stack } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 import { formatDateTime, prefToSelect, selectToPref, TIMEZONE_OPTIONS, TIME_FORMAT_OPTIONS } from "~/lib/datetime"
@@ -89,10 +89,23 @@ export default function GeneralSettings({ loaderData }: Route.ComponentProps) {
     displayFetcher.submit({ intent: "saveDisplayPrefs", timezone: nextTz, timeFormat: nextTf }, { method: "post" })
   }
 
+  // Autosave gives the user nothing to hold on to while the request is in
+  // flight — on a slow link the select just sits there. Show the wait in the
+  // same slot the acknowledgement lands in, so the row does not jump when one
+  // becomes the other. `pendingLocale` covers the language form: it submits
+  // with `reloadDocument`, so there is no fetcher state to watch, and it stays
+  // set until the document load replaces this component.
+  const saving = displayFetcher.state !== "idle" || themeFetcher.state !== "idle" || pendingLocale !== null
+
   return (
     <Stack gap="lg">
       {displayError && <Alert variant="error">{displayError}</Alert>}
-      {!displayError && justSaved && <Alert variant="success">{t("settings.saved")}</Alert>}
+      {!displayError && saving && (
+        <Alert variant="info" icon={<Spinner size="sm" />}>
+          {t("settings.saving")}
+        </Alert>
+      )}
+      {!displayError && !saving && justSaved && <Alert variant="success">{t("settings.saved")}</Alert>}
 
       <CardSection title={t("settings.languageLabel")}>
         {/* `reloadDocument` makes this a plain browser form POST rather than a

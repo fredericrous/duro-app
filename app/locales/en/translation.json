@@ -243,6 +243,7 @@
     "languageLabel": "Language",
     "languageHint": "Choose your preferred language for the interface.",
     "saved": "Settings saved.",
+    "saving": "Saving...",
     "security": {
       "heading": "Account & security",
       "description": "Your password, multi-factor authentication, sessions, and email are managed by your identity provider.",

@@ -243,6 +243,7 @@
     "languageLabel": "Langue",
     "languageHint": "Choisissez votre langue preferee pour l'interface.",
     "saved": "Parametres enregistres.",
+    "saving": "Enregistrement...",
     "security": {
       "heading": "Compte et securite",
       "description": "Votre mot de passe, l'authentification multifacteur, les sessions et l'e-mail sont geres par votre fournisseur d'identite.",

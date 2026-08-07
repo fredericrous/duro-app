@@ -160,6 +160,40 @@ describe("GeneralSettings component", () => {
     expect(await screen.findByText(t("settings.saved"))).toBeInTheDocument()
   })
 
+  it("shows the save in flight, then swaps it for the acknowledgement", async () => {
+    let release: (() => void) | undefined
+    renderRoute({
+      route: {
+        path: "/settings",
+        Component: GeneralSettings as never,
+        loader: () => ({ locale: "en", timezone: null, timeFormat: null, currentLocale: "en", theme: "system" }),
+        action: async () => {
+          // Hold the request open so the pending state is observable — on a
+          // fast link it would otherwise be gone before the assertion runs.
+          await new Promise<void>((resolve) => {
+            release = resolve
+          })
+          return { displayPrefsSaved: true }
+        },
+      },
+    })
+    await waitFor(() => {
+      expect(screen.getByText(t("settings.display.heading"))).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText(t("settings.display.timeFormatLabel")).closest("div")!.querySelector("button")!)
+    fireEvent.click(await screen.findByText(t("settings.display.timeFormat.24")))
+
+    // In flight: the waiting message occupies the slot, and the success one
+    // must not be there yet.
+    expect(await screen.findByText(t("settings.saving"))).toBeInTheDocument()
+    expect(screen.queryByText(t("settings.saved"))).not.toBeInTheDocument()
+
+    release!()
+    expect(await screen.findByText(t("settings.saved"))).toBeInTheDocument()
+    expect(screen.queryByText(t("settings.saving"))).not.toBeInTheDocument()
+  })
+
   it("stays quiet until something is actually saved", async () => {
     renderRoute({
       route: {
