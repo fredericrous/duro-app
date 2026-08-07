@@ -2,8 +2,9 @@ import * as PgClient from "@effect/sql-pg/PgClient"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { Context, Config, Duration, Effect, Layer } from "effect"
-import * as crypto from "node:crypto"
 import { statSync } from "node:fs"
+
+import { seedDevFixtures } from "./seed-dev.server"
 
 import m0001 from "./migrations/pg/0001_create_schema"
 import m0002 from "./migrations/pg/0002_create_user_revocations"
@@ -185,152 +186,9 @@ const PgLiteClientLayer = PgClient.layerFromPool({
 const seedDevData = Effect.gen(function* () {
   yield* runMigrations
   const sql = yield* SqlClient.SqlClient
-
-  // Only seed if empty
-  const existing = yield* sql`SELECT COUNT(*) as count FROM user_certificates`
-  if (Number(existing[0].count) > 0) return
-
   yield* Effect.log("seeding dev data")
-  const now = new Date().toISOString()
-  const expires = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
-
-  const users = [
-    { id: "dev", email: "dev@localhost", serial: "aa:bb:cc:dd:00:00:00:01" },
-    { id: "alice", email: "alice@example.com", serial: "aa:bb:cc:dd:00:00:00:02" },
-    { id: "alice", email: "alice@example.com", serial: "aa:bb:cc:dd:00:00:00:04" },
-    { id: "alice", email: "alice@example.com", serial: "aa:bb:cc:dd:00:00:00:05" },
-    { id: "bob", email: "bob@example.com", serial: "aa:bb:cc:dd:00:00:00:03" },
-  ]
-
-  for (const u of users) {
-    yield* sql`
-      INSERT INTO user_certificates (id, invite_id, user_id, username, email, serial_number, issued_at, expires_at)
-      VALUES (${crypto.randomUUID()}, ${crypto.randomUUID()}, ${u.id}, ${u.id}, ${u.email}, ${u.serial}, ${now}, ${expires})
-    `
-  }
-  yield* Effect.log("dev seed complete: 3 users with certificates (alice has 3)")
-
-  // --- Governance seed (separate sentinel) ---
-  yield* seedGovernanceData(sql)
+  yield* seedDevFixtures(sql)
 }).pipe(Effect.as(true as const))
-
-const seedGovernanceData = (sql: SqlClient.SqlClient) =>
-  Effect.gen(function* () {
-    const existing = yield* sql`SELECT COUNT(*) as count FROM principals`
-    if (Number(existing[0].count) > 0) return
-
-    yield* Effect.log("seeding governance data")
-
-    // --- Principals ---
-    const devId = "p-dev"
-    const aliceId = "p-alice"
-    const bobId = "p-bob"
-    const familyGroupId = "g-family"
-    const mediaGroupId = "g-media"
-
-    yield* sql`INSERT INTO principals (id, principal_type, external_id, display_name, email) VALUES (${devId}, 'user', 'dev', 'dev', 'dev@localhost')`
-    yield* sql`INSERT INTO principals (id, principal_type, external_id, display_name, email) VALUES (${aliceId}, 'user', 'alice', 'Alice', 'alice@example.com')`
-    yield* sql`INSERT INTO principals (id, principal_type, external_id, display_name, email) VALUES (${bobId}, 'user', 'bob', 'Bob', 'bob@example.com')`
-    yield* sql`INSERT INTO principals (id, principal_type, display_name) VALUES (${familyGroupId}, 'group', 'Family')`
-    yield* sql`INSERT INTO principals (id, principal_type, display_name) VALUES (${mediaGroupId}, 'group', 'Media')`
-
-    // --- Group memberships ---
-    yield* sql`INSERT INTO group_memberships (group_id, member_id) VALUES (${familyGroupId}, ${devId})`
-    yield* sql`INSERT INTO group_memberships (group_id, member_id) VALUES (${familyGroupId}, ${aliceId})`
-    yield* sql`INSERT INTO group_memberships (group_id, member_id) VALUES (${familyGroupId}, ${bobId})`
-    yield* sql`INSERT INTO group_memberships (group_id, member_id) VALUES (${mediaGroupId}, ${devId})`
-    yield* sql`INSERT INTO group_memberships (group_id, member_id) VALUES (${mediaGroupId}, ${aliceId})`
-
-    // --- Applications ---
-    const duroAppId = "app-duro"
-    const kbAppId = "app-kb-vision"
-    const jellyfinAppId = "app-jellyfin"
-    const grafanaAppId = "app-grafana"
-
-    yield* sql`INSERT INTO applications (id, slug, display_name, description, access_mode, owner_id) VALUES (${duroAppId}, 'duro', 'Duro', 'Access governance platform', 'request', ${devId})`
-    yield* sql`INSERT INTO applications (id, slug, display_name, description, access_mode, owner_id) VALUES (${kbAppId}, 'kb-vision', 'KB Vision', 'Knowledge base', 'request', ${devId})`
-    yield* sql`INSERT INTO applications (id, slug, display_name, description, access_mode, owner_id) VALUES (${jellyfinAppId}, 'jellyfin', 'Jellyfin', 'Media server', 'invite_only', ${devId})`
-    yield* sql`INSERT INTO applications (id, slug, display_name, description, access_mode, owner_id) VALUES (${grafanaAppId}, 'grafana', 'Grafana', 'Monitoring dashboards', 'open', ${devId})`
-
-    // --- Roles ---
-    const duroAdminRoleId = "role-duro-admin"
-    const kbViewerRoleId = "role-kb-viewer"
-    const kbEditorRoleId = "role-kb-editor"
-    const jfViewerRoleId = "role-jf-viewer"
-    const jfAdminRoleId = "role-jf-admin"
-    const grafanaEditorRoleId = "role-grafana-editor"
-
-    yield* sql`INSERT INTO roles (id, application_id, slug, display_name, description) VALUES (${duroAdminRoleId}, ${duroAppId}, 'admin', 'Admin', 'Full admin access')`
-    yield* sql`INSERT INTO roles (id, application_id, slug, display_name, description) VALUES (${kbViewerRoleId}, ${kbAppId}, 'viewer', 'Viewer', 'Read-only access')`
-    yield* sql`INSERT INTO roles (id, application_id, slug, display_name, description) VALUES (${kbEditorRoleId}, ${kbAppId}, 'editor', 'Editor', 'Read-write access')`
-    yield* sql`INSERT INTO roles (id, application_id, slug, display_name, description) VALUES (${jfViewerRoleId}, ${jellyfinAppId}, 'viewer', 'Viewer', 'Stream media')`
-    yield* sql`INSERT INTO roles (id, application_id, slug, display_name, description) VALUES (${jfAdminRoleId}, ${jellyfinAppId}, 'admin', 'Admin', 'Manage library')`
-    yield* sql`INSERT INTO roles (id, application_id, slug, display_name, description) VALUES (${grafanaEditorRoleId}, ${grafanaAppId}, 'editor', 'Editor', 'Edit dashboards')`
-
-    // --- Entitlements ---
-    const kbReadId = "ent-kb-read"
-    const kbWriteId = "ent-kb-write"
-    const jfStreamId = "ent-jf-stream"
-    const jfManageId = "ent-jf-manage"
-    const grafViewId = "ent-graf-view"
-    const grafEditId = "ent-graf-edit"
-    const duroAdminEntId = "ent-duro-admin"
-    const duroAccessEntId = "ent-duro-access"
-
-    yield* sql`INSERT INTO entitlements (id, application_id, slug, display_name) VALUES (${duroAdminEntId}, ${duroAppId}, 'admin', 'Admin access')`
-    yield* sql`INSERT INTO entitlements (id, application_id, slug, display_name) VALUES (${duroAccessEntId}, ${duroAppId}, 'access', 'Basic access')`
-    yield* sql`INSERT INTO entitlements (id, application_id, slug, display_name) VALUES (${kbReadId}, ${kbAppId}, 'space.read', 'Read spaces')`
-    yield* sql`INSERT INTO entitlements (id, application_id, slug, display_name) VALUES (${kbWriteId}, ${kbAppId}, 'space.write', 'Write spaces')`
-    yield* sql`INSERT INTO entitlements (id, application_id, slug, display_name) VALUES (${jfStreamId}, ${jellyfinAppId}, 'stream', 'Stream media')`
-    yield* sql`INSERT INTO entitlements (id, application_id, slug, display_name) VALUES (${jfManageId}, ${jellyfinAppId}, 'manage_library', 'Manage library')`
-    yield* sql`INSERT INTO entitlements (id, application_id, slug, display_name) VALUES (${grafViewId}, ${grafanaAppId}, 'dashboard.view', 'View dashboards')`
-    yield* sql`INSERT INTO entitlements (id, application_id, slug, display_name) VALUES (${grafEditId}, ${grafanaAppId}, 'dashboard.edit', 'Edit dashboards')`
-
-    // --- Role-entitlement mappings ---
-    yield* sql`INSERT INTO role_entitlements (role_id, entitlement_id) VALUES (${duroAdminRoleId}, ${duroAdminEntId})`
-    yield* sql`INSERT INTO role_entitlements (role_id, entitlement_id) VALUES (${duroAdminRoleId}, ${duroAccessEntId})`
-    yield* sql`INSERT INTO role_entitlements (role_id, entitlement_id) VALUES (${kbViewerRoleId}, ${kbReadId})`
-    yield* sql`INSERT INTO role_entitlements (role_id, entitlement_id) VALUES (${kbEditorRoleId}, ${kbReadId})`
-    yield* sql`INSERT INTO role_entitlements (role_id, entitlement_id) VALUES (${kbEditorRoleId}, ${kbWriteId})`
-    yield* sql`INSERT INTO role_entitlements (role_id, entitlement_id) VALUES (${jfViewerRoleId}, ${jfStreamId})`
-    yield* sql`INSERT INTO role_entitlements (role_id, entitlement_id) VALUES (${jfAdminRoleId}, ${jfStreamId})`
-    yield* sql`INSERT INTO role_entitlements (role_id, entitlement_id) VALUES (${jfAdminRoleId}, ${jfManageId})`
-    yield* sql`INSERT INTO role_entitlements (role_id, entitlement_id) VALUES (${grafanaEditorRoleId}, ${grafViewId})`
-    yield* sql`INSERT INTO role_entitlements (role_id, entitlement_id) VALUES (${grafanaEditorRoleId}, ${grafEditId})`
-
-    // --- Grants ---
-    // dev has admin on duro (direct)
-    yield* sql`INSERT INTO grants (id, principal_id, role_id, granted_by, reason) VALUES ('grant-dev-duro', ${devId}, ${duroAdminRoleId}, ${devId}, 'bootstrap')`
-    // dev has admin on kb-vision (direct)
-    yield* sql`INSERT INTO grants (id, principal_id, role_id, granted_by, reason) VALUES ('grant-dev-kb', ${devId}, ${kbEditorRoleId}, ${devId}, 'bootstrap')`
-    // family group has viewer on kb-vision (alice and bob get it via group)
-    yield* sql`INSERT INTO grants (id, principal_id, role_id, granted_by, reason) VALUES ('grant-family-kb', ${familyGroupId}, ${kbViewerRoleId}, ${devId}, 'group grant')`
-    // bob has viewer on jellyfin (direct)
-    yield* sql`INSERT INTO grants (id, principal_id, role_id, granted_by, reason) VALUES ('grant-bob-jf', ${bobId}, ${jfViewerRoleId}, ${devId}, 'direct grant')`
-
-    // --- Approval policy: kb-vision requires one_of approval from app owner ---
-    yield* sql`INSERT INTO approval_policies (id, application_id, scope_type, mode, rules) VALUES ('policy-kb', ${kbAppId}, 'application', 'one_of', ${JSON.stringify([{ approverType: "app_owner" }])})`
-
-    // --- Pending access request: bob wants kb-vision editor ---
-    const requestId = "req-bob-kb-editor"
-    yield* sql`INSERT INTO access_requests (id, requester_id, application_id, role_id, justification, status) VALUES (${requestId}, ${bobId}, ${kbAppId}, ${kbEditorRoleId}, 'Need to edit knowledge base articles', 'pending')`
-    yield* sql`INSERT INTO request_approvals (id, request_id, approver_id) VALUES ('approval-bob-kb', ${requestId}, ${devId})`
-
-    // --- Group mappings (OIDC → governance) ---
-    yield* sql`INSERT INTO group_mappings (id, oidc_group_name, principal_group_id) VALUES ('gm-family', 'family', ${familyGroupId})`
-    yield* sql`INSERT INTO group_mappings (id, oidc_group_name, principal_group_id) VALUES ('gm-media', 'media', ${mediaGroupId})`
-    yield* sql`INSERT INTO group_mappings (id, oidc_group_name, role_id, application_id) VALUES ('gm-admin', 'lldap_admin', ${duroAdminRoleId}, ${duroAppId})`
-
-    // --- API key for dev testing ---
-    const devApiKey = "duro_dev_test_key_0000000000000000"
-    const keyHash = crypto.createHash("sha256").update(devApiKey).digest("hex")
-    const devKeyPreview = `duro_${devApiKey.slice(5, 9)}…${devApiKey.slice(-4)}`
-    yield* sql`INSERT INTO api_keys (id, principal_id, key_hash, key_preview, name, scopes) VALUES ('apikey-dev', ${devId}, ${keyHash}, ${devKeyPreview}, 'Dev Test Key', ${JSON.stringify(["*"])})`
-
-    yield* Effect.log(
-      "governance seed complete: 4 apps, 6 roles, 8 entitlements, 4 grants, 1 policy, 1 pending request",
-    )
-  })
 
 export const DbDevLive = Layer.effect(MigrationsRan, seedDevData).pipe(Layer.provideMerge(PgLiteClientLayer))
 

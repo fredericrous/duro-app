@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "react-router dev",
+    "seed:dev": "tsx scripts/seed-dev.ts",
     "build": "react-router build && node scripts/build-worker.mjs",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
