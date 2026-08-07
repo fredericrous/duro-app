@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { act, renderHook } from "@testing-library/react"
 import { MemoryRouter, Route, Routes, useLocation } from "react-router"
 import type { ReactNode } from "react"
@@ -45,16 +45,20 @@ describe("useAppSearchParams", () => {
     expect(result.current.selected).toEqual([])
   })
 
-  it("setQuery writes `q` to the URL (and clears it on empty)", () => {
+  it("setQuery writes `q` to the URL once typing settles (and clears it on empty)", () => {
+    vi.useFakeTimers()
     const { result } = renderHook(() => useWithLocation("cat"), {
       wrapper: withRouter("/"),
     })
 
     act(() => result.current.hook.setQuery("plex"))
+    act(() => void vi.runAllTimers())
     expect(result.current.location.search).toBe("?q=plex")
 
     act(() => result.current.hook.setQuery(""))
+    act(() => void vi.runAllTimers())
     expect(result.current.location.search).toBe("")
+    vi.useRealTimers()
   })
 
   it("setSelected writes multiple chip values (repeated key)", () => {
@@ -103,6 +107,7 @@ describe("useAppSearchParams", () => {
   })
 
   it("echoes typing immediately, without waiting on the URL", () => {
+    vi.useFakeTimers()
     const { result } = renderHook(() => useWithLocation("cat"), {
       wrapper: withRouter("/"),
     })
@@ -110,9 +115,34 @@ describe("useAppSearchParams", () => {
     // commit as the keystroke — it never waits for a navigation to land.
     act(() => result.current.hook.setQuery("p"))
     expect(result.current.hook.query).toBe("p")
+    expect(result.current.location.search).toBe("")
+
     act(() => result.current.hook.setQuery("pl"))
     expect(result.current.hook.query).toBe("pl")
+
+    act(() => void vi.runAllTimers())
     expect(result.current.location.search).toBe("?q=pl")
+    vi.useRealTimers()
+  })
+
+  it("keeps every character when the URL lags behind the keyboard", () => {
+    vi.useFakeTimers()
+    const { result } = renderHook(() => useWithLocation("cat"), {
+      wrapper: withRouter("/"),
+    })
+    // Regression: the URL only ever catches up to an earlier keystroke, and
+    // adopting it as an "external" change used to overwrite the newer local
+    // value — so fast typing lost characters, worst on the slowest links.
+    for (const value of ["v", "va", "vau", "vaul", "vault"]) {
+      act(() => result.current.hook.setQuery(value))
+      act(() => void vi.advanceTimersByTime(50))
+    }
+    expect(result.current.hook.query).toBe("vault")
+
+    act(() => void vi.runAllTimers())
+    expect(result.current.hook.query).toBe("vault")
+    expect(result.current.location.search).toBe("?q=vault")
+    vi.useRealTimers()
   })
 
   it("follows the URL when q changes from outside the field", () => {
@@ -126,6 +156,7 @@ describe("useAppSearchParams", () => {
     act(() => result.current.hook.clearAll())
     rerender()
     expect(result.current.hook.query).toBe("")
+    expect(result.current.location.search).toBe("")
   })
 
   it("uses the chipParam argument to scope reads + writes", () => {
