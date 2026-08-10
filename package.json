@@ -15,10 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "prepare": "husky || true"
-  },
-  "lint-staged": {
-    "app/**/*.{ts,tsx,js,jsx,json,css}": "prettier --write"
+    "prepare": "amont init || true"
   },
   "dependencies": {
     "@duro-app/tokens": "^0.48.0",
@@ -78,14 +75,13 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "~19.1.7",
     "@vitest/coverage-v8": "^4.1.0",
+    "amont": "^1.5.0",
     "babel-plugin-react-compiler": "1.0.0",
     "esbuild": "^0.28.0",
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.0.1",
-    "husky": "^9.1.7",
     "jsdom": "^29.0.0",
-    "lint-staged": "^17.0.2",
     "msw": "^2.12.14",
     "postcss": "^8.5.8",
     "prettier": "^3.8.1",
