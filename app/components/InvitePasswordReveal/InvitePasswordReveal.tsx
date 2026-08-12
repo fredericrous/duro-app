@@ -29,7 +29,7 @@ export function InvitePasswordReveal({ p12Password }: { p12Password: string | nu
       <Card>
         <Stack gap="sm">
           <html.div style={styles.headerRow}>
-            <Icon name="lock-filled" size={20} />
+            <Icon name="lock-filled" size="md" />
             <Heading level={2} variant="headingSm">
               {t("invite.password.title")}
             </Heading>
@@ -46,7 +46,7 @@ export function InvitePasswordReveal({ p12Password }: { p12Password: string | nu
     <Card>
       <Stack gap="sm">
         <html.div style={styles.headerRow}>
-          <Icon name="lock-filled" size={20} />
+          <Icon name="lock-filled" size="md" />
           <Heading level={2} variant="headingSm">
             {t("invite.password.title")}
           </Heading>

@@ -137,7 +137,7 @@ export default function AdminAuthzPlaygroundPage({ loaderData }: Route.Component
       <Panel.Root bordered>
         <Panel.Body>
           <fetcher.Form method="post">
-            <input type="hidden" name="intent" value="checkAccess" />
+            <html.input type="hidden" name="intent" value="checkAccess" />
             <Stack gap="md">
               <html.div>
                 <Text>{t("admin.cols.principal")}</Text>
@@ -154,7 +154,7 @@ export default function AdminAuthzPlaygroundPage({ loaderData }: Route.Component
                     <Combobox.Empty>{t("admin.principals.noResults")}</Combobox.Empty>
                   </Combobox.Popup>
                 </Combobox.Root>
-                <input type="hidden" name="subject" value={selectedSubject} />
+                <html.input type="hidden" name="subject" value={selectedSubject} />
               </html.div>
 
               <html.div>
@@ -177,7 +177,7 @@ export default function AdminAuthzPlaygroundPage({ loaderData }: Route.Component
                     <Combobox.Empty>{t("admin.principals.noResults")}</Combobox.Empty>
                   </Combobox.Popup>
                 </Combobox.Root>
-                <input type="hidden" name="application" value={selectedApp} />
+                <html.input type="hidden" name="application" value={selectedApp} />
               </html.div>
 
               <html.div>
@@ -197,7 +197,7 @@ export default function AdminAuthzPlaygroundPage({ loaderData }: Route.Component
                     </Combobox.Empty>
                   </Combobox.Popup>
                 </Combobox.Root>
-                <input type="hidden" name="action" value={selectedAction} />
+                <html.input type="hidden" name="action" value={selectedAction} />
                 <Text color="muted">{t("admin.authz.actionHint")}</Text>
               </html.div>
 
@@ -218,7 +218,7 @@ export default function AdminAuthzPlaygroundPage({ loaderData }: Route.Component
                     </Combobox.Empty>
                   </Combobox.Popup>
                 </Combobox.Root>
-                <input type="hidden" name="resourceId" value={selectedResource} />
+                <html.input type="hidden" name="resourceId" value={selectedResource} />
                 <Text color="muted">{t("admin.authz.resourceHint")}</Text>
               </html.div>
               <Button type="submit" variant="primary" disabled={isChecking}>

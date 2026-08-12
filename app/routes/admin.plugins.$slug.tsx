@@ -9,7 +9,7 @@ import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import type { PluginAction, PluginManifest } from "~/lib/plugins/contracts"
 import type { AuditEvent, ConnectedSystem } from "~/lib/governance/types"
-import { Badge, Button, EmptyState, Heading, Inline, Panel, Stack, Table, Tag, Text } from "@duro-app/ui"
+import { Badge, Button, EmptyState, Heading, Inline, LinkButton, Panel, Stack, Table, Tag, Text } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 import { css, html } from "react-strict-dom"
@@ -241,9 +241,9 @@ export default function AdminPluginDetailPage({ loaderData }: { loaderData: Awai
       </CardSection>
 
       <Inline gap="sm">
-        <a href={`/admin/audit?source=plugin:${manifest.slug}`}>
-          <Button variant="secondary">{t("admin.pluginDetail.viewAuditLog")}</Button>
-        </a>
+        <LinkButton href={`/admin/audit?source=plugin:${manifest.slug}`} variant="secondary">
+          {t("admin.pluginDetail.viewAuditLog")}
+        </LinkButton>
       </Inline>
     </Stack>
   )

@@ -1,4 +1,5 @@
 import { Suspense, useMemo, useState } from "react"
+import { html } from "react-strict-dom"
 import { redirect, useParams } from "react-router"
 import { Trans, useTranslation } from "react-i18next"
 import type { Route } from "./+types/invite-create-account"
@@ -184,7 +185,7 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
     return (
       <CenteredCardPage>
         <Stack gap="lg" align="center">
-          <StatusIcon name="check-circle" size={64} variant="success" />
+          <StatusIcon name="check-circle" size="xxl" variant="success" />
           <Heading level={1}>{t("createAccount.success.title")}</Heading>
           <Text as="p" color="muted">
             {t("createAccount.success.message", { appName: loaderData.appName })}
@@ -208,7 +209,7 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
         <Trans
           i18nKey="createAccount.subtitle"
           values={{ email: loaderData.email }}
-          components={{ strong: <strong /> }}
+          components={{ strong: <html.strong /> }}
         />
       </Text>
       <Suspense

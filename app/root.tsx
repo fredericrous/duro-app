@@ -10,7 +10,10 @@ import {
   useRouteLoaderData,
 } from "react-router"
 import { useTranslation } from "react-i18next"
-import { ActionBarProvider, ThemeProvider, ToastProvider } from "@duro-app/ui"
+import { css, html } from "react-strict-dom"
+import { ActionBarProvider, Heading, Stack, Text, ThemeProvider, ToastProvider } from "@duro-app/ui"
+import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { DevToolbar } from "~/components/DevToolbar/DevToolbar"
 import type { Route } from "./+types/root"
 import { resolveLocale } from "~/lib/i18n.server"
@@ -147,10 +150,32 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main className="error-container">
-      <h1>{message}</h1>
-      <p>{details}</p>
-      <a href="/">{t("error.goHome")}</a>
-    </main>
+    <html.main style={styles.errorContainer}>
+      <Stack gap="md" align="center">
+        <Heading level={1}>{message}</Heading>
+        <Text variant="bodyLg" color="muted" align="center">
+          {details}
+        </Text>
+        <html.a href="/" style={styles.errorLink}>
+          {t("error.goHome")}
+        </html.a>
+      </Stack>
+    </html.main>
   )
 }
+
+const styles = css.create({
+  errorContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "100vh",
+    textAlign: "center",
+    padding: spacing.xl,
+  },
+  errorLink: {
+    color: colors.accent,
+    textDecoration: "underline",
+  },
+})

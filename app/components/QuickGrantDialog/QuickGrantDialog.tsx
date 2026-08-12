@@ -1,4 +1,5 @@
 import { useFetcher } from "react-router"
+import { html } from "react-strict-dom"
 import { useTranslation } from "react-i18next"
 import { useEffect, useMemo, useRef } from "react"
 import { Button, Combobox, Dialog, EmptyState, Field, Input, Select, Stack, Text } from "@duro-app/ui"
@@ -91,7 +92,7 @@ export function QuickGrantDialog({
           )}
           {!blocked && (
             <fetcher.Form method="post">
-              <input type="hidden" name="intent" value="createGrant" />
+              <html.input type="hidden" name="intent" value="createGrant" />
               <Stack gap="md">
                 {ldapProvisioned && (
                   <Text color="muted">

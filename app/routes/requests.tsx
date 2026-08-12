@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { html } from "react-strict-dom"
 import { Effect, Either, Schema } from "effect"
 import { useFetcher, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
@@ -239,8 +240,8 @@ export default function MyRequestsPage({ loaderData }: Route.ComponentProps) {
                           <Table.Cell>
                             <Inline gap="sm">
                               <fetcher.Form method="post">
-                                <input type="hidden" name="intent" value="acceptInvitation" />
-                                <input type="hidden" name="invitationId" value={inv.id} />
+                                <html.input type="hidden" name="intent" value="acceptInvitation" />
+                                <html.input type="hidden" name="invitationId" value={inv.id} />
                                 <Button type="submit" variant="primary" disabled={busy}>
                                   {t("requests.invitations.accept")}
                                 </Button>
@@ -358,8 +359,8 @@ export default function MyRequestsPage({ loaderData }: Route.ComponentProps) {
         title={t("requests.cancelConfirmTitle")}
         confirmSlot={() => (
           <fetcher.Form method="post" onSubmit={() => setCancelId(null)}>
-            <input type="hidden" name="intent" value="cancel" />
-            <input type="hidden" name="requestId" value={cancelId ?? ""} />
+            <html.input type="hidden" name="intent" value="cancel" />
+            <html.input type="hidden" name="requestId" value={cancelId ?? ""} />
             <Button type="submit" variant="secondary">
               {t("requests.cancel")}
             </Button>
@@ -375,8 +376,8 @@ export default function MyRequestsPage({ loaderData }: Route.ComponentProps) {
         title={t("requests.invitations.declineConfirmTitle")}
         confirmSlot={() => (
           <fetcher.Form method="post" onSubmit={() => setDeclineId(null)}>
-            <input type="hidden" name="intent" value="declineInvitation" />
-            <input type="hidden" name="invitationId" value={declineId ?? ""} />
+            <html.input type="hidden" name="intent" value="declineInvitation" />
+            <html.input type="hidden" name="invitationId" value={declineId ?? ""} />
             <Button type="submit" variant="secondary">
               {t("requests.invitations.decline")}
             </Button>

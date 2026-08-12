@@ -1,7 +1,7 @@
 import { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
 import { css, html } from "react-strict-dom"
-import { Badge, Button, Callout, Heading, Inline, Panel, Stack, Text } from "@duro-app/ui"
+import { Badge, Button, Callout, Heading, Inline, LinkButton, Panel, Stack, Text } from "@duro-app/ui"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { hasStarterTemplate } from "~/lib/governance/defaultRbac"
 import type { Application, Entitlement, Grant, Role } from "~/lib/governance/types"
@@ -147,7 +147,7 @@ export function AppOverview({
 
       <Inline gap="sm">
         <syncFetcher.Form method="post">
-          <input type="hidden" name="intent" value="syncNow" />
+          <html.input type="hidden" name="intent" value="syncNow" />
           <Button type="submit" variant="secondary" disabled={isSyncing}>
             {isSyncing ? "Syncing…" : "Sync now"}
           </Button>
@@ -155,9 +155,9 @@ export function AppOverview({
         <Button variant="secondary" onClick={() => onSwitchTab("settings")}>
           Edit settings
         </Button>
-        <a href={`/admin/audit?applicationId=${application.id}`}>
-          <Button variant="secondary">View audit log</Button>
-        </a>
+        <LinkButton href={`/admin/audit?applicationId=${application.id}`} variant="secondary">
+          View audit log
+        </LinkButton>
       </Inline>
 
       {syncFetcher.data && "message" in syncFetcher.data && (

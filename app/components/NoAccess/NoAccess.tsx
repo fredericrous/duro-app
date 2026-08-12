@@ -39,7 +39,7 @@ export function NoAccess({ user, requestableApps = [], fetcher }: NoAccessProps)
   return (
     <html.div style={styles.container}>
       <html.div style={styles.icon}>
-        <StatusIcon name="forbidden" size={64} variant="error" />
+        <StatusIcon name="forbidden" size="xxl" variant="error" />
       </html.div>
       <Stack gap="sm" align="center">
         <Heading level={1}>{t("noAccess.title")}</Heading>

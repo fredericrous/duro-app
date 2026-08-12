@@ -34,6 +34,7 @@ import {
   Stack,
   Tabs,
   Text,
+  Tooltip,
   useToast,
 } from "@duro-app/ui"
 import { Table } from "@duro-app/ui/table"
@@ -393,7 +394,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
             >
               {roles.length === 0 ? (
                 <EmptyState
-                  icon={<Icon name="shield" size={32} />}
+                  icon={<Icon name="shield" size="xl" />}
                   message={t("admin.applications.empty.roles")}
                   action={
                     <Button variant="primary" onClick={() => setRoleDialogOpen(true)}>
@@ -418,7 +419,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
             >
               {entitlements.length === 0 ? (
                 <EmptyState
-                  icon={<Icon name="key" size={32} />}
+                  icon={<Icon name="key" size="xl" />}
                   message={t("admin.applications.empty.entitlements")}
                   action={
                     <Button variant="primary" onClick={() => setEntitlementDialogOpen(true)}>
@@ -443,7 +444,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
             >
               {resources.length === 0 ? (
                 <EmptyState
-                  icon={<Icon name="lock" size={32} />}
+                  icon={<Icon name="lock" size="xl" />}
                   message={t("admin.applications.empty.resources")}
                   action={
                     <Button variant="primary" onClick={() => setResourceDialogOpen(true)}>
@@ -468,7 +469,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
             >
               {grantRows.length === 0 ? (
                 <EmptyState
-                  icon={<Icon name="check-circle" size={32} />}
+                  icon={<Icon name="check-circle" size="xl" />}
                   message={t("admin.applications.empty.grants")}
                   action={
                     <Button variant="primary" onClick={() => setQuickGrantOpen(true)}>
@@ -486,7 +487,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
             <CardSection title={t("admin.applications.sections.requests")}>
               {pendingRequests.length === 0 ? (
                 <EmptyState
-                  icon={<Icon name="check-circle" size={32} />}
+                  icon={<Icon name="check-circle" size="xl" />}
                   message={t("admin.applications.empty.requests")}
                 />
               ) : (
@@ -509,9 +510,13 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                         <Table.Cell>{r.entitlementName ?? r.entitlementId ?? "—"}</Table.Cell>
                         <Table.Cell>
                           {r.justification ? (
-                            <span title={r.justification}>
-                              {r.justification.length > 60 ? r.justification.slice(0, 60) + "…" : r.justification}
-                            </span>
+                            <Tooltip.Root content={r.justification}>
+                              <Tooltip.Trigger>
+                                <Text as="span">
+                                  {r.justification.length > 60 ? r.justification.slice(0, 60) + "…" : r.justification}
+                                </Text>
+                              </Tooltip.Trigger>
+                            </Tooltip.Root>
                           ) : (
                             "—"
                           )}
@@ -535,7 +540,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
           {activeTab === "settings" && (
             <CardSection title={t("admin.applications.sections.settings")}>
               <settingsFetcher.Form method="post">
-                <input type="hidden" name="intent" value="updateSettings" />
+                <html.input type="hidden" name="intent" value="updateSettings" />
                 <Stack gap="md">
                   <Field.Root>
                     <Field.Label>{t("admin.cols.slug")}</Field.Label>
@@ -569,7 +574,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                   </Field.Root>
                   <Field.Root>
                     <Field.Label>{t("admin.cols.enabled")}</Field.Label>
-                    <input type="hidden" name="enabled" value={application.enabled ? "true" : "false"} />
+                    <html.input type="hidden" name="enabled" value={application.enabled ? "true" : "false"} />
                     <Checkbox
                       name="enabled"
                       value="true"
@@ -628,7 +633,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
           </Dialog.Header>
           <Dialog.Body>
             <fetcher.Form method="post" onSubmit={() => setTimeout(() => setRoleDialogOpen(false), 0)}>
-              <input type="hidden" name="intent" value="createRole" />
+              <html.input type="hidden" name="intent" value="createRole" />
               <Stack gap="md">
                 <Field.Root>
                   <Field.Label>{t("admin.cols.slug")}</Field.Label>
@@ -660,7 +665,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
           </Dialog.Header>
           <Dialog.Body>
             <fetcher.Form method="post" onSubmit={() => setTimeout(() => setEntitlementDialogOpen(false), 0)}>
-              <input type="hidden" name="intent" value="createEntitlement" />
+              <html.input type="hidden" name="intent" value="createEntitlement" />
               <Stack gap="md">
                 <Field.Root>
                   <Field.Label>{t("admin.cols.slug")}</Field.Label>
@@ -698,7 +703,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
           </Dialog.Header>
           <Dialog.Body>
             <fetcher.Form method="post" onSubmit={() => setTimeout(() => setResourceDialogOpen(false), 0)}>
-              <input type="hidden" name="intent" value="createResource" />
+              <html.input type="hidden" name="intent" value="createResource" />
               <Stack gap="md">
                 <Field.Root>
                   <Field.Label>{t("admin.applications.dialog.resourceType")}</Field.Label>

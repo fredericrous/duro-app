@@ -148,6 +148,24 @@ describe("DevicesSection", () => {
     expect(toast).toHaveTextContent(t("devices.list.revoked"))
   })
 
+  describe("renaming a device", () => {
+    // The rename form submits through `fetcher.Form` while its own onSubmit
+    // captures the typed label for the optimistic render and closes the form.
+    // Both have to survive the same submit: the optimistic label must stick,
+    // and the request must still reach the action.
+    it("submits the new label and shows it optimistically", async () => {
+      renderSection({ certificates: [certExpiringIn(60, "RENAMEME")] }, { certRenamed: true })
+      fireEvent.click(await screen.findByRole("button", { name: t("devices.list.rename") }))
+      const input = await screen.findByPlaceholderText(t("devices.devicePlaceholder"))
+      fireEvent.change(input, { target: { value: "Work laptop" } })
+      fireEvent.click(screen.getByRole("button", { name: t("common.save") }))
+
+      const toast = await waitFor(() => screen.getByRole("status"))
+      expect(toast).toHaveTextContent(t("devices.list.renamed"))
+      expect(await screen.findByText("Work laptop")).toBeInTheDocument()
+    })
+  })
+
   describe("renewing a device", () => {
     it("submits and points the user at their email", async () => {
       renderSection({ certificates: [certExpiringIn(5, "RENEWME1")] })

@@ -18,9 +18,9 @@
     "prepare": "amont init || true"
   },
   "dependencies": {
-    "@duro-app/tokens": "^0.48.0",
-    "@duro-app/ui": "^0.50.0",
-    "@duro-app/ui-email": "^0.38.0",
+    "@duro-app/tokens": "^1.0.0",
+    "@duro-app/ui": "^1.0.0",
+    "@duro-app/ui-email": "^1.0.0",
     "@effect/experimental": "^0.58.0",
     "@effect/opentelemetry": "^0.61.0",
     "@effect/platform": "^0.94.5",
@@ -60,6 +60,7 @@
   },
   "devDependencies": {
     "@babel/preset-typescript": "^7.28.5",
+    "@duro-app/eslint-plugin": "^1.0.0",
     "@effect/eslint-plugin": "^0.3.2",
     "@effect/vitest": "^0.27.0",
     "@eslint/js": "^10.0.1",

@@ -91,7 +91,7 @@ export function AppSearchBar({
               inputRef.current?.focus()
             }}
           >
-            <Icon name="x-circle" size={16} />
+            <Icon name="x-circle" size="sm" />
             <html.span style={styles.visuallyHidden}>{clearLabel}</html.span>
           </InputGroup.Addon>
         )}

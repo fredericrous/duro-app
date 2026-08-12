@@ -92,17 +92,17 @@ export default function SettingsLayout({ loaderData }: Route.ComponentProps) {
   const navContent = (
     <SideNav.Root value={activeValue} onValueChange={handleValueChange}>
       <SideNav.Section label={t("settings.nav.title", "Settings")}>
-        <SideNav.Item value="general" icon={<Icon name="user-plus" size={18} />}>
+        <SideNav.Item value="general" icon={<Icon name="user-plus" size="md" />}>
           {t("settings.nav.general", "General")}
         </SideNav.Item>
-        <SideNav.Item value="activity" icon={<Icon name="clock" size={18} />}>
+        <SideNav.Item value="activity" icon={<Icon name="clock" size="md" />}>
           {t("settings.nav.activity", "Activity")}
         </SideNav.Item>
-        <SideNav.Item value="api-keys" icon={<Icon name="key" size={18} />}>
+        <SideNav.Item value="api-keys" icon={<Icon name="key" size="md" />}>
           {t("settings.nav.apiKeys", "API keys")}
         </SideNav.Item>
         {loaderData.hasSecurity && (
-          <SideNav.Item value="security" icon={<Icon name="shield" size={18} />}>
+          <SideNav.Item value="security" icon={<Icon name="shield" size="md" />}>
             {t("settings.nav.security", "Security")}
           </SideNav.Item>
         )}

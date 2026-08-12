@@ -1,4 +1,5 @@
 import { useFetcher } from "react-router"
+import { html } from "react-strict-dom"
 import { Badge, Button, Checkbox, DetailPanel, List } from "@duro-app/ui"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 import { certStatus } from "~/lib/cert-status"
@@ -9,8 +10,8 @@ function CertRevokeButton({ serialNumber, t }: { serialNumber: string; t: (key: 
 
   return (
     <fetcher.Form method="post">
-      <input type="hidden" name="intent" value="revokeCert" />
-      <input type="hidden" name="serialNumber" value={serialNumber} />
+      <html.input type="hidden" name="intent" value="revokeCert" />
+      <html.input type="hidden" name="serialNumber" value={serialNumber} />
       <Button type="submit" variant="danger" size="small" disabled={isRevoking}>
         {isRevoking ? t("admin.users.actions.revoking") : t("admin.users.certs.revokeCert")}
       </Button>

@@ -207,8 +207,8 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
               </Field.Root>
               <ButtonGroup>
                 <fetcher.Form method="post">
-                  <input type="hidden" name="intent" value="approve" />
-                  <input type="hidden" name="comment" value={comment} />
+                  <html.input type="hidden" name="intent" value="approve" />
+                  <html.input type="hidden" name="comment" value={comment} />
                   <Button type="submit" variant="primary" disabled={isSubmitting}>
                     {isSubmitting ? t("common.processing") : t("admin.accessRequests.detail.approve")}
                   </Button>
@@ -229,8 +229,8 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
                 title={t("admin.accessRequests.detail.rejectConfirmTitle")}
                 confirmSlot={() => (
                   <fetcher.Form method="post" onSubmit={() => setRejectOpen(false)}>
-                    <input type="hidden" name="intent" value="reject" />
-                    <input type="hidden" name="comment" value={comment} />
+                    <html.input type="hidden" name="intent" value="reject" />
+                    <html.input type="hidden" name="comment" value={comment} />
                     <Button type="submit" variant="danger">
                       {t("admin.accessRequests.detail.reject")}
                     </Button>
@@ -245,7 +245,7 @@ export default function AdminAccessRequestDetailPage({ loaderData }: Route.Compo
                 title={t("admin.accessRequests.detail.cancelConfirmTitle")}
                 confirmSlot={() => (
                   <fetcher.Form method="post" onSubmit={() => setCancelOpen(false)}>
-                    <input type="hidden" name="intent" value="cancel" />
+                    <html.input type="hidden" name="intent" value="cancel" />
                     <Button type="submit" variant="secondary">
                       {t("common.cancel")}
                     </Button>

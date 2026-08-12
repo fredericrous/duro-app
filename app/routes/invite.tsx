@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect } from "react"
+import { html } from "react-strict-dom"
 import { redirect, useParams } from "react-router"
 import { Trans, useTranslation } from "react-i18next"
 import type { Route } from "./+types/invite"
@@ -206,7 +207,11 @@ export default function InvitePage({ loaderData }: Route.ComponentProps) {
         <Stack gap="sm">
           <Heading level={1}>{t("invite.title", { appName: loaderData.appName })}</Heading>
           <Text as="p" color="muted">
-            <Trans i18nKey="invite.subtitle" values={{ email: loaderData.email }} components={{ strong: <strong /> }} />
+            <Trans
+              i18nKey="invite.subtitle"
+              values={{ email: loaderData.email }}
+              components={{ strong: <html.strong /> }}
+            />
           </Text>
 
           {loaderData.groupNames?.length > 0 && (

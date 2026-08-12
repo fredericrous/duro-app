@@ -37,7 +37,7 @@ export default function WelcomePage({ loaderData }: Route.ComponentProps) {
     <CenteredCardPage>
       <html.div style={styles.centered}>
         <html.div style={styles.bigIcon}>
-          <StatusIcon name="check-circle" size={64} variant="success" />
+          <StatusIcon name="check-circle" size="xxl" variant="success" />
         </html.div>
 
         <Heading level={1}>{t("welcome.heading", { user })}</Heading>
