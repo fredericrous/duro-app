@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react"
+import { html } from "react-strict-dom"
 import { Trans, useTranslation } from "react-i18next"
 import { useFetcher, useParams } from "react-router"
 import type { Route } from "./+types/cert.$revealToken"
@@ -144,7 +145,7 @@ export default function CertRevealPage({ loaderData }: Route.ComponentProps) {
             <Trans
               i18nKey="certReveal.revealed.note"
               values={{ email: loaderData.email }}
-              components={{ strong: <strong /> }}
+              components={{ strong: <html.strong /> }}
             />
           </Text>
           <LinkButton href={downloadHref} variant="primary" fullWidth>
@@ -164,7 +165,7 @@ export default function CertRevealPage({ loaderData }: Route.ComponentProps) {
             <Trans
               i18nKey="certReveal.subtitle"
               values={{ email: loaderData.email }}
-              components={{ strong: <strong /> }}
+              components={{ strong: <html.strong /> }}
             />
           </Text>
         </Stack>

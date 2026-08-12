@@ -1,4 +1,5 @@
 import { startTransition, useEffect, useRef, useState } from "react"
+import { html } from "react-strict-dom"
 import { useFetcher, useRevalidator } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/admin.invites"
@@ -270,12 +271,12 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
             <Text as="p">{actionData.warning}</Text>
             <fetcher.Form method="post" style={{ marginTop: "0.5rem" }}>
               {(actionData.emails as string[]).map((e) => (
-                <input key={e} type="hidden" name="emails" value={e} />
+                <html.input key={e} type="hidden" name="emails" value={e} />
               ))}
-              <input type="hidden" name="confirmed" value="true" />
-              <input type="hidden" name="revocationId" value={actionData.revocationId} />
+              <html.input type="hidden" name="confirmed" value="true" />
+              <html.input type="hidden" name="revocationId" value={actionData.revocationId} />
               {(actionData.groups as string[]).map((g) => (
-                <input key={g} type="hidden" name="groups" value={g} />
+                <html.input key={g} type="hidden" name="groups" value={g} />
               ))}
               <Button type="submit" variant="primary">
                 {t("admin.invites.proceedAnyway")}
@@ -397,15 +398,15 @@ function PendingInviteRow({ invite }: { invite: Invite }) {
       <Table.Cell isActions>
         <Inline gap="sm">
           <resendFetcher.Form method="post">
-            <input type="hidden" name="intent" value="resend" />
-            <input type="hidden" name="inviteId" value={invite.id} />
+            <html.input type="hidden" name="intent" value="resend" />
+            <html.input type="hidden" name="inviteId" value={invite.id} />
             <Button type="submit" variant="secondary" size="small" disabled={isResending || isRevoking}>
               {isResending ? t("admin.invites.action.resending") : t("admin.invites.action.resend")}
             </Button>
           </resendFetcher.Form>
           <revokeFetcher.Form method="post">
-            <input type="hidden" name="intent" value="revoke" />
-            <input type="hidden" name="inviteId" value={invite.id} />
+            <html.input type="hidden" name="intent" value="revoke" />
+            <html.input type="hidden" name="inviteId" value={invite.id} />
             <Button type="submit" variant="danger" size="small" disabled={isRevoking || isResending}>
               {isRevoking ? t("admin.invites.action.revoking") : t("admin.invites.action.revoke")}
             </Button>
@@ -435,15 +436,15 @@ function FailedInviteRow({ invite }: { invite: Invite }) {
       <Table.Cell isActions>
         <Inline gap="sm">
           <retryFetcher.Form method="post">
-            <input type="hidden" name="intent" value="retry" />
-            <input type="hidden" name="inviteId" value={invite.id} />
+            <html.input type="hidden" name="intent" value="retry" />
+            <html.input type="hidden" name="inviteId" value={invite.id} />
             <Button type="submit" variant="secondary" size="small" disabled={isRetrying || isRevoking}>
               {isRetrying ? t("admin.invites.action.retrying") : t("admin.invites.action.retry")}
             </Button>
           </retryFetcher.Form>
           <revokeFetcher.Form method="post">
-            <input type="hidden" name="intent" value="revoke" />
-            <input type="hidden" name="inviteId" value={invite.id} />
+            <html.input type="hidden" name="intent" value="revoke" />
+            <html.input type="hidden" name="inviteId" value={invite.id} />
             <Button type="submit" variant="danger" size="small" disabled={isRevoking || isRetrying}>
               {isRevoking ? t("admin.invites.action.revoking") : t("admin.invites.action.revoke")}
             </Button>

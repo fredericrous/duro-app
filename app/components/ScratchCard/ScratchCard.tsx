@@ -136,6 +136,11 @@ export function ScratchCard({
   }
 
   return (
+    // The container/cover pair is styled by a CSS module that leans on a
+    // descendant combinator (`.container > *:not(.canvas):not(.cover)`) and on
+    // pointer-events juggling around the <canvas>; neither is expressible
+    // through css.create/html.*.
+    // eslint-disable-next-line duro/no-raw-html-element
     <div className={`${styles.container}${className ? ` ${className}` : ""}`} style={{ width, height }}>
       {children}
       {!fadeOut && (
@@ -154,6 +159,7 @@ export function ScratchCard({
           {/* Accessible reveal control. `pointer-events: none` lets mouse
               scratches fall through to the canvas, while it stays keyboard-
               focusable and Enter/Space-activatable for keyboard/SR users. */}
+          {/* eslint-disable-next-line duro/no-raw-html-element -- see container above */}
           <button type="button" className={styles.cover} aria-label={label} onClick={reveal} />
         </>
       )}

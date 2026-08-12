@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { html } from "react-strict-dom"
 import { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
@@ -264,7 +265,7 @@ export default function AdminInvitationsPage({ loaderData }: Route.ComponentProp
           </Dialog.Header>
           <Dialog.Body>
             <fetcher.Form method="post" onSubmit={() => setTimeout(() => setDialogOpen(false), 0)}>
-              <input type="hidden" name="intent" value="createInvitation" />
+              <html.input type="hidden" name="intent" value="createInvitation" />
               <Stack gap="md">
                 <Field.Root>
                   <Field.Label>{t("admin.invitations.dialog.application")}</Field.Label>
@@ -356,8 +357,8 @@ export default function AdminInvitationsPage({ loaderData }: Route.ComponentProp
         title={t("admin.invitations.cancelConfirmTitle")}
         confirmSlot={() => (
           <fetcher.Form method="post" onSubmit={() => setCancelId(null)}>
-            <input type="hidden" name="intent" value="cancelInvitation" />
-            <input type="hidden" name="invitationId" value={cancelId ?? ""} />
+            <html.input type="hidden" name="intent" value="cancelInvitation" />
+            <html.input type="hidden" name="invitationId" value={cancelId ?? ""} />
             <Button type="submit" variant="danger">
               {t("admin.invitations.cancel")}
             </Button>

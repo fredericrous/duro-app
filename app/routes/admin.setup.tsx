@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { html } from "react-strict-dom"
 import { redirect, useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
 import { Effect } from "effect"
@@ -126,7 +127,7 @@ export default function AdminSetupPage({ loaderData }: Route.ComponentProps) {
         {errorCode && <Alert variant="error">{t(`admin.setup.error.${errorCode}` as const) as string}</Alert>}
 
         <fetcher.Form method="post">
-          <input type="hidden" name="intent" value="createBootstrapInvite" />
+          <html.input type="hidden" name="intent" value="createBootstrapInvite" />
           <Stack gap="md">
             <Field.Root>
               <Field.Label>{t("admin.setup.emailLabel")}</Field.Label>

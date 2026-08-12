@@ -317,8 +317,8 @@ function RevokeCell({ grantId }: { grantId: string }) {
         title={t("admin.grants.confirmRevokeTitle")}
         confirmSlot={() => (
           <fetcher.Form method="post" onSubmit={() => setConfirmOpen(false)}>
-            <input type="hidden" name="intent" value="revoke" />
-            <input type="hidden" name="grantId" value={grantId} />
+            <html.input type="hidden" name="intent" value="revoke" />
+            <html.input type="hidden" name="grantId" value={grantId} />
             <Button type="submit" variant="danger">
               {t("admin.grants.revoke")}
             </Button>

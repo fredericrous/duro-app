@@ -1,4 +1,4 @@
-import { redirect, useNavigation } from "react-router"
+import { Form, redirect, useNavigation } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/reinvite"
 import { runEffect } from "~/lib/runtime.server"
@@ -196,11 +196,11 @@ export default function ReinvitePage({ loaderData, actionData }: Route.Component
 
       {actionData && "error" in actionData && <Alert variant="error">{t(reinviteErrorKey(actionData.error))}</Alert>}
 
-      <form method="post">
+      <Form method="post">
         <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
           {isSubmitting ? t("reinvite.submitting") : t("reinvite.submit")}
         </Button>
-      </form>
+      </Form>
     </CenteredCardPage>
   )
 }

@@ -124,9 +124,9 @@ export function RequestAccessForm({
   return (
     <html.div style={styles.formWrap}>
       <fetcher.Form method="post" action={action}>
-        <input type="hidden" name="intent" value="requestAccess" />
-        <input type="hidden" name="applicationId" value={appId} />
-        <input type="hidden" name="roleId" value={roleId} />
+        <html.input type="hidden" name="intent" value="requestAccess" />
+        <html.input type="hidden" name="applicationId" value={appId} />
+        <html.input type="hidden" name="roleId" value={roleId} />
         <Stack gap="md">
           {errorCode && (
             <Alert variant="error">

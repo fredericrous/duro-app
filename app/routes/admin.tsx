@@ -241,47 +241,47 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
           grouped by the admin's job rather than the data model. Item values
           (and thus navMap/URLs) are unchanged. */}
       <SideNav.Section label={t("admin.nav.overview", "Overview")}>
-        <SideNav.Item value="dashboard" icon={<Icon name="map" size={18} />}>
+        <SideNav.Item value="dashboard" icon={<Icon name="map" size="md" />}>
           {t("admin.nav.dashboard", "Dashboard")}
         </SideNav.Item>
       </SideNav.Section>
       <SideNav.Section label={t("admin.nav.accessManagement", "Access management")}>
-        <SideNav.Item value="identities" icon={<Icon name="users" size={18} />}>
+        <SideNav.Item value="identities" icon={<Icon name="users" size="md" />}>
           {t("admin.nav.identities", "Identities")}
         </SideNav.Item>
-        <SideNav.Item value="grants" icon={<Icon name="key" size={18} />}>
+        <SideNav.Item value="grants" icon={<Icon name="key" size="md" />}>
           {t("admin.nav.grants", "Grants")}
         </SideNav.Item>
-        <SideNav.Item value="applications" icon={<Icon name="layers" size={18} />}>
+        <SideNav.Item value="applications" icon={<Icon name="layers" size="md" />}>
           {t("admin.nav.applications", "Applications")}
         </SideNav.Item>
       </SideNav.Section>
       <SideNav.Section label={t("admin.nav.requestsInvites", "Requests & invites")}>
-        <SideNav.Item value="access-requests" icon={<Icon name="clock" size={18} />}>
+        <SideNav.Item value="access-requests" icon={<Icon name="clock" size="md" />}>
           <NavLabel label={t("admin.nav.accessRequests", "Access Requests")} count={counts.accessRequests} />
         </SideNav.Item>
-        <SideNav.Item value="invitations" icon={<Icon name="mail" size={18} />}>
+        <SideNav.Item value="invitations" icon={<Icon name="mail" size="md" />}>
           <NavLabel label={t("admin.nav.invitations", "Access Invitations")} count={counts.accessInvitations} />
         </SideNav.Item>
-        <SideNav.Item value="invites" icon={<Icon name="user-plus" size={18} />}>
+        <SideNav.Item value="invites" icon={<Icon name="user-plus" size="md" />}>
           {t("admin.nav.invites", "User Invites")}
         </SideNav.Item>
       </SideNav.Section>
       <SideNav.Section label={t("admin.nav.auditRecovery", "Audit & recovery")}>
-        <SideNav.Item value="audit" icon={<Icon name="file-text" size={18} />}>
+        <SideNav.Item value="audit" icon={<Icon name="file-text" size="md" />}>
           {t("admin.nav.auditLog", "Audit Log")}
         </SideNav.Item>
-        <SideNav.Item value="recovery" icon={<Icon name="shield" size={18} />}>
+        <SideNav.Item value="recovery" icon={<Icon name="shield" size="md" />}>
           {t("admin.nav.recovery", "Device Recovery")}
         </SideNav.Item>
       </SideNav.Section>
       {/* Group Mappings intentionally lives on /admin/identities (a button in
           its header), not in the menu — it's identity/group configuration. */}
       <SideNav.Section label={t("admin.nav.advanced", "Advanced")}>
-        <SideNav.Item value="authz-playground" icon={<Icon name="shield-check" size={18} />}>
+        <SideNav.Item value="authz-playground" icon={<Icon name="shield-check" size="md" />}>
           {t("admin.nav.authzPlayground", "Authz Playground")}
         </SideNav.Item>
-        <SideNav.Item value="plugins" icon={<Icon name="plug" size={18} />}>
+        <SideNav.Item value="plugins" icon={<Icon name="plug" size="md" />}>
           {t("admin.nav.plugins", "Plugins")}
         </SideNav.Item>
       </SideNav.Section>

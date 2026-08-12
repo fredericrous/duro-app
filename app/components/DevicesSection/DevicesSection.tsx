@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react"
+import { html } from "react-strict-dom"
 import { useTranslation } from "react-i18next"
 import { useFetcher } from "react-router"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
@@ -20,6 +21,7 @@ import {
   Text,
   Toggle,
   ToggleGroup,
+  Tooltip,
   type ToastOptions,
 } from "@duro-app/ui"
 
@@ -112,8 +114,8 @@ function RevokeCell({ cert, onRevoked }: { cert: UserCertificate; onRevoked: () 
     return (
       <Inline gap="sm">
         <fetcher.Form method="post" action={API_URL}>
-          <input type="hidden" name="intent" value="revokeCert" />
-          <input type="hidden" name="serialNumber" value={cert.serialNumber} />
+          <html.input type="hidden" name="intent" value="revokeCert" />
+          <html.input type="hidden" name="serialNumber" value={cert.serialNumber} />
           <Button type="submit" variant="danger" size="small" disabled={isSubmitting}>
             {isSubmitting ? t("devices.list.revoking") : t("devices.list.revokeYes")}
           </Button>
@@ -159,9 +161,13 @@ function SupersededRow({ cert }: { cert: UserCertificate }) {
         </Text>
       </Table.Cell>
       <Table.Cell>
-        <code title={cert.serialNumber} style={{ fontFamily: "monospace" }}>
-          {cert.serialNumber.slice(-8)}
-        </code>
+        <Tooltip.Root content={cert.serialNumber}>
+          <Tooltip.Trigger>
+            <Text as="span" variant="code">
+              {cert.serialNumber.slice(-8)}
+            </Text>
+          </Tooltip.Trigger>
+        </Tooltip.Root>
       </Table.Cell>
       <Table.Cell>
         <Text as="span" color="muted" variant="bodySm">
@@ -205,18 +211,18 @@ function DeviceRow({ cert, certificates }: { cert: UserCertificate; certificates
     <Table.Row>
       <Table.Cell>
         {renaming ? (
-          <form
+          <fetcher.Form
+            method="post"
+            action={API_URL}
             onSubmit={(e) => {
-              e.preventDefault()
               const fd = new FormData(e.currentTarget)
               const next = ((fd.get("label") as string) ?? "").trim() || null
-              void fetcher.submit(fd, { method: "post", action: API_URL })
               setPendingLabel({ value: next })
               setRenaming(false)
             }}
           >
-            <input type="hidden" name="intent" value="renameCert" />
-            <input type="hidden" name="serialNumber" value={cert.serialNumber} />
+            <html.input type="hidden" name="intent" value="renameCert" />
+            <html.input type="hidden" name="serialNumber" value={cert.serialNumber} />
             <Inline gap="sm">
               <Input
                 name="label"
@@ -231,7 +237,7 @@ function DeviceRow({ cert, certificates }: { cert: UserCertificate; certificates
                 {t("common.cancel")}
               </Button>
             </Inline>
-          </form>
+          </fetcher.Form>
         ) : (
           <Inline gap="sm" align="center">
             {label ? (
@@ -248,9 +254,13 @@ function DeviceRow({ cert, certificates }: { cert: UserCertificate; certificates
         )}
       </Table.Cell>
       <Table.Cell>
-        <code title={cert.serialNumber} style={{ fontFamily: "monospace" }}>
-          {cert.serialNumber.slice(-8)}
-        </code>
+        <Tooltip.Root content={cert.serialNumber}>
+          <Tooltip.Trigger>
+            <Text as="span" variant="code">
+              {cert.serialNumber.slice(-8)}
+            </Text>
+          </Tooltip.Trigger>
+        </Tooltip.Root>
       </Table.Cell>
       <Table.Cell>{formatDate(cert.issuedAt)}</Table.Cell>
       <Table.Cell>
@@ -263,8 +273,8 @@ function DeviceRow({ cert, certificates }: { cert: UserCertificate; certificates
         <Stack gap="sm">
           <Inline gap="sm">
             <fetcher.Form method="post" action={API_URL}>
-              <input type="hidden" name="intent" value="renewCert" />
-              <input type="hidden" name="serialNumber" value={cert.serialNumber} />
+              <html.input type="hidden" name="intent" value="renewCert" />
+              <html.input type="hidden" name="serialNumber" value={cert.serialNumber} />
               {/* Promoted only when the certificate is actually at risk — a
                   renew button competing with revoke on every healthy row is
                   noise, but on an expiring one it IS the next step. */}
@@ -369,7 +379,7 @@ export function DevicesSection({
             <Text as="p">{t("devices.confirm", { email })}</Text>
             <fetcher.Form method="post" action={API_URL}>
               <Stack gap="sm">
-                <input type="hidden" name="intent" value="issueCert" />
+                <html.input type="hidden" name="intent" value="issueCert" />
                 <Input name="label" placeholder={t("devices.devicePlaceholder")} maxLength={64} />
                 <Inline gap="sm">
                   <Button type="submit" variant="primary" disabled={isSubmitting}>

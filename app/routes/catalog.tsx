@@ -3,7 +3,7 @@ import { Effect } from "effect"
 import type { Route } from "./+types/catalog"
 import { Link, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
-import { Badge, Button, Callout, EmptyState, Inline, PageShell, Stack, Table, Text } from "@duro-app/ui"
+import { Badge, Button, Callout, EmptyState, Inline, LinkButton, PageShell, Stack, Table, Text } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { Header } from "~/components/Header/Header"
@@ -344,9 +344,9 @@ function CatalogBody({
                         </Link>
                       )}
                       {entry.state === "open" && entry.app.url && (
-                        <a href={entry.app.url} target="_blank" rel="noopener noreferrer">
-                          <Button variant="secondary">{t("apps.openLaunch")}</Button>
-                        </a>
+                        <LinkButton href={entry.app.url} variant="secondary" target="_blank" rel="noopener noreferrer">
+                          {t("apps.openLaunch")}
+                        </LinkButton>
                       )}
                     </Inline>
                   </Table.Cell>

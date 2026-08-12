@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { html } from "react-strict-dom"
 import type { Route } from "./+types/admin.recovery"
 import { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
@@ -84,7 +85,9 @@ function RequestRow({ req }: { req: RecoveryRequest }) {
       <Table.Cell>{req.email}</Table.Cell>
       <Table.Cell>{new Date(req.createdAt).toLocaleString()}</Table.Cell>
       <Table.Cell>
-        <code style={{ fontFamily: "monospace" }}>{req.requestIp ?? "—"}</code>
+        <Text as="span" variant="code">
+          {req.requestIp ?? "—"}
+        </Text>
       </Table.Cell>
       <Table.Cell>{req.note ?? "—"}</Table.Cell>
       <Table.Cell>
@@ -114,8 +117,8 @@ function RequestRow({ req }: { req: RecoveryRequest }) {
                 <Checkbox name="revokeOthers" value="on">
                   {t("admin.recovery.revokeOthers")}
                 </Checkbox>
-                <input type="hidden" name="intent" value="approve" />
-                <input type="hidden" name="requestId" value={req.id} />
+                <html.input type="hidden" name="intent" value="approve" />
+                <html.input type="hidden" name="requestId" value={req.id} />
                 <Button type="submit" variant="primary">
                   {t("admin.recovery.approve")}
                 </Button>
@@ -132,8 +135,8 @@ function RequestRow({ req }: { req: RecoveryRequest }) {
           title={t("admin.recovery.confirmDenyTitle")}
           confirmSlot={() => (
             <fetcher.Form method="post" onSubmit={() => setDenyOpen(false)}>
-              <input type="hidden" name="intent" value="deny" />
-              <input type="hidden" name="requestId" value={req.id} />
+              <html.input type="hidden" name="intent" value="deny" />
+              <html.input type="hidden" name="requestId" value={req.id} />
               <Button type="submit" variant="danger">
                 {t("admin.recovery.deny")}
               </Button>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { html } from "react-strict-dom"
 import { Link, useFetcher, useNavigate, useSearchParams } from "react-router"
 import { useTranslation } from "react-i18next"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
@@ -146,7 +147,7 @@ export default function AdminApplicationsPage({ loaderData }: Route.ComponentPro
 
   const syncForm = (
     <fetcher.Form method="post">
-      <input type="hidden" name="intent" value="syncFromCluster" />
+      <html.input type="hidden" name="intent" value="syncFromCluster" />
       <Button type="submit" variant="primary" size="small" disabled={isSyncing}>
         {isSyncing ? t("admin.applications.syncing") : t("admin.applications.syncFromCluster")}
       </Button>

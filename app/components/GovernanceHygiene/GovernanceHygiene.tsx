@@ -30,7 +30,7 @@ export function GovernanceHygiene({ findings }: { findings: ReadonlyArray<Hygien
         {active.length === 0 ? (
           <Inline gap="sm" align="center">
             <html.span style={[styles.icon, styles.ok]}>
-              <Icon name="check-circle" size={18} />
+              <Icon name="check-circle" size="md" />
             </html.span>
             <Text color="muted">{t("admin.hygiene.allClear")}</Text>
           </Inline>
@@ -40,7 +40,7 @@ export function GovernanceHygiene({ findings }: { findings: ReadonlyArray<Hygien
               <Inline key={f.id} justify="between" align="center">
                 <Inline gap="sm" align="center">
                   <html.span style={[styles.icon, styles.warn]}>
-                    <Icon name="alert-triangle" size={18} />
+                    <Icon name="alert-triangle" size="md" />
                   </html.span>
                   <Text>{t(`admin.hygiene.findings.${f.id}`, { count: f.count })}</Text>
                 </Inline>

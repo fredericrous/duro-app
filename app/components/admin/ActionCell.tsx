@@ -1,4 +1,5 @@
 import { useFetcher } from "react-router"
+import { html } from "react-strict-dom"
 import { Button, ButtonGroup } from "@duro-app/ui"
 import { useFetcherToast, type MutationResult } from "~/lib/useFetcherToast"
 import type { UserData, RevokeTarget } from "./UserColumns"
@@ -37,9 +38,9 @@ export function ActionCell({
   return (
     <ButtonGroup gap="xs">
       <certFetcher.Form method="post">
-        <input type="hidden" name="intent" value="resendCert" />
-        <input type="hidden" name="username" value={id} />
-        <input type="hidden" name="email" value={email} />
+        <html.input type="hidden" name="intent" value="resendCert" />
+        <html.input type="hidden" name="username" value={id} />
+        <html.input type="hidden" name="email" value={email} />
         <Button type="submit" variant="secondary" size="small" disabled={isSendingCert}>
           {isSendingCert ? t("admin.users.actions.sendingCert") : t("admin.users.actions.sendCert")}
         </Button>

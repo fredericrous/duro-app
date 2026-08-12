@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next"
+import { html } from "react-strict-dom"
 import type { AppDefinition } from "~/lib/apps"
 import { getCategoryOrder, formatCategory, groupAppsByCategory } from "~/lib/apps"
 import { Grid, Stack, Text } from "@duro-app/ui"
@@ -27,7 +28,7 @@ export function AppGrid({ apps, categoryOrder }: AppGridProps) {
         if (!categoryApps || categoryApps.length === 0) return null
 
         return (
-          <section key={category}>
+          <html.section key={category}>
             <Stack gap="md">
               <Text variant="overline" color="muted" as="div">
                 {categoryLabel(category)}
@@ -38,7 +39,7 @@ export function AppGrid({ apps, categoryOrder }: AppGridProps) {
                 ))}
               </Grid>
             </Stack>
-          </section>
+          </html.section>
         )
       })}
     </Stack>

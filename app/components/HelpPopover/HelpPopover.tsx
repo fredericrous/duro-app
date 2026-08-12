@@ -1,7 +1,9 @@
 import type { CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
+import { css, html } from "react-strict-dom"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { shadows } from "@duro-app/tokens/tokens/shadows.css"
+import { spacing, radii } from "@duro-app/tokens/tokens/spacing.css"
 
 const detailsStyle: CSSProperties = {
   display: "inline-block",
@@ -29,26 +31,28 @@ const summaryStyle: CSSProperties = {
   fontWeight: 600,
 }
 
-const popupStyle: CSSProperties = {
-  position: "absolute",
-  zIndex: 50,
-  top: "calc(100% + 4px)",
-  left: 0,
-  minWidth: 240,
-  maxWidth: 320,
-  padding: "0.75rem",
-  background: colors.bgCard,
-  color: colors.text,
-  borderWidth: 1,
-  borderStyle: "solid",
-  borderColor: colors.border,
-  borderRadius: 6,
-  boxShadow: shadows.md,
-  fontSize: "0.875rem",
-  lineHeight: 1.4,
-  whiteSpace: "normal",
-  fontWeight: 400,
-}
+const styles = css.create({
+  popup: {
+    position: "absolute",
+    zIndex: 50,
+    top: "calc(100% + 4px)",
+    left: 0,
+    minWidth: 240,
+    maxWidth: 320,
+    padding: spacing.ms,
+    backgroundColor: colors.bgCard,
+    color: colors.text,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+    borderRadius: radii.sm,
+    boxShadow: shadows.md,
+    fontSize: "0.875rem",
+    lineHeight: 1.4,
+    whiteSpace: "normal",
+    fontWeight: 400,
+  },
+})
 
 interface HelpPopoverProps {
   /** i18n key for the glossary description, e.g. "glossary.principals" */
@@ -70,9 +74,9 @@ export function HelpPopover({ termKey }: HelpPopoverProps) {
       <summary aria-label={label} title={label} style={summaryStyle}>
         ?
       </summary>
-      <div style={popupStyle} role="note">
+      <html.div style={styles.popup} role="note">
         {t(termKey) as string}
-      </div>
+      </html.div>
     </details>
   )
 }

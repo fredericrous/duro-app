@@ -269,8 +269,8 @@ export default function AdminGroupMappingsPage({ loaderData }: Route.ComponentPr
           </Dialog.Header>
           <Dialog.Body>
             <fetcher.Form method="post" onSubmit={() => setTimeout(() => setDialogOpen(false), 0)}>
-              <input type="hidden" name="intent" value="create" />
-              <input type="hidden" name="mappingType" value={mappingType} />
+              <html.input type="hidden" name="intent" value="create" />
+              <html.input type="hidden" name="mappingType" value={mappingType} />
               <Stack gap="md">
                 <Field.Root>
                   <Field.Label>{t("admin.groupMappings.oidcGroupName")}</Field.Label>
@@ -401,8 +401,8 @@ function DeleteCell({ mappingId }: { mappingId: string }) {
         title={t("admin.groupMappings.confirmDeleteTitle")}
         confirmSlot={() => (
           <fetcher.Form method="post" onSubmit={() => setConfirmOpen(false)}>
-            <input type="hidden" name="intent" value="delete" />
-            <input type="hidden" name="id" value={mappingId} />
+            <html.input type="hidden" name="intent" value="delete" />
+            <html.input type="hidden" name="id" value={mappingId} />
             <Button type="submit" variant="danger">
               {t("admin.groupMappings.delete")}
             </Button>

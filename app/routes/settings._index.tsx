@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { html } from "react-strict-dom"
 import { useTranslation } from "react-i18next"
 import { Form, redirect, useFetcher, useSearchParams } from "react-router"
 import { Effect } from "effect"
@@ -115,7 +116,7 @@ export default function GeneralSettings({ loaderData }: Route.ComponentProps) {
             already-initialised i18next instance — and the selects' latched
             labels — on the old language. */}
         <Form method="post" reloadDocument ref={localeFormRef}>
-          <input type="hidden" name="intent" value="saveLocale" />
+          <html.input type="hidden" name="intent" value="saveLocale" />
           <Stack gap="lg">
             <Field.Root>
               <LanguageSelect

@@ -72,6 +72,19 @@ const styles = css.create({
     borderStyle: "solid",
     borderColor: colors.border,
   },
+  keyFallback: {
+    width: "100%",
+    minHeight: 64,
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+    fontSize: 12,
+    padding: spacing.sm,
+    borderRadius: 6,
+    backgroundColor: colors.bgCard,
+    color: colors.text,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+  },
 })
 
 type KeyStatus = "active" | "revoked" | "expired"
@@ -117,6 +130,9 @@ export function ApiKeysSection({ apiKeys }: Props) {
   const [savedAck, setSavedAck] = useState(false)
   const { copied, showCopied, resetCopied } = useCopyFeedback()
   const handledKeyIdRef = useRef<string | null>(null)
+  // react-strict-dom's click event has no currentTarget, so the
+  // select-all-on-click affordance reaches the node through a ref.
+  const rawKeyFallbackRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (result && "apiKeyCreated" in result && result.apiKeyCreated && handledKeyIdRef.current !== result.id) {
@@ -246,7 +262,7 @@ export function ApiKeysSection({ apiKeys }: Props) {
       </html.div>
 
       <fetcher.Form method="post">
-        <input type="hidden" name="intent" value="createApiKey" />
+        <html.input type="hidden" name="intent" value="createApiKey" />
         <Stack gap="lg">
           <Field.Root>
             <Field.Label>{t("settings.apiKeys.fields.name")}</Field.Label>
@@ -369,23 +385,13 @@ export function ApiKeysSection({ apiKeys }: Props) {
                 <Text as="span" variant="bodySm" color="muted">
                   {t("settings.apiKeys.reveal.fallbackLabel")}
                 </Text>
-                <textarea
+                <html.textarea
+                  ref={rawKeyFallbackRef}
                   readOnly
                   value={reveal?.rawKey ?? ""}
-                  onClick={(e) => e.currentTarget.select()}
+                  onClick={() => rawKeyFallbackRef.current?.select()}
                   rows={3}
-                  style={{
-                    width: "100%",
-                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                    fontSize: 12,
-                    padding: 8,
-                    borderRadius: 6,
-                    border: `1px solid ${colors.border}`,
-                    backgroundColor: colors.bgCard,
-                    color: colors.text,
-                    resize: "vertical",
-                    minHeight: 64,
-                  }}
+                  style={styles.keyFallback}
                 />
               </Stack>
               <Checkbox checked={savedAck} onChange={(e) => setSavedAck(e.target.checked)}>
@@ -434,8 +440,8 @@ export function ApiKeysSection({ apiKeys }: Props) {
                   setRevokeTarget(null)
                 }}
               >
-                <input type="hidden" name="intent" value="revokeApiKey" />
-                <input type="hidden" name="keyId" value={revokeTarget?.id ?? ""} />
+                <html.input type="hidden" name="intent" value="revokeApiKey" />
+                <html.input type="hidden" name="keyId" value={revokeTarget?.id ?? ""} />
                 <Button type="submit" variant="danger">
                   {t("settings.apiKeys.revokeConfirm.confirm")}
                 </Button>

@@ -84,7 +84,7 @@ export function SetupCompleteness({ criteria, i18nPrefix = "admin.applications.s
             <html.div style={[styles.completeBanner, entering && styles.completeBannerEnter]}>
               <Inline gap="sm" align="center">
                 <html.span style={[styles.statusIcon, styles.iconSuccess]}>
-                  <Icon name="check-circle" size={20} />
+                  <Icon name="check-circle" size="md" />
                 </html.span>
                 <Text>{t(`${i18nPrefix}.complete`)}</Text>
               </Inline>
@@ -95,7 +95,7 @@ export function SetupCompleteness({ criteria, i18nPrefix = "admin.applications.s
                 <Inline key={c.id} justify="between" align="center">
                   <Inline gap="sm" align="center">
                     <html.span style={[styles.statusIcon, c.done ? styles.iconSuccess : styles.iconMuted]}>
-                      <Icon name={c.done ? "check-circle" : "clock"} size={18} />
+                      <Icon name={c.done ? "check-circle" : "clock"} size="md" />
                     </html.span>
                     <Text color={c.done ? "muted" : undefined}>{t(`${i18nPrefix}.criteria.${c.id}`)}</Text>
                   </Inline>
