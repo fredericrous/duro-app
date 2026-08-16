@@ -1,3 +1,8 @@
 build/
 .react-router/
 node_modules/
+
+# Chart YAML follows the charts repo yamllint conventions (two spaces before
+# inline comments), which prettier rewrites to one — see the 1.52.0 publish
+# failure. Helm templates are not valid standalone YAML for prettier anyway.
+chart/
