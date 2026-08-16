@@ -27,6 +27,8 @@ export const OPERATOR_BASE = "http://operator.test:8080"
 /** Plugin tests use this generic allow-listed domain. */
 export const PLUGIN_BASE = "https://api.example.com"
 
+export const FORGEJO_BASE = "http://forgejo.test:3000"
+
 // ---------------------------------------------------------------------------
 // Default handlers — happy-path responses for every boundary.
 // Tests override specifics via `server.use(...)`.
@@ -44,6 +46,28 @@ const lldapHandlers = [
       errors: [{ message: "no default handler — override via server.use(...)" }],
     }),
   ),
+]
+
+const forgejoHandlers = [
+  // user lookup: 404 by default — the account-missing state; tests that need
+  // an existing account override with a 200.
+  http.get(`${FORGEJO_BASE}/api/v1/users/:username`, () =>
+    HttpResponse.json({ message: "user not found" }, { status: 404 }),
+  ),
+  http.get(`${FORGEJO_BASE}/api/v1/users/:username/keys`, () => HttpResponse.json([])),
+  http.post(`${FORGEJO_BASE}/api/v1/user/keys`, () =>
+    HttpResponse.json(
+      {
+        id: 101,
+        title: "Test key",
+        fingerprint: "SHA256:testfingerprint",
+        created_at: "2026-08-16T00:00:00Z",
+        key_type: "ssh-ed25519",
+      },
+      { status: 201 },
+    ),
+  ),
+  http.delete(`${FORGEJO_BASE}/api/v1/user/keys/:id`, () => new HttpResponse(null, { status: 204 })),
 ]
 
 const vaultHandlers = [
@@ -70,7 +94,7 @@ const operatorHandlers = [
 // Server export
 // ---------------------------------------------------------------------------
 
-export const server = setupServer(...lldapHandlers, ...vaultHandlers, ...operatorHandlers)
+export const server = setupServer(...lldapHandlers, ...vaultHandlers, ...operatorHandlers, ...forgejoHandlers)
 
 // Re-export the building blocks so test files import everything from one place.
 export { http, HttpResponse }

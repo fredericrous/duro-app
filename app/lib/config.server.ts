@@ -20,6 +20,14 @@ export const config = {
     .filter(Boolean),
   operatorApiUrl: process.env.OPERATOR_API_URL ?? "",
   /**
+   * In-cluster base URL of the Forgejo git forge API (self-service SSH keys).
+   * Empty when not configured — the settings UI hides the Git access tab and
+   * the /settings/git loader redirects, so no Forgejo code path runs.
+   */
+  forgejoUrl: process.env.FORGEJO_URL ?? "",
+  /** User-facing Forgejo URL for "sign in once" CTAs and outbound links. */
+  forgejoPublicUrl: process.env.FORGEJO_PUBLIC_URL ?? "",
+  /**
    * Base URL of the identity provider's user portal (e.g. Authelia).
    * Empty when not configured — the settings UI hides the Account & security
    * card in that case so users don't see broken external links.

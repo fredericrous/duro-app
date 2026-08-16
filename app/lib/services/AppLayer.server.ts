@@ -30,7 +30,9 @@ import { ApiKeyRepoLive } from "~/lib/governance/ApiKeyRepo.server"
 import { ProvisioningServiceLive, ProvisioningServiceDev } from "~/lib/governance/ProvisioningService.server"
 import { GroupSyncServiceLive } from "~/lib/governance/GroupSyncService.server"
 import { GroupMappingRepoLive } from "~/lib/governance/GroupMappingRepo.server"
+import { config } from "~/lib/config.server"
 import { OperatorClientLive, OperatorClientDev } from "./OperatorClient.server"
+import { ForgejoClientLive, ForgejoClientDev } from "./ForgejoClient.server"
 import { AppSyncServiceLive } from "~/lib/governance/AppSyncService.server"
 
 // Plugin system
@@ -114,6 +116,9 @@ export const AppLayer = Layer.mergeAll(
   GroupSyncServiceLive,
   GroupMappingRepoLive,
   isDevServer ? OperatorClientDev : OperatorClientLive,
+  // Gated on config, not isDevServer: setting FORGEJO_URL in .env.dev opts a
+  // local session into the Live client for hands-on testing.
+  config.forgejoUrl ? ForgejoClientLive : ForgejoClientDev,
   AppSyncServiceWired,
   // Plugin system
   PluginRegistryLive,
