@@ -4,7 +4,7 @@ vi.mock("~/lib/auth.server", () => ({
   requireAuth: vi.fn(),
 }))
 vi.mock("~/lib/config.server", () => ({
-  config: { autheliaUrl: "https://auth.example.com" },
+  config: { autheliaUrl: "https://auth.example.com", forgejoUrl: "http://forgejo.test:3000" },
 }))
 
 import { requireAuth } from "~/lib/auth.server"
@@ -18,11 +18,12 @@ beforeEach(() => {
 })
 
 describe("/settings layout loader", () => {
-  it("exposes hasSecurity from the Authelia config", async () => {
+  it("exposes hasSecurity and hasGit from the config", async () => {
     mockRequireAuth.mockResolvedValue({ user: "alice" } as never)
     const result = await callLoader(loader)
-    const data = expectData<{ hasSecurity: boolean }>(result)
+    const data = expectData<{ hasSecurity: boolean; hasGit: boolean }>(result)
     expect(data.hasSecurity).toBe(true)
+    expect(data.hasGit).toBe(true)
   })
 })
 

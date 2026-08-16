@@ -71,6 +71,12 @@ web:
     LLDAP_URL: "http://lldap.lldap.svc.cluster.local.:17170"
     LLDAP_ADMIN_USER: "admin"
     OPERATOR_API_URL: "http://duro-operator.duro.svc.cluster.local:9090"
+    # Git forge (Forgejo) for self-service SSH keys. Both empty by default:
+    # the Git access settings tab only exists when FORGEJO_URL is set (the
+    # admin token arrives separately via the duro-secrets ExternalSecret as
+    # FORGEJO_ADMIN_TOKEN).
+    FORGEJO_URL: ""
+    FORGEJO_PUBLIC_URL: ""
   resources:
     requests:
       memory: "96Mi"
@@ -102,7 +108,7 @@ database:
   # "embedded" runs a file-backed PGlite (Postgres-in-WASM) inside the app pod —
   # zero external dependencies, single pod, no worker. "postgres" uses an
   # external Postgres via DATABASE_URL (required for HA / a separate worker).
-  mode: embedded  # "embedded" or "postgres"
+  mode: embedded # "embedded" or "postgres"
   # Embedded mode only: directory for the PGlite data store. Injected as
   # DURO_DB_PATH — which the app treats as the switch into embedded mode — so it
   # MUST NOT be set in postgres mode (see deployment.yaml).

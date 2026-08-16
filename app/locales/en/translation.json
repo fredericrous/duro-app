@@ -33,7 +33,11 @@
         "declined": "Declined"
       },
       "eventType": {
-        "auth.login": "Signed in"
+        "auth.login": "Signed in",
+        "git_ssh_key.added": "SSH key added",
+        "git_ssh_key.removed": "SSH key deleted",
+        "git_ssh_key.rejected": "SSH key rejected",
+        "git.forge.misconfigured": "Git forge misconfigured"
       }
     },
     "scratchToReveal": "Scratch or press Enter to reveal",
@@ -306,9 +310,94 @@
       "title": "Settings",
       "general": "General",
       "apiKeys": "API keys",
+      "git": "Git access",
       "security": "Security",
       "menu": "Menu",
       "activity": "Activity"
+    },
+    "git": {
+      "heading": "Git access",
+      "description": "Add an SSH public key so you can clone, pull and push over SSH. Keys live on the git server — Duro just lets you manage them from here.",
+      "account": "Git account: {{username}}",
+      "openForge": "Open the git server",
+      "accountMissing": {
+        "title": "Sign in to the git server once first",
+        "body": "Your git account is created the first time you sign in there with your Duro account. Open the git server, sign in, then come back — your SSH keys will show up here.",
+        "hint": "Opens in a new tab. Sign in with the same account you use here.",
+        "recheck": "I’ve signed in — check again",
+        "rechecking": "Checking…",
+        "stillMissing": "Still no git account. It can take a moment after a first sign-in — try again, or ask an admin if it keeps happening."
+      },
+      "unavailable": {
+        "title": "The git server isn’t answering",
+        "body": "Your SSH keys can’t be listed right now. Nothing was changed — try again in a moment.",
+        "retry": "Try again",
+        "retrying": "Checking…"
+      },
+      "empty": {
+        "message": "No SSH keys yet. Add one so git can authenticate you without a password."
+      },
+      "list": {
+        "added": "added {{date}}",
+        "delete": "Delete",
+        "deleteAria": "Delete the SSH key {{title}}",
+        "fingerprint": "Fingerprint"
+      },
+      "add": {
+        "open": "Add SSH key",
+        "description": "Paste the public half of your key pair. Public keys are safe to share; private keys never leave your machine.",
+        "keyLabel": "Public key",
+        "keyHint": "Usually the contents of ~/.ssh/id_ed25519.pub — one single line, starting with ssh-ed25519 or ssh-rsa.",
+        "keygenPrompt": "No key yet? Generate one:",
+        "copyCommand": "Copy",
+        "copiedCommand": "Copied!",
+        "copyCommandFailed": "Copy failed — select the text manually.",
+        "titleLabel": "Title",
+        "titlePlaceholder": "e.g. MacBook Pro",
+        "titleHint": "Just for you — how this key shows up in the list below. 100 characters max.",
+        "titleAutofilled": "Taken from the key’s comment. Change it if you like.",
+        "submit": "Add key",
+        "submitting": "Adding…",
+        "success": "SSH key added.",
+        "alreadyPresent": "This key was already on your account — nothing to do.",
+        "atCap": "You’ve reached the {{max}}-key limit — delete one to add another."
+      },
+      "privateKey": {
+        "title": "That was a private key — it has been cleared.",
+        "body": "Nothing was sent to the server and nothing was saved. Paste the public half instead: the file whose name ends in .pub.",
+        "rotateHint": "If you pasted it somewhere else as well, generate a fresh key pair."
+      },
+      "delete": {
+        "title": "Delete this SSH key?",
+        "body": "{{title}} will stop working immediately. Any clone or push using it will be refused until you add a new key.",
+        "fingerprintLabel": "Fingerprint",
+        "confirm": "Yes, delete",
+        "success": "SSH key deleted."
+      },
+      "errors": {
+        "account_missing": "Your git account isn’t set up yet. Sign in to the git server once, then come back.",
+        "unauthorized": "Duro isn’t allowed to manage keys on the git server. Contact an admin.",
+        "unconfigured": "Git access isn’t set up on this Duro instance. Contact an admin.",
+        "invalid_key": "That doesn’t look like an SSH public key.",
+        "key_in_use": "This key is already registered on the git server. Use a different key.",
+        "title_taken": "You already have a key with this title. Pick another one.",
+        "too_many_keys": "You’ve reached the key limit. Delete one to add another.",
+        "key_not_found": "That key is already gone — the list has been refreshed.",
+        "unavailable": "The git server isn’t answering. Nothing was changed — try again in a moment.",
+        "unknown": "Something went wrong. Try again."
+      },
+      "validation": {
+        "private_key": "That’s a private key. Paste the public half — the file ending in .pub.",
+        "multiline": "An SSH public key is a single line. Remove the line breaks, or paste just one key.",
+        "too_long": "This is too long to be a public key. Check that you pasted the right file.",
+        "bad_shape": "Expected the type, then the key, then an optional comment. For example: ssh-ed25519 AAAAC3… you@laptop",
+        "unsupported_type": "This key type isn’t accepted. Use ssh-ed25519 (recommended) or ssh-rsa.",
+        "weak_algorithm": "This key is too weak to be accepted. Generate a new one with ssh-keygen -t ed25519.",
+        "bad_base64": "The key body is damaged — it was probably cut off or wrapped when it was copied. Copy the whole line again.",
+        "type_mismatch": "The type at the start doesn’t match the key itself. Copy the whole line again from your .pub file.",
+        "title_required": "Give this key a title.",
+        "title_too_long": "100 characters max."
+      }
     },
     "display": {
       "heading": "Date & time",

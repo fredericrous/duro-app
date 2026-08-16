@@ -33,7 +33,11 @@
         "declined": "Refusée"
       },
       "eventType": {
-        "auth.login": "Connexion"
+        "auth.login": "Connexion",
+        "git_ssh_key.added": "Clé SSH ajoutée",
+        "git_ssh_key.removed": "Clé SSH supprimée",
+        "git_ssh_key.rejected": "Clé SSH rejetée",
+        "git.forge.misconfigured": "Forge Git mal configurée"
       }
     },
     "scratchToReveal": "Grattez ou appuyez sur Entrée pour révéler",
@@ -306,9 +310,94 @@
       "title": "Paramètres",
       "general": "Général",
       "apiKeys": "Clés API",
+      "git": "Accès Git",
       "security": "Sécurité",
       "menu": "Menu",
       "activity": "Activité"
+    },
+    "git": {
+      "heading": "Accès Git",
+      "description": "Ajoutez une clé publique SSH pour cloner, récupérer et pousser du code en SSH. Les clés sont stockées sur le serveur Git — Duro vous permet simplement de les gérer d’ici.",
+      "account": "Compte Git : {{username}}",
+      "openForge": "Ouvrir le serveur Git",
+      "accountMissing": {
+        "title": "Connectez-vous une première fois au serveur Git",
+        "body": "Votre compte Git est créé lors de votre première connexion avec votre compte Duro. Ouvrez le serveur Git, connectez-vous, puis revenez ici — vos clés SSH apparaîtront alors.",
+        "hint": "S’ouvre dans un nouvel onglet. Connectez-vous avec le même compte qu’ici.",
+        "recheck": "C’est fait — vérifier à nouveau",
+        "rechecking": "Vérification…",
+        "stillMissing": "Toujours aucun compte Git. Cela peut prendre un instant après une première connexion — réessayez, ou demandez à un administrateur si cela persiste."
+      },
+      "unavailable": {
+        "title": "Le serveur Git ne répond pas",
+        "body": "Vos clés SSH ne peuvent pas être affichées pour le moment. Rien n’a été modifié — réessayez dans un instant.",
+        "retry": "Réessayer",
+        "retrying": "Vérification…"
+      },
+      "empty": {
+        "message": "Aucune clé SSH pour le moment. Ajoutez-en une pour que Git vous authentifie sans mot de passe."
+      },
+      "list": {
+        "added": "ajoutée le {{date}}",
+        "delete": "Supprimer",
+        "deleteAria": "Supprimer la clé SSH {{title}}",
+        "fingerprint": "Empreinte"
+      },
+      "add": {
+        "open": "Ajouter une clé SSH",
+        "description": "Collez la partie publique de votre paire de clés. Une clé publique peut être partagée sans risque ; une clé privée ne doit jamais quitter votre machine.",
+        "keyLabel": "Clé publique",
+        "keyHint": "En général le contenu de ~/.ssh/id_ed25519.pub — une seule ligne, commençant par ssh-ed25519 ou ssh-rsa.",
+        "keygenPrompt": "Pas encore de clé ? Générez-en une :",
+        "copyCommand": "Copier",
+        "copiedCommand": "Copié !",
+        "copyCommandFailed": "Échec de la copie — sélectionnez le texte manuellement.",
+        "titleLabel": "Titre",
+        "titlePlaceholder": "ex. MacBook Pro",
+        "titleHint": "Pour vous uniquement — le nom sous lequel cette clé apparaîtra dans la liste ci-dessous. 100 caractères maximum.",
+        "titleAutofilled": "Repris du commentaire de la clé. Modifiez-le si vous le souhaitez.",
+        "submit": "Ajouter la clé",
+        "submitting": "Ajout…",
+        "success": "Clé SSH ajoutée.",
+        "alreadyPresent": "Cette clé était déjà enregistrée sur votre compte — rien à faire.",
+        "atCap": "Vous avez atteint la limite de {{max}} clés — supprimez-en une pour en ajouter une autre."
+      },
+      "privateKey": {
+        "title": "C’était une clé privée — elle a été effacée.",
+        "body": "Rien n’a été envoyé au serveur ni enregistré. Collez plutôt la partie publique : le fichier dont le nom se termine par .pub.",
+        "rotateHint": "Si vous l’avez aussi collée ailleurs, générez une nouvelle paire de clés."
+      },
+      "delete": {
+        "title": "Supprimer cette clé SSH ?",
+        "body": "{{title}} cessera de fonctionner immédiatement. Tout clone ou push qui l’utilise sera refusé jusqu’à ce que vous ajoutiez une nouvelle clé.",
+        "fingerprintLabel": "Empreinte",
+        "confirm": "Oui, supprimer",
+        "success": "Clé SSH supprimée."
+      },
+      "errors": {
+        "account_missing": "Votre compte Git n’est pas encore créé. Connectez-vous une fois au serveur Git, puis revenez.",
+        "unauthorized": "Duro n’est pas autorisé à gérer les clés sur le serveur Git. Contactez un administrateur.",
+        "unconfigured": "L’accès Git n’est pas configuré sur cette instance Duro. Contactez un administrateur.",
+        "invalid_key": "Cela ne ressemble pas à une clé publique SSH.",
+        "key_in_use": "Cette clé est déjà enregistrée sur le serveur Git. Utilisez une autre clé.",
+        "title_taken": "Vous avez déjà une clé portant ce titre. Choisissez-en un autre.",
+        "too_many_keys": "Vous avez atteint la limite de clés. Supprimez-en une pour en ajouter une autre.",
+        "key_not_found": "Cette clé n’existe plus — la liste a été actualisée.",
+        "unavailable": "Le serveur Git ne répond pas. Rien n’a été modifié — réessayez dans un instant.",
+        "unknown": "Une erreur est survenue. Réessayez."
+      },
+      "validation": {
+        "private_key": "Il s’agit d’une clé privée. Collez la partie publique — le fichier se terminant par .pub.",
+        "multiline": "Une clé publique SSH tient sur une seule ligne. Supprimez les retours à la ligne, ou ne collez qu’une seule clé.",
+        "too_long": "C’est trop long pour une clé publique. Vérifiez que vous avez collé le bon fichier.",
+        "bad_shape": "Format attendu : le type, puis la clé, puis un commentaire facultatif. Par exemple : ssh-ed25519 AAAAC3… you@laptop",
+        "unsupported_type": "Ce type de clé n’est pas accepté. Utilisez ssh-ed25519 (recommandé) ou ssh-rsa.",
+        "weak_algorithm": "Cette clé est trop faible pour être acceptée. Générez-en une nouvelle avec ssh-keygen -t ed25519.",
+        "bad_base64": "Le corps de la clé est endommagé — il a probablement été tronqué ou coupé à la copie. Recopiez la ligne entière.",
+        "type_mismatch": "Le type indiqué au début ne correspond pas à la clé elle-même. Recopiez la ligne entière depuis votre fichier .pub.",
+        "title_required": "Donnez un titre à cette clé.",
+        "title_too_long": "100 caractères maximum."
+      }
     },
     "display": {
       "heading": "Date et heure",

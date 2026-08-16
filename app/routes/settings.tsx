@@ -53,7 +53,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requireAuth(request)
   // The Security section only exists when an Authelia portal is configured;
   // gate the nav item on it so we don't link to a dead section.
-  return { hasSecurity: Boolean(config.autheliaUrl) }
+  return { hasSecurity: Boolean(config.autheliaUrl), hasGit: Boolean(config.forgejoUrl) }
 }
 
 function deriveActiveValue(pathname: string): string {
@@ -66,6 +66,7 @@ const navMap: Record<string, string> = {
   general: "/settings",
   activity: "/settings/activity",
   "api-keys": "/settings/api-keys",
+  git: "/settings/git",
   security: "/settings/security",
 }
 
@@ -101,6 +102,11 @@ export default function SettingsLayout({ loaderData }: Route.ComponentProps) {
         <SideNav.Item value="api-keys" icon={<Icon name="key" size="md" />}>
           {t("settings.nav.apiKeys", "API keys")}
         </SideNav.Item>
+        {loaderData.hasGit && (
+          <SideNav.Item value="git" icon={<Icon name="git-branch" size="md" />}>
+            {t("settings.nav.git", "Git access")}
+          </SideNav.Item>
+        )}
         {loaderData.hasSecurity && (
           <SideNav.Item value="security" icon={<Icon name="shield" size="md" />}>
             {t("settings.nav.security", "Security")}

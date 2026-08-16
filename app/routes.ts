@@ -8,6 +8,7 @@ export default [
       route("activity", "routes/settings.activity.tsx"),
       route("certificate", "routes/settings.certificate.tsx"),
       route("api-keys", "routes/settings.api-keys.tsx"),
+      route("git", "routes/settings.git.tsx"),
       route("security", "routes/settings.security.tsx"),
     ]),
     route("catalog", "routes/catalog.tsx"),
