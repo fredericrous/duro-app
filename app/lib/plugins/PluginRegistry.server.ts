@@ -5,6 +5,7 @@ import { STARTER_ROLE_SLUGS, STARTER_ENTITLEMENT_SLUGS } from "~/lib/governance/
 import { ManifestInvalid, PluginNotFound } from "./errors"
 import { lldapGroupMembershipPlugin } from "./builtins/lldap-group-membership"
 import { giteaTeamsPlugin } from "./builtins/gitea-teams"
+import { forgejoTeamsPlugin } from "./builtins/forgejo-teams"
 import { immichAdminBitPlugin } from "./builtins/immich-admin-bit"
 import { plexLibrariesPlugin } from "./builtins/plex-libraries"
 
@@ -135,6 +136,7 @@ export const PluginRegistryLive = Layer.sync(PluginRegistry, () => {
     giteaTeamsPlugin,
     immichAdminBitPlugin,
     plexLibrariesPlugin,
+    forgejoTeamsPlugin,
   ]
 
   const existingSlugs = new Set<string>()
