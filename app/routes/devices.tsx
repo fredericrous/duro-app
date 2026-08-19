@@ -49,11 +49,7 @@ export default function DevicesPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <PageShell maxWidth="lg" header={<Header user={user} isAdmin={isAdmin} />}>
-      <DevicesSection
-        email={loaderData.email}
-        lastCertRenewalAt={loaderData.lastCertRenewalAt}
-        certificates={loaderData.certificates}
-      />
+      <DevicesSection lastCertRenewalAt={loaderData.lastCertRenewalAt} certificates={loaderData.certificates} />
     </PageShell>
   )
 }

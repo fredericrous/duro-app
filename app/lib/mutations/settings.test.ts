@@ -15,19 +15,38 @@ beforeEach(async () => {
 })
 
 describe("parseSettingsMutation", () => {
-  it("parses issueCert (no label → null)", () => {
+  it("parses issueCert (no delivery → email, the historical flow)", () => {
     const fd = new FormData()
     fd.append("intent", "issueCert")
     const result = parseSettingsMutation(fd, auth)
-    expect(result).toEqual({ intent: "issueCert", label: null, auth })
+    expect(result).toEqual({ intent: "issueCert", delivery: "email", auth })
   })
 
-  it("parses issueCert with a device label (trimmed)", () => {
+  it("parses issueCert with link delivery (the QR flow)", () => {
     const fd = new FormData()
     fd.append("intent", "issueCert")
-    fd.append("label", "  MacBook Pro  ")
+    fd.append("delivery", "link")
     const result = parseSettingsMutation(fd, auth)
-    expect(result).toEqual({ intent: "issueCert", label: "MacBook Pro", auth })
+    expect(result).toEqual({ intent: "issueCert", delivery: "link", auth })
+  })
+
+  it("parses emailRevealLink with its token, and rejects it without one", () => {
+    const fd = new FormData()
+    fd.append("intent", "emailRevealLink")
+    fd.append("revealToken", "tok-abc")
+    expect(parseSettingsMutation(fd, auth)).toEqual({ intent: "emailRevealLink", revealToken: "tok-abc", auth })
+
+    const bare = new FormData()
+    bare.append("intent", "emailRevealLink")
+    expect(parseSettingsMutation(bare, auth)).toEqual({ error: "Missing reveal token" })
+  })
+
+  it("issueCert ignores a stray label field — naming happens at claim time", () => {
+    const fd = new FormData()
+    fd.append("intent", "issueCert")
+    fd.append("label", "MacBook Pro")
+    const result = parseSettingsMutation(fd, auth)
+    expect(result).toEqual({ intent: "issueCert", delivery: "email", auth })
   })
 
   it("parses revokeCert with serialNumber", () => {
@@ -239,13 +258,83 @@ describe("handleSettingsMutation — renewCert", () => {
     expect(await lastCertRenewalAt()).toBeNull()
   })
 
+  it("issueCert with link delivery returns the claim link instead of emailing", async () => {
+    const result = await testRunEffect(
+      handleSettingsMutation({ intent: "issueCert", delivery: "link", auth }) as Effect.Effect<unknown, unknown, never>,
+    )
+    expect(result).toMatchObject({ certLinkReady: true })
+    const r = result as { revealToken: string; expiresAt: string }
+    expect(r.revealToken.length).toBeGreaterThan(20)
+    expect(new Date(r.expiresAt).getTime()).toBeGreaterThan(Date.now())
+    // the QR flow spends the same per-user budget as the email flow
+    expect(await lastCertRenewalAt()).not.toBeNull()
+  })
+
   it("issueCert still stamps the per-user budget", async () => {
     expect(
       await testRunEffect(
-        handleSettingsMutation({ intent: "issueCert", label: null, auth }) as Effect.Effect<unknown, unknown, never>,
+        handleSettingsMutation({ intent: "issueCert", delivery: "email", auth }) as Effect.Effect<
+          unknown,
+          unknown,
+          never
+        >,
       ),
     ).toMatchObject({ certSent: true })
     expect(await lastCertRenewalAt()).not.toBeNull()
+  })
+
+  describe("emailRevealLink — the dialog's 'email me this link' fallback", () => {
+    /** Issue via link delivery and hand back the live token. */
+    const issueLink = async (who: AuthInfo = auth) => {
+      const result = await testRunEffect(
+        handleSettingsMutation({ intent: "issueCert", delivery: "link", auth: who }) as Effect.Effect<
+          unknown,
+          unknown,
+          never
+        >,
+      )
+      return (result as { revealToken: string }).revealToken
+    }
+
+    it("emails the SAME token without minting a second cert or re-spending the budget", async () => {
+      const token = await issueLink()
+      const before = await certsFor(auth.user!)
+      const result = await testRunEffect(
+        handleSettingsMutation({ intent: "emailRevealLink", revealToken: token, auth }) as Effect.Effect<
+          unknown,
+          unknown,
+          never
+        >,
+      )
+      expect(result).toMatchObject({ certSent: true })
+      // same token → same cert; nothing new was issued
+      expect(await certsFor(auth.user!)).toHaveLength(before.length)
+    })
+
+    it("refuses another user's token without an existence oracle", async () => {
+      const token = await issueLink()
+      const mallory: AuthInfo = { sub: "m-sub", user: "mallory", email: "m@example.com", groups: ["users"] }
+      const result = await testRunEffect(
+        handleSettingsMutation({ intent: "emailRevealLink", revealToken: token, auth: mallory }) as Effect.Effect<
+          unknown,
+          unknown,
+          never
+        >,
+      )
+      // Indistinguishable from a token that never existed.
+      expect(result).toMatchObject({ certError: "Link not found" })
+    })
+
+    it("refuses a token that never existed", async () => {
+      const result = await testRunEffect(
+        handleSettingsMutation({ intent: "emailRevealLink", revealToken: "nope", auth }) as Effect.Effect<
+          unknown,
+          unknown,
+          never
+        >,
+      )
+      expect(result).toMatchObject({ certError: "Link not found" })
+    })
   })
 
   it("rate-limits a device renewed within the last 24h", async () => {

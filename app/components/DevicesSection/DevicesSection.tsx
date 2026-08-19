@@ -9,8 +9,11 @@ import { useDisplayFormat } from "~/hooks/useDisplayFormat"
 import { daysUntil, expiryStatus } from "~/lib/cert-status"
 import { buildDeviceRows, renewalCooldownUntil, sortDeviceRows, type DeviceSort } from "~/lib/devices"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { QrCode } from "~/components/QrCode/QrCode"
+import { useCopyFeedback } from "~/hooks/useCopyFeedback"
 import {
   Alert,
+  Dialog,
   Badge,
   Button,
   Inline,
@@ -62,6 +65,93 @@ function certToast(raw: unknown, t: (key: string) => string): ToastOptions | nul
 }
 
 const API_URL = "/devices"
+
+/**
+ * The QR handoff for a freshly issued device certificate. The link is the
+ * same single-use /cert/:token the email flow sends — here it's shown
+ * directly so the NEW device can scan its way in without a mailbox on it.
+ * The token is a bearer secret with a TTL: shown once to the authenticated
+ * owner, gone when the dialog closes (it lives only in the action result).
+ */
+function ClaimLinkDialog({
+  open,
+  onClose,
+  revealToken,
+  expiresAt,
+}: {
+  open: boolean
+  onClose: () => void
+  revealToken: string | null
+  expiresAt: string | null
+}) {
+  const { t } = useTranslation()
+  const { formatDateTime } = useDisplayFormat()
+  const { copied, copyFailed, copy } = useCopyFeedback()
+  // "Email me this link instead" — the SAME token goes out by mail; no second
+  // certificate is minted and the per-user budget is untouched.
+  const emailFetcher = useFetcher<SettingsResult>()
+  // The dialog swallows the page behind it, so the send outcome (success or
+  // "link not found") has to be announced from here.
+  useFetcherToast(emailFetcher, { render: (d) => certToast(d, t) })
+  const emailing = emailFetcher.state !== "idle"
+  const emailed = emailFetcher.data != null && "certSent" in emailFetcher.data
+  const claimUrl =
+    revealToken !== null && typeof window !== "undefined" ? `${window.location.origin}/cert/${revealToken}` : ""
+
+  return (
+    <Dialog.Root
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose()
+      }}
+    >
+      <Dialog.Portal size="sm">
+        <Dialog.Header>
+          <Dialog.Title>{t("devices.qr.title")}</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          <Stack gap="md" align="center">
+            <Text as="p" variant="bodySm" color="muted">
+              {t("devices.qr.hint")}
+            </Text>
+            {claimUrl !== "" && <QrCode value={claimUrl} label={t("devices.qr.alt")} />}
+            <Inline gap="sm" align="center">
+              <Button variant="secondary" size="small" onClick={() => copy(claimUrl)}>
+                {copyFailed ? t("devices.qr.copyFailed") : copied ? t("devices.qr.copied") : t("devices.qr.copyLink")}
+              </Button>
+              <Button
+                variant="secondary"
+                size="small"
+                disabled={emailing || emailed || revealToken === null}
+                onClick={() => {
+                  if (revealToken !== null)
+                    emailFetcher.submit({ intent: "emailRevealLink", revealToken }, { method: "post", action: API_URL })
+                }}
+              >
+                {emailed
+                  ? t("devices.qr.emailSent")
+                  : emailing
+                    ? t("devices.qr.emailing")
+                    : t("devices.qr.emailInstead")}
+              </Button>
+            </Inline>
+            <Text as="p" variant="bodySm" color="muted">
+              {expiresAt !== null ? t("devices.qr.expiry", { time: formatDateTime(expiresAt) }) : null}
+            </Text>
+            <Text as="p" variant="bodySm" color="muted">
+              {t("devices.qr.nameHint")}
+            </Text>
+          </Stack>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Button variant="primary" onClick={onClose}>
+            {t("common.done", "Done")}
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Portal>
+    </Dialog.Root>
+  )
+}
 
 function ExpiryBadge({ expiresAt }: { expiresAt: string }) {
   const { t } = useTranslation()
@@ -247,6 +337,14 @@ function DeviceRow({ cert, certificates }: { cert: UserCertificate; certificates
                 {t("devices.list.unnamed")}
               </Text>
             )}
+            {/* UA-observed device kind, captured at claim time in its own
+                column — survives renames, so "perso" is still knowably an
+                iPhone. Hidden when it would just repeat the label. */}
+            {cert.claimedPlatform && cert.claimedPlatform !== label && (
+              <Text as="span" variant="bodySm" color="muted">
+                {cert.claimedPlatform}
+              </Text>
+            )}
             <Button type="button" variant="link" size="small" onClick={() => setRenaming(true)}>
               {t("devices.list.rename")}
             </Button>
@@ -301,11 +399,9 @@ function DeviceRow({ cert, certificates }: { cert: UserCertificate; certificates
 }
 
 export function DevicesSection({
-  email,
   lastCertRenewalAt,
   certificates,
 }: {
-  email: string | null
   lastCertRenewalAt: string | null
   certificates: UserCertificate[]
 }) {
@@ -313,12 +409,12 @@ export function DevicesSection({
   const { formatDateTime } = useDisplayFormat()
   const fetcher = useFetcher<SettingsResult>()
   useFetcherToast(fetcher, { render: (d) => certToast(d, t) })
-  const [confirming, setConfirming] = useState(false)
   const [sort, setSort] = useState<DeviceSort>("name")
 
   const result = fetcher.data
   const isSubmitting = fetcher.state !== "idle"
   const justSent = result != null && "certSent" in result
+  const linkReady = result != null && "certLinkReady" in result ? result : null
 
   const rows = sortDeviceRows(buildDeviceRows(certificates), sort)
 
@@ -328,9 +424,10 @@ export function DevicesSection({
   // than in an effect, which would be a cascading-render hazard. Keying off the
   // result's identity means reopening the form later doesn't re-close it.
   const [handledResult, setHandledResult] = useState<SettingsResult | undefined>(undefined)
+  const [linkDismissed, setLinkDismissed] = useState(false)
   if (result !== handledResult) {
     setHandledResult(result)
-    if (justSent) setConfirming(false)
+    if (linkReady) setLinkDismissed(false)
   }
 
   // Rate limit check — derived per render (module-level helper, same pattern
@@ -351,8 +448,15 @@ export function DevicesSection({
       // section header where it is always in the same place — not under a list
       // whose length varies, where it drifts off-screen as devices accumulate.
       action={
-        <Button variant="primary" disabled={cooldownRemaining || confirming} onClick={() => setConfirming(true)}>
-          {t("devices.newCert")}
+        // ONE click: issuing is the whole point of the button, so it issues —
+        // the QR dialog that follows is the confirmation surface (and offers
+        // "email me this link" for the same token). Cooldown still gates it.
+        <Button
+          variant="primary"
+          disabled={cooldownRemaining || isSubmitting}
+          onClick={() => fetcher.submit({ intent: "issueCert", delivery: "link" }, { method: "post", action: API_URL })}
+        >
+          {isSubmitting ? t("devices.issuing") : t("devices.newCert")}
         </Button>
       }
     >
@@ -374,25 +478,12 @@ export function DevicesSection({
           </Text>
         )}
 
-        {confirming && !cooldownRemaining && (
-          <Stack gap="sm">
-            <Text as="p">{t("devices.confirm", { email })}</Text>
-            <fetcher.Form method="post" action={API_URL}>
-              <Stack gap="sm">
-                <html.input type="hidden" name="intent" value="issueCert" />
-                <Input name="label" placeholder={t("devices.devicePlaceholder")} maxLength={64} />
-                <Inline gap="sm">
-                  <Button type="submit" variant="primary" disabled={isSubmitting}>
-                    {isSubmitting ? t("devices.issuing") : t("devices.confirmButton")}
-                  </Button>
-                  <Button type="button" variant="secondary" onClick={() => setConfirming(false)}>
-                    {t("common.cancel")}
-                  </Button>
-                </Inline>
-              </Stack>
-            </fetcher.Form>
-          </Stack>
-        )}
+        <ClaimLinkDialog
+          open={linkReady !== null && !linkDismissed}
+          onClose={() => setLinkDismissed(true)}
+          revealToken={linkReady !== null ? linkReady.revealToken : null}
+          expiresAt={linkReady !== null ? linkReady.expiresAt : null}
+        />
 
         {rows.length > 0 && (
           <>

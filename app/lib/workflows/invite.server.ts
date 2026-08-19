@@ -298,6 +298,14 @@ export interface ResendCertOptions {
    * renewal would lock them out of an mTLS-gated app.
    */
   renewedFromSerial?: string | null
+  /**
+   * How the reveal link reaches the device. "email" (default) keeps the
+   * historical flow. "link" skips the email entirely and hands the link back
+   * to the caller — the /devices page renders it as a QR so the new device
+   * scans its way straight to /cert/:token. Same token, same TTL, same
+   * single-use semantics either way.
+   */
+  delivery?: "email" | "link"
 }
 
 export const resendCert = (email: string, username: string, opts: ResendCertOptions = {}) =>
@@ -350,7 +358,21 @@ export const resendCert = (email: string, username: string, opts: ResendCertOpti
       username,
       expiresAt: new Date(Date.now() + REVEAL_TTL_MS),
       renewedFromSerial: opts.renewedFromSerial ?? null,
+      serialNumber: certResult.serialNumber,
     })
+
+    const expiresAt = new Date(Date.now() + REVEAL_TTL_MS).toISOString()
+
+    if ((opts.delivery ?? "email") === "link") {
+      // QR flow: the caller shows the link to the authenticated owner —
+      // no email leaves the building.
+      return {
+        success: true as const,
+        message: "Certificate ready",
+        renewalId: tempId,
+        reveal: { token: reveal.token, expiresAt },
+      }
+    }
 
     // Send the link-only renewal email (no P12 attachment — the cert is
     // downloaded from the reveal page, behind the same token).

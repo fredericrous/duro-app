@@ -23,6 +23,9 @@ export interface CertRevealToken {
    * cert row because storing that row is best-effort (see resendCert).
    */
   renewedFromSerial: string | null
+  /** Serial of the cert this reveal delivers — lets the claim page name the
+   *  right device. Null on rows minted before the QR/claim-naming flow. */
+  serialNumber: string | null
 }
 
 export interface CreateRevealInput {
@@ -31,6 +34,7 @@ export interface CreateRevealInput {
   username: string
   expiresAt: Date
   renewedFromSerial?: string | null
+  serialNumber?: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -73,6 +77,7 @@ const toRow = (r: any): CertRevealToken => ({
   expiresAt: r.expiresAt,
   revealedAt: r.revealedAt ?? null,
   renewedFromSerial: r.renewedFromSerial ?? null,
+  serialNumber: r.serialNumber ?? null,
 })
 
 // ---------------------------------------------------------------------------
@@ -92,9 +97,10 @@ export const CertRevealRepoLive = Layer.effect(
         const tokenHash = hashToken(token)
         const expiresAt = input.expiresAt.toISOString()
         const renewedFromSerial = input.renewedFromSerial ?? null
+        const serialNumber = input.serialNumber ?? null
         return withErr(
-          sql`INSERT INTO cert_reveal_tokens (id, token_hash, renewal_id, email, username, expires_at, renewed_from_serial)
-              VALUES (${id}, ${tokenHash}, ${input.renewalId}, ${input.email}, ${input.username}, ${expiresAt}, ${renewedFromSerial})`.pipe(
+          sql`INSERT INTO cert_reveal_tokens (id, token_hash, renewal_id, email, username, expires_at, renewed_from_serial, serial_number)
+              VALUES (${id}, ${tokenHash}, ${input.renewalId}, ${input.email}, ${input.username}, ${expiresAt}, ${renewedFromSerial}, ${serialNumber})`.pipe(
             Effect.as({ id, token }),
           ),
           "Failed to create cert reveal token",

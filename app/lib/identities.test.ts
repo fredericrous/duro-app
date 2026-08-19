@@ -27,6 +27,7 @@ const cert = (over: Partial<UserCertificate> & { serialNumber: string; username:
   userId: null,
   email: `${over.username}@example.com`,
   label: null,
+  claimedPlatform: null,
   issuedAt: "2024-01-01T00:00:00Z",
   expiresAt: "2999-01-01T00:00:00Z", // far future → active
   revokedAt: null,

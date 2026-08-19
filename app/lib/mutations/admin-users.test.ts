@@ -258,6 +258,7 @@ describe("handleAdminUsersMutation", () => {
       revokeState: null,
       revokeError: null,
       renewedFromSerial: null,
+      claimedPlatform: null,
     })
 
     const layer = Layer.mergeAll(
@@ -324,6 +325,7 @@ describe("handleAdminUsersMutation", () => {
       revokeState: null,
       revokeError: null,
       renewedFromSerial: null,
+      claimedPlatform: null,
     })
     certs.set("sn-2", {
       id: "2",
@@ -339,6 +341,7 @@ describe("handleAdminUsersMutation", () => {
       revokeState: null,
       revokeError: null,
       renewedFromSerial: null,
+      claimedPlatform: null,
     })
 
     const layer = Layer.mergeAll(
@@ -373,6 +376,7 @@ describe("handleAdminUsersMutation", () => {
       revokeState: null,
       revokeError: null,
       renewedFromSerial: null,
+      claimedPlatform: null,
     })
     certs.set("sn-2", {
       id: "2",
@@ -388,6 +392,7 @@ describe("handleAdminUsersMutation", () => {
       revokeState: "completed",
       revokeError: null,
       renewedFromSerial: null,
+      claimedPlatform: null,
     })
 
     const layer = Layer.mergeAll(
@@ -422,6 +427,7 @@ describe("handleAdminUsersMutation", () => {
       revokeState: null,
       revokeError: null,
       renewedFromSerial: null,
+      claimedPlatform: null,
     })
     certs.set("sn-2", {
       id: "2",
@@ -437,6 +443,7 @@ describe("handleAdminUsersMutation", () => {
       revokeState: null,
       revokeError: null,
       renewedFromSerial: null,
+      claimedPlatform: null,
     })
 
     const layer = Layer.mergeAll(
@@ -483,6 +490,7 @@ describe("handleAdminUsersMutation", () => {
       revokeState: null,
       revokeError: null,
       renewedFromSerial: null,
+      claimedPlatform: null,
     })
     certs.set("sn-b", {
       id: "2",
@@ -498,6 +506,7 @@ describe("handleAdminUsersMutation", () => {
       revokeState: null,
       revokeError: null,
       renewedFromSerial: null,
+      claimedPlatform: null,
     })
     const layer = Layer.mergeAll(
       mockCertManager,
@@ -535,6 +544,7 @@ describe("handleAdminUsersMutation", () => {
         revokeState: null,
         revokeError: null,
         renewedFromSerial: null,
+        claimedPlatform: null,
       })
     }
     const layer = Layer.mergeAll(
@@ -572,6 +582,7 @@ describe("handleAdminUsersMutation", () => {
       revokeState: null,
       revokeError: null,
       renewedFromSerial: null,
+      claimedPlatform: null,
     })
     const certs = new Map<string, UserCertificate>([
       ["sn-fail", mkCert("sn-fail")],
