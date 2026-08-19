@@ -37,11 +37,14 @@ export async function loader({ params }: Route.LoaderArgs) {
     ),
   )
   if (result.state === "ok") {
+    // Deliberately NO password here: loader data rides every GET — SSR HTML,
+    // the streamed hydration payload, mail-scanner prefetches, proxies. The
+    // secret is handed out only by the reveal POST below, in the same
+    // transaction that burns it.
     return {
       valid: true as const,
       revealed: false as const,
       email: result.row.email,
-      password: result.password,
       canName: result.row.serialNumber !== null,
       appName: config.appName,
     }
@@ -84,19 +87,29 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (intent !== "reveal") return { revealed: false as const }
 
-  const consumed = await runEffect(
+  const result = await runEffect(
     consumeReveal(revealToken, request.headers.get("user-agent")).pipe(
       Effect.catchAll((e) =>
-        Effect.logError("[cert-reveal] action error", { error: String(e) }).pipe(Effect.as(false)),
+        Effect.logError("[cert-reveal] action error", { error: String(e) }).pipe(
+          Effect.as({ consumed: false as const, password: null }),
+        ),
       ),
     ),
   )
-  return { revealed: consumed }
+  return { revealed: result.consumed, password: result.password }
 }
 
-function PasswordCard({ password }: { password: string }) {
+function PasswordCard() {
   const { t } = useTranslation()
-  const fetcher = useFetcher()
+  // The scratch gesture posts the reveal intent; the SAME response that burns
+  // the one-time password carries it back. Until then there is nothing under
+  // the foil — the secret never exists in any GET (SSR HTML, hydration
+  // payload, prefetches). fetcher.data survives the revalidation the POST
+  // triggers, so the password stays copyable after the loader flips to
+  // "revealed".
+  const fetcher = useFetcher<{ revealed?: boolean; password?: string | null }>()
+  const password = fetcher.data?.password ?? null
+  const revealFailed = fetcher.data != null && fetcher.data.revealed === false
   const { revealed, onReveal } = useScratchReveal(
     `scratch:${typeof window !== "undefined" ? window.location.pathname : ""}`,
   )
@@ -104,7 +117,6 @@ function PasswordCard({ password }: { password: string }) {
 
   const handleReveal = useCallback(() => {
     onReveal()
-    // Burn the one-time password server-side once the user scratches it open.
     fetcher.submit({ intent: "reveal" }, { method: "post" })
   }, [fetcher, onReveal])
 
@@ -119,12 +131,21 @@ function PasswordCard({ password }: { password: string }) {
           onReveal={handleReveal}
           label={t("common.scratchToReveal")}
         >
-          <Input defaultValue={password} />
+          <Input value={password ?? ""} readOnly />
         </ScratchCard>
-        <InputGroup.Addon disabled={!revealed} minWidth={72} onClick={() => copy(password)}>
+        <InputGroup.Addon
+          disabled={!revealed || password === null}
+          minWidth={72}
+          onClick={() => password !== null && copy(password)}
+        >
           {copied ? t("invite.password.copied") : t("invite.password.copy")}
         </InputGroup.Addon>
       </InputGroup.Root>
+      {revealFailed && (
+        <Text variant="bodySm" color="error">
+          {t("certReveal.revealFailed")}
+        </Text>
+      )}
       {copyFailed && (
         <Text variant="bodySm" color="muted">
           {t("invite.password.copyFailed")}
@@ -194,12 +215,13 @@ export default function CertRevealPage({ loaderData }: Route.ComponentProps) {
   const params = useParams()
   const downloadHref = `/cert/${params.revealToken}/download`
 
-  // Scratching burns the password server-side, so the revalidation that follows
-  // the reveal POST returns `revealed: true` — within a round-trip of the
-  // scratch, and long before anyone can hit Copy. Hold on to what this page
-  // load was handed so the password and its Copy button survive that flip; a
-  // fresh load has nothing captured and still gets the "already revealed" card.
-  const [sessionPassword] = useState(() => (loaderData.valid && !loaderData.revealed ? loaderData.password : null))
+  // Scratching burns the password server-side, so the revalidation that
+  // follows the reveal POST flips the loader to `revealed: true` — within a
+  // round-trip of the scratch, long before anyone can hit Copy. Freeze the
+  // branch decision at mount so the scratch layout (whose fetcher holds the
+  // just-revealed password) survives that flip; a fresh page load starts
+  // revealed and gets the "already revealed" card.
+  const [startedUnrevealed] = useState(() => loaderData.valid && !loaderData.revealed)
 
   if (!loaderData.valid) {
     const key =
@@ -215,9 +237,7 @@ export default function CertRevealPage({ loaderData }: Route.ComponentProps) {
     return <ErrorCard icon={icon} tone={tone} title={t("certReveal.error.title")} message={t(key)} />
   }
 
-  const password = sessionPassword ?? (loaderData.revealed ? null : loaderData.password)
-
-  if (!password) {
+  if (!startedUnrevealed) {
     return (
       <CenteredCardPage>
         <Stack gap="lg">
@@ -251,7 +271,7 @@ export default function CertRevealPage({ loaderData }: Route.ComponentProps) {
             />
           </Text>
         </Stack>
-        <PasswordCard password={password} />
+        <PasswordCard />
         <Text as="p" variant="bodySm" color="muted">
           {t("invite.password.oneTime")}
         </Text>

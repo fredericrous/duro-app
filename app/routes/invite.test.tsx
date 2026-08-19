@@ -96,12 +96,15 @@ describe("/invite/:token loader", () => {
     const data = expectData<{
       valid: boolean
       email?: string
-      p12Password?: string
+      hasPassword?: boolean
       groupNames?: string[]
     }>(result)
     expect(data.valid).toBe(true)
     expect(data.email).toBe("alice@example.com")
-    expect(data.p12Password).toBe("ThisIsTheP12Password!")
+    // Existence only — the password itself never rides the loader (GET data
+    // is SSR-serialized and prefetchable); disclosure is the reveal POST's.
+    expect(data.hasPassword).toBe(true)
+    expect(JSON.stringify(data)).not.toContain("ThisIsTheP12Password!")
     expect(data.groupNames).toEqual(["family", "media"])
   })
 
@@ -142,13 +145,26 @@ describe("/invite/:token action", () => {
     expect(data.error).toBe("Invalid request origin")
   })
 
-  it("returns { revealed: true } for intent=reveal under a valid origin", async () => {
+  it("hands out the password for intent=reveal against a still-valid invite", async () => {
+    mockRunEffect.mockResolvedValue("ThisIsTheP12Password!" as never)
     const result = await callAction(action, {
       params: { token: "t1" },
       formData: { intent: "reveal" },
     })
-    const data = expectData<{ revealed?: boolean }>(result)
+    const data = expectData<{ revealed?: boolean; p12Password?: string | null }>(result)
     expect(data.revealed).toBe(true)
+    expect(data.p12Password).toBe("ThisIsTheP12Password!")
+  })
+
+  it("hands out nothing when the invite is no longer valid (consumed/expired/attempts)", async () => {
+    mockRunEffect.mockResolvedValue(null as never)
+    const result = await callAction(action, {
+      params: { token: "t1" },
+      formData: { intent: "reveal" },
+    })
+    const data = expectData<{ revealed?: boolean; p12Password?: string | null }>(result)
+    expect(data.revealed).toBe(false)
+    expect(data.p12Password).toBeNull()
   })
 
   it("returns the unknown-action error shape for any other intent", async () => {
@@ -226,7 +242,7 @@ describe("InvitePage component", () => {
       appName: "Duro",
       email: "alice@example.com",
       groupNames: ["Media Team"],
-      p12Password: "ThisIsTheP12Pwd123!",
+      hasPassword: true,
       healthUrl: "/health",
     })
     // The valid branch uses t("invite.title", { appName }) for the page

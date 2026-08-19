@@ -28,7 +28,7 @@ export class CertManager extends Context.Tag("CertManager")<
 // Dev fake — in-memory cert store, no Vault needed
 // ---------------------------------------------------------------------------
 
-const devCertStore = new Map<string, { password: string; serialNumber: string; email: string; p12: Buffer }>()
+const devCertStore = new Map<string, { password: string | null; serialNumber: string; email: string; p12: Buffer }>()
 const devRevokedSerials = new Set<string>()
 
 export const CertManagerDev = Layer.succeed(CertManager, {
@@ -50,7 +50,18 @@ export const CertManagerDev = Layer.succeed(CertManager, {
 
   getP12: (inviteId) => Effect.succeed(devCertStore.get(inviteId)?.p12 ?? null),
 
-  consumeP12Password: (inviteId) => Effect.succeed(devCertStore.get(inviteId)?.password ?? null),
+  // Really consume, like the Vault layer does: the password is one-time, and
+  // one-time-ness lives entirely here (resolveReveal derives its state from
+  // password presence). A non-consuming dev variant made the reveal flow
+  // untestable and silently different from prod.
+  consumeP12Password: (inviteId) =>
+    Effect.sync(() => {
+      const entry = devCertStore.get(inviteId)
+      if (!entry) return null
+      const password = entry.password ?? null
+      entry.password = null
+      return password
+    }),
 
   deleteP12Secret: (inviteId) => {
     devCertStore.delete(inviteId)

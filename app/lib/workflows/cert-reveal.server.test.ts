@@ -57,7 +57,7 @@ describe("consumeReveal", () => {
   it("revokes the superseded cert once the replacement is in the user's hands", async () => {
     const token = await testRunEffect(seedRenewal({ oldSerial: "SN-PREV" }))
 
-    expect(await testRunEffect(consumeReveal(token))).toBe(true)
+    expect((await testRunEffect(consumeReveal(token))).consumed).toBe(true)
 
     const old = await testRunEffect(readCert("SN-PREV"))
     expect(old?.revokeState).toBe("completed")
@@ -79,7 +79,7 @@ describe("consumeReveal", () => {
     )
     const token = await testRunEffect(seedRenewal({ oldSerial: null }))
 
-    expect(await testRunEffect(consumeReveal(token))).toBe(true)
+    expect((await testRunEffect(consumeReveal(token))).consumed).toBe(true)
     expect((await testRunEffect(readCert("SN-UNRELATED")))?.revokedAt).toBeNull()
   })
 
@@ -97,7 +97,7 @@ describe("consumeReveal", () => {
   })
 
   it("reports nothing revealed for an unknown token", async () => {
-    expect(await testRunEffect(consumeReveal("not-a-real-token"))).toBe(false)
+    expect((await testRunEffect(consumeReveal("not-a-real-token"))).consumed).toBe(false)
   })
 
   it("still hands over the password when revoking the old cert fails", async () => {
@@ -116,7 +116,8 @@ describe("consumeReveal", () => {
       ),
     )
 
-    expect(revealed).toBe(true)
+    expect(revealed.consumed).toBe(true)
+    expect(revealed.password).not.toBeNull()
     const old = await testRunEffect(readCert("SN-STUCK"))
     expect(old?.revokeState).toBe("failed")
     expect(old?.revokedAt).toBeNull()
@@ -222,14 +223,18 @@ describe("claimed platform capture", () => {
 
   it("records the platform on reveal even when the user never names the device", async () => {
     const { token, serial } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
-    expect(await testRunEffect(consumeReveal(token, IPHONE_UA) as Effect.Effect<any, unknown, never>)).toBe(true)
+    expect((await testRunEffect(consumeReveal(token, IPHONE_UA) as Effect.Effect<any, unknown, never>)).consumed).toBe(
+      true,
+    )
     const cert = await testRunEffect(readCert(serial!) as Effect.Effect<any, unknown, never>)
     expect(cert?.claimedPlatform).toBe("iPhone")
   })
 
   it("keeps the FIRST observation — a later visit cannot rewrite what claimed the cert", async () => {
     const { token, serial } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
-    expect(await testRunEffect(consumeReveal(token, IPHONE_UA) as Effect.Effect<any, unknown, never>)).toBe(true)
+    expect((await testRunEffect(consumeReveal(token, IPHONE_UA) as Effect.Effect<any, unknown, never>)).consumed).toBe(
+      true,
+    )
     // Naming later from a different browser must not overwrite the platform.
     await testRunEffect(nameDeviceFromReveal(token, "perso", MAC_UA) as Effect.Effect<any, unknown, never>)
     const cert = await testRunEffect(readCert(serial!) as Effect.Effect<any, unknown, never>)
@@ -242,5 +247,24 @@ describe("claimed platform capture", () => {
     await testRunEffect(nameDeviceFromReveal(token, "mystery box", "curl/8.6.0") as Effect.Effect<any, unknown, never>)
     const cert = await testRunEffect(readCert(serial!) as Effect.Effect<any, unknown, never>)
     expect(cert?.claimedPlatform).toBeNull()
+  })
+})
+
+describe("consumeReveal — disclosure is burn-scoped", () => {
+  beforeEach(async () => {
+    await truncateAll()
+  })
+
+  it("hands the password out exactly once: with the burn, never again", async () => {
+    const { token } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
+    const first = await testRunEffect(consumeReveal(token))
+    expect(first.consumed).toBe(true)
+    expect(typeof first.password).toBe("string")
+    expect((first.password as string).length).toBeGreaterThan(0)
+
+    // Second consume: already burned — no password, not even a hint.
+    const second = await testRunEffect(consumeReveal(token))
+    expect(second.consumed).toBe(false)
+    expect(second.password).toBeNull()
   })
 })

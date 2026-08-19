@@ -1349,7 +1349,8 @@
       "save": "Enregistrer",
       "saving": "Enregistrement…",
       "saved": "Appareil nommé « {{label}} »."
-    }
+    },
+    "revealFailed": "Impossible de révéler le mot de passe — rechargez la page et réessayez."
   },
   "authError": {
     "title": "La connexion n'a pas pu être finalisée",

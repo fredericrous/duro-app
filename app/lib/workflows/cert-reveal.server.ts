@@ -54,21 +54,24 @@ export const resolveReveal = (revealToken: string) =>
  * losing a revocation is recoverable, losing the password is not (it exists
  * nowhere else once consumed).
  *
- * Returns whether the password was handed out.
+ * Returns the password itself when (and only when) this call burned it: the
+ * explicit reveal POST is the single request that ever carries the secret.
+ * The loader never does — a GET (prefetchable, cacheable, SSR-serialized)
+ * must stay secret-free, so disclosure and burn are one atomic transaction.
  */
 export const consumeReveal = (revealToken: string, userAgent?: string | null) =>
   Effect.gen(function* () {
     const revealRepo = yield* CertRevealRepo
     const cert = yield* CertManager
     const result = yield* resolveReveal(revealToken)
-    if (result.state !== "ok") return false
+    if (result.state !== "ok") return { consumed: false as const, password: null }
     yield* revealRepo.markRevealed(result.row.id)
     yield* cert.consumeP12Password(result.row.renewalId)
     yield* recordClaimedPlatform(result.row, userAgent)
     if (result.row.renewedFromSerial) {
       yield* revokeSupersededCert(result.row.renewedFromSerial, result.row.username)
     }
-    return true
+    return { consumed: true as const, password: result.password }
   })
 
 /**

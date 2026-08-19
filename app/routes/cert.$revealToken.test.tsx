@@ -32,20 +32,23 @@ beforeEach(() => {
 })
 
 describe("/cert/:revealToken loader", () => {
-  it("state=ok → returns the password + email for the scratch card", async () => {
+  it("state=ok → returns email/state but NEVER the password (GETs are secret-free)", async () => {
     mockRunEffect.mockResolvedValue({
       state: "ok",
       row: { email: "daddy@example.com", expiresAt: future },
       password: "s3cret-pw",
     } as never)
 
-    const data = expectData<{ valid: boolean; revealed: boolean; email: string; password: string }>(
-      await callLoader(revealLoader, { params: { revealToken: "tok" } }),
-    )
+    const result = await callLoader(revealLoader, { params: { revealToken: "tok" } })
+    const data = expectData<{ valid: boolean; revealed: boolean; email: string }>(result)
     expect(data.valid).toBe(true)
     expect(data.revealed).toBe(false)
     expect(data.email).toBe("daddy@example.com")
-    expect(data.password).toBe("s3cret-pw")
+    // The enforceable rule: loader data is SSR-serialized and prefetchable, so
+    // the one-time password must never appear in it — only the reveal POST
+    // (which burns it) may carry it.
+    expect(JSON.stringify(data)).not.toContain("s3cret-pw")
+    expect("password" in (data as Record<string, unknown>)).toBe(false)
   })
 
   it("state=revealed → valid but no password (download still offered)", async () => {
@@ -80,12 +83,22 @@ describe("/cert/:revealToken loader", () => {
 })
 
 describe("/cert/:revealToken action (reveal POST)", () => {
-  it("returns revealed:true when the consume succeeds", async () => {
-    mockRunEffect.mockResolvedValue(true as never)
-    const data = expectData<{ revealed: boolean }>(
+  it("returns revealed:true AND the password when the consume succeeds — burn and disclose are one transaction", async () => {
+    mockRunEffect.mockResolvedValue({ consumed: true, password: "s3cret-pw" } as never)
+    const data = expectData<{ revealed: boolean; password: string | null }>(
       await callAction(revealAction, { params: { revealToken: "tok" }, formData: { intent: "reveal" } }),
     )
     expect(data.revealed).toBe(true)
+    expect(data.password).toBe("s3cret-pw")
+  })
+
+  it("returns no password when the consume fails (already burned, bad token)", async () => {
+    mockRunEffect.mockResolvedValue({ consumed: false, password: null } as never)
+    const data = expectData<{ revealed: boolean; password: string | null }>(
+      await callAction(revealAction, { params: { revealToken: "tok" }, formData: { intent: "reveal" } }),
+    )
+    expect(data.revealed).toBe(false)
+    expect(data.password).toBeNull()
   })
 
   it("ignores a non-reveal intent without touching the runtime", async () => {
@@ -130,7 +143,7 @@ const renderReveal = (loaderData: unknown) =>
       path: "/cert/:revealToken",
       Component: CertRevealPage as never,
       loader: () => loaderData,
-      action: () => ({ revealed: true }),
+      action: () => ({ revealed: true, password: "s3cret-pw" }),
     },
     url: "/cert/tok",
   })
@@ -163,21 +176,18 @@ describe("CertRevealPage component", () => {
     expect(screen.getByRole("link", { name: t("certReveal.download") })).toHaveAttribute("href", "/cert/tok/download")
   })
 
-  it("renders the scratch card, pre-filled password and download link", async () => {
+  it("renders the scratch card EMPTY — nothing under the foil until the reveal POST answers", async () => {
     renderReveal({
       valid: true,
       revealed: false,
       email: "user@example.com",
-      password: "s3cret-pw",
       appName: "Duro",
     })
 
     await waitFor(() => {
       expect(screen.getByText(t("certReveal.title"))).toBeInTheDocument()
     })
-    // PasswordCard renders with the password pre-filled in the scratch-hidden
-    // input and the copy addon present.
-    expect(screen.getByDisplayValue("s3cret-pw")).toBeInTheDocument()
+    expect(screen.queryByDisplayValue("s3cret-pw")).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "scratch to reveal" })).toBeInTheDocument()
     expect(screen.getByText(t("invite.password.copy"))).toBeInTheDocument()
     expect(screen.getByText(t("invite.password.oneTime"))).toBeInTheDocument()
@@ -188,7 +198,7 @@ describe("CertRevealPage component", () => {
   // revalidation. Until the react-strict-dom mock cached its element types this
   // could not be tested at all — each re-render remounted the card, which
   // registered a fresh fetcher, which re-rendered, forever.
-  it("survives the reveal round-trip when the burn takes the password away", async () => {
+  it("scratch → reveal POST hands out the password, and it survives the burned-loader revalidation", async () => {
     let loaderCalls = 0
     renderRoute({
       route: {
@@ -196,17 +206,21 @@ describe("CertRevealPage component", () => {
         Component: CertRevealPage as never,
         loader: () =>
           loaderCalls++ === 0
-            ? { valid: true, revealed: false, email: "user@example.com", password: "s3cret-pw", appName: "Duro" }
+            ? { valid: true, revealed: false, email: "user@example.com", appName: "Duro" }
             : { valid: true, revealed: true, email: "user@example.com", appName: "Duro" },
-        action: () => ({ revealed: true }),
+        action: () => ({ revealed: true, password: "s3cret-pw" }),
       },
       url: "/cert/tok",
     })
 
-    await screen.findByDisplayValue("s3cret-pw")
+    // Nothing secret on screen (or in the DOM) before the scratch.
+    await screen.findByRole("button", { name: "scratch to reveal" })
+    expect(screen.queryByDisplayValue("s3cret-pw")).not.toBeInTheDocument()
+
     fireEvent.click(screen.getByRole("button", { name: "scratch to reveal" }))
 
-    // The reveal POST ran and the loader re-ran with the password already burned.
+    // The reveal POST answered with the password and the loader re-ran burned.
+    expect(await screen.findByDisplayValue("s3cret-pw")).toBeInTheDocument()
     await waitFor(() => expect(loaderCalls).toBeGreaterThan(1))
 
     // The password and its copy button are still on screen for the user to use.

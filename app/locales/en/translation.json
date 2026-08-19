@@ -1349,7 +1349,8 @@
       "save": "Save",
       "saving": "Saving…",
       "saved": "Device named “{{label}}”."
-    }
+    },
+    "revealFailed": "Couldn’t reveal the password — reload the page and try again."
   },
   "authError": {
     "title": "Sign-in couldn't be completed",

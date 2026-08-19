@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, fireEvent, act } from "@testing-library/react"
+import { screen, fireEvent, act } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import en from "~/locales/en/translation.json"
+import { renderRoute } from "~/test/render-route"
 
 vi.mock("~/components/ScratchCard/ScratchCard", () => ({
   ScratchCard: ({ children, onReveal }: { children: React.ReactNode; onReveal: () => void }) => (
@@ -12,6 +13,20 @@ vi.mock("~/components/ScratchCard/ScratchCard", () => ({
 }))
 
 import { InvitePasswordReveal } from "./InvitePasswordReveal"
+
+// The component posts intent=reveal through useFetcher, so it needs a data
+// router; the action plays the server handing out the password ONLY on that
+// POST — mirroring the real /invite/:token contract.
+const renderReveal = (hasPassword: boolean) =>
+  renderRoute({
+    route: {
+      path: "/invite/:token",
+      Component: () => <InvitePasswordReveal hasPassword={hasPassword} />,
+      loader: () => null,
+      action: () => ({ revealed: true, p12Password: "s3cret" }),
+    },
+    url: "/invite/tok",
+  })
 
 beforeEach(() => {
   localStorage.clear()
@@ -25,24 +40,25 @@ beforeEach(() => {
 })
 
 describe("InvitePasswordReveal", () => {
-  it("shows consumed message when password is null", () => {
-    render(<InvitePasswordReveal p12Password={null} />)
-    expect(screen.getByText(en.invite.password.consumed)).toBeInTheDocument()
+  it("shows consumed message when no password remains", async () => {
+    renderReveal(false)
+    expect(await screen.findByText(en.invite.password.consumed)).toBeInTheDocument()
   })
 
-  it("shows password input with copy disabled before reveal", () => {
-    render(<InvitePasswordReveal p12Password="s3cret" />)
-    expect(screen.getByDisplayValue("s3cret")).toBeInTheDocument()
-    const copyBtn = screen.getByRole("button", { name: en.invite.password.copy })
+  it("keeps the input EMPTY with copy disabled before reveal — the secret hasn't left the server", async () => {
+    renderReveal(true)
+    const copyBtn = await screen.findByRole("button", { name: en.invite.password.copy })
     expect(copyBtn).toBeDisabled()
+    expect(screen.queryByDisplayValue("s3cret")).not.toBeInTheDocument()
   })
 
-  it("enables copy after reveal and shows oneTime text", async () => {
+  it("scratch fetches the password, enables copy and shows oneTime text", async () => {
     const user = userEvent.setup()
-    render(<InvitePasswordReveal p12Password="s3cret" />)
+    renderReveal(true)
 
-    await user.click(screen.getByRole("button", { name: "scratch to reveal" }))
+    await user.click(await screen.findByRole("button", { name: "scratch to reveal" }))
 
+    expect(await screen.findByDisplayValue("s3cret")).toBeInTheDocument()
     const copyBtn = screen.getByRole("button", { name: en.invite.password.copy })
     expect(copyBtn).toBeEnabled()
     expect(screen.getByText(en.invite.password.oneTime)).toBeVisible()
@@ -50,8 +66,9 @@ describe("InvitePasswordReveal", () => {
 
   it("copies password and shows copied text", async () => {
     const user = userEvent.setup()
-    render(<InvitePasswordReveal p12Password="s3cret" />)
-    await user.click(screen.getByRole("button", { name: "scratch to reveal" }))
+    renderReveal(true)
+    await user.click(await screen.findByRole("button", { name: "scratch to reveal" }))
+    await screen.findByDisplayValue("s3cret")
 
     fireEvent.click(screen.getByRole("button", { name: en.invite.password.copy }))
 
@@ -63,10 +80,11 @@ describe("InvitePasswordReveal", () => {
     // shouldAdvanceTime lets the writeText promise settle under fake timers —
     // the copy feedback is now driven by that resolution, not by the click.
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    render(<InvitePasswordReveal p12Password="s3cret" />)
+    renderReveal(true)
 
     // Use fireEvent (synchronous) to avoid userEvent's internal timers conflicting with fake timers
-    fireEvent.click(screen.getByRole("button", { name: "scratch to reveal" }))
+    fireEvent.click(await screen.findByRole("button", { name: "scratch to reveal" }))
+    await screen.findByDisplayValue("s3cret")
     fireEvent.click(screen.getByRole("button", { name: en.invite.password.copy }))
 
     expect(await screen.findByRole("button", { name: en.invite.password.copied })).toBeInTheDocument()
