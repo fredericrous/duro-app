@@ -1,6 +1,12 @@
 import { defineConfig } from "vitest/config"
 import path from "path"
 
+// A CI shard only runs (and only covers) its slice of the suite, so absolute
+// coverage percentages are meaningless there — thresholds must gate the
+// MERGED report (the `--merge-reports --coverage` run in ci.yml), not the
+// shards feeding it.
+const isShardRun = process.argv.some((a) => a === "--shard" || a.startsWith("--shard="))
+
 export default defineConfig({
   test: {
     // jsdom is the default — every test file that touches the DOM
@@ -10,6 +16,8 @@ export default defineConfig({
     // (vitest 4 dropped the file-level `environmentMatchGlobs` config).
     environment: "jsdom",
     setupFiles: ["./app/test/setup.ts"],
+    // Builds the migrated-PGlite snapshot once per run — see its doc comment.
+    globalSetup: ["./app/test/global-setup.ts"],
     include: ["app/**/*.test.{ts,tsx}"],
     css: { modules: { classNameStrategy: "non-scoped" } },
     // Cap worker concurrency. vitest's default reads the NODE's core count,
@@ -67,12 +75,14 @@ export default defineConfig({
       // grinding ~30 small route files at diminishing ROI; planning doc
       // tracks the realistic remaining work — see
       // /Users/fredericrous/.claude/plans/in-duro-app-how-hashed-snowglobe.md.
-      thresholds: {
-        lines: 73,
-        statements: 72,
-        functions: 66,
-        branches: 62,
-      },
+      thresholds: isShardRun
+        ? undefined
+        : {
+            lines: 73,
+            statements: 72,
+            functions: 66,
+            branches: 62,
+          },
     },
   },
   resolve: {

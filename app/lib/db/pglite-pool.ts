@@ -175,8 +175,9 @@ class PglitePool extends EventEmitter {
 const GLOBAL_KEY = "__pglite_backend__"
 const isVitest = typeof process !== "undefined" && process.env.VITEST === "true"
 
-export async function createPglitePool(opts?: { dataDir?: string }) {
+export async function createPglitePool(opts?: { dataDir?: string; ignoreSnapshot?: boolean }) {
   let backend: PgLiteBackend
+  let directInstance: PGlite | null = null
 
   if (opts?.dataDir) {
     // Embedded production mode: file-backed PGlite, in-process (no worker —
@@ -188,10 +189,25 @@ export async function createPglitePool(opts?: { dataDir?: string }) {
     await pglite.waitReady
     backend = new DirectBackend(pglite)
   } else if (isVitest) {
-    // vitest — load PGlite directly, each test suite gets its own instance
+    // vitest — load PGlite directly, each test suite gets its own instance.
+    // When the global setup published a migrated-data-dir snapshot, restore
+    // from it instead of starting empty: the per-file migration replay (32
+    // DDL rounds × every DB-backed test file) collapses into one tarball
+    // load. The migration runner still executes afterwards and applies any
+    // migrations newer than the snapshot, so a stale snapshot costs only the
+    // delta — never correctness.
     const { PGlite: PGliteCtor } = await import("@electric-sql/pglite")
-    const pglite = new PGliteCtor()
+    const snapshotPath = process.env.DURO_PGLITE_SNAPSHOT
+    let pglite: PGlite
+    if (snapshotPath && !opts?.ignoreSnapshot) {
+      const { readFile } = await import("node:fs/promises")
+      const bytes = await readFile(snapshotPath)
+      pglite = new PGliteCtor({ loadDataDir: new Blob([bytes]) })
+    } else {
+      pglite = new PGliteCtor()
+    }
     await pglite.waitReady
+    directInstance = pglite
     backend = new DirectBackend(pglite)
   } else if ((globalThis as any)[GLOBAL_KEY]) {
     // reuse existing worker
@@ -204,5 +220,9 @@ export async function createPglitePool(opts?: { dataDir?: string }) {
     backend = wb
   }
 
-  return new PglitePool(backend) as any
+  const pool = new PglitePool(backend) as any
+  // Raw instance handle for the snapshot builder (dumpDataDir needs the
+  // PGlite object itself, not the pg.Pool facade). Direct backends only.
+  pool.__pglite = directInstance
+  return pool
 }
