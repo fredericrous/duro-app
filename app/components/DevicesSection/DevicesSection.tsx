@@ -78,11 +78,13 @@ function ClaimLinkDialog({
   onClose,
   revealToken,
   expiresAt,
+  claimUrl,
 }: {
   open: boolean
   onClose: () => void
   revealToken: string | null
   expiresAt: string | null
+  claimUrl: string | null
 }) {
   const { t } = useTranslation()
   const { formatDateTime } = useDisplayFormat()
@@ -95,8 +97,6 @@ function ClaimLinkDialog({
   useFetcherToast(emailFetcher, { render: (d) => certToast(d, t) })
   const emailing = emailFetcher.state !== "idle"
   const emailed = emailFetcher.data != null && "certSent" in emailFetcher.data
-  const claimUrl =
-    revealToken !== null && typeof window !== "undefined" ? `${window.location.origin}/cert/${revealToken}` : ""
 
   return (
     <Dialog.Root
@@ -114,9 +114,9 @@ function ClaimLinkDialog({
             <Text as="p" variant="bodySm" color="muted">
               {t("devices.qr.hint")}
             </Text>
-            {claimUrl !== "" && <QrCode value={claimUrl} label={t("devices.qr.alt")} />}
+            {claimUrl !== null && <QrCode value={claimUrl} label={t("devices.qr.alt")} />}
             <Inline gap="sm" align="center">
-              <Button variant="secondary" size="small" onClick={() => copy(claimUrl)}>
+              <Button variant="secondary" size="small" onClick={() => claimUrl !== null && copy(claimUrl)}>
                 {copyFailed ? t("devices.qr.copyFailed") : copied ? t("devices.qr.copied") : t("devices.qr.copyLink")}
               </Button>
               <Button
@@ -483,6 +483,7 @@ export function DevicesSection({
           onClose={() => setLinkDismissed(true)}
           revealToken={linkReady !== null ? linkReady.revealToken : null}
           expiresAt={linkReady !== null ? linkReady.expiresAt : null}
+          claimUrl={linkReady !== null ? linkReady.claimUrl : null}
         />
 
         {rows.length > 0 && (

@@ -32,6 +32,7 @@ function renderSection(
   actionResult: unknown = {
     certLinkReady: true,
     revealToken: "tok-1",
+    claimUrl: "https://join.example.com/cert/tok-1",
     expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
   },
 ) {
@@ -237,6 +238,7 @@ describe("the QR claim-link flow", () => {
           return {
             certLinkReady: true,
             revealToken: "tok-1",
+            claimUrl: "https://join.example.com/cert/tok-1",
             expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
           }
         },
