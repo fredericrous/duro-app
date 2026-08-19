@@ -4,7 +4,7 @@ import { Trans, useTranslation } from "react-i18next"
 import { useFetcher, useParams } from "react-router"
 import type { Route } from "./+types/cert.$revealToken"
 import { runEffect } from "~/lib/runtime.server"
-import { consumeReveal, resolveReveal } from "~/lib/workflows/cert-reveal.server"
+import { consumeReveal, nameDeviceFromReveal, resolveReveal } from "~/lib/workflows/cert-reveal.server"
 import { config, isOriginAllowed } from "~/lib/config.server"
 import { Effect } from "effect"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
@@ -41,11 +41,18 @@ export async function loader({ params }: Route.LoaderArgs) {
       revealed: false as const,
       email: result.row.email,
       password: result.password,
+      canName: result.row.serialNumber !== null,
       appName: config.appName,
     }
   }
   if (result.state === "revealed") {
-    return { valid: true as const, revealed: true as const, email: result.row.email, appName: config.appName }
+    return {
+      valid: true as const,
+      revealed: true as const,
+      email: result.row.email,
+      canName: result.row.serialNumber !== null,
+      appName: config.appName,
+    }
   }
   return { valid: false as const, error: result.state as CertRevealError, appName: config.appName }
 }
@@ -56,7 +63,25 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (!isOriginAllowed(request.headers.get("Origin"))) return { revealed: false as const }
 
   const formData = await request.formData()
-  if (formData.get("intent") !== "reveal") return { revealed: false as const }
+  const intent = formData.get("intent")
+
+  // Claim-time naming: the link is minted name-less; the device names itself
+  // here. Token-authed like everything else on this page.
+  if (intent === "name") {
+    const label = String(formData.get("label") ?? "")
+    const result = await runEffect(
+      nameDeviceFromReveal(revealToken, label).pipe(
+        Effect.catchAll((e) =>
+          Effect.logError("[cert-reveal] name error", { error: String(e) }).pipe(
+            Effect.as({ named: false as const, reason: "unknown" as const }),
+          ),
+        ),
+      ),
+    )
+    return result.named ? { named: true as const, label: result.label } : { named: false as const }
+  }
+
+  if (intent !== "reveal") return { revealed: false as const }
 
   const consumed = await runEffect(
     consumeReveal(revealToken).pipe(
@@ -108,6 +133,57 @@ function PasswordCard({ password }: { password: string }) {
   )
 }
 
+/**
+ * "Name this device" — the claim-time half of the QR flow. The link is minted
+ * without a name so the QR and email journeys stay identical; whoever holds
+ * the link (the device being set up) names it here. Saved via its own
+ * token-authed intent; renames later live on /devices as before.
+ */
+function DeviceNameCard() {
+  const { t } = useTranslation()
+  const fetcher = useFetcher<{ named?: boolean; label?: string }>()
+  const [value, setValue] = useState("")
+  const saved = fetcher.data?.named === true
+  const savedLabel = fetcher.data?.label
+  const submitting = fetcher.state !== "idle"
+
+  if (saved) {
+    return (
+      <Text as="p" variant="bodySm" color="success">
+        {t("certReveal.name.saved", { label: savedLabel })}
+      </Text>
+    )
+  }
+  return (
+    <fetcher.Form method="post">
+      <html.input type="hidden" name="intent" value="name" />
+      <Stack gap="xs">
+        <Text as="p" variant="bodySm" color="muted">
+          {t("certReveal.name.hint")}
+        </Text>
+        <InputGroup.Root>
+          <Input
+            name="label"
+            value={value}
+            placeholder={t("certReveal.name.placeholder")}
+            onChange={(e) => setValue(e.target.value)}
+            disabled={submitting}
+          />
+          <InputGroup.Addon
+            disabled={submitting || value.trim() === ""}
+            minWidth={72}
+            onClick={() => {
+              fetcher.submit({ intent: "name", label: value }, { method: "post" })
+            }}
+          >
+            {submitting ? t("certReveal.name.saving") : t("certReveal.name.save")}
+          </InputGroup.Addon>
+        </InputGroup.Root>
+      </Stack>
+    </fetcher.Form>
+  )
+}
+
 export default function CertRevealPage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
   const params = useParams()
@@ -148,6 +224,7 @@ export default function CertRevealPage({ loaderData }: Route.ComponentProps) {
               components={{ strong: <html.strong /> }}
             />
           </Text>
+          {loaderData.canName && <DeviceNameCard />}
           <LinkButton href={downloadHref} variant="primary" fullWidth>
             {t("certReveal.download")}
           </LinkButton>
@@ -173,6 +250,7 @@ export default function CertRevealPage({ loaderData }: Route.ComponentProps) {
         <Text as="p" variant="bodySm" color="muted">
           {t("invite.password.oneTime")}
         </Text>
+        {loaderData.canName && <DeviceNameCard />}
         <LinkButton href={downloadHref} variant="primary" fullWidth>
           {t("certReveal.download")}
         </LinkButton>

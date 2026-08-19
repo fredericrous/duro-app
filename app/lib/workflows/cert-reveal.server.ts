@@ -1,6 +1,7 @@
 import { Effect } from "effect"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
+import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { hashToken } from "~/lib/crypto.server"
 import { revokeSupersededCert } from "~/lib/workflows/cert-revocation.server"
 
@@ -49,4 +50,31 @@ export const consumeReveal = (revealToken: string) =>
       yield* revokeSupersededCert(result.row.renewedFromSerial, result.row.username)
     }
     return true
+  })
+
+/**
+ * Claim-time device naming: the QR/email link is minted NAME-LESS, and the
+ * device names itself on the claim page. Allowed while the token is alive
+ * (ok) and after the password was revealed (revealed) — the person holding
+ * the link IS the device owner mid-setup; naming after the scratch is the
+ * natural order. Never allowed on invalid/expired tokens, and only for
+ * reveal rows that carry a serial (older rows predate the column).
+ *
+ * The label passes the same trim/cap rules as the /devices rename.
+ */
+export const nameDeviceFromReveal = (revealToken: string, rawLabel: string) =>
+  Effect.gen(function* () {
+    const certRepo = yield* CertificateRepo
+    const result = yield* resolveReveal(revealToken)
+    if (result.state !== "ok" && result.state !== "revealed") {
+      return { named: false as const, reason: result.state }
+    }
+    if (!result.row.serialNumber) {
+      return { named: false as const, reason: "unnameable" as const }
+    }
+    const label = rawLabel.trim().slice(0, 64)
+    if (label === "") return { named: false as const, reason: "empty" as const }
+    const affected = yield* certRepo.setLabel(result.row.serialNumber, result.row.username, label)
+    if (affected === 0) return { named: false as const, reason: "missing" as const }
+    return { named: true as const, label }
   })

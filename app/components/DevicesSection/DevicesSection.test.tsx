@@ -98,7 +98,7 @@ describe("DevicesSection", () => {
   it("disables the header button while its own form is open, so it cannot re-trigger", async () => {
     renderSection()
     fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
-    expect(await screen.findByRole("button", { name: t("devices.confirmButton") })).toBeInTheDocument()
+    expect(await screen.findByRole("button", { name: t("devices.showQr") })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: t("devices.newCert") })).toBeDisabled()
   })
 
@@ -109,9 +109,11 @@ describe("DevicesSection", () => {
   })
 
   describe("issuing a certificate", () => {
-    const submit = async () => {
+    const EMAIL = "alice@example.com"
+    const submit = async (delivery: "email" | "link" = "email") => {
       fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
-      fireEvent.click(await screen.findByRole("button", { name: t("devices.confirmButton") }))
+      const name = delivery === "link" ? t("devices.showQr") : t("devices.sendEmail").replace("{{email}}", EMAIL)
+      fireEvent.click(await screen.findByRole("button", { name }))
     }
 
     it("closes the confirm form and points the user at their email", async () => {
@@ -120,7 +122,7 @@ describe("DevicesSection", () => {
       // The toast auto-dismisses, so the "check your email" pointer also
       // persists inline, next to the button that produced it.
       expect(await screen.findByText(t("devices.success"))).toBeInTheDocument()
-      expect(screen.queryByRole("button", { name: t("devices.confirmButton") })).not.toBeInTheDocument()
+      expect(screen.queryByRole("button", { name: t("devices.showQr") })).not.toBeInTheDocument()
       expect(screen.queryByRole("button", { name: t("common.cancel") })).not.toBeInTheDocument()
     })
 
@@ -136,7 +138,7 @@ describe("DevicesSection", () => {
       await submit()
       const toast = await waitFor(() => screen.getByRole("alert"))
       expect(toast).toHaveTextContent("Vault unreachable")
-      expect(screen.getByRole("button", { name: t("devices.confirmButton") })).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: t("devices.showQr") })).toBeInTheDocument()
     })
   })
 
@@ -213,5 +215,28 @@ describe("DevicesSection", () => {
       // Both certs belong to the same device, so the label is not repeated.
       expect(screen.getAllByText("MacBook Pro")).toHaveLength(1)
     })
+  })
+})
+
+describe("the QR claim-link flow", () => {
+  it("opens the QR dialog with the claim link when delivery is link", async () => {
+    renderSection(
+      {},
+      { certLinkReady: true, revealToken: "tok-qr-1", expiresAt: new Date(Date.now() + 86_400_000).toISOString() },
+    )
+    fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
+    fireEvent.click(await screen.findByRole("button", { name: t("devices.showQr") }))
+    expect(await screen.findByText(t("devices.qr.title"))).toBeInTheDocument()
+    // the QR encodes the claim URL for the token
+    expect(screen.getByRole("img", { name: t("devices.qr.alt") })).toBeInTheDocument()
+    // and the user is told naming happens on the claim page
+    expect(screen.getByText(t("devices.qr.nameHint"))).toBeInTheDocument()
+  })
+
+  it("the add form offers no name field — naming moved to the claim page", async () => {
+    renderSection()
+    fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
+    await screen.findByRole("button", { name: t("devices.showQr") })
+    expect(screen.queryByPlaceholderText(t("devices.devicePlaceholder"))).not.toBeInTheDocument()
   })
 })

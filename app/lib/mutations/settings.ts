@@ -15,7 +15,7 @@ import type { AuthInfo } from "~/lib/auth.server"
 // ---------------------------------------------------------------------------
 
 export type SettingsMutation =
-  | { intent: "issueCert"; label?: string | null; auth: AuthInfo }
+  | { intent: "issueCert"; delivery: "email" | "link"; auth: AuthInfo }
   | { intent: "renewCert"; serialNumber: string; auth: AuthInfo }
   | { intent: "revokeCert"; serialNumber: string; auth: AuthInfo }
   | { intent: "renameCert"; serialNumber: string; label: string | null; auth: AuthInfo }
@@ -25,6 +25,7 @@ export type SettingsMutation =
 
 export type SettingsResult =
   | { certSent: true }
+  | { certLinkReady: true; revealToken: string; expiresAt: string }
   | { certError: string }
   | { rateLimited: true; nextAvailable: string }
   | { certRevoked: true }
@@ -36,7 +37,7 @@ export type SettingsResult =
 // Handlers
 // ---------------------------------------------------------------------------
 
-function handleIssueCert(auth: AuthInfo, label?: string | null) {
+function handleIssueCert(auth: AuthInfo, delivery: "email" | "link") {
   return Effect.gen(function* () {
     if (!auth.email) {
       return { certError: "No email associated with your account." } as SettingsResult
@@ -54,10 +55,19 @@ function handleIssueCert(auth: AuthInfo, label?: string | null) {
       }
     }
 
-    const result = yield* resendCert(auth.email, auth.user!, { label })
+    // No label here: the device names itself on the claim page (/cert/:token),
+    // so the QR and email flows stay identical after this point.
+    const result = yield* resendCert(auth.email, auth.user!, { delivery })
 
     yield* prefs.setCertRenewal(auth.user!, result.renewalId)
 
+    if (result.reveal) {
+      return {
+        certLinkReady: true as const,
+        revealToken: result.reveal.token,
+        expiresAt: result.reveal.expiresAt,
+      }
+    }
     return { certSent: true as const }
   }).pipe(
     Effect.catchAll((e) => {
@@ -207,7 +217,7 @@ function handleSaveLocale(locale: string, auth: AuthInfo) {
 export function handleSettingsMutation(mutation: SettingsMutation) {
   switch (mutation.intent) {
     case "issueCert":
-      return handleIssueCert(mutation.auth, mutation.label)
+      return handleIssueCert(mutation.auth, mutation.delivery)
     case "renewCert":
       return handleRenewCert(mutation.serialNumber, mutation.auth)
     case "revokeCert":
@@ -238,7 +248,8 @@ export function parseSettingsMutation(formData: FormData, auth: AuthInfo): Setti
   const intent = formData.get("intent") as string | null
 
   if (intent === "issueCert") {
-    return { intent, label: parseLabel(formData.get("label")), auth }
+    const delivery = formData.get("delivery") === "link" ? ("link" as const) : ("email" as const)
+    return { intent, delivery, auth }
   }
   if (intent === "renewCert") {
     // No label from the form — a renewal inherits the device name of the cert

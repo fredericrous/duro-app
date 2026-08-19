@@ -231,6 +231,19 @@
       "label": "Sort by",
       "name": "Name",
       "expiry": "Expiry"
+    },
+    "deliveryPrompt": "How should the new device get its certificate?",
+    "showQr": "Show QR code",
+    "sendEmail": "Email the link to {{email}}",
+    "qr": {
+      "title": "Scan with the new device",
+      "hint": "Point the new device’s camera at the code — it opens the certificate page directly. Nothing was emailed.",
+      "alt": "QR code opening this device’s certificate page",
+      "copyLink": "Copy link instead",
+      "copied": "Copied!",
+      "copyFailed": "Copy failed — use the QR code.",
+      "expiry": "The link works once and expires {{time}}.",
+      "nameHint": "You’ll name the device on that page."
     }
   },
   "categories": {
@@ -1329,6 +1342,13 @@
       "expired": "This reveal link has expired. Request a new certificate to get a fresh link.",
       "consumed": "This password has already been revealed. Request a new certificate if you still need one.",
       "unknown": "Something went wrong. Please try again or request a new certificate."
+    },
+    "name": {
+      "hint": "Name this device — how it will show up in your device list.",
+      "placeholder": "e.g. Pixel 9",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Device named “{{label}}”."
     }
   },
   "authError": {

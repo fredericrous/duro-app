@@ -4,7 +4,7 @@ import { Effect } from "effect"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
-import { consumeReveal } from "./cert-reveal.server"
+import { consumeReveal, nameDeviceFromReveal } from "./cert-reveal.server"
 import { hashToken } from "~/lib/crypto.server"
 import { testRunEffect, truncateAll } from "~/test/test-runtime"
 
@@ -120,5 +120,83 @@ describe("consumeReveal", () => {
     const old = await testRunEffect(readCert("SN-STUCK"))
     expect(old?.revokeState).toBe("failed")
     expect(old?.revokedAt).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Claim-time device naming (the QR flow's second half)
+// ---------------------------------------------------------------------------
+
+/** Seed a NEW-device reveal (no predecessor) whose row carries the serial. */
+const seedNamedable = (opts: { serial?: string | null; username?: string } = {}) =>
+  Effect.gen(function* () {
+    const certRepo = yield* CertificateRepo
+    const revealRepo = yield* CertRevealRepo
+    const cert = yield* CertManager
+    const username = opts.username ?? "alice"
+    const email = `${username}@example.com`
+    const serial = opts.serial === undefined ? "SN-QR-1" : opts.serial
+
+    if (serial) {
+      yield* certRepo.store({
+        username,
+        email,
+        serialNumber: serial,
+        issuedAt: new Date(),
+        expiresAt: new Date(Date.now() + 365 * 86_400_000),
+      })
+    }
+    const renewalId = `renewal-qr-${serial ?? "none"}`
+    yield* cert.issueCertAndP12(email, renewalId)
+    const { token } = yield* revealRepo.create({
+      renewalId,
+      email,
+      username,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      serialNumber: serial,
+    })
+    return { token, serial }
+  })
+
+describe("nameDeviceFromReveal", () => {
+  beforeEach(async () => {
+    await truncateAll()
+  })
+
+  it("names the cert while the token is live, trimming and capping the label", async () => {
+    const { token, serial } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
+    const result = await testRunEffect(
+      nameDeviceFromReveal(token, `  Pixel 9  ${"x".repeat(100)}`) as Effect.Effect<any, unknown, never>,
+    )
+    expect(result.named).toBe(true)
+    expect(result.label.length).toBeLessThanOrEqual(64)
+    const cert = await testRunEffect(readCert(serial!) as Effect.Effect<any, unknown, never>)
+    expect(cert!.label).toBe(result.label)
+  })
+
+  it("still names after the password was revealed (natural setup order)", async () => {
+    const { token, serial } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
+    await testRunEffect(consumeReveal(token) as Effect.Effect<unknown, unknown, never>)
+    const result = await testRunEffect(nameDeviceFromReveal(token, "Pixel 9") as Effect.Effect<any, unknown, never>)
+    expect(result).toMatchObject({ named: true, label: "Pixel 9" })
+    const cert = await testRunEffect(readCert(serial!) as Effect.Effect<any, unknown, never>)
+    expect(cert!.label).toBe("Pixel 9")
+  })
+
+  it("refuses an invalid token and an empty label", async () => {
+    expect(
+      await testRunEffect(nameDeviceFromReveal("nope", "Pixel") as Effect.Effect<any, unknown, never>),
+    ).toMatchObject({ named: false, reason: "invalid" })
+    const { token } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
+    expect(await testRunEffect(nameDeviceFromReveal(token, "   ") as Effect.Effect<any, unknown, never>)).toMatchObject(
+      { named: false, reason: "empty" },
+    )
+  })
+
+  it("refuses rows minted before the serial column (unnameable, not a crash)", async () => {
+    const { token } = await testRunEffect(seedNamedable({ serial: null }) as Effect.Effect<any, unknown, never>)
+    expect(
+      await testRunEffect(nameDeviceFromReveal(token, "Pixel") as Effect.Effect<any, unknown, never>),
+    ).toMatchObject({ named: false, reason: "unnameable" })
   })
 })
