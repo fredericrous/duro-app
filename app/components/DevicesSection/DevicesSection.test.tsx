@@ -38,9 +38,7 @@ function renderSection(
   return renderRoute({
     route: {
       path: "/devices",
-      Component: () => (
-        <DevicesSection email="alice@example.com" lastCertRenewalAt={null} certificates={[]} {...props} />
-      ),
+      Component: () => <DevicesSection lastCertRenewalAt={null} certificates={[]} {...props} />,
       loader: () => null,
       action: () => actionResult,
     },
@@ -227,7 +225,7 @@ describe("the QR claim-link flow", () => {
     renderRoute({
       route: {
         path: "/devices",
-        Component: () => <DevicesSection email="alice@example.com" lastCertRenewalAt={null} certificates={[]} />,
+        Component: () => <DevicesSection lastCertRenewalAt={null} certificates={[]} />,
         loader: () => null,
         action: async ({ request }) => {
           const fd = await request.formData()

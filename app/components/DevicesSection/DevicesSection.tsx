@@ -399,11 +399,9 @@ function DeviceRow({ cert, certificates }: { cert: UserCertificate; certificates
 }
 
 export function DevicesSection({
-  email,
   lastCertRenewalAt,
   certificates,
 }: {
-  email: string | null
   lastCertRenewalAt: string | null
   certificates: UserCertificate[]
 }) {
