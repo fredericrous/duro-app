@@ -47,6 +47,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         return { invite, p12Password }
       }).pipe(Effect.orDie),
     )
+    // The password itself never leaves through the loader (GETs are
+    // prefetchable, cacheable, and SSR-serialized) — only its existence does.
+    // Disclosure happens in the reveal POST below.
 
     if (!invite) {
       return {
@@ -95,7 +98,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       valid: true as const,
       email: invite.email,
       groupNames: JSON.parse(invite.groupNames) as string[],
-      p12Password,
+      hasPassword: p12Password !== null,
       appName: config.appName,
       healthUrl,
     }
@@ -126,7 +129,23 @@ export async function action({ request, params }: Route.ActionArgs) {
   const intent = formData.get("intent") as string | null
 
   if (intent === "reveal") {
-    return { revealed: true }
+    // Hand the password out ONLY here, to a same-origin, user-initiated POST
+    // against a still-valid invite — never in loader (GET) data. Re-check
+    // validity: the action must not become a side door around the loader's
+    // consumed/expired/attempts gates.
+    const tokenHash = hashToken(token)
+    const p12Password = await runEffect(
+      Effect.gen(function* () {
+        const repo = yield* InviteRepo
+        const cert = yield* CertManager
+        const invite = yield* repo.findByTokenHash(tokenHash)
+        if (!invite || isConsumed(invite.status)) return null
+        if (new Date(invite.expiresAt) < new Date()) return null
+        if (invite.attempts >= 5) return null
+        return yield* cert.getP12Password(invite.id)
+      }).pipe(Effect.orDie),
+    )
+    return { revealed: p12Password !== null, p12Password }
   }
 
   return { error: "Unknown action" }
@@ -226,7 +245,7 @@ export default function InvitePage({ loaderData }: Route.ComponentProps) {
             <LinkButton href={`/invite/${params.token}/download`} variant="primary" fullWidth>
               {t("invite.download.button")}
             </LinkButton>
-            <InvitePasswordReveal p12Password={loaderData.p12Password} />
+            <InvitePasswordReveal hasPassword={loaderData.hasPassword} />
           </Stack>
         )}
         <CertCheck status={effectiveCertStatus} onRecheck={recheck} />
