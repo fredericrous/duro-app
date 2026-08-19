@@ -245,6 +245,28 @@ export const makeEmbeddedDbLayer = (dataDir: string) => {
  * Test layer: uses an in-memory PGlite instance (no external Postgres needed).
  * Runs migrations then truncates all data tables for a clean test state.
  */
+/**
+ * Test-only: boot a fresh PGlite, run every migration, and hand back the
+ * serialized data directory. The vitest global setup writes this to a cache
+ * file once per (migrations-hash) and every test file restores from it via
+ * DURO_PGLITE_SNAPSHOT instead of replaying the whole migration history.
+ */
+export const dumpMigratedDataDir = async (): Promise<Uint8Array> => {
+  const { createPglitePool } = await import("./pglite-pool")
+  // ignoreSnapshot: the builder must start from an empty instance even when a
+  // (stale) snapshot env var is already set.
+  const pool = await createPglitePool({ ignoreSnapshot: true })
+  const layer = PgClient.layerFromPool({
+    acquire: Effect.succeed(pool),
+    transformResultNames: snakeToCamel,
+  })
+  await Effect.runPromise(runMigrations.pipe(Effect.provide(layer)))
+  const blob: Blob = await pool.__pglite.dumpDataDir()
+  const bytes = new Uint8Array(await blob.arrayBuffer())
+  await pool.end()
+  return bytes
+}
+
 export const makeTestDbLayer = () => {
   const migrateAndClean = Effect.gen(function* () {
     yield* runMigrations
