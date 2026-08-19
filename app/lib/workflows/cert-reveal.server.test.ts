@@ -200,3 +200,47 @@ describe("nameDeviceFromReveal", () => {
     ).toMatchObject({ named: false, reason: "unnameable" })
   })
 })
+
+describe("claimed platform capture", () => {
+  const IPHONE_UA =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+  const MAC_UA =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+
+  beforeEach(async () => {
+    await truncateAll()
+  })
+
+  it("records the claiming device's kind from the UA when naming, in its own column", async () => {
+    const { token, serial } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
+    await testRunEffect(nameDeviceFromReveal(token, "perso", IPHONE_UA) as Effect.Effect<any, unknown, never>)
+    const cert = await testRunEffect(readCert(serial!) as Effect.Effect<any, unknown, never>)
+    // The label is the user's word; the platform is the server's observation.
+    expect(cert?.label).toBe("perso")
+    expect(cert?.claimedPlatform).toBe("iPhone")
+  })
+
+  it("records the platform on reveal even when the user never names the device", async () => {
+    const { token, serial } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
+    expect(await testRunEffect(consumeReveal(token, IPHONE_UA) as Effect.Effect<any, unknown, never>)).toBe(true)
+    const cert = await testRunEffect(readCert(serial!) as Effect.Effect<any, unknown, never>)
+    expect(cert?.claimedPlatform).toBe("iPhone")
+  })
+
+  it("keeps the FIRST observation — a later visit cannot rewrite what claimed the cert", async () => {
+    const { token, serial } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
+    expect(await testRunEffect(consumeReveal(token, IPHONE_UA) as Effect.Effect<any, unknown, never>)).toBe(true)
+    // Naming later from a different browser must not overwrite the platform.
+    await testRunEffect(nameDeviceFromReveal(token, "perso", MAC_UA) as Effect.Effect<any, unknown, never>)
+    const cert = await testRunEffect(readCert(serial!) as Effect.Effect<any, unknown, never>)
+    expect(cert?.label).toBe("perso")
+    expect(cert?.claimedPlatform).toBe("iPhone")
+  })
+
+  it("stores nothing when the UA says nothing recognisable", async () => {
+    const { token, serial } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
+    await testRunEffect(nameDeviceFromReveal(token, "mystery box", "curl/8.6.0") as Effect.Effect<any, unknown, never>)
+    const cert = await testRunEffect(readCert(serial!) as Effect.Effect<any, unknown, never>)
+    expect(cert?.claimedPlatform).toBeNull()
+  })
+})

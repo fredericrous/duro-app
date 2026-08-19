@@ -10,6 +10,7 @@ import { Effect } from "effect"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { useScratchReveal } from "~/hooks/useScratchReveal"
+import { defaultDeviceName } from "~/lib/device-name"
 import { useCopyFeedback } from "~/hooks/useCopyFeedback"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
 import { Heading, Input, InputGroup, LinkButton, Stack, Text } from "@duro-app/ui"
@@ -70,7 +71,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "name") {
     const label = String(formData.get("label") ?? "")
     const result = await runEffect(
-      nameDeviceFromReveal(revealToken, label).pipe(
+      nameDeviceFromReveal(revealToken, label, request.headers.get("user-agent")).pipe(
         Effect.catchAll((e) =>
           Effect.logError("[cert-reveal] name error", { error: String(e) }).pipe(
             Effect.as({ named: false as const, reason: "unknown" as const }),
@@ -84,7 +85,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent !== "reveal") return { revealed: false as const }
 
   const consumed = await runEffect(
-    consumeReveal(revealToken).pipe(
+    consumeReveal(revealToken, request.headers.get("user-agent")).pipe(
       Effect.catchAll((e) =>
         Effect.logError("[cert-reveal] action error", { error: String(e) }).pipe(Effect.as(false)),
       ),
@@ -142,7 +143,11 @@ function PasswordCard({ password }: { password: string }) {
 function DeviceNameCard() {
   const { t } = useTranslation()
   const fetcher = useFetcher<{ named?: boolean; label?: string }>()
-  const [value, setValue] = useState("")
+  // The device opening this page IS the device being added — its own
+  // user-agent is the best default name. Always editable.
+  const [value, setValue] = useState(
+    () => (typeof navigator !== "undefined" ? defaultDeviceName(navigator.userAgent) : null) ?? "",
+  )
   const saved = fetcher.data?.named === true
   const savedLabel = fetcher.data?.label
   const submitting = fetcher.state !== "idle"

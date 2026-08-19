@@ -37,6 +37,7 @@ import m0028 from "./migrations/pg/0028_seed_catalog_info"
 import m0029 from "./migrations/pg/0029_add_theme_preference"
 import m0030 from "./migrations/pg/0030_add_cert_renewal_lineage"
 import m0031 from "./migrations/pg/0031_add_reveal_serial"
+import m0032 from "./migrations/pg/0032_add_cert_claimed_platform"
 
 const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
@@ -110,6 +111,7 @@ const migrations: Array<
   [29, "add_theme_preference", m0029],
   [30, "add_cert_renewal_lineage", m0030],
   [31, "add_reveal_serial", m0031],
+  [32, "add_cert_claimed_platform", m0032],
 ]
 
 const runMigrations = Effect.gen(function* () {

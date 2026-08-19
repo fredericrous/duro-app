@@ -232,9 +232,6 @@
       "name": "Name",
       "expiry": "Expiry"
     },
-    "deliveryPrompt": "How should the new device get its certificate?",
-    "showQr": "Show QR code",
-    "sendEmail": "Email the link to {{email}}",
     "qr": {
       "title": "Scan with the new device",
       "hint": "Point the new device’s camera at the code — it opens the certificate page directly. Nothing was emailed.",
@@ -243,7 +240,10 @@
       "copied": "Copied!",
       "copyFailed": "Copy failed — use the QR code.",
       "expiry": "The link works once and expires {{time}}.",
-      "nameHint": "You’ll name the device on that page."
+      "nameHint": "You’ll name the device on that page.",
+      "emailInstead": "Email me this link",
+      "emailing": "Sending…",
+      "emailSent": "Sent — check your inbox."
     }
   },
   "categories": {

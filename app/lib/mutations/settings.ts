@@ -3,6 +3,9 @@ import { errorMessage } from "~/lib/error-message"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
+import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
+import { EmailService } from "~/lib/services/EmailService.server"
+import { hashToken } from "~/lib/crypto.server"
 import { resendCert } from "~/lib/workflows/invite.server"
 import { supportedLngs } from "~/lib/i18n"
 import { localeCookieHeader } from "~/lib/i18n.server"
@@ -16,6 +19,7 @@ import type { AuthInfo } from "~/lib/auth.server"
 
 export type SettingsMutation =
   | { intent: "issueCert"; delivery: "email" | "link"; auth: AuthInfo }
+  | { intent: "emailRevealLink"; revealToken: string; auth: AuthInfo }
   | { intent: "renewCert"; serialNumber: string; auth: AuthInfo }
   | { intent: "revokeCert"; serialNumber: string; auth: AuthInfo }
   | { intent: "renameCert"; serialNumber: string; label: string | null; auth: AuthInfo }
@@ -74,6 +78,28 @@ function handleIssueCert(auth: AuthInfo, delivery: "email" | "link") {
       const message = errorMessage(e, "Failed to send certificate")
       return Effect.succeed({ certError: message } as SettingsResult)
     }),
+  )
+}
+
+/**
+ * Email an ALREADY-ISSUED claim link (the QR dialog's "email me this link
+ * instead"). Same token, same TTL — no second certificate, no budget spend.
+ * Ownership-checked: the reveal row must belong to the caller and be alive.
+ */
+function handleEmailRevealLink(revealToken: string, auth: AuthInfo) {
+  return Effect.gen(function* () {
+    const revealRepo = yield* CertRevealRepo
+    const emailService = yield* EmailService
+    const prefs = yield* PreferencesRepo
+    const row = yield* revealRepo.findByTokenHash(hashToken(revealToken))
+    if (!row || row.username !== auth.user || new Date(row.expiresAt) < new Date()) {
+      return { certError: "Link not found" } as SettingsResult
+    }
+    const locale = yield* prefs.getLocale(auth.user!)
+    yield* emailService.sendCertRenewalEmail(row.email, locale, revealToken)
+    return { certSent: true as const } as SettingsResult
+  }).pipe(
+    Effect.catchAll((e) => Effect.succeed({ certError: errorMessage(e, "Failed to send the link") } as SettingsResult)),
   )
 }
 
@@ -218,6 +244,8 @@ export function handleSettingsMutation(mutation: SettingsMutation) {
   switch (mutation.intent) {
     case "issueCert":
       return handleIssueCert(mutation.auth, mutation.delivery)
+    case "emailRevealLink":
+      return handleEmailRevealLink(mutation.revealToken, mutation.auth)
     case "renewCert":
       return handleRenewCert(mutation.serialNumber, mutation.auth)
     case "revokeCert":
@@ -250,6 +278,11 @@ export function parseSettingsMutation(formData: FormData, auth: AuthInfo): Setti
   if (intent === "issueCert") {
     const delivery = formData.get("delivery") === "link" ? ("link" as const) : ("email" as const)
     return { intent, delivery, auth }
+  }
+  if (intent === "emailRevealLink") {
+    const revealToken = formData.get("revealToken") as string
+    if (!revealToken) return { error: "Missing reveal token" }
+    return { intent, revealToken, auth }
   }
   if (intent === "renewCert") {
     // No label from the form — a renewal inherits the device name of the cert

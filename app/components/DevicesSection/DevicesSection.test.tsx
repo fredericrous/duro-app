@@ -18,6 +18,7 @@ const certExpiringIn = (days: number, serialNumber = "AABBCC11", over: Partial<U
     expiresAt,
     revokedAt: null,
     renewedFromSerial: null,
+    claimedPlatform: null,
     ...over,
   } as UserCertificate
 }
@@ -26,7 +27,14 @@ type SectionProps = Parameters<typeof DevicesSection>[0]
 
 // The section submits through `useFetcher`, so it needs a real data router (and
 // the ToastProvider that renderRoute mounts) — plain `render` can't host it.
-function renderSection(props: Partial<SectionProps> = {}, actionResult: unknown = { certSent: true }) {
+function renderSection(
+  props: Partial<SectionProps> = {},
+  actionResult: unknown = {
+    certLinkReady: true,
+    revealToken: "tok-1",
+    expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+  },
+) {
   return renderRoute({
     route: {
       path: "/devices",
@@ -95,11 +103,11 @@ describe("DevicesSection", () => {
     expect(screen.getAllByRole("button", { name: t("devices.newCert") })).toHaveLength(1)
   })
 
-  it("disables the header button while its own form is open, so it cannot re-trigger", async () => {
+  it("issues in ONE click — no chooser step between the button and the QR dialog", async () => {
     renderSection()
     fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
-    expect(await screen.findByRole("button", { name: t("devices.showQr") })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: t("devices.newCert") })).toBeDisabled()
+    // The very next surface is the claim dialog itself.
+    expect(await screen.findByText(t("devices.qr.title"))).toBeInTheDocument()
   })
 
   it("never renders a scratch card — the password is revealed from the email only", async () => {
@@ -108,37 +116,18 @@ describe("DevicesSection", () => {
     expect(screen.queryByRole("button", { name: t("common.scratchToReveal") })).not.toBeInTheDocument()
   })
 
-  describe("issuing a certificate", () => {
-    const EMAIL = "alice@example.com"
-    const submit = async (delivery: "email" | "link" = "email") => {
+  describe("issuing a certificate (one click)", () => {
+    const submit = async () => {
       fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
-      const name = delivery === "link" ? t("devices.showQr") : t("devices.sendEmail").replace("{{email}}", EMAIL)
-      fireEvent.click(await screen.findByRole("button", { name }))
     }
 
-    it("closes the confirm form and points the user at their email", async () => {
-      renderSection()
-      await submit()
-      // The toast auto-dismisses, so the "check your email" pointer also
-      // persists inline, next to the button that produced it.
-      expect(await screen.findByText(t("devices.success"))).toBeInTheDocument()
-      expect(screen.queryByRole("button", { name: t("devices.showQr") })).not.toBeInTheDocument()
-      expect(screen.queryByRole("button", { name: t("common.cancel") })).not.toBeInTheDocument()
-    })
-
-    it("toasts the success where the user is looking", async () => {
-      renderSection()
-      await submit()
-      const toast = await waitFor(() => screen.getByRole("status"))
-      expect(toast).toHaveTextContent(t("devices.success"))
-    })
-
-    it("surfaces a failure without closing the form", async () => {
+    it("surfaces a failure inline, next to the button that produced it", async () => {
       renderSection({}, { certError: "Vault unreachable" })
       await submit()
       const toast = await waitFor(() => screen.getByRole("alert"))
       expect(toast).toHaveTextContent("Vault unreachable")
-      expect(screen.getByRole("button", { name: t("devices.showQr") })).toBeInTheDocument()
+      // ...and no claim dialog opens on failure.
+      expect(screen.queryByText(t("devices.qr.title"))).not.toBeInTheDocument()
     })
   })
 
@@ -170,7 +159,9 @@ describe("DevicesSection", () => {
 
   describe("renewing a device", () => {
     it("submits and points the user at their email", async () => {
-      renderSection({ certificates: [certExpiringIn(5, "RENEWME1")] })
+      // Renewals still deliver by email — only the header's new-device flow
+      // switched to the QR link.
+      renderSection({ certificates: [certExpiringIn(5, "RENEWME1")] }, { certSent: true })
       fireEvent.click(await screen.findByRole("button", { name: t("devices.renew") }))
       const toast = await waitFor(() => screen.getByRole("status"))
       expect(toast).toHaveTextContent(t("devices.success"))
@@ -219,24 +210,64 @@ describe("DevicesSection", () => {
 })
 
 describe("the QR claim-link flow", () => {
-  it("opens the QR dialog with the claim link when delivery is link", async () => {
-    renderSection(
-      {},
-      { certLinkReady: true, revealToken: "tok-qr-1", expiresAt: new Date(Date.now() + 86_400_000).toISOString() },
-    )
+  it("opens the QR dialog directly after the click", async () => {
+    renderSection()
     fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
-    fireEvent.click(await screen.findByRole("button", { name: t("devices.showQr") }))
     expect(await screen.findByText(t("devices.qr.title"))).toBeInTheDocument()
     // the QR encodes the claim URL for the token
     expect(screen.getByRole("img", { name: t("devices.qr.alt") })).toBeInTheDocument()
     // and the user is told naming happens on the claim page
     expect(screen.getByText(t("devices.qr.nameHint"))).toBeInTheDocument()
+    // the email fallback lives INSIDE the dialog — same token, no second cert
+    expect(screen.getByRole("button", { name: t("devices.qr.emailInstead") })).toBeInTheDocument()
   })
 
-  it("the add form offers no name field — naming moved to the claim page", async () => {
+  it("emails the SAME link from inside the dialog and confirms the send", async () => {
+    // The action answers per intent: issue → link payload, emailRevealLink → sent.
+    renderRoute({
+      route: {
+        path: "/devices",
+        Component: () => <DevicesSection email="alice@example.com" lastCertRenewalAt={null} certificates={[]} />,
+        loader: () => null,
+        action: async ({ request }) => {
+          const fd = await request.formData()
+          if (fd.get("intent") === "emailRevealLink") {
+            // proves the dialog posts the token it is showing, not a new issue
+            expect(fd.get("revealToken")).toBe("tok-1")
+            return { certSent: true }
+          }
+          return {
+            certLinkReady: true,
+            revealToken: "tok-1",
+            expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+          }
+        },
+      },
+      url: "/devices",
+    })
+    fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
+    fireEvent.click(await screen.findByRole("button", { name: t("devices.qr.emailInstead") }))
+    expect(await screen.findByRole("button", { name: t("devices.qr.emailSent") })).toBeDisabled()
+  })
+
+  it("offers no name field anywhere — naming moved to the claim page", async () => {
     renderSection()
     fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
-    await screen.findByRole("button", { name: t("devices.showQr") })
+    await screen.findByText(t("devices.qr.title"))
     expect(screen.queryByPlaceholderText(t("devices.devicePlaceholder"))).not.toBeInTheDocument()
+  })
+})
+
+describe("the claimed-platform column", () => {
+  it("shows the UA-observed device kind next to a custom label", async () => {
+    renderSection({ certificates: [certExpiringIn(60, "PLATFRM1", { label: "perso", claimedPlatform: "iPhone" })] })
+    await screen.findByText("perso")
+    expect(screen.getByText("iPhone")).toBeInTheDocument()
+  })
+
+  it("does not repeat the platform when it IS the label", async () => {
+    renderSection({ certificates: [certExpiringIn(60, "PLATFRM2", { label: "iPhone", claimedPlatform: "iPhone" })] })
+    await screen.findByText("iPhone")
+    expect(screen.getAllByText("iPhone")).toHaveLength(1)
   })
 })

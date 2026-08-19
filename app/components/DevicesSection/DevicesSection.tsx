@@ -87,6 +87,14 @@ function ClaimLinkDialog({
   const { t } = useTranslation()
   const { formatDateTime } = useDisplayFormat()
   const { copied, copyFailed, copy } = useCopyFeedback()
+  // "Email me this link instead" — the SAME token goes out by mail; no second
+  // certificate is minted and the per-user budget is untouched.
+  const emailFetcher = useFetcher<SettingsResult>()
+  // The dialog swallows the page behind it, so the send outcome (success or
+  // "link not found") has to be announced from here.
+  useFetcherToast(emailFetcher, { render: (d) => certToast(d, t) })
+  const emailing = emailFetcher.state !== "idle"
+  const emailed = emailFetcher.data != null && "certSent" in emailFetcher.data
   const claimUrl =
     revealToken !== null && typeof window !== "undefined" ? `${window.location.origin}/cert/${revealToken}` : ""
 
@@ -110,6 +118,21 @@ function ClaimLinkDialog({
             <Inline gap="sm" align="center">
               <Button variant="secondary" size="small" onClick={() => copy(claimUrl)}>
                 {copyFailed ? t("devices.qr.copyFailed") : copied ? t("devices.qr.copied") : t("devices.qr.copyLink")}
+              </Button>
+              <Button
+                variant="secondary"
+                size="small"
+                disabled={emailing || emailed || revealToken === null}
+                onClick={() => {
+                  if (revealToken !== null)
+                    emailFetcher.submit({ intent: "emailRevealLink", revealToken }, { method: "post", action: API_URL })
+                }}
+              >
+                {emailed
+                  ? t("devices.qr.emailSent")
+                  : emailing
+                    ? t("devices.qr.emailing")
+                    : t("devices.qr.emailInstead")}
               </Button>
             </Inline>
             <Text as="p" variant="bodySm" color="muted">
@@ -314,6 +337,14 @@ function DeviceRow({ cert, certificates }: { cert: UserCertificate; certificates
                 {t("devices.list.unnamed")}
               </Text>
             )}
+            {/* UA-observed device kind, captured at claim time in its own
+                column — survives renames, so "perso" is still knowably an
+                iPhone. Hidden when it would just repeat the label. */}
+            {cert.claimedPlatform && cert.claimedPlatform !== label && (
+              <Text as="span" variant="bodySm" color="muted">
+                {cert.claimedPlatform}
+              </Text>
+            )}
             <Button type="button" variant="link" size="small" onClick={() => setRenaming(true)}>
               {t("devices.list.rename")}
             </Button>
@@ -380,7 +411,6 @@ export function DevicesSection({
   const { formatDateTime } = useDisplayFormat()
   const fetcher = useFetcher<SettingsResult>()
   useFetcherToast(fetcher, { render: (d) => certToast(d, t) })
-  const [confirming, setConfirming] = useState(false)
   const [sort, setSort] = useState<DeviceSort>("name")
 
   const result = fetcher.data
@@ -399,11 +429,7 @@ export function DevicesSection({
   const [linkDismissed, setLinkDismissed] = useState(false)
   if (result !== handledResult) {
     setHandledResult(result)
-    if (justSent) setConfirming(false)
-    if (linkReady) {
-      setConfirming(false)
-      setLinkDismissed(false)
-    }
+    if (linkReady) setLinkDismissed(false)
   }
 
   // Rate limit check — derived per render (module-level helper, same pattern
@@ -424,8 +450,15 @@ export function DevicesSection({
       // section header where it is always in the same place — not under a list
       // whose length varies, where it drifts off-screen as devices accumulate.
       action={
-        <Button variant="primary" disabled={cooldownRemaining || confirming} onClick={() => setConfirming(true)}>
-          {t("devices.newCert")}
+        // ONE click: issuing is the whole point of the button, so it issues —
+        // the QR dialog that follows is the confirmation surface (and offers
+        // "email me this link" for the same token). Cooldown still gates it.
+        <Button
+          variant="primary"
+          disabled={cooldownRemaining || isSubmitting}
+          onClick={() => fetcher.submit({ intent: "issueCert", delivery: "link" }, { method: "post", action: API_URL })}
+        >
+          {isSubmitting ? t("devices.issuing") : t("devices.newCert")}
         </Button>
       }
     >
@@ -445,35 +478,6 @@ export function DevicesSection({
           <Text as="p" variant="bodySm" color="muted">
             {t("devices.nextAvailable", { time: nextAvailableText })}
           </Text>
-        )}
-
-        {confirming && !cooldownRemaining && (
-          <Stack gap="sm">
-            {/* No name field here: the device names itself on the claim page,
-                so the QR scan and the email link go through the same steps. */}
-            <Text as="p">{t("devices.deliveryPrompt")}</Text>
-            {/* Two forms because the DS Button forwards no name/value: each
-                delivery is its own form with the choice in a hidden field. */}
-            <Inline gap="sm">
-              <fetcher.Form method="post" action={API_URL}>
-                <html.input type="hidden" name="intent" value="issueCert" />
-                <html.input type="hidden" name="delivery" value="link" />
-                <Button type="submit" variant="primary" disabled={isSubmitting}>
-                  {isSubmitting ? t("devices.issuing") : t("devices.showQr")}
-                </Button>
-              </fetcher.Form>
-              <fetcher.Form method="post" action={API_URL}>
-                <html.input type="hidden" name="intent" value="issueCert" />
-                <html.input type="hidden" name="delivery" value="email" />
-                <Button type="submit" variant="secondary" disabled={isSubmitting}>
-                  {t("devices.sendEmail", { email })}
-                </Button>
-              </fetcher.Form>
-              <Button type="button" variant="secondary" onClick={() => setConfirming(false)}>
-                {t("common.cancel")}
-              </Button>
-            </Inline>
-          </Stack>
         )}
 
         <ClaimLinkDialog

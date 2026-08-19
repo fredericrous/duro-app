@@ -221,6 +221,7 @@ const mockCertificateRepo = () =>
   Layer.succeed(CertificateRepo, {
     store: () => Effect.void,
     setLabel: () => Effect.succeed(1),
+    setClaimedPlatform: () => Effect.void,
     listValid: () => Effect.succeed([]),
     listUnrevoked: () => Effect.succeed([]),
     findLatestRenewalOf: () => Effect.succeed(null),

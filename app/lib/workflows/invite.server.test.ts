@@ -323,6 +323,7 @@ const mockCertificateRepo = (calls: { method: string; args: unknown[] }[] = []) 
       return Effect.void
     },
     setLabel: (_serial, _username, _label) => Effect.succeed(1),
+    setClaimedPlatform: () => Effect.void,
     listValid: () => Effect.succeed([]),
     listUnrevoked: () => Effect.succeed([]),
     findLatestRenewalOf: () => Effect.succeed(null),
@@ -856,6 +857,7 @@ describe("audit emissions", () => {
     const certRepoWithSerial = Layer.succeed(CertificateRepo, {
       store: () => Effect.void,
       setLabel: () => Effect.succeed(1),
+      setClaimedPlatform: () => Effect.void,
       listValid: () => Effect.succeed([]),
       listAllByUsernames: () => Effect.succeed({}),
       findBySerial: () => Effect.succeed(null),

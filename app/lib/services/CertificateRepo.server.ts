@@ -16,6 +16,9 @@ export interface UserCertificate {
   email: string
   /** User-supplied device name; null until set (shown as "Unnamed device"). */
   label: string | null
+  /** UA-derived device kind captured at claim time (e.g. "iPhone", "Mac").
+   *  Survives renames — the label is the pet name, this is what it IS. */
+  claimedPlatform: string | null
   serialNumber: string
   issuedAt: string
   expiresAt: string
@@ -56,6 +59,11 @@ export class CertificateRepo extends Context.Tag("CertificateRepo")<
   {
     readonly store: (cert: StoreCertInput) => Effect.Effect<void, CertificateRepoError>
     /** Set/clear a cert's device label. Ownership-enforced. Returns affected row count. */
+    /** Record the claiming device's kind, once — set-if-null so a later page
+     *  reload can't overwrite what the first claim observed. Token-authed
+     *  callers scope by serial (no username check: the reveal row is the
+     *  authority on ownership). */
+    readonly setClaimedPlatform: (serialNumber: string, platform: string) => Effect.Effect<void, CertificateRepoError>
     readonly setLabel: (
       serialNumber: string,
       username: string,
@@ -101,6 +109,7 @@ const toRow = (r: any): UserCertificate => ({
   username: r.username,
   email: r.email,
   label: r.label ?? null,
+  claimedPlatform: r.claimedPlatform ?? null,
   serialNumber: r.serialNumber,
   issuedAt: r.issuedAt,
   expiresAt: r.expiresAt,
@@ -137,6 +146,15 @@ export const CertificateRepoLive = Layer.effect(
           "Failed to store certificate",
         )
       },
+
+      setClaimedPlatform: (serialNumber: string, platform: string) =>
+        withErr(
+          // Set-if-null: the first claim observation wins; reloads and later
+          // visits to the claim page can't rewrite history.
+          sql`UPDATE user_certificates SET claimed_platform = ${platform}
+              WHERE serial_number = ${serialNumber} AND claimed_platform IS NULL`.pipe(Effect.asVoid),
+          "Failed to set certificate claimed platform",
+        ),
 
       setLabel: (serialNumber: string, username: string, label: string | null) =>
         withErr(

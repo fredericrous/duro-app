@@ -4,6 +4,24 @@ import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { hashToken } from "~/lib/crypto.server"
 import { revokeSupersededCert } from "~/lib/workflows/cert-revocation.server"
+import { defaultDeviceName } from "~/lib/device-name"
+
+/**
+ * Persist what KIND of device is claiming the cert, derived from the claim
+ * request's User-Agent — the browser opening this page IS the new device, so
+ * the server-observed header is more trustworthy than any client-sent field.
+ * Stored in its own column, separate from the user-editable label: renaming
+ * "iPhone" to "perso" must not erase the fact that it is an iPhone.
+ * Best-effort and set-if-null; older reveal rows without a serial are skipped.
+ */
+const recordClaimedPlatform = (row: { serialNumber: string | null }, userAgent: string | null | undefined) =>
+  Effect.gen(function* () {
+    if (!row.serialNumber || !userAgent) return
+    const platform = defaultDeviceName(userAgent)
+    if (!platform) return
+    const certRepo = yield* CertificateRepo
+    yield* certRepo.setClaimedPlatform(row.serialNumber, platform)
+  })
 
 /**
  * Resolve the reveal token to its current state. Shared by the loader, action
@@ -38,7 +56,7 @@ export const resolveReveal = (revealToken: string) =>
  *
  * Returns whether the password was handed out.
  */
-export const consumeReveal = (revealToken: string) =>
+export const consumeReveal = (revealToken: string, userAgent?: string | null) =>
   Effect.gen(function* () {
     const revealRepo = yield* CertRevealRepo
     const cert = yield* CertManager
@@ -46,6 +64,7 @@ export const consumeReveal = (revealToken: string) =>
     if (result.state !== "ok") return false
     yield* revealRepo.markRevealed(result.row.id)
     yield* cert.consumeP12Password(result.row.renewalId)
+    yield* recordClaimedPlatform(result.row, userAgent)
     if (result.row.renewedFromSerial) {
       yield* revokeSupersededCert(result.row.renewedFromSerial, result.row.username)
     }
@@ -62,7 +81,7 @@ export const consumeReveal = (revealToken: string) =>
  *
  * The label passes the same trim/cap rules as the /devices rename.
  */
-export const nameDeviceFromReveal = (revealToken: string, rawLabel: string) =>
+export const nameDeviceFromReveal = (revealToken: string, rawLabel: string, userAgent?: string | null) =>
   Effect.gen(function* () {
     const certRepo = yield* CertificateRepo
     const result = yield* resolveReveal(revealToken)
@@ -76,5 +95,6 @@ export const nameDeviceFromReveal = (revealToken: string, rawLabel: string) =>
     if (label === "") return { named: false as const, reason: "empty" as const }
     const affected = yield* certRepo.setLabel(result.row.serialNumber, result.row.username, label)
     if (affected === 0) return { named: false as const, reason: "missing" as const }
+    yield* recordClaimedPlatform(result.row, userAgent)
     return { named: true as const, label }
   })

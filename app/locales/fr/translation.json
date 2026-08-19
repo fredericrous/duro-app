@@ -232,9 +232,6 @@
       "name": "Nom",
       "expiry": "Expiration"
     },
-    "deliveryPrompt": "Comment le nouvel appareil doit-il recevoir son certificat ?",
-    "showQr": "Afficher le QR code",
-    "sendEmail": "Envoyer le lien à {{email}}",
     "qr": {
       "title": "Scannez avec le nouvel appareil",
       "hint": "Pointez l’appareil photo du nouvel appareil vers le code — la page du certificat s’ouvre directement. Aucun e-mail n’a été envoyé.",
@@ -243,7 +240,10 @@
       "copied": "Copié !",
       "copyFailed": "Échec de la copie — utilisez le QR code.",
       "expiry": "Le lien fonctionne une seule fois et expire {{time}}.",
-      "nameHint": "Vous nommerez l’appareil sur cette page."
+      "nameHint": "Vous nommerez l’appareil sur cette page.",
+      "emailInstead": "M’envoyer ce lien par e-mail",
+      "emailing": "Envoi…",
+      "emailSent": "Envoyé — consultez votre boîte mail."
     }
   },
   "categories": {
