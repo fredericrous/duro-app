@@ -9,7 +9,7 @@ vi.mock("~/lib/config.server", () => ({
 // shim that fires onReveal — same pattern as InvitePasswordReveal.test.tsx.
 vi.mock("~/components/ScratchCard/ScratchCard", () => ({
   ScratchCard: ({ children, onReveal }: { children: React.ReactNode; onReveal: () => void }) => (
-    <div data-testid="scratch-card" onClick={onReveal}>
+    <div role="button" aria-label="scratch to reveal" onClick={onReveal}>
       {children}
     </div>
   ),
@@ -178,7 +178,7 @@ describe("CertRevealPage component", () => {
     // PasswordCard renders with the password pre-filled in the scratch-hidden
     // input and the copy addon present.
     expect(screen.getByDisplayValue("s3cret-pw")).toBeInTheDocument()
-    expect(screen.getByTestId("scratch-card")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "scratch to reveal" })).toBeInTheDocument()
     expect(screen.getByText(t("invite.password.copy"))).toBeInTheDocument()
     expect(screen.getByText(t("invite.password.oneTime"))).toBeInTheDocument()
     expect(screen.getByRole("link", { name: t("certReveal.download") })).toHaveAttribute("href", "/cert/tok/download")
@@ -204,7 +204,7 @@ describe("CertRevealPage component", () => {
     })
 
     await screen.findByDisplayValue("s3cret-pw")
-    fireEvent.click(screen.getByTestId("scratch-card"))
+    fireEvent.click(screen.getByRole("button", { name: "scratch to reveal" }))
 
     // The reveal POST ran and the loader re-ran with the password already burned.
     await waitFor(() => expect(loaderCalls).toBeGreaterThan(1))

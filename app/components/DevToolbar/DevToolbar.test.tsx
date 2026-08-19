@@ -5,7 +5,11 @@ import { DevToolbar, useDevOverrides } from "./DevToolbar"
 
 function OverridesConsumer() {
   const overrides = useDevOverrides()
-  return <span data-testid="cert">{String(overrides?.certInstalled ?? "null")}</span>
+  return (
+    <span role="status" aria-label="cert override">
+      {String(overrides?.certInstalled ?? "null")}
+    </span>
+  )
 }
 
 describe("DevToolbar", () => {
@@ -37,15 +41,15 @@ describe("DevToolbar", () => {
       </DevToolbar>,
     )
 
-    expect(screen.getByTestId("cert")).toHaveTextContent("false")
+    expect(screen.getByRole("status", { name: "cert override" })).toHaveTextContent("false")
 
     await user.click(screen.getByRole("switch"))
 
-    expect(screen.getByTestId("cert")).toHaveTextContent("true")
+    expect(screen.getByRole("status", { name: "cert override" })).toHaveTextContent("true")
   })
 
   it("useDevOverrides returns null outside provider", () => {
     render(<OverridesConsumer />)
-    expect(screen.getByTestId("cert")).toHaveTextContent("null")
+    expect(screen.getByRole("status", { name: "cert override" })).toHaveTextContent("null")
   })
 })

@@ -5,7 +5,7 @@ import en from "~/locales/en/translation.json"
 
 vi.mock("~/components/ScratchCard/ScratchCard", () => ({
   ScratchCard: ({ children, onReveal }: { children: React.ReactNode; onReveal: () => void }) => (
-    <div data-testid="scratch-card" onClick={onReveal}>
+    <div role="button" aria-label="scratch to reveal" onClick={onReveal}>
       {children}
     </div>
   ),
@@ -41,7 +41,7 @@ describe("InvitePasswordReveal", () => {
     const user = userEvent.setup()
     render(<InvitePasswordReveal p12Password="s3cret" />)
 
-    await user.click(screen.getByTestId("scratch-card"))
+    await user.click(screen.getByRole("button", { name: "scratch to reveal" }))
 
     const copyBtn = screen.getByRole("button", { name: en.invite.password.copy })
     expect(copyBtn).toBeEnabled()
@@ -51,7 +51,7 @@ describe("InvitePasswordReveal", () => {
   it("copies password and shows copied text", async () => {
     const user = userEvent.setup()
     render(<InvitePasswordReveal p12Password="s3cret" />)
-    await user.click(screen.getByTestId("scratch-card"))
+    await user.click(screen.getByRole("button", { name: "scratch to reveal" }))
 
     fireEvent.click(screen.getByRole("button", { name: en.invite.password.copy }))
 
@@ -66,7 +66,7 @@ describe("InvitePasswordReveal", () => {
     render(<InvitePasswordReveal p12Password="s3cret" />)
 
     // Use fireEvent (synchronous) to avoid userEvent's internal timers conflicting with fake timers
-    fireEvent.click(screen.getByTestId("scratch-card"))
+    fireEvent.click(screen.getByRole("button", { name: "scratch to reveal" }))
     fireEvent.click(screen.getByRole("button", { name: en.invite.password.copy }))
 
     expect(await screen.findByRole("button", { name: en.invite.password.copied })).toBeInTheDocument()
