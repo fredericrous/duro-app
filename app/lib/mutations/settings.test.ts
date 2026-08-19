@@ -263,9 +263,12 @@ describe("handleSettingsMutation — renewCert", () => {
       handleSettingsMutation({ intent: "issueCert", delivery: "link", auth }) as Effect.Effect<unknown, unknown, never>,
     )
     expect(result).toMatchObject({ certLinkReady: true })
-    const r = result as { revealToken: string; expiresAt: string }
+    const r = result as { revealToken: string; expiresAt: string; claimUrl: string }
     expect(r.revealToken.length).toBeGreaterThan(20)
     expect(new Date(r.expiresAt).getTime()).toBeGreaterThan(Date.now())
+    // The claim URL rides the public (join) edge the email uses — never the
+    // mTLS-gated host the admin happens to be browsing.
+    expect(r.claimUrl).toBe(`https://join.daddyshome.fr/cert/${r.revealToken}`)
     // the QR flow spends the same per-user budget as the email flow
     expect(await lastCertRenewalAt()).not.toBeNull()
   })

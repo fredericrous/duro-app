@@ -6,6 +6,7 @@ import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 import { EmailService } from "~/lib/services/EmailService.server"
 import { hashToken } from "~/lib/crypto.server"
+import { config } from "~/lib/config.server"
 import { resendCert } from "~/lib/workflows/invite.server"
 import { supportedLngs } from "~/lib/i18n"
 import { localeCookieHeader } from "~/lib/i18n.server"
@@ -29,7 +30,7 @@ export type SettingsMutation =
 
 export type SettingsResult =
   | { certSent: true }
-  | { certLinkReady: true; revealToken: string; expiresAt: string }
+  | { certLinkReady: true; revealToken: string; expiresAt: string; claimUrl: string }
   | { certError: string }
   | { rateLimited: true; nextAvailable: string }
   | { certRevoked: true }
@@ -70,6 +71,11 @@ function handleIssueCert(auth: AuthInfo, delivery: "email" | "link") {
         certLinkReady: true as const,
         revealToken: result.reveal.token,
         expiresAt: result.reveal.expiresAt,
+        // Built server-side from the same base the renewal email uses: the
+        // claim link must ride the public (join) edge — the page origin is
+        // the mTLS-gated home host, which a cert-less new device cannot even
+        // TLS-handshake with.
+        claimUrl: `${config.inviteBaseUrl}/cert/${result.reveal.token}`,
       }
     }
     return { certSent: true as const }
