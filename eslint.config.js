@@ -1,39 +1,16 @@
-import js from "@eslint/js"
-import tseslint from "typescript-eslint"
-import reactHooks from "eslint-plugin-react-hooks"
-import effect from "@effect/eslint-plugin"
-import duro from "@duro-app/eslint-plugin"
-import prettier from "eslint-config-prettier"
+import { react, effect, tests } from "@duro-app/eslint-config"
 
-export default tseslint.config(
+export default [
   { ignores: ["build/**", ".react-router/**"] },
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
-  reactHooks.configs.flat.recommended,
+  // Shared duro-stack presets: base TS conventions + react-hooks + the duro
+  // plugin + UI-library policy (react), Effect server policy (effect), and
+  // accessibility-first test selectors (tests, self-scoped to test files).
+  ...react,
+  ...effect,
+  ...tests,
   {
-    plugins: { "@effect": effect },
-    rules: {
-      "@typescript-eslint/no-unused-vars": [
-        "warn",
-        { argsIgnorePattern: "^_", destructuredArrayIgnorePattern: "^_", varsIgnorePattern: "^_" },
-      ],
-      "@typescript-eslint/no-explicit-any": "off",
-      "@effect/no-import-from-barrel-package": "warn",
-    },
-  },
-  {
-    ...duro.configs.recommended,
     files: ["app/**/*.{ts,tsx}"],
-    // Tests render throwaway DOM fixtures and route/component mocks; email
-    // templates are @react-email/@duro-app/ui-email, where react-strict-dom
-    // does not run at all. Neither ships design-system UI.
-    ignores: ["app/**/*.test.{ts,tsx}", "app/lib/emails/**"],
-    languageOptions: {
-      parser: tseslint.parser,
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
     rules: {
-      ...duro.configs.recommended.rules,
       "duro/no-raw-html-element": [
         "error",
         {
@@ -57,5 +34,19 @@ export default tseslint.config(
       ],
     },
   },
-  prettier,
-)
+  {
+    // Tests render throwaway DOM fixtures and route/component mocks; email
+    // templates are @react-email/@duro-app/ui-email, where react-strict-dom
+    // does not run at all. Neither ships design-system UI, so the duro
+    // rules don't apply (the import policy above still does).
+    files: ["app/**/*.test.{ts,tsx}", "app/lib/emails/**"],
+    rules: {
+      "duro/no-raw-html-element": "off",
+      "duro/prefer-ds-form-components": "off",
+      "duro/no-deprecated-table-parts": "off",
+      "duro/no-raw-design-values": "off",
+      "duro/no-flex-grow-web": "off",
+      "duro/no-tokens-barrel-import": "off",
+    },
+  },
+]

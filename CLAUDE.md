@@ -13,10 +13,14 @@ Then: `npx @duro-app/cli <Component>` (props+usage) ·
 free text (e.g. `npx @duro-app/cli "tags that wrap"`) searches usage metadata.
 MCP server: `claude mcp add duro -- npx -y -p @duro-app/cli -p @modelcontextprotocol/sdk duro mcp`
 
-Lint: `@duro-app/eslint-plugin` (`duro.configs.recommended`, wired into
-`eslint.config.js` over `app/**`) enforces the critical rules (html.\* elements,
-deep token imports, no deprecated Table parts; warns on raw px/hex with token
-equivalents).
+Lint: `@duro-app/eslint-config` (shared duro-stack flat config — `react` +
+`effect` + `tests` presets) enforces the critical rules (html.\* elements,
+deep token imports, form kit over bare `html.input`, no deprecated Table
+parts; warns on raw px/hex with token equivalents and on `flexGrow` in
+`css.create`), the UI-library policy (`@duro-app/ui` only; `@effect/sql`
+not Kysely; `@effect/opentelemetry` via subpath), and accessibility-first
+test selectors (no `getByTestId`). Errors gate at commit (amont) and CI;
+warnings inform — severity is the gate, never `--max-warnings`.
 
 v1 notes: Icon/StatusIcon `size` is a token (`sm|md|lg|xl|xxl` = 16/18/24/36/48px);
 Dialog/Drawer/DetailPanel `closeAnimationDuration` is a motion token
