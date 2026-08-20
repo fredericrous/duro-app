@@ -2,7 +2,6 @@ import { Effect } from "effect"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
-import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { hashToken } from "~/lib/crypto.server"
 import { revokeSupersededCert } from "~/lib/workflows/cert-revocation.server"
 import { defaultDeviceName } from "~/lib/device-name"
@@ -170,32 +169,4 @@ export const reissueClaimLink = (username: string) =>
       serialNumber: row.serialNumber,
     })
     return { token, expiresAt: new Date(row.expiresAt).toISOString() }
-  })
-
-/**
- * Give the daily new-device budget back when the certificate that SPENT it is
- * revoked — an undo of today's issuance, not a general revoke-one-get-one.
- *
- * The distinction is the whole security argument: refunding any revocation
- * would let anyone holding a session trade a pile of stale devices for a pile
- * of fresh 90-day credentials. Scoped this way the user can churn (issue,
- * revoke, issue) but never accumulate, because each new certificate costs
- * them the previous one.
- *
- * Callers MUST only reach here once the revocation actually completed:
- * refunding a FAILED revocation would hand back the budget while the
- * certificate still works.
- */
-export const refundBudgetIfSpentOn = (serialNumber: string, username: string) =>
-  Effect.gen(function* () {
-    const revealRepo = yield* CertRevealRepo
-    const prefs = yield* PreferencesRepo
-    const { renewalId } = yield* prefs.getLastCertRenewal(username)
-    if (!renewalId) return false
-    const row = yield* revealRepo.findBySerial(serialNumber)
-    // No reveal row (certs predating the serial column) or a different
-    // renewal → this is not the cert that spent the budget. Leave it spent.
-    if (!row || row.username !== username || row.renewalId !== renewalId) return false
-    yield* prefs.clearCertRenewal(username)
-    return true
   })

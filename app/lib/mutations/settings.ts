@@ -8,7 +8,8 @@ import { EmailService } from "~/lib/services/EmailService.server"
 import { hashToken } from "~/lib/crypto.server"
 import { config } from "~/lib/config.server"
 import { resendCert } from "~/lib/workflows/invite.server"
-import { refundBudgetIfSpentOn, reissueClaimLink } from "~/lib/workflows/cert-reveal.server"
+import { reissueClaimLink } from "~/lib/workflows/cert-reveal.server"
+import { deviceBudget } from "~/lib/workflows/device-budget.server"
 import { supportedLngs } from "~/lib/i18n"
 import { localeCookieHeader } from "~/lib/i18n.server"
 import { isThemePreference, themeCookieHeader } from "~/lib/theme.server"
@@ -50,23 +51,15 @@ function handleIssueCert(auth: AuthInfo, delivery: "email" | "link") {
       return { certError: "No email associated with your account." } as SettingsResult
     }
 
-    const prefs = yield* PreferencesRepo
-    const { lastCertRenewal } = { lastCertRenewal: yield* prefs.getLastCertRenewal(auth.user!) }
-
-    if (lastCertRenewal.at) {
-      const elapsed = Date.now() - lastCertRenewal.at.getTime()
-      const twentyFourHours = 24 * 60 * 60 * 1000
-      if (elapsed < twentyFourHours) {
-        const nextAvailable = new Date(lastCertRenewal.at.getTime() + twentyFourHours).toISOString()
-        return { rateLimited: true as const, nextAvailable }
-      }
+    // The budget is the certificates themselves — see ~/lib/device-budget.
+    const budget = yield* deviceBudget(auth.user!)
+    if (budget.used >= budget.limit && budget.nextAvailable) {
+      return { rateLimited: true as const, nextAvailable: budget.nextAvailable }
     }
 
     // No label here: the device names itself on the claim page (/cert/:token),
     // so the QR and email flows stay identical after this point.
     const result = yield* resendCert(auth.email, auth.user!, { delivery })
-
-    yield* prefs.setCertRenewal(auth.user!, result.renewalId)
 
     if (result.reveal) {
       return {
@@ -209,10 +202,8 @@ function handleRevokeCert(serialNumber: string, auth: AuthInfo) {
         certRepo.markRevokeFailed(serialNumber, String(e)).pipe(Effect.catchAll(() => Effect.void)),
       ),
     )
-    // Only past this point — the revocation COMPLETED. Refunding a failed one
-    // would return the budget while the certificate still works. Best-effort:
-    // a bookkeeping hiccup must not turn a successful revoke into an error.
-    yield* refundBudgetIfSpentOn(serialNumber, auth.user!).pipe(Effect.catchAll(() => Effect.succeed(false)))
+    // No budget bookkeeping to undo: the revoked cert simply stops counting
+    // toward the rolling window, which frees its slot immediately.
     return { certRevoked: true as const } as SettingsResult
   }).pipe(
     Effect.catchAll((e) => {

@@ -3,6 +3,7 @@ import { css, html } from "react-strict-dom"
 import { useTranslation } from "react-i18next"
 import { useFetcher } from "react-router"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
+import { NEW_DEVICE_LIMIT, type DeviceBudget } from "~/lib/device-budget"
 import type { SettingsResult } from "~/lib/mutations/settings"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 import { useDisplayFormat } from "~/hooks/useDisplayFormat"
@@ -28,23 +29,6 @@ import {
   Tooltip,
   type ToastOptions,
 } from "@duro-app/ui"
-
-/**
- * 24h cooldown on issuing a certificate for a NEW device, derived from the wall
- * clock at call time (module level, like expiryStatus, so components stay
- * compiler-pure and a lapsed cooldown unlocks on the next render without a
- * remount). Renewals are rate-limited per certificate instead — see
- * renewalCooldownUntil.
- */
-function cooldownState(
-  lastCertRenewalAt: string | null | undefined,
-): { inCooldown: true; cooldownEndsAt: number } | { inCooldown: false } {
-  const twentyFourHours = 24 * 60 * 60 * 1000
-  const cooldownEndsAt = lastCertRenewalAt ? new Date(lastCertRenewalAt).getTime() + twentyFourHours : null
-  return cooldownEndsAt !== null && Date.now() < cooldownEndsAt
-    ? { inCooldown: true, cooldownEndsAt }
-    : { inCooldown: false }
-}
 
 /**
  * Toast copy for a settled cert mutation. The list can be long enough that a
@@ -93,7 +77,7 @@ const styles = css.create({
 type ClaimState =
   | { kind: "pending" }
   | { kind: "ready"; revealToken: string; expiresAt: string; claimUrl: string }
-  | { kind: "cooldown"; nextAvailable: string | number }
+  | { kind: "cooldown"; nextAvailable: string }
   | { kind: "error"; message: string }
 
 /**
@@ -145,7 +129,12 @@ function ClaimLinkDialog({
         <Dialog.Body>
           {state?.kind === "cooldown" && (
             <Stack gap="md">
-              <Text as="p">{t("devices.qr.cooldownBody", { time: formatDateTime(state.nextAvailable) })}</Text>
+              <Text as="p">
+                {t("devices.qr.cooldownBody", {
+                  time: formatDateTime(state.nextAvailable),
+                  limit: NEW_DEVICE_LIMIT,
+                })}
+              </Text>
             </Stack>
           )}
 
@@ -470,11 +459,12 @@ function DeviceRow({ cert, certificates }: { cert: UserCertificate; certificates
 }
 
 export function DevicesSection({
-  lastCertRenewalAt,
+  budget,
   certificates,
   pendingClaim = null,
 }: {
-  lastCertRenewalAt: string | null
+  /** Live new-device slots — see ~/lib/device-budget. */
+  budget: DeviceBudget
   certificates: UserCertificate[]
   /** A device setup still waiting to be claimed — expiry only; the link
    *  itself is fetched by an explicit POST, never served in loader data. */
@@ -497,7 +487,7 @@ export function DevicesSection({
   // already-open QR dialog into "come back tomorrow".
   const [session, setSession] = useState<{
     staleData: SettingsResult | undefined
-    blockedUntil: number | null
+    blockedUntil: string | null
   } | null>(null)
 
   const issue = () => {
@@ -509,9 +499,9 @@ export function DevicesSection({
   // cooldown here rather than at render time keeps it honest to the moment of
   // the click without re-rendering on a timer.
   const openClaimDialog = () => {
-    const cd = cooldownState(lastCertRenewalAt)
-    setSession({ staleData: fetcher.data, blockedUntil: cd.inCooldown ? cd.cooldownEndsAt : null })
-    if (!cd.inCooldown) issue()
+    const full = budget.used >= budget.limit && budget.nextAvailable !== null
+    setSession({ staleData: fetcher.data, blockedUntil: full ? budget.nextAvailable : null })
+    if (!full) issue()
   }
 
   const retry = () => {
@@ -550,10 +540,9 @@ export function DevicesSection({
                   ? { kind: "error", message: sessionResult.error }
                   : { kind: "pending" }
 
-  // Ambient "you already added one today" hint, so the limit is visible
-  // before the click too. The dialog is what explains it after one.
-  const cooldown = cooldownState(lastCertRenewalAt)
-  const nextAvailableText = cooldown.inCooldown ? formatDateTime(cooldown.cooldownEndsAt) : ""
+  // Ambient hint so the limit is visible BEFORE the click too; the dialog is
+  // what explains it after one.
+  const atLimit = budget.used >= budget.limit && budget.nextAvailable !== null
 
   return (
     <CardSection
@@ -575,9 +564,9 @@ export function DevicesSection({
           {t("devices.description")}
         </Text>
 
-        {cooldown.inCooldown && (
+        {atLimit && budget.nextAvailable !== null && (
           <Text as="p" variant="bodySm" color="muted">
-            {t("devices.nextAvailable", { time: nextAvailableText })}
+            {t("devices.nextAvailable", { time: formatDateTime(budget.nextAvailable) })}
           </Text>
         )}
 

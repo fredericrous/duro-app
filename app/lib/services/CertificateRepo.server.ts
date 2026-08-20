@@ -76,6 +76,16 @@ export class CertificateRepo extends Context.Tag("CertificateRepo")<
      */
     readonly listUnrevoked: (username: string) => Effect.Effect<UserCertificate[], CertificateRepoError>
     /**
+     * Live NEW-device certs issued since `since`, oldest first. This IS the
+     * daily device budget: the certificates themselves are the ledger, so a
+     * revoked one stops counting the moment it is revoked, and a renewal
+     * (which replaces a device rather than adding one) never counts at all.
+     */
+    readonly listRecentNewDevices: (
+      username: string,
+      since: Date,
+    ) => Effect.Effect<UserCertificate[], CertificateRepoError>
+    /**
      * Newest cert issued as a replacement for `serialNumber`. The renewal
      * cooldown is derived from its issued_at.
      */
@@ -172,6 +182,17 @@ export const CertificateRepoLive = Layer.effect(
               WHERE username = ${username} AND revoked_at IS NULL AND expires_at > NOW()
               ORDER BY issued_at DESC`.pipe(Effect.map((rows) => rows.map(toRow))),
           "Failed to list valid certificates",
+        ),
+
+      listRecentNewDevices: (username: string, since: Date) =>
+        withErr(
+          sql`SELECT * FROM user_certificates
+              WHERE username = ${username}
+                AND revoked_at IS NULL
+                AND renewed_from_serial IS NULL
+                AND issued_at > ${since.toISOString()}
+              ORDER BY issued_at ASC`.pipe(Effect.map((rows) => rows.map(toRow))),
+          "Failed to list recent new devices",
         ),
 
       listUnrevoked: (username: string) =>

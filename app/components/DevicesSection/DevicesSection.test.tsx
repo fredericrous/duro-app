@@ -25,6 +25,10 @@ const certExpiringIn = (days: number, serialNumber = "AABBCC11", over: Partial<U
 
 type SectionProps = Parameters<typeof DevicesSection>[0]
 
+const FREE_BUDGET = { used: 0, limit: 3, nextAvailable: null }
+/** All slots taken; the oldest frees up in an hour. */
+const FULL_BUDGET = { used: 3, limit: 3, nextAvailable: new Date(Date.now() + 3600_000).toISOString() }
+
 // Every intent the section posts, in order — lets a test assert that a click
 // the client already knows is pointless never reaches the server.
 let submitted: string[] = []
@@ -47,7 +51,7 @@ function renderSection(
   return renderRoute({
     route: {
       path: "/devices",
-      Component: () => <DevicesSection lastCertRenewalAt={null} certificates={[]} {...props} />,
+      Component: () => <DevicesSection budget={FREE_BUDGET} certificates={[]} {...props} />,
       loader: () => null,
       action: async ({ request }: { request: Request }) => {
         const fd = await request.formData()
@@ -92,11 +96,10 @@ describe("DevicesSection", () => {
   })
 
   it("explains the cooldown in the dialog instead of swallowing the click", async () => {
-    // lastCertRenewalAt < 24h ago → the daily new-device budget is spent.
-    // A disabled button would eat the click and tell the user nothing (the
-    // reported bug); the dialog has to say what happened and when it lifts.
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-    renderSection({ lastCertRenewalAt: oneHourAgo })
+    // Every slot in the rolling window is occupied. A disabled button would
+    // eat the click and tell the user nothing (the reported bug); the dialog
+    // has to say what happened and when a slot frees up.
+    renderSection({ budget: FULL_BUDGET })
 
     const button = await screen.findByRole("button", { name: t("devices.newCert") })
     expect(button).toBeEnabled()
@@ -255,7 +258,7 @@ describe("the QR claim-link flow", () => {
     renderRoute({
       route: {
         path: "/devices",
-        Component: () => <DevicesSection lastCertRenewalAt={null} certificates={[]} />,
+        Component: () => <DevicesSection budget={FREE_BUDGET} certificates={[]} />,
         loader: () => null,
         action: async () => {
           await held
@@ -298,7 +301,7 @@ describe("the QR claim-link flow", () => {
     renderRoute({
       route: {
         path: "/devices",
-        Component: () => <DevicesSection lastCertRenewalAt={null} certificates={[]} />,
+        Component: () => <DevicesSection budget={FREE_BUDGET} certificates={[]} />,
         loader: () => null,
         action: async ({ request }) => {
           const fd = await request.formData()
@@ -353,8 +356,7 @@ describe("resuming an interrupted setup", () => {
 
   it("still offers the waiting setup while the daily budget is spent", async () => {
     // The whole point: being interrupted mid-setup must not cost a day.
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-    renderSection({ pendingClaim: PENDING, lastCertRenewalAt: oneHourAgo })
+    renderSection({ pendingClaim: PENDING, budget: FULL_BUDGET })
     expect(await screen.findByRole("button", { name: t("devices.pending.action") })).toBeEnabled()
   })
 })
