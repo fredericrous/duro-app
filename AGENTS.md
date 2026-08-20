@@ -1,4 +1,5 @@
 <!-- amont:start -->
+
 ## Git hooks (amont)
 
 This repository enforces pre-commit / pre-push checks. Ask the registry
@@ -9,7 +10,7 @@ amont list --json
 amont list --json --stage pre-push --pushed  # exactly what pushing next gates
 ```
 
-Each check reports its *effective* severity (`block`/`warn`, including any
+Each check reports its _effective_ severity (`block`/`warn`, including any
 `amont.severity.*` override) and whether it fires here. The same output
 carries `commit_style`: the subject and description limits `commit-msg`
 enforces, and where the type's gitmoji is placed. It also carries
@@ -39,4 +40,5 @@ git config amont.severity.<check-id> warn
 `commit-msg` takes neither `hook.skip` nor a severity override. Write the
 message it asks for, or change what it asks for — `amont setup`, or
 `amont.commit.*` directly.
+
 <!-- amont:end -->
