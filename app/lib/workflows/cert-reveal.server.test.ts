@@ -4,7 +4,15 @@ import { Effect } from "effect"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
-import { consumeReveal, nameDeviceFromReveal } from "./cert-reveal.server"
+import {
+  consumeReveal,
+  findPendingClaim,
+  nameDeviceFromReveal,
+  refundBudgetIfSpentOn,
+  reissueClaimLink,
+  resolveReveal,
+} from "./cert-reveal.server"
+import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { hashToken } from "~/lib/crypto.server"
 import { testRunEffect, truncateAll } from "~/test/test-runtime"
 
@@ -266,5 +274,138 @@ describe("consumeReveal — disclosure is burn-scoped", () => {
     const second = await testRunEffect(consumeReveal(token))
     expect(second.consumed).toBe(false)
     expect(second.password).toBeNull()
+  })
+})
+
+describe("resuming an interrupted device setup", () => {
+  beforeEach(async () => {
+    await truncateAll()
+  })
+
+  it("reports a pending claim while the password is unburned, and hands back a working link", async () => {
+    const { token } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
+
+    const pending = await testRunEffect(findPendingClaim("alice") as Effect.Effect<any, unknown, never>)
+    expect(pending).not.toBeNull()
+
+    const reissued = await testRunEffect(reissueClaimLink("alice") as Effect.Effect<any, unknown, never>)
+    expect(reissued).not.toBeNull()
+    // A DIFFERENT token (the original is stored only as a hash and is
+    // unrecoverable) that nonetheless resolves to the same live certificate.
+    expect(reissued.token).not.toBe(token)
+    const resolved = await testRunEffect(resolveReveal(reissued.token) as Effect.Effect<any, unknown, never>)
+    expect(resolved.state).toBe("ok")
+    // ...and it does NOT extend the window the credential was granted for.
+    expect(reissued.expiresAt).toBe(pending.expiresAt)
+  })
+
+  it("stops offering the setup once the password has been burned", async () => {
+    const { token } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
+    await testRunEffect(consumeReveal(token) as Effect.Effect<any, unknown, never>)
+
+    // The link can no longer finish the job, so it is not offered as resumable.
+    expect(await testRunEffect(findPendingClaim("alice") as Effect.Effect<any, unknown, never>)).toBeNull()
+    expect(await testRunEffect(reissueClaimLink("alice") as Effect.Effect<any, unknown, never>)).toBeNull()
+  })
+
+  it("never leaks another user's pending setup", async () => {
+    await testRunEffect(seedNamedable({ username: "alice" }) as Effect.Effect<any, unknown, never>)
+    expect(await testRunEffect(findPendingClaim("mallory") as Effect.Effect<any, unknown, never>)).toBeNull()
+    expect(await testRunEffect(reissueClaimLink("mallory") as Effect.Effect<any, unknown, never>)).toBeNull()
+  })
+})
+
+describe("refundBudgetIfSpentOn", () => {
+  beforeEach(async () => {
+    await truncateAll()
+  })
+
+  /** Mark `renewalId` as the renewal that spent today's budget. */
+  const spendBudgetOn = (renewalId: string, username = "alice") =>
+    testRunEffect(
+      Effect.gen(function* () {
+        const prefs = yield* PreferencesRepo
+        yield* prefs.setCertRenewal(username, renewalId)
+      }) as Effect.Effect<any, unknown, never>,
+    )
+
+  const budgetAt = (username = "alice") =>
+    testRunEffect(
+      Effect.gen(function* () {
+        const prefs = yield* PreferencesRepo
+        return yield* prefs.getLastCertRenewal(username)
+      }) as unknown as Effect.Effect<{ at: Date | null; renewalId: string | null }, unknown, never>,
+    )
+
+  it("refunds when the revoked cert is the one that spent the budget", async () => {
+    const { serial } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
+    await spendBudgetOn(`renewal-qr-${serial}`)
+    expect((await budgetAt()).at).not.toBeNull()
+
+    expect(await testRunEffect(refundBudgetIfSpentOn(serial!, "alice") as Effect.Effect<any, unknown, never>)).toBe(
+      true,
+    )
+
+    // The timestamp is what gates the next issue — clearing only the id would
+    // leave the user just as stuck.
+    const after = await budgetAt()
+    expect(after.at).toBeNull()
+    expect(after.renewalId).toBeNull()
+  })
+
+  it("does NOT refund when some OTHER device is revoked", async () => {
+    // The security boundary: revoke-one-get-one across a device list would let
+    // anyone holding a session trade stale devices for fresh 90-day certs.
+    const { serial } = await testRunEffect(seedNamedable({ serial: "SN-TODAY" }) as Effect.Effect<any, unknown, never>)
+    await spendBudgetOn(`renewal-qr-${serial}`)
+    const other = await testRunEffect(seedNamedable({ serial: "SN-OLDER" }) as Effect.Effect<any, unknown, never>)
+
+    expect(
+      await testRunEffect(refundBudgetIfSpentOn(other.serial!, "alice") as Effect.Effect<any, unknown, never>),
+    ).toBe(false)
+    expect((await budgetAt()).at).not.toBeNull()
+  })
+
+  it("does not let one user's revoke refund another user's budget", async () => {
+    const { serial } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
+    await spendBudgetOn(`renewal-qr-${serial}`, "alice")
+    await spendBudgetOn("renewal-mallory", "mallory")
+
+    expect(await testRunEffect(refundBudgetIfSpentOn(serial!, "mallory") as Effect.Effect<any, unknown, never>)).toBe(
+      false,
+    )
+    expect((await budgetAt("alice")).at).not.toBeNull()
+    expect((await budgetAt("mallory")).at).not.toBeNull()
+  })
+
+  it("leaves the budget alone for certs with no reveal row (pre-QR issuances)", async () => {
+    await spendBudgetOn("renewal-unrelated")
+    expect(await testRunEffect(refundBudgetIfSpentOn("SN-GHOST", "alice") as Effect.Effect<any, unknown, never>)).toBe(
+      false,
+    )
+    expect((await budgetAt()).at).not.toBeNull()
+  })
+})
+
+describe("a revoked setup stops being resumable", () => {
+  beforeEach(async () => {
+    await truncateAll()
+  })
+
+  it("drops the pending claim once its certificate is revoked", async () => {
+    const { serial } = await testRunEffect(seedNamedable() as Effect.Effect<any, unknown, never>)
+    expect(await testRunEffect(findPendingClaim("alice") as Effect.Effect<any, unknown, never>)).not.toBeNull()
+
+    await testRunEffect(
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        yield* repo.markRevokePending(serial!, "alice")
+        yield* repo.markRevokeCompleted(serial!)
+      }) as Effect.Effect<any, unknown, never>,
+    )
+
+    // Offering it would hand out a link that downloads a dead certificate.
+    expect(await testRunEffect(findPendingClaim("alice") as Effect.Effect<any, unknown, never>)).toBeNull()
+    expect(await testRunEffect(reissueClaimLink("alice") as Effect.Effect<any, unknown, never>)).toBeNull()
   })
 })

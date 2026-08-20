@@ -144,6 +144,8 @@ const mockCertRevealRepo = Layer.succeed(CertRevealRepo, {
   create: () => Effect.succeed({ id: "reveal-id", token: "reveal-tok" }),
   findByTokenHash: () => Effect.succeed(null),
   markRevealed: () => Effect.void,
+  findLatestLive: () => Effect.succeed(null),
+  findBySerial: () => Effect.succeed(null),
 })
 
 const TestLayer = Layer.mergeAll(

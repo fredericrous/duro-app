@@ -472,9 +472,13 @@ function DeviceRow({ cert, certificates }: { cert: UserCertificate; certificates
 export function DevicesSection({
   lastCertRenewalAt,
   certificates,
+  pendingClaim = null,
 }: {
   lastCertRenewalAt: string | null
   certificates: UserCertificate[]
+  /** A device setup still waiting to be claimed — expiry only; the link
+   *  itself is fetched by an explicit POST, never served in loader data. */
+  pendingClaim?: { expiresAt: string } | null
 }) {
   const { t } = useTranslation()
   const { formatDateTime } = useDisplayFormat()
@@ -513,6 +517,13 @@ export function DevicesSection({
   const retry = () => {
     setSession({ staleData: fetcher.data, blockedUntil: null })
     issue()
+  }
+
+  // Resume an interrupted setup: same certificate, fresh link, no budget
+  // spent. Opens the same dialog so there is one place a claim link lives.
+  const resumeClaim = () => {
+    setSession({ staleData: fetcher.data, blockedUntil: null })
+    fetcher.submit({ intent: "showClaimLink" }, { method: "post", action: API_URL })
   }
 
   // Only THIS session's answer counts — `fetcher.data` outlives the dialog.
@@ -568,6 +579,22 @@ export function DevicesSection({
           <Text as="p" variant="bodySm" color="muted">
             {t("devices.nextAvailable", { time: nextAvailableText })}
           </Text>
+        )}
+
+        {/* The link outlives the dialog that showed it: closing the QR used to
+            strand a perfectly good setup server-side while the user was told
+            to wait a day. */}
+        {pendingClaim !== null && (
+          <Alert variant="info">
+            <Stack gap="sm">
+              <Text as="p">{t("devices.pending.body", { time: formatDateTime(pendingClaim.expiresAt) })}</Text>
+              <Inline gap="sm">
+                <Button variant="secondary" size="small" onClick={resumeClaim}>
+                  {t("devices.pending.action")}
+                </Button>
+              </Inline>
+            </Stack>
+          </Alert>
         )}
 
         <ClaimLinkDialog state={claimState} onClose={() => setSession(null)} onRetry={retry} />

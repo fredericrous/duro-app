@@ -249,6 +249,10 @@
       "cooldownBody": "Each account can set up one new device per day. You can add another one {{time}}. Renewing an existing device is never blocked.",
       "errorTitle": "Couldn’t create the link",
       "retry": "Try again"
+    },
+    "pending": {
+      "body": "A device setup is waiting — the link is still valid until {{time}}.",
+      "action": "Show the link again"
     }
   },
   "categories": {

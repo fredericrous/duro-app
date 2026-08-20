@@ -20,6 +20,12 @@ export class PreferencesRepo extends Context.Tag("PreferencesRepo")<
     readonly getLastCertRenewal: (username: string) => Effect.Effect<{ at: Date | null; renewalId: string | null }>
     readonly setCertRenewal: (username: string, renewalId: string) => Effect.Effect<void, PreferencesError>
     readonly clearCertRenewalId: (username: string) => Effect.Effect<void, PreferencesError>
+    /**
+     * Give the daily new-device budget back. Clears the TIMESTAMP as well as
+     * the id — the budget check reads `at`, so clearing the id alone leaves
+     * the user just as locked out.
+     */
+    readonly clearCertRenewal: (username: string) => Effect.Effect<void, PreferencesError>
     /** Display prefs used to render timestamps; null means "use the client
      * default" (browser timezone / locale clock). */
     readonly getDisplayPrefs: (
@@ -99,6 +105,13 @@ export const PreferencesRepoLive = Layer.effect(
       clearCertRenewalId: (username: string) => {
         const stmt = sql`UPDATE user_preferences SET cert_renewal_id = NULL WHERE username = ${username}`
         return withErr(stmt.pipe(Effect.asVoid), "Failed to clear cert renewal ID")
+      },
+
+      clearCertRenewal: (username: string) => {
+        const stmt = sql`UPDATE user_preferences
+                         SET cert_renewal_id = NULL, last_cert_renewal_at = NULL, updated_at = NOW()
+                         WHERE username = ${username}`
+        return withErr(stmt.pipe(Effect.asVoid), "Failed to clear cert renewal")
       },
 
       getDisplayPrefs: (username: string) =>
