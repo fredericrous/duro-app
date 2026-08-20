@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react"
-import { html } from "react-strict-dom"
+import { css, html } from "react-strict-dom"
 import { useTranslation } from "react-i18next"
 import { useFetcher } from "react-router"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
@@ -19,6 +19,7 @@ import {
   Inline,
   Input,
   ScrollArea,
+  Spinner,
   Stack,
   Table,
   Text,
@@ -67,6 +68,35 @@ function certToast(raw: unknown, t: (key: string) => string): ToastOptions | nul
 const API_URL = "/devices"
 
 /**
+ * The QR keeps its own size constant so the pending placeholder can reserve
+ * exactly the space the code will occupy — the dialog must not resize under
+ * the user's eyes when the link arrives.
+ */
+const QR_SIZE = 224
+
+const styles = css.create({
+  qrSlot: {
+    width: QR_SIZE,
+    height: QR_SIZE,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+})
+
+/**
+ * What the claim dialog is showing. One click opens the dialog immediately —
+ * every outcome then lands INSIDE it, because a disabled button and a muted
+ * line of body text elsewhere on the page is not feedback: the click gets
+ * swallowed and the user is told nothing.
+ */
+type ClaimState =
+  | { kind: "pending" }
+  | { kind: "ready"; revealToken: string; expiresAt: string; claimUrl: string }
+  | { kind: "cooldown"; nextAvailable: string | number }
+  | { kind: "error"; message: string }
+
+/**
  * The QR handoff for a freshly issued device certificate. The link is the
  * same single-use /cert/:token the email flow sends — here it's shown
  * directly so the NEW device can scan its way in without a mailbox on it.
@@ -74,17 +104,13 @@ const API_URL = "/devices"
  * owner, gone when the dialog closes (it lives only in the action result).
  */
 function ClaimLinkDialog({
-  open,
+  state,
   onClose,
-  revealToken,
-  expiresAt,
-  claimUrl,
+  onRetry,
 }: {
-  open: boolean
+  state: ClaimState | null
   onClose: () => void
-  revealToken: string | null
-  expiresAt: string | null
-  claimUrl: string | null
+  onRetry: () => void
 }) {
   const { t } = useTranslation()
   const { formatDateTime } = useDisplayFormat()
@@ -98,54 +124,99 @@ function ClaimLinkDialog({
   const emailing = emailFetcher.state !== "idle"
   const emailed = emailFetcher.data != null && "certSent" in emailFetcher.data
 
+  const title =
+    state?.kind === "cooldown"
+      ? t("devices.qr.cooldownTitle")
+      : state?.kind === "error"
+        ? t("devices.qr.errorTitle")
+        : t("devices.qr.title")
+
   return (
     <Dialog.Root
-      open={open}
+      open={state !== null}
       onOpenChange={(o) => {
         if (!o) onClose()
       }}
     >
       <Dialog.Portal size="sm">
         <Dialog.Header>
-          <Dialog.Title>{t("devices.qr.title")}</Dialog.Title>
+          <Dialog.Title>{title}</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
-          <Stack gap="md" align="center">
-            <Text as="p" variant="bodySm" color="muted">
-              {t("devices.qr.hint")}
-            </Text>
-            {claimUrl !== null && <QrCode value={claimUrl} label={t("devices.qr.alt")} />}
-            <Inline gap="sm" align="center">
-              <Button variant="secondary" size="small" onClick={() => claimUrl !== null && copy(claimUrl)}>
-                {copyFailed ? t("devices.qr.copyFailed") : copied ? t("devices.qr.copied") : t("devices.qr.copyLink")}
-              </Button>
-              <Button
-                variant="secondary"
-                size="small"
-                disabled={emailing || emailed || revealToken === null}
-                onClick={() => {
-                  if (revealToken !== null)
-                    emailFetcher.submit({ intent: "emailRevealLink", revealToken }, { method: "post", action: API_URL })
-                }}
-              >
-                {emailed
-                  ? t("devices.qr.emailSent")
-                  : emailing
-                    ? t("devices.qr.emailing")
-                    : t("devices.qr.emailInstead")}
-              </Button>
-            </Inline>
-            <Text as="p" variant="bodySm" color="muted">
-              {expiresAt !== null ? t("devices.qr.expiry", { time: formatDateTime(expiresAt) }) : null}
-            </Text>
-            <Text as="p" variant="bodySm" color="muted">
-              {t("devices.qr.nameHint")}
-            </Text>
-          </Stack>
+          {state?.kind === "cooldown" && (
+            <Stack gap="md">
+              <Text as="p">{t("devices.qr.cooldownBody", { time: formatDateTime(state.nextAvailable) })}</Text>
+            </Stack>
+          )}
+
+          {state?.kind === "error" && (
+            <Stack gap="md">
+              <Alert variant="error">{state.message}</Alert>
+              <Inline gap="sm" align="center">
+                <Button variant="secondary" size="small" onClick={onRetry}>
+                  {t("devices.qr.retry")}
+                </Button>
+              </Inline>
+            </Stack>
+          )}
+
+          {(state?.kind === "pending" || state?.kind === "ready") && (
+            <Stack gap="md" align="center">
+              <Text as="p" variant="bodySm" color="muted">
+                {state.kind === "ready" ? t("devices.qr.hint") : t("devices.qr.preparing")}
+              </Text>
+              {/* The placeholder occupies exactly the QR's footprint, so the
+                  code appears in place instead of shoving the dialog around.
+                  The Spinner takes no `label`: the visible line above already
+                  says it, and the DS renders that label sr-only, so passing it
+                  would announce the same sentence twice. */}
+              <html.div style={styles.qrSlot}>
+                {state.kind === "ready" ? (
+                  <QrCode value={state.claimUrl} label={t("devices.qr.alt")} size={QR_SIZE} />
+                ) : (
+                  <Spinner size="lg" />
+                )}
+              </html.div>
+              <Inline gap="sm" align="center">
+                <Button
+                  variant="secondary"
+                  size="small"
+                  disabled={state.kind !== "ready"}
+                  onClick={() => state.kind === "ready" && copy(state.claimUrl)}
+                >
+                  {copyFailed ? t("devices.qr.copyFailed") : copied ? t("devices.qr.copied") : t("devices.qr.copyLink")}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="small"
+                  disabled={state.kind !== "ready" || emailing || emailed}
+                  onClick={() => {
+                    if (state.kind === "ready")
+                      emailFetcher.submit(
+                        { intent: "emailRevealLink", revealToken: state.revealToken },
+                        { method: "post", action: API_URL },
+                      )
+                  }}
+                >
+                  {emailed
+                    ? t("devices.qr.emailSent")
+                    : emailing
+                      ? t("devices.qr.emailing")
+                      : t("devices.qr.emailInstead")}
+                </Button>
+              </Inline>
+              <Text as="p" variant="bodySm" color="muted">
+                {state.kind === "ready" ? t("devices.qr.expiry", { time: formatDateTime(state.expiresAt) }) : null}
+              </Text>
+              <Text as="p" variant="bodySm" color="muted">
+                {t("devices.qr.nameHint")}
+              </Text>
+            </Stack>
+          )}
         </Dialog.Body>
         <Dialog.Footer>
           <Button variant="primary" onClick={onClose}>
-            {t("common.done", "Done")}
+            {state?.kind === "ready" ? t("common.done") : t("common.close")}
           </Button>
         </Dialog.Footer>
       </Dialog.Portal>
@@ -408,38 +479,70 @@ export function DevicesSection({
   const { t } = useTranslation()
   const { formatDateTime } = useDisplayFormat()
   const fetcher = useFetcher<SettingsResult>()
-  useFetcherToast(fetcher, { render: (d) => certToast(d, t) })
   const [sort, setSort] = useState<DeviceSort>("name")
 
-  const result = fetcher.data
   const isSubmitting = fetcher.state !== "idle"
-  const justSent = result != null && "certSent" in result
-  const linkReady = result != null && "certLinkReady" in result ? result : null
-
   const rows = sortDeviceRows(buildDeviceRows(certificates), sort)
 
-  // Collapse the form once the certificate is on its way — an open form sitting
-  // under a list that just grew a row reads as "nothing happened, try again".
-  // Adjusted during render (React's state-derived-from-data pattern) rather
-  // than in an effect, which would be a cascading-render hazard. Keying off the
-  // result's identity means reopening the form later doesn't re-close it.
-  const [handledResult, setHandledResult] = useState<SettingsResult | undefined>(undefined)
-  const [linkDismissed, setLinkDismissed] = useState(false)
-  if (result !== handledResult) {
-    setHandledResult(result)
-    if (linkReady) setLinkDismissed(false)
+  // One dialog session per click. `staleData` is whatever the fetcher was
+  // holding when this session opened, so a previous session's answer is never
+  // mistaken for this one's; `blockedUntil` is set when the click never
+  // reached the server because the client already knew about the cooldown.
+  // Both are frozen at open time — the revalidation that follows a successful
+  // issue moves the cooldown forward, and a live read would flip an
+  // already-open QR dialog into "come back tomorrow".
+  const [session, setSession] = useState<{
+    staleData: SettingsResult | undefined
+    blockedUntil: number | null
+  } | null>(null)
+
+  const issue = () => {
+    fetcher.submit({ intent: "issueCert", delivery: "link" }, { method: "post", action: API_URL })
   }
 
-  // Rate limit check — derived per render (module-level helper, same pattern
-  // as expiryStatus above) so a lapsed cooldown unlocks without a remount.
-  const isRateLimited = result != null && "rateLimited" in result
+  // The button never swallows a click: the dialog opens first, and whatever
+  // happens next (link, cooldown, failure) is shown there. Reading the
+  // cooldown here rather than at render time keeps it honest to the moment of
+  // the click without re-rendering on a timer.
+  const openClaimDialog = () => {
+    const cd = cooldownState(lastCertRenewalAt)
+    setSession({ staleData: fetcher.data, blockedUntil: cd.inCooldown ? cd.cooldownEndsAt : null })
+    if (!cd.inCooldown) issue()
+  }
+
+  const retry = () => {
+    setSession({ staleData: fetcher.data, blockedUntil: null })
+    issue()
+  }
+
+  // Only THIS session's answer counts — `fetcher.data` outlives the dialog.
+  const sessionResult = session !== null && fetcher.data !== session.staleData ? fetcher.data : undefined
+  const claimState: ClaimState | null =
+    session === null
+      ? null
+      : session.blockedUntil !== null
+        ? { kind: "cooldown", nextAvailable: session.blockedUntil }
+        : sessionResult === undefined
+          ? { kind: "pending" }
+          : "certLinkReady" in sessionResult
+            ? {
+                kind: "ready",
+                revealToken: sessionResult.revealToken,
+                expiresAt: sessionResult.expiresAt,
+                claimUrl: sessionResult.claimUrl,
+              }
+            : "rateLimited" in sessionResult
+              ? { kind: "cooldown", nextAvailable: sessionResult.nextAvailable }
+              : "certError" in sessionResult
+                ? { kind: "error", message: sessionResult.certError }
+                : "error" in sessionResult
+                  ? { kind: "error", message: sessionResult.error }
+                  : { kind: "pending" }
+
+  // Ambient "you already added one today" hint, so the limit is visible
+  // before the click too. The dialog is what explains it after one.
   const cooldown = cooldownState(lastCertRenewalAt)
-  const cooldownRemaining = isRateLimited || cooldown.inCooldown
-  const nextAvailableText = isRateLimited
-    ? formatDateTime(result.nextAvailable)
-    : cooldown.inCooldown
-      ? formatDateTime(cooldown.cooldownEndsAt)
-      : ""
+  const nextAvailableText = cooldown.inCooldown ? formatDateTime(cooldown.cooldownEndsAt) : ""
 
   return (
     <CardSection
@@ -451,12 +554,8 @@ export function DevicesSection({
         // ONE click: issuing is the whole point of the button, so it issues —
         // the QR dialog that follows is the confirmation surface (and offers
         // "email me this link" for the same token). Cooldown still gates it.
-        <Button
-          variant="primary"
-          disabled={cooldownRemaining || isSubmitting}
-          onClick={() => fetcher.submit({ intent: "issueCert", delivery: "link" }, { method: "post", action: API_URL })}
-        >
-          {isSubmitting ? t("devices.issuing") : t("devices.newCert")}
+        <Button variant="primary" disabled={isSubmitting} onClick={openClaimDialog}>
+          {t("devices.newCert")}
         </Button>
       }
     >
@@ -465,26 +564,13 @@ export function DevicesSection({
           {t("devices.description")}
         </Text>
 
-        {/* Feedback and the form the header button opens stay directly under
-            it, so an outcome is never announced somewhere the user isn't
-            looking — the list below can run long. */}
-        {result && "certError" in result && <Alert variant="error">{result.certError}</Alert>}
-
-        {justSent && <Alert variant="success">{t("devices.success")}</Alert>}
-
-        {cooldownRemaining && (
+        {cooldown.inCooldown && (
           <Text as="p" variant="bodySm" color="muted">
             {t("devices.nextAvailable", { time: nextAvailableText })}
           </Text>
         )}
 
-        <ClaimLinkDialog
-          open={linkReady !== null && !linkDismissed}
-          onClose={() => setLinkDismissed(true)}
-          revealToken={linkReady !== null ? linkReady.revealToken : null}
-          expiresAt={linkReady !== null ? linkReady.expiresAt : null}
-          claimUrl={linkReady !== null ? linkReady.claimUrl : null}
-        />
+        <ClaimLinkDialog state={claimState} onClose={() => setSession(null)} onRetry={retry} />
 
         {rows.length > 0 && (
           <>

@@ -243,7 +243,12 @@
       "nameHint": "Vous nommerez l’appareil sur cette page.",
       "emailInstead": "M’envoyer ce lien par e-mail",
       "emailing": "Envoi…",
-      "emailSent": "Envoyé — consultez votre boîte mail."
+      "emailSent": "Envoyé — consultez votre boîte mail.",
+      "preparing": "Préparation de votre lien…",
+      "cooldownTitle": "Vous avez déjà ajouté un appareil aujourd’hui",
+      "cooldownBody": "Chaque compte peut configurer un nouvel appareil par jour. Vous pourrez en ajouter un autre {{time}}. Le renouvellement d’un appareil existant n’est jamais bloqué.",
+      "errorTitle": "Impossible de créer le lien",
+      "retry": "Réessayer"
     }
   },
   "categories": {

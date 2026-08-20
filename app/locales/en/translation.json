@@ -243,7 +243,12 @@
       "nameHint": "You’ll name the device on that page.",
       "emailInstead": "Email me this link",
       "emailing": "Sending…",
-      "emailSent": "Sent — check your inbox."
+      "emailSent": "Sent — check your inbox.",
+      "preparing": "Preparing your device link…",
+      "cooldownTitle": "You already added a device today",
+      "cooldownBody": "Each account can set up one new device per day. You can add another one {{time}}. Renewing an existing device is never blocked.",
+      "errorTitle": "Couldn’t create the link",
+      "retry": "Try again"
     }
   },
   "categories": {
