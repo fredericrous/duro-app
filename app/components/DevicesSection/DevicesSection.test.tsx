@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it } from "vitest"
 import { screen, waitFor, fireEvent } from "@testing-library/react"
 import { DevicesSection } from "./DevicesSection"
 import { renderRoute } from "~/test/render-route"
@@ -25,6 +25,14 @@ const certExpiringIn = (days: number, serialNumber = "AABBCC11", over: Partial<U
 
 type SectionProps = Parameters<typeof DevicesSection>[0]
 
+// Every intent the section posts, in order — lets a test assert that a click
+// the client already knows is pointless never reaches the server.
+let submitted: string[] = []
+
+beforeEach(() => {
+  submitted = []
+})
+
 // The section submits through `useFetcher`, so it needs a real data router (and
 // the ToastProvider that renderRoute mounts) — plain `render` can't host it.
 function renderSection(
@@ -41,7 +49,11 @@ function renderSection(
       path: "/devices",
       Component: () => <DevicesSection lastCertRenewalAt={null} certificates={[]} {...props} />,
       loader: () => null,
-      action: () => actionResult,
+      action: async ({ request }: { request: Request }) => {
+        const fd = await request.formData()
+        submitted.push(String(fd.get("intent")))
+        return actionResult
+      },
     },
     url: "/devices",
   })
@@ -79,16 +91,28 @@ describe("DevicesSection", () => {
     expect(await screen.findByText(t("devices.list.expired"))).toBeInTheDocument()
   })
 
-  it("disables the add-a-device button when the user is in cooldown", async () => {
-    // lastCertRenewalAt < 24h ago → cooldown active.
+  it("explains the cooldown in the dialog instead of swallowing the click", async () => {
+    // lastCertRenewalAt < 24h ago → the daily new-device budget is spent.
+    // A disabled button would eat the click and tell the user nothing (the
+    // reported bug); the dialog has to say what happened and when it lifts.
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
     renderSection({ lastCertRenewalAt: oneHourAgo })
+
     const button = await screen.findByRole("button", { name: t("devices.newCert") })
-    expect(button).toBeDisabled()
-    // The button stays put in the header, so the reason it is disabled has to
-    // be stated in the body rather than under the button.
+    expect(button).toBeEnabled()
+    fireEvent.click(button)
+
+    expect(await screen.findByText(t("devices.qr.cooldownTitle"))).toBeInTheDocument()
+    // No QR, and — crucially — no certificate was issued for a click the
+    // server would only have rejected.
+    expect(screen.queryByRole("img", { name: t("devices.qr.alt") })).not.toBeInTheDocument()
+    expect(submitted).toHaveLength(0)
+
+    // The ambient hint stays too, so the limit is visible before clicking.
+    // (getAll: the dialog body says something similar — both are wanted.)
     const prefix = t("devices.nextAvailable", undefined, { time: "" }).trim()
-    expect(screen.getByText(new RegExp(prefix.split(/\s+/).slice(0, 2).join("\\s+"), "i"))).toBeInTheDocument()
+    const hits = screen.getAllByText(new RegExp(prefix.split(/\s+/).slice(0, 2).join("\\s+"), "i"))
+    expect(hits.length).toBeGreaterThan(0)
   })
 
   it("keeps a single add-a-device control in the same spot whether or not devices exist", async () => {
@@ -213,12 +237,60 @@ describe("the QR claim-link flow", () => {
     renderSection()
     fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
     expect(await screen.findByText(t("devices.qr.title"))).toBeInTheDocument()
-    // the QR encodes the claim URL for the token
-    expect(screen.getByRole("img", { name: t("devices.qr.alt") })).toBeInTheDocument()
+    // the QR encodes the claim URL for the token (it lands once the action answers)
+    expect(await screen.findByRole("img", { name: t("devices.qr.alt") })).toBeInTheDocument()
     // and the user is told naming happens on the claim page
     expect(screen.getByText(t("devices.qr.nameHint"))).toBeInTheDocument()
     // the email fallback lives INSIDE the dialog — same token, no second cert
     expect(screen.getByRole("button", { name: t("devices.qr.emailInstead") })).toBeInTheDocument()
+  })
+
+  it("shows a loader in the QR's place until the link arrives", async () => {
+    // The dialog is the acknowledgement of the click: it must open on the
+    // click itself, not when the server eventually answers.
+    let release: (() => void) | null = null
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    renderRoute({
+      route: {
+        path: "/devices",
+        Component: () => <DevicesSection lastCertRenewalAt={null} certificates={[]} />,
+        loader: () => null,
+        action: async () => {
+          await held
+          return {
+            certLinkReady: true,
+            revealToken: "tok-1",
+            claimUrl: "https://join.example.com/cert/tok-1",
+            expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+          }
+        },
+      },
+      url: "/devices",
+    })
+
+    fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
+
+    // Open, explaining itself, with the spinner standing in for the code.
+    expect(await screen.findByText(t("devices.qr.preparing"))).toBeInTheDocument()
+    expect(screen.queryByRole("img", { name: t("devices.qr.alt") })).not.toBeInTheDocument()
+    // Copy/email are inert until there is something to copy.
+    expect(screen.getByRole("button", { name: t("devices.qr.copyLink") })).toBeDisabled()
+
+    release!()
+    expect(await screen.findByRole("img", { name: t("devices.qr.alt") })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: t("devices.qr.copyLink") })).toBeEnabled()
+  })
+
+  it("offers a retry inside the dialog when issuing fails", async () => {
+    renderSection({}, { certError: "Vault unreachable" })
+    fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
+
+    expect(await screen.findByText(t("devices.qr.errorTitle"))).toBeInTheDocument()
+    expect(screen.getByText("Vault unreachable")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: t("devices.qr.retry") }))
+    await waitFor(() => expect(submitted.length).toBeGreaterThan(1))
   })
 
   it("emails the SAME link from inside the dialog and confirms the send", async () => {
@@ -246,6 +318,8 @@ describe("the QR claim-link flow", () => {
       url: "/devices",
     })
     fireEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
+    // The email fallback only lights up once there is a token to send.
+    await screen.findByRole("img", { name: t("devices.qr.alt") })
     fireEvent.click(await screen.findByRole("button", { name: t("devices.qr.emailInstead") }))
     expect(await screen.findByRole("button", { name: t("devices.qr.emailSent") })).toBeDisabled()
   })
