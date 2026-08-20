@@ -332,6 +332,33 @@ describe("the QR claim-link flow", () => {
   })
 })
 
+describe("resuming an interrupted setup", () => {
+  const PENDING = { expiresAt: new Date(Date.now() + 3600_000).toISOString() }
+
+  it("offers the waiting setup and reopens it as a link, spending no budget", async () => {
+    renderSection({ pendingClaim: PENDING })
+
+    fireEvent.click(await screen.findByRole("button", { name: t("devices.pending.action") }))
+
+    // Same dialog, same QR — but the intent is showClaimLink, NOT a new issue.
+    expect(await screen.findByRole("img", { name: t("devices.qr.alt") })).toBeInTheDocument()
+    expect(submitted).toEqual(["showClaimLink"])
+  })
+
+  it("says nothing when there is no setup waiting", async () => {
+    renderSection()
+    await screen.findByRole("button", { name: t("devices.newCert") })
+    expect(screen.queryByRole("button", { name: t("devices.pending.action") })).not.toBeInTheDocument()
+  })
+
+  it("still offers the waiting setup while the daily budget is spent", async () => {
+    // The whole point: being interrupted mid-setup must not cost a day.
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    renderSection({ pendingClaim: PENDING, lastCertRenewalAt: oneHourAgo })
+    expect(await screen.findByRole("button", { name: t("devices.pending.action") })).toBeEnabled()
+  })
+})
+
 describe("the claimed-platform column", () => {
   it("shows the UA-observed device kind next to a custom label", async () => {
     renderSection({ certificates: [certExpiringIn(60, "PLATFRM1", { label: "perso", claimedPlatform: "iPhone" })] })

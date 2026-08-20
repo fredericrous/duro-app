@@ -2,6 +2,7 @@ import { Effect } from "effect"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
+import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { hashToken } from "~/lib/crypto.server"
 import { revokeSupersededCert } from "~/lib/workflows/cert-revocation.server"
 import { defaultDeviceName } from "~/lib/device-name"
@@ -100,4 +101,101 @@ export const nameDeviceFromReveal = (revealToken: string, rawLabel: string, user
     if (affected === 0) return { named: false as const, reason: "missing" as const }
     yield* recordClaimedPlatform(result.row, userAgent)
     return { named: true as const, label }
+  })
+
+/**
+ * Has the certificate this reveal delivers already been revoked? Revoking the
+ * device you were in the middle of setting up (the refund path below) leaves
+ * its reveal row alive; without this check the page would keep offering a
+ * link that downloads a dead certificate. A missing cert row is NOT proof of
+ * revocation — storing it is best-effort — so that case stays resumable.
+ */
+const isRevoked = (serialNumber: string | null) =>
+  Effect.gen(function* () {
+    if (!serialNumber) return false
+    const certRepo = yield* CertificateRepo
+    const cert = yield* certRepo.findBySerial(serialNumber)
+    return cert !== null && cert.revokedAt !== null
+  })
+
+/**
+ * A device setup left mid-flight: the newest unexpired reveal whose one-time
+ * password is still unburned. That is exactly the state worth resuming — the
+ * link is fully actionable. Once the password has been scratched the cert is
+ * only recoverable by revoking it and starting over, so this deliberately
+ * reports nothing rather than offering a link that cannot finish the job.
+ *
+ * Returns metadata only. The raw token is NOT recoverable (the table stores
+ * its hash) and must never ride a loader anyway.
+ */
+export const findPendingClaim = (username: string) =>
+  Effect.gen(function* () {
+    const revealRepo = yield* CertRevealRepo
+    const cert = yield* CertManager
+    const row = yield* revealRepo.findLatestLive(username)
+    if (!row) return null
+    if (yield* isRevoked(row.serialNumber)) return null
+    const password = yield* cert.getP12Password(row.renewalId)
+    if (!password) return null
+    // Normalised: the pg driver hands back a Date for timestamptz even though
+    // the row type says string, and this value crosses into loader data.
+    return { expiresAt: new Date(row.expiresAt).toISOString() }
+  })
+
+/**
+ * Hand the waiting setup back to the user as a fresh link. Mints a NEW reveal
+ * token against the SAME renewal: no certificate is issued and the daily
+ * budget is untouched, because nothing new was created — this is the same
+ * credential, addressed again.
+ *
+ * The new token inherits the original expiry rather than restarting the 24h
+ * clock: re-showing a link must not extend the window the credential was
+ * granted for.
+ */
+export const reissueClaimLink = (username: string) =>
+  Effect.gen(function* () {
+    const revealRepo = yield* CertRevealRepo
+    const cert = yield* CertManager
+    const row = yield* revealRepo.findLatestLive(username)
+    if (!row) return null
+    if (yield* isRevoked(row.serialNumber)) return null
+    const password = yield* cert.getP12Password(row.renewalId)
+    if (!password) return null
+    const { token } = yield* revealRepo.create({
+      renewalId: row.renewalId,
+      email: row.email,
+      username: row.username,
+      expiresAt: new Date(row.expiresAt),
+      renewedFromSerial: row.renewedFromSerial,
+      serialNumber: row.serialNumber,
+    })
+    return { token, expiresAt: new Date(row.expiresAt).toISOString() }
+  })
+
+/**
+ * Give the daily new-device budget back when the certificate that SPENT it is
+ * revoked — an undo of today's issuance, not a general revoke-one-get-one.
+ *
+ * The distinction is the whole security argument: refunding any revocation
+ * would let anyone holding a session trade a pile of stale devices for a pile
+ * of fresh 90-day credentials. Scoped this way the user can churn (issue,
+ * revoke, issue) but never accumulate, because each new certificate costs
+ * them the previous one.
+ *
+ * Callers MUST only reach here once the revocation actually completed:
+ * refunding a FAILED revocation would hand back the budget while the
+ * certificate still works.
+ */
+export const refundBudgetIfSpentOn = (serialNumber: string, username: string) =>
+  Effect.gen(function* () {
+    const revealRepo = yield* CertRevealRepo
+    const prefs = yield* PreferencesRepo
+    const { renewalId } = yield* prefs.getLastCertRenewal(username)
+    if (!renewalId) return false
+    const row = yield* revealRepo.findBySerial(serialNumber)
+    // No reveal row (certs predating the serial column) or a different
+    // renewal → this is not the cert that spent the budget. Leave it spent.
+    if (!row || row.username !== username || row.renewalId !== renewalId) return false
+    yield* prefs.clearCertRenewal(username)
+    return true
   })

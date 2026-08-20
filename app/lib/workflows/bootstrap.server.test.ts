@@ -243,6 +243,7 @@ const mockPreferencesRepo = () =>
     getLastCertRenewal: () => Effect.succeed({ at: null, renewalId: null }),
     setCertRenewal: () => Effect.void,
     clearCertRenewalId: () => Effect.void,
+    clearCertRenewal: () => Effect.void,
     getDisplayPrefs: () => Effect.succeed({ timezone: null, timeFormat: null }),
     setDisplayPrefs: () => Effect.void,
     getTheme: () => Effect.succeed(null),
@@ -263,6 +264,8 @@ const mockCertRevealRepo = () =>
     create: () => Effect.succeed({ id: "reveal-test", token: "reveal-token-test" }),
     findByTokenHash: () => Effect.succeed(null),
     markRevealed: () => Effect.void,
+    findLatestLive: () => Effect.succeed(null),
+    findBySerial: () => Effect.succeed(null),
   })
 
 type AllLayersOpts = {

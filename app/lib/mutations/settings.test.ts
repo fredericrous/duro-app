@@ -49,6 +49,12 @@ describe("parseSettingsMutation", () => {
     expect(result).toEqual({ intent: "issueCert", delivery: "email", auth })
   })
 
+  it("parses showClaimLink (no fields — the server finds the waiting setup)", () => {
+    const fd = new FormData()
+    fd.append("intent", "showClaimLink")
+    expect(parseSettingsMutation(fd, auth)).toEqual({ intent: "showClaimLink", auth })
+  })
+
   it("parses revokeCert with serialNumber", () => {
     const fd = new FormData()
     fd.append("intent", "revokeCert")
@@ -284,6 +290,99 @@ describe("handleSettingsMutation — renewCert", () => {
       ),
     ).toMatchObject({ certSent: true })
     expect(await lastCertRenewalAt()).not.toBeNull()
+  })
+
+  describe("recovering an interrupted setup", () => {
+    const issueLink = async () => {
+      const result = await testRunEffect(
+        handleSettingsMutation({ intent: "issueCert", delivery: "link", auth }) as Effect.Effect<
+          unknown,
+          unknown,
+          never
+        >,
+      )
+      return result as { revealToken: string; claimUrl: string }
+    }
+
+    it("showClaimLink re-opens the SAME setup without issuing anything or spending the budget", async () => {
+      const first = await issueLink()
+      const spentAt = await lastCertRenewalAt()
+      const before = await certsFor(auth.user!)
+
+      const again = (await testRunEffect(
+        handleSettingsMutation({ intent: "showClaimLink", auth }) as Effect.Effect<unknown, unknown, never>,
+      )) as { certLinkReady: true; revealToken: string; claimUrl: string }
+
+      expect(again.certLinkReady).toBe(true)
+      // A fresh token (the original is only stored hashed) for the same cert.
+      expect(again.revealToken).not.toBe(first.revealToken)
+      expect(await certsFor(auth.user!)).toHaveLength(before.length)
+      // The budget is neither spent again nor refunded — nothing happened to it.
+      expect(await lastCertRenewalAt()).toEqual(spentAt)
+      expect(again.claimUrl).toBe(`https://join.daddyshome.fr/cert/${again.revealToken}`)
+    })
+
+    it("showClaimLink says so when nothing is waiting", async () => {
+      const result = await testRunEffect(
+        handleSettingsMutation({ intent: "showClaimLink", auth }) as Effect.Effect<unknown, unknown, never>,
+      )
+      expect(result).toMatchObject({ certError: "No device setup is waiting." })
+    })
+
+    it("revoking the cert that spent the budget refunds it — add another straight away", async () => {
+      await issueLink()
+      expect(await lastCertRenewalAt()).not.toBeNull()
+      const [cert] = await certsFor(auth.user!)
+
+      const revoked = await testRunEffect(
+        handleSettingsMutation({
+          intent: "revokeCert",
+          serialNumber: cert.serialNumber,
+          auth,
+        }) as Effect.Effect<unknown, unknown, never>,
+      )
+      expect(revoked).toMatchObject({ certRevoked: true })
+
+      // Budget back, so the very next issue succeeds instead of rate-limiting.
+      expect(await lastCertRenewalAt()).toBeNull()
+      expect(
+        await testRunEffect(
+          handleSettingsMutation({ intent: "issueCert", delivery: "link", auth }) as Effect.Effect<
+            unknown,
+            unknown,
+            never
+          >,
+        ),
+      ).toMatchObject({ certLinkReady: true })
+    })
+
+    it("revoking an UNRELATED device does not refund the budget", async () => {
+      // Otherwise a session holder could trade a list of stale devices for a
+      // list of fresh 90-day certificates.
+      await seedCert({ serialNumber: "SN-OLD" })
+      await issueLink()
+      const spentAt = await lastCertRenewalAt()
+      expect(spentAt).not.toBeNull()
+
+      await testRunEffect(
+        handleSettingsMutation({ intent: "revokeCert", serialNumber: "SN-OLD", auth }) as Effect.Effect<
+          unknown,
+          unknown,
+          never
+        >,
+      )
+
+      expect(await lastCertRenewalAt()).toEqual(spentAt)
+      expect(
+        await testRunEffect(
+          handleSettingsMutation({ intent: "issueCert", delivery: "link", auth }) as Effect.Effect<
+            unknown,
+            unknown,
+            never
+          >,
+        ),
+      ).toMatchObject({ rateLimited: true })
+    })
   })
 
   describe("emailRevealLink — the dialog's 'email me this link' fallback", () => {

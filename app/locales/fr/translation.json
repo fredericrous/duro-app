@@ -249,6 +249,10 @@
       "cooldownBody": "Chaque compte peut configurer un nouvel appareil par jour. Vous pourrez en ajouter un autre {{time}}. Le renouvellement d’un appareil existant n’est jamais bloqué.",
       "errorTitle": "Impossible de créer le lien",
       "retry": "Réessayer"
+    },
+    "pending": {
+      "body": "Une configuration d’appareil est en attente — le lien est valide jusqu’au {{time}}.",
+      "action": "Afficher le lien à nouveau"
     }
   },
   "categories": {

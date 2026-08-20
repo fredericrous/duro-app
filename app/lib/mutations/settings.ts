@@ -8,6 +8,7 @@ import { EmailService } from "~/lib/services/EmailService.server"
 import { hashToken } from "~/lib/crypto.server"
 import { config } from "~/lib/config.server"
 import { resendCert } from "~/lib/workflows/invite.server"
+import { refundBudgetIfSpentOn, reissueClaimLink } from "~/lib/workflows/cert-reveal.server"
 import { supportedLngs } from "~/lib/i18n"
 import { localeCookieHeader } from "~/lib/i18n.server"
 import { isThemePreference, themeCookieHeader } from "~/lib/theme.server"
@@ -21,6 +22,7 @@ import type { AuthInfo } from "~/lib/auth.server"
 export type SettingsMutation =
   | { intent: "issueCert"; delivery: "email" | "link"; auth: AuthInfo }
   | { intent: "emailRevealLink"; revealToken: string; auth: AuthInfo }
+  | { intent: "showClaimLink"; auth: AuthInfo }
   | { intent: "renewCert"; serialNumber: string; auth: AuthInfo }
   | { intent: "revokeCert"; serialNumber: string; auth: AuthInfo }
   | { intent: "renameCert"; serialNumber: string; label: string | null; auth: AuthInfo }
@@ -167,6 +169,32 @@ function handleRenewCert(serialNumber: string, auth: AuthInfo) {
   )
 }
 
+/**
+ * Hand back a device setup the user walked away from — the QR was closed, the
+ * phone wasn't ready, the tab was lost. Mints a fresh link against the SAME
+ * certificate: nothing is issued and the daily budget is untouched, so being
+ * interrupted mid-setup no longer costs a day.
+ */
+function handleShowClaimLink(auth: AuthInfo) {
+  return Effect.gen(function* () {
+    const pending = yield* reissueClaimLink(auth.user!)
+    if (!pending) {
+      return { certError: "No device setup is waiting." } as SettingsResult
+    }
+    return {
+      certLinkReady: true as const,
+      revealToken: pending.token,
+      expiresAt: pending.expiresAt,
+      claimUrl: `${config.inviteBaseUrl}/cert/${pending.token}`,
+    } as SettingsResult
+  }).pipe(
+    Effect.catchAll((e) => {
+      const message = errorMessage(e, "Failed to show the device link")
+      return Effect.succeed({ certError: message } as SettingsResult)
+    }),
+  )
+}
+
 function handleRevokeCert(serialNumber: string, auth: AuthInfo) {
   return Effect.gen(function* () {
     const cert = yield* CertManager
@@ -181,6 +209,10 @@ function handleRevokeCert(serialNumber: string, auth: AuthInfo) {
         certRepo.markRevokeFailed(serialNumber, String(e)).pipe(Effect.catchAll(() => Effect.void)),
       ),
     )
+    // Only past this point — the revocation COMPLETED. Refunding a failed one
+    // would return the budget while the certificate still works. Best-effort:
+    // a bookkeeping hiccup must not turn a successful revoke into an error.
+    yield* refundBudgetIfSpentOn(serialNumber, auth.user!).pipe(Effect.catchAll(() => Effect.succeed(false)))
     return { certRevoked: true as const } as SettingsResult
   }).pipe(
     Effect.catchAll((e) => {
@@ -252,6 +284,8 @@ export function handleSettingsMutation(mutation: SettingsMutation) {
       return handleIssueCert(mutation.auth, mutation.delivery)
     case "emailRevealLink":
       return handleEmailRevealLink(mutation.revealToken, mutation.auth)
+    case "showClaimLink":
+      return handleShowClaimLink(mutation.auth)
     case "renewCert":
       return handleRenewCert(mutation.serialNumber, mutation.auth)
     case "revokeCert":
@@ -284,6 +318,9 @@ export function parseSettingsMutation(formData: FormData, auth: AuthInfo): Setti
   if (intent === "issueCert") {
     const delivery = formData.get("delivery") === "link" ? ("link" as const) : ("email" as const)
     return { intent, delivery, auth }
+  }
+  if (intent === "showClaimLink") {
+    return { intent, auth }
   }
   if (intent === "emailRevealLink") {
     const revealToken = formData.get("revealToken") as string

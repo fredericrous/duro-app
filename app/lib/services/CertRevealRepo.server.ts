@@ -58,6 +58,16 @@ export class CertRevealRepo extends Context.Tag("CertRevealRepo")<
     readonly findByTokenHash: (tokenHash: string) => Effect.Effect<CertRevealToken | null, CertRevealRepoError>
     /** Stamp revealed_at. Idempotent — a no-op if already revealed. */
     readonly markRevealed: (id: string) => Effect.Effect<void, CertRevealRepoError>
+    /**
+     * Newest unexpired reveal row for a user, whatever its state. Used to find
+     * a device setup left mid-flight — the raw token is unrecoverable (only
+     * its hash is stored), so resuming means minting a fresh token against the
+     * same renewal, never resurrecting the old one.
+     */
+    readonly findLatestLive: (username: string) => Effect.Effect<CertRevealToken | null, CertRevealRepoError>
+    /** Reveal row that delivered a given certificate — the link from a
+     *  revoked serial back to the renewal that spent the daily budget. */
+    readonly findBySerial: (serialNumber: string) => Effect.Effect<CertRevealToken | null, CertRevealRepoError>
   }
 >() {}
 
@@ -121,6 +131,22 @@ export const CertRevealRepoLive = Layer.effect(
             Effect.asVoid,
           ),
           "Failed to mark cert reveal token revealed",
+        ),
+
+      findLatestLive: (username: string) =>
+        withErr(
+          sql`SELECT * FROM cert_reveal_tokens
+              WHERE username = ${username} AND expires_at > NOW()
+              ORDER BY created_at DESC LIMIT 1`.pipe(Effect.map((rows) => (rows[0] ? toRow(rows[0]) : null))),
+          "Failed to find live cert reveal token",
+        ),
+
+      findBySerial: (serialNumber: string) =>
+        withErr(
+          sql`SELECT * FROM cert_reveal_tokens
+              WHERE serial_number = ${serialNumber}
+              ORDER BY created_at DESC LIMIT 1`.pipe(Effect.map((rows) => (rows[0] ? toRow(rows[0]) : null))),
+          "Failed to find cert reveal token by serial",
         ),
     }
   }),
