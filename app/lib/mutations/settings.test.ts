@@ -4,7 +4,6 @@ import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { parseSettingsMutation, handleSettingsMutation } from "./settings"
 import { CertificateRepo, type UserCertificate } from "~/lib/services/CertificateRepo.server"
-import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import type { AuthInfo } from "~/lib/auth.server"
 import { truncateAll, testRunEffect } from "~/test/test-runtime"
 
@@ -211,7 +210,13 @@ describe("parseSettingsMutation — renewCert", () => {
 })
 
 describe("handleSettingsMutation — renewCert", () => {
-  const seedCert = (over: { serialNumber: string; username?: string; label?: string | null; issuedAt?: Date }) =>
+  const seedCert = (over: {
+    serialNumber: string
+    username?: string
+    label?: string | null
+    issuedAt?: Date
+    renewedFromSerial?: string
+  }) =>
     testRunEffect(
       Effect.gen(function* () {
         const repo = yield* CertificateRepo
@@ -220,6 +225,7 @@ describe("handleSettingsMutation — renewCert", () => {
           email: "test@example.com",
           label: over.label ?? null,
           serialNumber: over.serialNumber,
+          renewedFromSerial: over.renewedFromSerial ?? null,
           issuedAt: over.issuedAt ?? new Date(Date.now() - 60 * 86_400_000),
           expiresAt: new Date(Date.now() + 5 * 86_400_000),
         })
@@ -239,14 +245,6 @@ describe("handleSettingsMutation — renewCert", () => {
       }) as Effect.Effect<UserCertificate[], never, never>,
     )
 
-  const lastCertRenewalAt = () =>
-    testRunEffect(
-      Effect.gen(function* () {
-        const prefs = yield* PreferencesRepo
-        return (yield* prefs.getLastCertRenewal(auth.user!)).at
-      }) as Effect.Effect<Date | null, never, never>,
-    )
-
   it("issues a replacement carrying the old device's name and lineage", async () => {
     await seedCert({ serialNumber: "SN-RENEW", label: "MacBook Pro" })
 
@@ -257,11 +255,22 @@ describe("handleSettingsMutation — renewCert", () => {
     expect(replacement!.label).toBe("MacBook Pro")
   })
 
-  it("does not spend the per-user new-device budget", async () => {
-    await seedCert({ serialNumber: "SN-BUDGET" })
-    await renew("SN-BUDGET")
-    // Rescuing an expiring device must not block adding a different one.
-    expect(await lastCertRenewalAt()).toBeNull()
+  it("does not spend a new-device slot", async () => {
+    // Rescuing an expiring device must not block adding a different one, so
+    // exercise the real consequence: three renewals still leave the budget free.
+    for (const sn of ["SN-B1", "SN-B2", "SN-B3"]) {
+      await seedCert({ serialNumber: sn })
+      await renew(sn)
+    }
+    expect(
+      await testRunEffect(
+        handleSettingsMutation({ intent: "issueCert", delivery: "link", auth }) as Effect.Effect<
+          unknown,
+          unknown,
+          never
+        >,
+      ),
+    ).toMatchObject({ certLinkReady: true })
   })
 
   it("issueCert with link delivery returns the claim link instead of emailing", async () => {
@@ -275,167 +284,64 @@ describe("handleSettingsMutation — renewCert", () => {
     // The claim URL rides the public (join) edge the email uses — never the
     // mTLS-gated host the admin happens to be browsing.
     expect(r.claimUrl).toBe(`https://join.daddyshome.fr/cert/${r.revealToken}`)
-    // the QR flow spends the same per-user budget as the email flow
-    expect(await lastCertRenewalAt()).not.toBeNull()
   })
 
-  it("issueCert still stamps the per-user budget", async () => {
-    expect(
-      await testRunEffect(
-        handleSettingsMutation({ intent: "issueCert", delivery: "email", auth }) as Effect.Effect<
-          unknown,
-          unknown,
-          never
-        >,
-      ),
-    ).toMatchObject({ certSent: true })
-    expect(await lastCertRenewalAt()).not.toBeNull()
-  })
-
-  describe("recovering an interrupted setup", () => {
-    const issueLink = async () => {
-      const result = await testRunEffect(
+  describe("the rolling new-device budget", () => {
+    const issue = () =>
+      testRunEffect(
         handleSettingsMutation({ intent: "issueCert", delivery: "link", auth }) as Effect.Effect<
           unknown,
           unknown,
           never
         >,
       )
-      return result as { revealToken: string; claimUrl: string }
-    }
 
-    it("showClaimLink re-opens the SAME setup without issuing anything or spending the budget", async () => {
-      const first = await issueLink()
-      const spentAt = await lastCertRenewalAt()
-      const before = await certsFor(auth.user!)
+    it("allows a burst of three, then rate-limits the fourth", async () => {
+      // The case a 1/day limit turned into a three-day chore: one person
+      // arriving with a phone, a laptop and a tablet.
+      for (let i = 0; i < 3; i++) expect(await issue()).toMatchObject({ certLinkReady: true })
 
-      const again = (await testRunEffect(
-        handleSettingsMutation({ intent: "showClaimLink", auth }) as Effect.Effect<unknown, unknown, never>,
-      )) as { certLinkReady: true; revealToken: string; claimUrl: string }
-
-      expect(again.certLinkReady).toBe(true)
-      // A fresh token (the original is only stored hashed) for the same cert.
-      expect(again.revealToken).not.toBe(first.revealToken)
-      expect(await certsFor(auth.user!)).toHaveLength(before.length)
-      // The budget is neither spent again nor refunded — nothing happened to it.
-      expect(await lastCertRenewalAt()).toEqual(spentAt)
-      expect(again.claimUrl).toBe(`https://join.daddyshome.fr/cert/${again.revealToken}`)
+      const fourth = (await issue()) as { rateLimited?: true; nextAvailable?: string }
+      expect(fourth.rateLimited).toBe(true)
+      expect(new Date(fourth.nextAvailable!).getTime()).toBeGreaterThan(Date.now())
     })
 
-    it("showClaimLink says so when nothing is waiting", async () => {
-      const result = await testRunEffect(
-        handleSettingsMutation({ intent: "showClaimLink", auth }) as Effect.Effect<unknown, unknown, never>,
-      )
-      expect(result).toMatchObject({ certError: "No device setup is waiting." })
-    })
+    it("frees a slot as soon as one of today's devices is revoked", async () => {
+      for (let i = 0; i < 3; i++) await issue()
+      expect(await issue()).toMatchObject({ rateLimited: true })
 
-    it("revoking the cert that spent the budget refunds it — add another straight away", async () => {
-      await issueLink()
-      expect(await lastCertRenewalAt()).not.toBeNull()
-      const [cert] = await certsFor(auth.user!)
-
-      const revoked = await testRunEffect(
-        handleSettingsMutation({
-          intent: "revokeCert",
-          serialNumber: cert.serialNumber,
-          auth,
-        }) as Effect.Effect<unknown, unknown, never>,
-      )
-      expect(revoked).toMatchObject({ certRevoked: true })
-
-      // Budget back, so the very next issue succeeds instead of rate-limiting.
-      expect(await lastCertRenewalAt()).toBeNull()
-      expect(
-        await testRunEffect(
-          handleSettingsMutation({ intent: "issueCert", delivery: "link", auth }) as Effect.Effect<
-            unknown,
-            unknown,
-            never
-          >,
-        ),
-      ).toMatchObject({ certLinkReady: true })
-    })
-
-    it("revoking an UNRELATED device does not refund the budget", async () => {
-      // Otherwise a session holder could trade a list of stale devices for a
-      // list of fresh 90-day certificates.
-      await seedCert({ serialNumber: "SN-OLD" })
-      await issueLink()
-      const spentAt = await lastCertRenewalAt()
-      expect(spentAt).not.toBeNull()
-
+      const [first] = await certsFor(auth.user!)
       await testRunEffect(
-        handleSettingsMutation({ intent: "revokeCert", serialNumber: "SN-OLD", auth }) as Effect.Effect<
+        handleSettingsMutation({ intent: "revokeCert", serialNumber: first.serialNumber, auth }) as Effect.Effect<
           unknown,
           unknown,
           never
         >,
       )
 
-      expect(await lastCertRenewalAt()).toEqual(spentAt)
-      expect(
-        await testRunEffect(
-          handleSettingsMutation({ intent: "issueCert", delivery: "link", auth }) as Effect.Effect<
-            unknown,
-            unknown,
-            never
-          >,
-        ),
-      ).toMatchObject({ rateLimited: true })
-    })
-  })
-
-  describe("emailRevealLink — the dialog's 'email me this link' fallback", () => {
-    /** Issue via link delivery and hand back the live token. */
-    const issueLink = async (who: AuthInfo = auth) => {
-      const result = await testRunEffect(
-        handleSettingsMutation({ intent: "issueCert", delivery: "link", auth: who }) as Effect.Effect<
-          unknown,
-          unknown,
-          never
-        >,
-      )
-      return (result as { revealToken: string }).revealToken
-    }
-
-    it("emails the SAME token without minting a second cert or re-spending the budget", async () => {
-      const token = await issueLink()
-      const before = await certsFor(auth.user!)
-      const result = await testRunEffect(
-        handleSettingsMutation({ intent: "emailRevealLink", revealToken: token, auth }) as Effect.Effect<
-          unknown,
-          unknown,
-          never
-        >,
-      )
-      expect(result).toMatchObject({ certSent: true })
-      // same token → same cert; nothing new was issued
-      expect(await certsFor(auth.user!)).toHaveLength(before.length)
+      // No refund bookkeeping — the revoked cert simply stops occupying a slot.
+      expect(await issue()).toMatchObject({ certLinkReady: true })
     })
 
-    it("refuses another user's token without an existence oracle", async () => {
-      const token = await issueLink()
-      const mallory: AuthInfo = { sub: "m-sub", user: "mallory", email: "m@example.com", groups: ["users"] }
-      const result = await testRunEffect(
-        handleSettingsMutation({ intent: "emailRevealLink", revealToken: token, auth: mallory }) as Effect.Effect<
-          unknown,
-          unknown,
-          never
-        >,
-      )
-      // Indistinguishable from a token that never existed.
-      expect(result).toMatchObject({ certError: "Link not found" })
+    it("does not count devices set up more than a day ago", async () => {
+      const old = new Date(Date.now() - 25 * 60 * 60 * 1000)
+      for (const sn of ["SN-OLD-1", "SN-OLD-2", "SN-OLD-3"]) await seedCert({ serialNumber: sn, issuedAt: old })
+      expect(await issue()).toMatchObject({ certLinkReady: true })
     })
 
-    it("refuses a token that never existed", async () => {
-      const result = await testRunEffect(
-        handleSettingsMutation({ intent: "emailRevealLink", revealToken: "nope", auth }) as Effect.Effect<
-          unknown,
-          unknown,
-          never
-        >,
-      )
-      expect(result).toMatchObject({ certError: "Link not found" })
+    it("does not count renewals — replacing a device never uses a new-device slot", async () => {
+      await seedCert({ serialNumber: "SN-BASE", issuedAt: new Date() })
+      for (let i = 0; i < 3; i++) {
+        await seedCert({ serialNumber: `SN-RENEW-${i}`, issuedAt: new Date(), renewedFromSerial: "SN-BASE" })
+      }
+      expect(await issue()).toMatchObject({ certLinkReady: true })
+    })
+
+    it("counts per user — another account's devices do not consume yours", async () => {
+      for (const sn of ["SN-M1", "SN-M2", "SN-M3"]) {
+        await seedCert({ serialNumber: sn, username: "mallory", issuedAt: new Date() })
+      }
+      expect(await issue()).toMatchObject({ certLinkReady: true })
     })
   })
 

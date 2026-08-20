@@ -35,15 +35,13 @@ beforeEach(() => {
 })
 
 describe("/devices loader", () => {
-  it("packages email + cert renewal + certificates", async () => {
-    mockRunEffect.mockResolvedValue({
-      lastCertRenewalAt: "2026-01-01T00:00:00.000Z",
-      certificates: [{ id: "c1" }],
-    } as never)
+  it("packages email + device budget + certificates", async () => {
+    const budget = { used: 1, limit: 3, nextAvailable: null }
+    mockRunEffect.mockResolvedValue({ budget, certificates: [{ id: "c1" }] } as never)
     const result = await callLoader(loader)
-    const data = expectData<{ email: string; lastCertRenewalAt: string | null; certificates: unknown[] }>(result)
+    const data = expectData<{ email: string; budget: typeof budget; certificates: unknown[] }>(result)
     expect(data.email).toBe("a@example.com")
-    expect(data.lastCertRenewalAt).toBe("2026-01-01T00:00:00.000Z")
+    expect(data.budget).toEqual(budget)
     expect(data.certificates).toEqual([{ id: "c1" }])
     // The one-time password is never handed to this page — it is revealed from
     // the emailed link only.
@@ -98,7 +96,7 @@ describe("DevicesPage component", () => {
         Component: DevicesPage as never,
         loader: () => ({
           email: "a@example.com",
-          lastCertRenewalAt: null,
+          budget: { used: 0, limit: 3, nextAvailable: null },
           certificates: [
             {
               id: "c1",

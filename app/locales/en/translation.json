@@ -245,8 +245,8 @@
       "emailing": "Sending…",
       "emailSent": "Sent — check your inbox.",
       "preparing": "Preparing your device link…",
-      "cooldownTitle": "You already added a device today",
-      "cooldownBody": "Each account can set up one new device per day. You can add another one {{time}}. Renewing an existing device is never blocked.",
+      "cooldownTitle": "You've used today's device setups",
+      "cooldownBody": "You can set up {{limit}} new devices a day — a slot frees up {{time}}. Revoking one of today's new devices frees its slot right away, and renewing an existing device is never blocked.",
       "errorTitle": "Couldn’t create the link",
       "retry": "Try again"
     },

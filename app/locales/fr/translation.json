@@ -245,8 +245,8 @@
       "emailing": "Envoi…",
       "emailSent": "Envoyé — consultez votre boîte mail.",
       "preparing": "Préparation de votre lien…",
-      "cooldownTitle": "Vous avez déjà ajouté un appareil aujourd’hui",
-      "cooldownBody": "Chaque compte peut configurer un nouvel appareil par jour. Vous pourrez en ajouter un autre {{time}}. Le renouvellement d’un appareil existant n’est jamais bloqué.",
+      "cooldownTitle": "Vous avez utilisé vos configurations du jour",
+      "cooldownBody": "Vous pouvez configurer {{limit}} nouveaux appareils par jour — une place se libère {{time}}. Révoquer un des nouveaux appareils du jour libère sa place immédiatement, et le renouvellement d’un appareil existant n’est jamais bloqué.",
       "errorTitle": "Impossible de créer le lien",
       "retry": "Réessayer"
     },
