@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import { useFetcher, useRevalidator } from "react-router"
 import { useTranslation } from "react-i18next"
+import { useLinkTarget } from "~/hooks/useLinkTarget"
 import { Alert, Button, Dialog, Inline, LinkButton, Spinner, Stack, Text } from "@duro-app/ui"
 import { RequestAccessForm } from "~/components/RequestAccessForm/RequestAccessForm"
 import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
@@ -127,6 +128,7 @@ export function OutcomePanel({
   onClose: () => void
 }) {
   const { t } = useTranslation()
+  const linkProps = useLinkTarget()
   const app = appName ?? t("header.requestDialog.outcome.thisApp")
   const isGranted = outcome === "auto_approved"
 
@@ -135,7 +137,7 @@ export function OutcomePanel({
       <Alert variant={isGranted ? "success" : "info"}>{t(`header.requestDialog.outcome.${outcome}`, { app })}</Alert>
       <Inline gap="sm" justify="end">
         {isGranted && appUrl ? (
-          <LinkButton href={appUrl} target="_blank" variant="primary">
+          <LinkButton href={appUrl} variant="primary" {...linkProps}>
             {t("header.requestDialog.outcome.open", { app })}
           </LinkButton>
         ) : (

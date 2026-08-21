@@ -1,17 +1,7 @@
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { AppGrid } from "./AppGrid"
 import type { AppDefinition } from "~/lib/apps"
-
-// react-router's Link is the only dependency that needs stubbing — AppCard
-// uses it for the "open app" anchor.
-vi.mock("react-router", () => ({
-  Link: ({ children, to, ...rest }: { children: React.ReactNode; to: string }) => (
-    <a href={to} {...rest}>
-      {children}
-    </a>
-  ),
-}))
 
 const app = (overrides: Partial<AppDefinition> & Pick<AppDefinition, "id" | "category">): AppDefinition => ({
   name: overrides.id,

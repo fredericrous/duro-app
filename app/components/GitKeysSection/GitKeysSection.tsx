@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { css, html } from "react-strict-dom"
 import { useTranslation } from "react-i18next"
+import { useLinkTarget } from "~/hooks/useLinkTarget"
 import { useFetcher, useRevalidator } from "react-router"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
@@ -107,6 +108,7 @@ function errorMessage(code: GitKeysErrorCode, t: (key: string, opts?: Record<str
 
 export function GitKeysSection({ status, keys, username, gitWebUrl, heading }: GitKeysSectionProps) {
   const { t } = useTranslation()
+  const linkProps = useLinkTarget()
   const { formatDate } = useDisplayFormat()
   const revalidator = useRevalidator()
   const fetcher = useFetcher<SettingsGitKeysResult>()
@@ -265,7 +267,7 @@ export function GitKeysSection({ status, keys, username, gitWebUrl, heading }: G
               </Stack>
             </Callout>
             <Inline gap="sm">
-              <LinkButton href={gitWebUrl} target="_blank" rel="noopener noreferrer" variant="primary">
+              <LinkButton href={gitWebUrl} variant="primary" {...linkProps}>
                 {t("settings.git.openForge")}
               </LinkButton>
               <Button
@@ -349,7 +351,7 @@ export function GitKeysSection({ status, keys, username, gitWebUrl, heading }: G
             <Text as="span" variant="bodySm" color="muted">
               {t("settings.git.account", { username })}
             </Text>
-            <LinkButton href={gitWebUrl} target="_blank" rel="noopener noreferrer" variant="secondary" size="small">
+            <LinkButton href={gitWebUrl} variant="secondary" size="small" {...linkProps}>
               {t("settings.git.openForge")}
             </LinkButton>
           </Inline>

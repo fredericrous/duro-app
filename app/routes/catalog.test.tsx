@@ -227,7 +227,10 @@ describe("CatalogPage component — populated", () => {
     })
     const learnMore = screen.getByRole("link", { name: /Learn more/i })
     expect(learnMore).toHaveAttribute("href", "https://www.plex.tv")
-    expect(learnMore).toHaveAttribute("target", "_blank")
+    // Same tab by default now — leaving Duro is governed by the user's
+    // "open links in a new tab" preference (see useLinkTarget), not hardcoded.
+    expect(learnMore).not.toHaveAttribute("target")
+    expect(learnMore).not.toHaveAttribute("rel")
   })
 
   it("omits the Learn more link when the app has no homepage", async () => {

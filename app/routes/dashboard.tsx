@@ -11,6 +11,7 @@ import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { expiryStatus } from "~/lib/cert-status"
 import { DisplayPrefsProvider } from "~/hooks/useDisplayFormat"
+import { LinkTargetProvider } from "~/hooks/useLinkTarget"
 
 export async function loader({ request }: Route.LoaderArgs) {
   // First-run shortcut: if there are no human users yet, send the visitor
@@ -65,15 +66,19 @@ export async function loader({ request }: Route.LoaderArgs) {
     )
   }
 
-  // Display prefs (timezone + clock) so every descendant can render timestamps
-  // the way the user chose — read via useDisplayFormat(). One cheap lookup;
-  // falls back to the client/locale defaults when unset or on error.
-  const displayPrefs = await runEffect(
+  // The user's presentation preferences, read once for the whole dashboard
+  // tree: how timestamps render (useDisplayFormat) and whether links that leave
+  // Duro open in a new tab (useLinkTarget). Batched into a single runEffect
+  // because they are two columns of the same one-row lookup. Falls back to the
+  // client/locale defaults and same-tab when unset or on error.
+  const userPrefs = await runEffect(
     Effect.gen(function* () {
       const prefs = yield* PreferencesRepo
-      return yield* prefs.getDisplayPrefs(auth.user!)
+      const display = yield* prefs.getDisplayPrefs(auth.user!)
+      const openLinksInNewTab = yield* prefs.getOpenLinksInNewTab(auth.user!)
+      return { ...display, openLinksInNewTab }
     }),
-  ).catch(() => ({ timezone: null, timeFormat: null }))
+  ).catch(() => ({ timezone: null, timeFormat: null, openLinksInNewTab: false }))
 
   // Certificates that are expired or expire within a week, so the header can
   // badge "Devices". A cert lapsing is the one piece of account upkeep nobody
@@ -100,15 +105,18 @@ export async function loader({ request }: Route.LoaderArgs) {
     currentPrincipalId,
     openRequestItems,
     certAlerts,
-    timezone: displayPrefs.timezone,
-    timeFormat: displayPrefs.timeFormat,
+    timezone: userPrefs.timezone,
+    timeFormat: userPrefs.timeFormat,
+    openLinksInNewTab: userPrefs.openLinksInNewTab,
   }
 }
 
 export default function DashboardLayout({ loaderData }: Route.ComponentProps) {
   return (
     <DisplayPrefsProvider value={{ timezone: loaderData.timezone, timeFormat: loaderData.timeFormat }}>
-      <Outlet />
+      <LinkTargetProvider value={loaderData.openLinksInNewTab}>
+        <Outlet />
+      </LinkTargetProvider>
     </DisplayPrefsProvider>
   )
 }

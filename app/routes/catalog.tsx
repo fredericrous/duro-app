@@ -3,6 +3,7 @@ import { Effect } from "effect"
 import type { Route } from "./+types/catalog"
 import { Link, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
+import { useLinkTarget } from "~/hooks/useLinkTarget"
 import { Badge, Button, Callout, EmptyState, Inline, LinkButton, PageShell, Stack, Table, Text } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
@@ -166,6 +167,8 @@ function CatalogBody({
   iconBySlug: Record<string, string>
 }) {
   const { t } = useTranslation()
+  // Hoisted out of the row map below — a hook must not be called per row.
+  const linkProps = useLinkTarget()
   const appsCatalog = use(promise)
   const { query, deferredQuery, selected, setQuery, setSelected, clearAll } = useAppSearchParams("state")
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -296,12 +299,7 @@ function CatalogBody({
                           </Text>
                         )}
                         {entry.app.homepage && (
-                          <html.a
-                            href={entry.app.homepage}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={styles.learnMore}
-                          >
+                          <html.a href={entry.app.homepage} style={styles.learnMore} {...linkProps}>
                             {t("apps.learnMore")} ↗
                           </html.a>
                         )}
@@ -344,7 +342,7 @@ function CatalogBody({
                         </Link>
                       )}
                       {entry.state === "open" && entry.app.url && (
-                        <LinkButton href={entry.app.url} variant="secondary" target="_blank" rel="noopener noreferrer">
+                        <LinkButton href={entry.app.url} variant="secondary" {...linkProps}>
                           {t("apps.openLaunch")}
                         </LinkButton>
                       )}

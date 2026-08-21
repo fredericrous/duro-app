@@ -30,6 +30,7 @@ export type SettingsMutation =
   | { intent: "saveLocale"; locale: string; auth: AuthInfo }
   | { intent: "saveDisplayPrefs"; timezone: string | null; timeFormat: string | null; auth: AuthInfo }
   | { intent: "saveTheme"; theme: string; auth: AuthInfo }
+  | { intent: "saveOpenInNewTab"; openInNewTab: boolean; auth: AuthInfo }
 
 export type SettingsResult =
   | { certSent: true }
@@ -39,6 +40,7 @@ export type SettingsResult =
   | { certRevoked: true }
   | { certRenamed: true }
   | { displayPrefsSaved: true }
+  | { openInNewTabSaved: true }
   | { error: string }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +242,21 @@ function handleSaveDisplayPrefs(timezone: string | null, timeFormat: string | nu
   )
 }
 
+function handleSaveOpenInNewTab(openInNewTab: boolean, auth: AuthInfo) {
+  return Effect.gen(function* () {
+    const prefs = yield* PreferencesRepo
+    yield* prefs.setOpenLinksInNewTab(auth.user!, openInNewTab)
+    // No cookie / no _redirect marker (unlike saveLocale and saveTheme): only
+    // the dashboard layout loader reads this, and it revalidates after the
+    // fetcher post — nothing above it in the tree paints with the value.
+    return { openInNewTabSaved: true as const } as SettingsResult
+  }).pipe(
+    Effect.catchAll((e) =>
+      Effect.succeed({ error: errorMessage(e, "Failed to save the link-target preference") } as SettingsResult),
+    ),
+  )
+}
+
 function handleSaveTheme(theme: string, auth: AuthInfo) {
   return Effect.gen(function* () {
     if (!isThemePreference(theme)) {
@@ -287,6 +304,8 @@ export function handleSettingsMutation(mutation: SettingsMutation) {
       return handleSaveLocale(mutation.locale, mutation.auth)
     case "saveDisplayPrefs":
       return handleSaveDisplayPrefs(mutation.timezone, mutation.timeFormat, mutation.auth)
+    case "saveOpenInNewTab":
+      return handleSaveOpenInNewTab(mutation.openInNewTab, mutation.auth)
     case "saveTheme":
       return handleSaveTheme(mutation.theme, mutation.auth)
   }
@@ -334,6 +353,17 @@ export function parseSettingsMutation(formData: FormData, auth: AuthInfo): Setti
     const serialNumber = formData.get("serialNumber") as string
     if (!serialNumber) return { error: "Missing serial number" }
     return { intent, serialNumber, label: parseLabel(formData.get("label")), auth }
+  }
+  if (intent === "saveOpenInNewTab") {
+    // FormData is strings, and the traps run both ways: Boolean("false") is
+    // true, and a native unchecked checkbox omits the key entirely, so "absent"
+    // would be indistinguishable from "off". The UI always submits an explicit
+    // "true"/"false", so accept only those — anything else surfaces as the
+    // page's error Alert instead of silently persisting false forever, which
+    // being the default would look exactly like the feature working.
+    const raw = formData.get("openInNewTab")
+    if (raw !== "true" && raw !== "false") return { error: "Invalid link-target preference" }
+    return { intent, openInNewTab: raw === "true", auth }
   }
   if (intent === "saveTheme") {
     const theme = formData.get("theme") as string

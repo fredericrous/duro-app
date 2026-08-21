@@ -100,7 +100,14 @@ describe("GeneralSettings component", () => {
       route: {
         path: "/settings",
         Component: GeneralSettings as never,
-        loader: () => ({ locale: "en", timezone: null, timeFormat: null, currentLocale: "en", theme: "system" }),
+        loader: () => ({
+          locale: "en",
+          timezone: null,
+          timeFormat: null,
+          currentLocale: "en",
+          theme: "system",
+          openLinksInNewTab: false,
+        }),
       },
     })
     await waitFor(() => {
@@ -121,7 +128,14 @@ describe("GeneralSettings component", () => {
       route: {
         path: "/settings",
         Component: GeneralSettings as never,
-        loader: () => ({ locale: "en", timezone: null, timeFormat: null, currentLocale: "en", theme: "system" }),
+        loader: () => ({
+          locale: "en",
+          timezone: null,
+          timeFormat: null,
+          currentLocale: "en",
+          theme: "system",
+          openLinksInNewTab: false,
+        }),
         action: async ({ request }: { request: Request }) => {
           const fd = await request.formData()
           submitted.push(Object.fromEntries(fd) as Record<string, string>)
@@ -146,12 +160,53 @@ describe("GeneralSettings component", () => {
     expect(await screen.findByText(t("settings.saved"))).toBeInTheDocument()
   })
 
+  it("saves the link-target preference the moment the switch flips", async () => {
+    const submitted: Record<string, string>[] = []
+    renderRoute({
+      route: {
+        path: "/settings",
+        Component: GeneralSettings as never,
+        loader: () => ({
+          locale: "en",
+          timezone: null,
+          timeFormat: null,
+          currentLocale: "en",
+          theme: "system",
+          openLinksInNewTab: false,
+        }),
+        action: async ({ request }: { request: Request }) => {
+          const fd = await request.formData()
+          submitted.push(Object.fromEntries(fd) as Record<string, string>)
+          return { openInNewTabSaved: true }
+        },
+      },
+    })
+
+    fireEvent.click(await screen.findByRole("switch", { name: t("settings.links.newTabLabel") }))
+
+    await waitFor(() => expect(submitted.length).toBeGreaterThan(0))
+    expect(submitted[0].intent).toBe("saveOpenInNewTab")
+    // The literal string the parser demands — this assertion and the parser
+    // test meet in the middle, so a change to either encoding breaks a test
+    // rather than silently persisting the wrong value.
+    expect(submitted[0].openInNewTab).toBe("true")
+
+    expect(await screen.findByText(t("settings.saved"))).toBeInTheDocument()
+  })
+
   it("announces the save that language and theme complete after their reload", async () => {
     renderRoute({
       route: {
         path: "/settings",
         Component: GeneralSettings as never,
-        loader: () => ({ locale: "en", timezone: null, timeFormat: null, currentLocale: "en", theme: "system" }),
+        loader: () => ({
+          locale: "en",
+          timezone: null,
+          timeFormat: null,
+          currentLocale: "en",
+          theme: "system",
+          openLinksInNewTab: false,
+        }),
       },
       url: "/settings?saved=1",
     })
@@ -166,7 +221,14 @@ describe("GeneralSettings component", () => {
       route: {
         path: "/settings",
         Component: GeneralSettings as never,
-        loader: () => ({ locale: "en", timezone: null, timeFormat: null, currentLocale: "en", theme: "system" }),
+        loader: () => ({
+          locale: "en",
+          timezone: null,
+          timeFormat: null,
+          currentLocale: "en",
+          theme: "system",
+          openLinksInNewTab: false,
+        }),
         action: async () => {
           // Hold the request open so the pending state is observable — on a
           // fast link it would otherwise be gone before the assertion runs.
@@ -199,7 +261,14 @@ describe("GeneralSettings component", () => {
       route: {
         path: "/settings",
         Component: GeneralSettings as never,
-        loader: () => ({ locale: "en", timezone: null, timeFormat: null, currentLocale: "en", theme: "system" }),
+        loader: () => ({
+          locale: "en",
+          timezone: null,
+          timeFormat: null,
+          currentLocale: "en",
+          theme: "system",
+          openLinksInNewTab: false,
+        }),
       },
     })
     await waitFor(() => {
