@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Duro">
+  <!--
+    Maskable variant: Android crops to a circle inscribed in the inner 80%, so
+    the ground bleeds edge to edge (no rounded corners to lose) and the glyph
+    is scaled to ~60% and centred, keeping it inside the safe zone whatever
+    mask the launcher applies.
+  -->
+  <rect width="512" height="512" fill="#6aaffc" />
+  <g transform="translate(256 256) scale(0.62) translate(-256 -256)">
+    <path
+      fill="#0f1720"
+      d="M160 128h104c70.7 0 128 57.3 128 128s-57.3 128-128 128H160V128zm72 64v128h32c35.3 0 64-28.7 64-64s-28.7-64-64-64h-32z"
+    />
+  </g>
+</svg>

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Duro">
+  <!--
+    Icon master for the PWA rasters. The "D" is a PATH, not <text>: librsvg
+    resolves fonts through fontconfig and does not map the CSS generic
+    `system-ui`, so a text-based source rasterises with whatever sans happens
+    to be installed — different on every machine and in CI. Geometry renders
+    identically everywhere.
+
+    Ground and ink match public/favicon.svg (#6aaffc on #0f1720).
+  -->
+  <rect width="512" height="512" rx="112" fill="#6aaffc" />
+  <path
+    fill="#0f1720"
+    d="M160 128h104c70.7 0 128 57.3 128 128s-57.3 128-128 128H160V128zm72 64v128h32c35.3 0 64-28.7 64-64s-28.7-64-64-64h-32z"
+  />
+</svg>

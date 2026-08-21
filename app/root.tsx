@@ -107,6 +107,14 @@ export function Layout({ children }: { children: ReactNode }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        {/* crossOrigin is load-bearing, not decoration: a manifest is fetched
+            with credentials omitted unless the link says otherwise (true even
+            same-origin), and this origin sits behind Authelia ext-auth — an
+            uncredentialed fetch gets a 302 to the auth host, the manifest
+            fails to parse, and the browser just reports "no manifest". */}
+        <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
+        <meta name="theme-color" content="#0f0f0f" />
         <Meta />
         <Links />
       </head>
