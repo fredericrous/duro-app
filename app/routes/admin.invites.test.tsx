@@ -102,9 +102,11 @@ describe("/admin/invites action", () => {
 // Component-render tests
 // ===========================================================================
 
-import { screen, waitFor } from "@testing-library/react"
+import { screen, waitFor, within } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import AdminInvitesPage from "./admin.invites"
 import { renderRoute } from "~/test/render-route"
+import { t } from "~/test/test-utils"
 
 const renderPage = (
   data: {
@@ -239,5 +241,109 @@ describe("InviteFunnel delivery rendering", () => {
   it("shows a deferred hint while delivery is still retrying", async () => {
     renderPage({ pendingInvites: [sentInvite({ deliveryStatus: "deferred" })] })
     await waitFor(() => expect(screen.getByText(/retrying/i)).toBeInTheDocument())
+  })
+})
+
+// =============================================================================
+// Page component — the two send buttons and the QR dialog
+// =============================================================================
+
+/** Every FormData the page posts, so a test can assert what reached the server. */
+let posted: FormData[] = []
+
+/** Like `renderPage`, but with an action that records what the form posted. */
+function renderPageWithAction(actionResult: unknown = { success: true, message: "ok" }) {
+  posted = []
+  return renderRoute({
+    parentLoaderId: "routes/dashboard",
+    parentLoader: () => ({ user: "admin", isAdmin: true }),
+    route: {
+      path: "/admin/invites",
+      Component: AdminInvitesPage as never,
+      loader: () => ({
+        groups: [{ id: 1, displayName: "family" }],
+        pendingInvites: [],
+        failedInvites: [],
+        checklist: { showAddApplication: false, showInviteTeammate: false, showConfigurePlugins: false },
+      }),
+      action: async ({ request }: { request: Request }) => {
+        const form = await request.formData()
+        posted.push(form)
+        return actionResult
+      },
+    },
+  })
+}
+
+const addEmail = async (value: string) => {
+  // The stub router resolves the loader asynchronously, so the form isn't
+  // mounted on the first tick.
+  const input = await screen.findByPlaceholderText(t("admin.invites.emailPlaceholder"))
+  await userEvent.type(input, `${value}{Enter}`)
+}
+
+describe("/admin/invites page", () => {
+  it("keeps both send buttons disabled until an email AND a group are chosen", async () => {
+    renderPageWithAction()
+    const send = await screen.findByRole("button", { name: t("admin.invites.submit") })
+    const qr = screen.getByRole("button", { name: t("admin.invites.qr.button") })
+    expect(send).toBeDisabled()
+    expect(qr).toBeDisabled()
+
+    await addEmail("alice@example.com")
+    // An email alone isn't enough — the invite would grant no access.
+    expect(send).toBeDisabled()
+    expect(qr).toBeDisabled()
+
+    await userEvent.click(screen.getByRole("checkbox", { name: "family" }))
+    expect(send).toBeEnabled()
+    expect(qr).toBeEnabled()
+  })
+
+  it("keeps only the QR button disabled for a multi-recipient invite", async () => {
+    renderPageWithAction()
+    await addEmail("alice@example.com")
+    await addEmail("bob@example.com")
+    await userEvent.click(screen.getByRole("checkbox", { name: "family" }))
+
+    expect(screen.getByRole("button", { name: t("admin.invites.submit") })).toBeEnabled()
+    expect(screen.getByRole("button", { name: t("admin.invites.qr.button") })).toBeDisabled()
+    expect(screen.getByText(t("admin.invites.qr.singleEmailHint"))).toBeInTheDocument()
+  })
+
+  it("posts delivery=link and shows the QR dialog naming the address to sign up with", async () => {
+    const expiresAt = new Date(Date.now() + 7 * 86_400_000).toISOString()
+    renderPageWithAction({
+      success: true,
+      message: "Invite ready for alice@example.com",
+      invite: { url: "https://join.example.com/invite/tok-1", email: "alice@example.com", expiresAt },
+    })
+    await addEmail("alice@example.com")
+    await userEvent.click(screen.getByRole("checkbox", { name: "family" }))
+    await userEvent.click(screen.getByRole("button", { name: t("admin.invites.qr.button") }))
+
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0].get("delivery")).toBe("link")
+    expect(posted[0].getAll("emails")).toEqual(["alice@example.com"])
+    expect(posted[0].getAll("groups")).toEqual(["1|family"])
+
+    const dialog = await screen.findByRole("dialog")
+    // The QR itself, and the one instruction that makes it usable: the account
+    // has to be created with the invited address.
+    expect(within(dialog).getByRole("img", { name: t("admin.invites.qr.alt") })).toBeInTheDocument()
+    expect(
+      within(dialog).getByText(t("admin.invites.qr.emailNote", undefined, { email: "alice@example.com" })),
+    ).toBeInTheDocument()
+  })
+
+  it("does not open the QR dialog for an ordinary emailed invite", async () => {
+    renderPageWithAction({ success: true, message: "Invite sent to alice@example.com" })
+    await addEmail("alice@example.com")
+    await userEvent.click(screen.getByRole("checkbox", { name: "family" }))
+    await userEvent.click(screen.getByRole("button", { name: t("admin.invites.submit") }))
+
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0].get("delivery")).toBe("email")
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
   })
 })

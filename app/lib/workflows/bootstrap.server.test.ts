@@ -90,7 +90,7 @@ const mockInviteRepo = (store = new Map<string, Invite>()) =>
           invitedBy: input.invitedBy,
         })
         store.set(id, inv)
-        return { id, token, openToken }
+        return { id, token, openToken, expiresAt: "2099-01-01T00:00:00.000Z" }
       }),
     findById: (id) => Effect.sync(() => store.get(id) ?? null),
     findByTokenHash: () => Effect.sync(() => null),

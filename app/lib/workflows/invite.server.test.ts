@@ -90,7 +90,7 @@ const mockInviteRepo = (store: Map<string, Invite> = new Map(), revocations: Rev
           invitedBy: input.invitedBy,
         })
         store.set(id, invite)
-        return { id, token, openToken }
+        return { id, token, openToken, expiresAt: "2099-01-01T00:00:00.000Z" }
       }),
     findById: (id) => Effect.sync(() => store.get(id) ?? null),
     findByTokenHash: (_hash) => Effect.sync(() => null),
@@ -444,6 +444,44 @@ describe("queueInvite", () => {
           mockCertManager(certCalls),
           mockEmailService(),
           mockCertificateRepo(certRepoCalls),
+          mockUserManager(),
+          mockPreferencesRepo(),
+          mockAudit,
+        ),
+      ),
+    )
+  })
+
+  it.effect("delivery:'link' issues the cert but sends no email, and returns the token + expiry", () => {
+    const store = new Map<string, Invite>()
+    const certCalls: { method: string; args: unknown[] }[] = []
+    const emailCalls: { method: string; args: unknown[] }[] = []
+
+    return queueInvite({
+      email: "alice@example.com",
+      groups: [1],
+      groupNames: ["friends"],
+      invitedBy: "admin",
+      delivery: "link",
+    }).pipe(
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          // The admin hands the link over themselves — nothing must be mailed,
+          // or the recipient gets two live paths to the same token.
+          expect(emailCalls).toHaveLength(0)
+          expect(result.success).toBe(true)
+          expect(result.token).toBeTruthy()
+          expect(result.expiresAt).toBeTruthy()
+          // The cert is still minted up front, exactly as for an emailed invite.
+          expect(certCalls.some((c) => c.method === "issueCertAndP12")).toBe(true)
+        }),
+      ),
+      Effect.provide(
+        Layer.mergeAll(
+          mockInviteRepo(store),
+          mockCertManager(certCalls),
+          mockEmailService(emailCalls),
+          mockCertificateRepo(),
           mockUserManager(),
           mockPreferencesRepo(),
           mockAudit,

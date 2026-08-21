@@ -143,7 +143,7 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
       groupNames: string[]
       invitedBy: string
       locale?: string
-    }) => Effect.Effect<{ id: string; token: string; openToken: string }, InviteError>
+    }) => Effect.Effect<{ id: string; token: string; openToken: string; expiresAt: string }, InviteError>
     readonly findByTokenHash: (tokenHash: string) => Effect.Effect<Invite | null, InviteError>
     readonly recordOpen: (openToken: string, userAgent: string | null) => Effect.Effect<void, InviteError>
     readonly recordClick: (tokenHash: string, userAgent: string | null) => Effect.Effect<void, InviteError>
@@ -296,7 +296,7 @@ export const InviteRepoLive = Layer.effect(
             "Failed to create invite",
           )
 
-          return { id, token, openToken }
+          return { id, token, openToken, expiresAt: expires }
         }),
 
       findByTokenHash: (tokenHash) =>
