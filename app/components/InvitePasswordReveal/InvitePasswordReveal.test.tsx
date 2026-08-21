@@ -5,9 +5,29 @@ import en from "~/locales/en/translation.json"
 import { renderRoute } from "~/test/render-route"
 
 vi.mock("~/components/ScratchCard/ScratchCard", () => ({
-  ScratchCard: ({ children, onReveal }: { children: React.ReactNode; onReveal: () => void }) => (
-    <div role="button" aria-label="scratch to reveal" onClick={onReveal}>
+  // Two phases, because they are the whole point: `onScratchStart` fires on
+  // the first contact (when the password must be fetched) and `onReveal` only
+  // once the foil is gone. A mock that fired them together would hide the
+  // regression where nothing sits under the foil while you scratch.
+  ScratchCard: ({
+    children,
+    onReveal,
+    onScratchStart,
+  }: {
+    children: React.ReactNode
+    onReveal: () => void
+    onScratchStart?: () => void
+  }) => (
+    <div>
       {children}
+      <button aria-label="start scratching" onClick={() => onScratchStart?.()} />
+      <button
+        aria-label="scratch to reveal"
+        onClick={() => {
+          onScratchStart?.()
+          onReveal()
+        }}
+      />
     </div>
   ),
 }))
@@ -50,6 +70,15 @@ describe("InvitePasswordReveal", () => {
     const copyBtn = await screen.findByRole("button", { name: en.invite.password.copy })
     expect(copyBtn).toBeDisabled()
     expect(screen.queryByDisplayValue("s3cret")).not.toBeInTheDocument()
+  })
+
+  it("puts the password under the foil as scratching STARTS, not when it ends", async () => {
+    renderReveal(true)
+
+    fireEvent.click(await screen.findByRole("button", { name: "start scratching" }))
+
+    expect(await screen.findByDisplayValue("s3cret")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: en.invite.password.copy })).toBeDisabled()
   })
 
   it("scratch fetches the password, enables copy and shows oneTime text", async () => {

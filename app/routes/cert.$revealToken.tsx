@@ -115,10 +115,17 @@ function PasswordCard() {
   )
   const { copied, copyFailed, copy } = useCopyFeedback()
 
-  const handleReveal = useCallback(() => {
-    onReveal()
-    fetcher.submit({ intent: "reveal" }, { method: "post" })
-  }, [fetcher, onReveal])
+  // Fetch on the FIRST scratch, not on the completed reveal. The secret still
+  // never rides a GET, but the round-trip now overlaps the scratching itself,
+  // so the password is already under the foil as it comes away — scratching a
+  // card that turns out to be empty until you finish defeats the whole point.
+  // Guarded because ScratchCard fires this once per card, and a re-submit
+  // after the burn would come back empty.
+  const requestPassword = useCallback(() => {
+    if (fetcher.state === "idle" && fetcher.data == null) {
+      fetcher.submit({ intent: "reveal" }, { method: "post" })
+    }
+  }, [fetcher])
 
   return (
     <Stack gap="xs">
@@ -128,7 +135,8 @@ function PasswordCard() {
           height={48}
           revealThreshold={0.8}
           initialRevealed={revealed}
-          onReveal={handleReveal}
+          onScratchStart={requestPassword}
+          onReveal={onReveal}
           label={t("common.scratchToReveal")}
         >
           <Input value={password ?? ""} readOnly />

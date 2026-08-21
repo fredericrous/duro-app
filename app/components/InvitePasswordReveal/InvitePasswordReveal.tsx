@@ -31,10 +31,13 @@ export function InvitePasswordReveal({ hasPassword }: { hasPassword: boolean }) 
   )
   const { copied, copy } = useCopyFeedback()
 
-  const handleReveal = useCallback(() => {
-    onReveal()
-    fetcher.submit({ intent: "reveal" }, { method: "post" })
-  }, [fetcher, onReveal])
+  // See cert.$revealToken: the fetch rides the START of the scratch so the
+  // password is behind the foil by the time it lifts, without ever riding a GET.
+  const requestPassword = useCallback(() => {
+    if (fetcher.state === "idle" && fetcher.data == null) {
+      fetcher.submit({ intent: "reveal" }, { method: "post" })
+    }
+  }, [fetcher])
 
   if (!hasPassword) {
     return (
@@ -72,7 +75,8 @@ export function InvitePasswordReveal({ hasPassword }: { hasPassword: boolean }) 
             height={48}
             revealThreshold={0.8}
             initialRevealed={revealed}
-            onReveal={handleReveal}
+            onScratchStart={requestPassword}
+            onReveal={onReveal}
             label={t("common.scratchToReveal")}
           >
             <Input value={p12Password ?? ""} readOnly />

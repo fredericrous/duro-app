@@ -8,9 +8,29 @@ vi.mock("~/lib/config.server", () => ({
 // ScratchCard wraps a <canvas> (no jsdom 2D context); swap it for a clickable
 // shim that fires onReveal — same pattern as InvitePasswordReveal.test.tsx.
 vi.mock("~/components/ScratchCard/ScratchCard", () => ({
-  ScratchCard: ({ children, onReveal }: { children: React.ReactNode; onReveal: () => void }) => (
-    <div role="button" aria-label="scratch to reveal" onClick={onReveal}>
+  // Two phases, because they are the whole point: `onScratchStart` fires on
+  // the first contact (when the password must be fetched) and `onReveal` only
+  // once the foil is gone. A mock that fired them together would hide the
+  // regression where nothing sits under the foil while you scratch.
+  ScratchCard: ({
+    children,
+    onReveal,
+    onScratchStart,
+  }: {
+    children: React.ReactNode
+    onReveal: () => void
+    onScratchStart?: () => void
+  }) => (
+    <div>
       {children}
+      <button aria-label="start scratching" onClick={() => onScratchStart?.()} />
+      <button
+        aria-label="scratch to reveal"
+        onClick={() => {
+          onScratchStart?.()
+          onReveal()
+        }}
+      />
     </div>
   ),
 }))
@@ -198,6 +218,23 @@ describe("CertRevealPage component", () => {
   // revalidation. Until the react-strict-dom mock cached its element types this
   // could not be tested at all — each re-render remounted the card, which
   // registered a fresh fetcher, which re-rendered, forever.
+  it("puts the password under the foil as scratching STARTS, not when it ends", async () => {
+    // The regression this guards: moving the secret off the GET made it arrive
+    // only after the reveal completed, so you scratched an empty card and then
+    // waited. The fetch has to ride the first contact instead.
+    renderReveal({ valid: true, revealed: false, email: "user@example.com", appName: "Duro" })
+
+    await screen.findByRole("button", { name: "start scratching" })
+    expect(screen.queryByDisplayValue("s3cret-pw")).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "start scratching" }))
+
+    // Present behind the foil before the card is anywhere near revealed...
+    expect(await screen.findByDisplayValue("s3cret-pw")).toBeInTheDocument()
+    // ...while the reveal-gated control stays disabled until the foil is gone.
+    expect(screen.getByRole("button", { name: t("invite.password.copy") })).toBeDisabled()
+  })
+
   it("scratch → reveal POST hands out the password, and it survives the burned-loader revalidation", async () => {
     let loaderCalls = 0
     renderRoute({
