@@ -29,6 +29,13 @@ export class PreferencesRepo extends Context.Tag("PreferencesRepo")<
       username: string,
       prefs: { timezone: string | null; timeFormat: string | null },
     ) => Effect.Effect<void, PreferencesError>
+    /**
+     * Whether links that leave Duro open in a new tab. NULL in the DB (the user
+     * never chose) collapses to false here — same-tab is the default, so no
+     * consumer has to re-derive that.
+     */
+    readonly getOpenLinksInNewTab: (username: string) => Effect.Effect<boolean>
+    readonly setOpenLinksInNewTab: (username: string, value: boolean) => Effect.Effect<void, PreferencesError>
     /** Stored theme choice, or null when the user hasn't picked one. */
     readonly getTheme: (username: string) => Effect.Effect<string | null>
     readonly setTheme: (username: string, theme: string) => Effect.Effect<void, PreferencesError>
@@ -122,6 +129,29 @@ export const PreferencesRepoLive = Layer.effect(
             Effect.asVoid,
           ),
           "Failed to set display preferences",
+        ),
+
+      getOpenLinksInNewTab: (username: string) =>
+        sql`SELECT open_links_in_new_tab FROM user_preferences WHERE username = ${username}`.pipe(
+          // @effect/sql-pg camelCases column names → open_links_in_new_tab =
+          // openLinksInNewTab. Reading the snake_case key here would silently
+          // return undefined forever (see getLastCertRenewal below).
+          // `=== true` rather than a truthiness check so a driver handing back
+          // null/undefined can never leak a non-boolean to callers.
+          Effect.map(
+            (rows) => (rows[0] as { openLinksInNewTab?: boolean | null } | undefined)?.openLinksInNewTab === true,
+          ),
+          Effect.catchAll(() => Effect.succeed(false)),
+        ),
+
+      setOpenLinksInNewTab: (username: string, value: boolean) =>
+        withErr(
+          sql`INSERT INTO user_preferences (username, locale, updated_at, open_links_in_new_tab)
+              VALUES (${username}, 'en', NOW(), ${value})
+              ON CONFLICT(username) DO UPDATE SET open_links_in_new_tab = ${value}, updated_at = NOW()`.pipe(
+            Effect.asVoid,
+          ),
+          "Failed to save the link-target preference",
         ),
 
       getTheme: (username: string) =>

@@ -442,6 +442,11 @@
       "light": "Clair",
       "system": "Système (suivre l’appareil)"
     },
+    "links": {
+      "heading": "Ouverture des liens",
+      "newTabLabel": "Ouvrir les liens dans un nouvel onglet",
+      "newTabHint": "S’applique aux liens qui quittent Duro : tuiles d’applications, boutons Ouvrir et En savoir plus du catalogue, et liens vers les portails dans les Paramètres. Désactivé par défaut : ils s’ouvrent dans cet onglet et le bouton Retour vous ramène à Duro. Dans tous les cas, un Ctrl-clic (Cmd-clic sur Mac) ou un clic milieu ouvre toujours un nouvel onglet."
+    },
     "activity": {
       "recentTitle": "Activité récente",
       "recentHint": "Connexions et changements de vos accès. Si quelque chose ici n’est pas de vous, contactez votre administrateur.",

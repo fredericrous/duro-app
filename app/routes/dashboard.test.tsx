@@ -44,7 +44,7 @@ describe("/dashboard loader", () => {
       .mockResolvedValueOnce(false as never) // isFirstRun
       .mockResolvedValueOnce("principal-1" as never) // principal lookup
       .mockResolvedValueOnce(2 as never) // open-request-items count
-      .mockResolvedValueOnce({ timezone: "Europe/Paris", timeFormat: "24" } as never) // display prefs
+      .mockResolvedValueOnce({ timezone: "Europe/Paris", timeFormat: "24", openLinksInNewTab: true } as never) // user prefs (display + link target)
       .mockResolvedValueOnce(1 as never) // expiring-certificate count
     mockRequireAuth.mockResolvedValue({
       user: "alice",
@@ -76,6 +76,7 @@ describe("/dashboard loader", () => {
       certAlerts: 1,
       timezone: "Europe/Paris",
       timeFormat: "24",
+      openLinksInNewTab: true,
     })
   })
 
@@ -85,7 +86,7 @@ describe("/dashboard loader", () => {
       // Principal lookup failure is caught inside the effect (catchAll →
       // logWarning → null), so runEffect resolves null instead of rejecting.
       .mockResolvedValueOnce(null as never) // principal lookup
-      .mockResolvedValueOnce({ timezone: null, timeFormat: null } as never) // display prefs
+      .mockResolvedValueOnce({ timezone: null, timeFormat: null, openLinksInNewTab: false } as never) // user prefs (display + link target)
       .mockResolvedValueOnce(0 as never) // expiring-certificate count
     mockRequireAuth.mockResolvedValue({
       user: "alice",
@@ -104,7 +105,7 @@ describe("/dashboard loader", () => {
   it("currentPrincipalId stays null when auth.sub is missing", async () => {
     mockRunEffect
       .mockResolvedValueOnce(false as never) // isFirstRun
-      .mockResolvedValueOnce({ timezone: null, timeFormat: null } as never) // display prefs
+      .mockResolvedValueOnce({ timezone: null, timeFormat: null, openLinksInNewTab: false } as never) // user prefs (display + link target)
       .mockResolvedValueOnce(0 as never) // expiring-certificate count
     mockRequireAuth.mockResolvedValue({
       user: "alice",

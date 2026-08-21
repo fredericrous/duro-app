@@ -117,6 +117,51 @@ describe("PreferencesRepo — theme", () => {
   })
 })
 
+describe("PreferencesRepo — link target", () => {
+  it.layer(TestLayer)("defaults to same-tab for an unknown user", (it) => {
+    it.effect("missing row → false", () =>
+      Effect.gen(function* () {
+        const repo = yield* PreferencesRepo
+        // NULL/absent collapses to false at this boundary, so no caller has to
+        // re-derive the default.
+        expect(yield* repo.getOpenLinksInNewTab("nobody")).toBe(false)
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("round-trips and can be turned back off", (it) => {
+    it.effect("persists true, then false", () =>
+      Effect.gen(function* () {
+        const repo = yield* PreferencesRepo
+        yield* repo.setOpenLinksInNewTab("gina", true)
+        expect(yield* repo.getOpenLinksInNewTab("gina")).toBe(true)
+        // The one that matters: turning it back off must persist a real false,
+        // not be swallowed as "falsy, therefore unset".
+        yield* repo.setOpenLinksInNewTab("gina", false)
+        expect(yield* repo.getOpenLinksInNewTab("gina")).toBe(false)
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("coexists with the other preferences on one row", (it) => {
+    it.effect("locale + display prefs + link target all survive", () =>
+      Effect.gen(function* () {
+        const repo = yield* PreferencesRepo
+        yield* repo.setLocale("hank", "fr")
+        yield* repo.setDisplayPrefs("hank", { timezone: "Asia/Tokyo", timeFormat: "24" })
+        yield* repo.setOpenLinksInNewTab("hank", true)
+
+        // Every pref is a column of the SAME row, and each setter re-inserts
+        // `locale` to satisfy its NOT NULL — so clobbering a sibling is the
+        // live failure mode this guards.
+        expect(yield* repo.getLocale("hank")).toBe("fr")
+        expect(yield* repo.getDisplayPrefs("hank")).toEqual({ timezone: "Asia/Tokyo", timeFormat: "24" })
+        expect(yield* repo.getOpenLinksInNewTab("hank")).toBe(true)
+      }),
+    )
+  })
+})
+
 describe("PreferencesRepo — cert renewal", () => {
   it.layer(TestLayer)("getLastCertRenewal returns nulls for an unknown user", (it) => {
     it.effect("missing row → {at:null, renewalId:null}", () =>

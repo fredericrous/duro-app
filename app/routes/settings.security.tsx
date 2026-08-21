@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next"
+import { useLinkTarget } from "~/hooks/useLinkTarget"
 import { redirect } from "react-router"
 import type { Route } from "./+types/settings.security"
 import { requireAuth } from "~/lib/auth.server"
@@ -19,13 +20,14 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export default function SecuritySettings({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
+  const linkProps = useLinkTarget()
   return (
     <CardSection title={t("settings.security.heading")}>
       <Stack gap="sm">
         <Text as="p" color="muted" variant="bodySm">
           {t("settings.security.description")}
         </Text>
-        <LinkButton href={loaderData.autheliaUrl} target="_blank" rel="noopener noreferrer" variant="secondary">
+        <LinkButton href={loaderData.autheliaUrl} variant="secondary" {...linkProps}>
           {t("settings.security.openPortal")}
         </LinkButton>
         <Text as="p" color="muted" variant="bodySm">

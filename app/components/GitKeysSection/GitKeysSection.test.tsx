@@ -43,7 +43,8 @@ describe("GitKeysSection — states", () => {
     })
     const cta = screen.getByRole("link", { name: t("settings.git.openForge") })
     expect(cta).toHaveAttribute("href", "https://git.example.com")
-    expect(cta).toHaveAttribute("target", "_blank")
+    // Same tab unless the user opted into new tabs — see useLinkTarget.
+    expect(cta).not.toHaveAttribute("target")
     expect(screen.getByRole("button", { name: t("settings.git.accountMissing.recheck") })).toBeInTheDocument()
     expect(screen.queryByText(t("settings.git.add.open"))).not.toBeInTheDocument()
   })

@@ -105,6 +105,34 @@ describe("parseSettingsMutation", () => {
     expect(result).toEqual({ error: "Invalid display preferences" })
   })
 
+  it.each([
+    ["true", true],
+    ["false", false],
+  ])("parses saveOpenInNewTab %j → %j", (raw, expected) => {
+    const fd = new FormData()
+    fd.append("intent", "saveOpenInNewTab")
+    fd.append("openInNewTab", raw)
+    // "false" must round-trip as a real false, not be rejected — turning the
+    // preference back off is a first-class action.
+    expect(parseSettingsMutation(fd, auth)).toEqual({ intent: "saveOpenInNewTab", openInNewTab: expected, auth })
+  })
+
+  it.each(["on", "", "1"])("rejects saveOpenInNewTab with a non-boolean value (%j)", (raw) => {
+    // "on" is what a native checkbox would submit — the exact wrong-encoding
+    // trap. Rejecting loudly beats persisting a silent false that looks like
+    // the feature working.
+    const fd = new FormData()
+    fd.append("intent", "saveOpenInNewTab")
+    fd.append("openInNewTab", raw)
+    expect(parseSettingsMutation(fd, auth)).toEqual({ error: "Invalid link-target preference" })
+  })
+
+  it("rejects saveOpenInNewTab when the field is missing entirely", () => {
+    const fd = new FormData()
+    fd.append("intent", "saveOpenInNewTab")
+    expect(parseSettingsMutation(fd, auth)).toEqual({ error: "Invalid link-target preference" })
+  })
+
   it("parses saveTheme with a valid theme", () => {
     const fd = new FormData()
     fd.append("intent", "saveTheme")

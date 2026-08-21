@@ -381,6 +381,8 @@ const mockPreferencesRepo = () =>
     getDisplayPrefs: () => Effect.succeed({ timezone: null, timeFormat: null }),
     setDisplayPrefs: () => Effect.void,
     getTheme: () => Effect.succeed(null),
+    getOpenLinksInNewTab: () => Effect.succeed(false),
+    setOpenLinksInNewTab: () => Effect.void,
     setTheme: () => Effect.void,
   })
 
@@ -515,6 +517,8 @@ describe("queueInvite", () => {
       getDisplayPrefs: () => Effect.succeed({ timezone: null, timeFormat: null }),
       setDisplayPrefs: () => Effect.void,
       getTheme: () => Effect.succeed(null),
+      getOpenLinksInNewTab: () => Effect.succeed(false),
+      setOpenLinksInNewTab: () => Effect.void,
       setTheme: () => Effect.void,
     })
 

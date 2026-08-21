@@ -442,6 +442,11 @@
       "light": "Light",
       "system": "System (match device)"
     },
+    "links": {
+      "heading": "Opening links",
+      "newTabLabel": "Open links in a new tab",
+      "newTabHint": "Applies to links that leave Duro: app tiles, the catalog's Open and Learn more buttons, and the portal links in Settings. Off by default, so they open in this tab and Back returns you to Duro. Either way, Ctrl-click (Cmd-click on a Mac) or middle-click always opens a new tab."
+    },
     "activity": {
       "recentTitle": "Recent activity",
       "recentHint": "Sign-ins and changes to your access. If something here wasn't you, contact your admin.",
