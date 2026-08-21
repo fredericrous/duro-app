@@ -1,4 +1,5 @@
 import { Effect } from "effect"
+import { config } from "~/lib/config.server"
 import { errorMessage } from "~/lib/error-message"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { queueInvite, revokeInvite } from "~/lib/workflows/invite.server"
@@ -18,16 +19,28 @@ export type AdminInvitesMutation =
       locale: string
       confirmed: boolean
       revocationId?: string
+      /** "email" mails the invite; "link" returns it for the admin to hand over (QR). */
+      delivery: "email" | "link"
     }
 
 export type AdminInvitesResult =
-  | { success: true; message: string }
+  | {
+      success: true
+      message: string
+      /**
+       * Present only for `delivery: "link"`. The invite token is a bearer
+       * secret, so it rides this POST response and nothing else — never an
+       * SSR-rendered GET.
+       */
+      invite?: { url: string; email: string; expiresAt: string }
+    }
   | { error: string }
   | {
       warning: string
       revocationId: string
       emails: string[]
       groups: string[]
+      delivery: "email" | "link"
     }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +84,7 @@ export function handleAdminInvitesMutation(mutation: AdminInvitesMutation) {
               revocationId: revocation.id,
               emails: mutation.emails,
               groups: mutation.groups,
+              delivery: mutation.delivery,
             } as AdminInvitesResult
           }
         }
@@ -91,6 +105,7 @@ export function handleAdminInvitesMutation(mutation: AdminInvitesMutation) {
 
         const errors: string[] = []
         let sent = 0
+        let link: { url: string; email: string; expiresAt: string } | undefined
 
         for (const email of mutation.emails) {
           yield* queueInvite({
@@ -99,9 +114,17 @@ export function handleAdminInvitesMutation(mutation: AdminInvitesMutation) {
             groupNames,
             invitedBy: "admin",
             locale: mutation.locale,
+            delivery: mutation.delivery,
           }).pipe(
-            Effect.tap(() => {
+            Effect.tap((invite) => {
               sent++
+              if (mutation.delivery === "link") {
+                link = {
+                  url: `${config.inviteBaseUrl}/invite/${invite.token}`,
+                  email,
+                  expiresAt: invite.expiresAt,
+                }
+              }
               return Effect.void
             }),
             Effect.catchAll((e) => {
@@ -119,11 +142,13 @@ export function handleAdminInvitesMutation(mutation: AdminInvitesMutation) {
         const message =
           errors.length > 0
             ? `Sent ${sent} of ${mutation.emails.length} invites. Errors:\n${errors.join("\n")}`
-            : sent === 1
-              ? `Invite sent to ${mutation.emails[0]}`
-              : `${sent} invites sent`
+            : mutation.delivery === "link"
+              ? `Invite ready for ${mutation.emails[0]}`
+              : sent === 1
+                ? `Invite sent to ${mutation.emails[0]}`
+                : `${sent} invites sent`
 
-        return { success: true as const, message }
+        return { success: true as const, message, ...(link ? { invite: link } : {}) }
       }
     }
   }).pipe(
@@ -169,6 +194,11 @@ export function parseAdminInvitesMutation(formData: FormData): AdminInvitesMutat
   const locale = (formData.get("locale") as string) || "en"
   const confirmed = formData.get("confirmed") === "true"
   const revocationId = (formData.get("revocationId") as string) || undefined
+  const rawDelivery = formData.get("delivery")
+  if (rawDelivery !== null && rawDelivery !== "email" && rawDelivery !== "link") {
+    return { error: "Unsupported delivery" }
+  }
+  const delivery = rawDelivery === "link" ? "link" : "email"
 
   // Support both hidden inputs (one per email) and legacy single-string format
   const emails =
@@ -181,6 +211,11 @@ export function parseAdminInvitesMutation(formData: FormData): AdminInvitesMutat
   if (groups.length === 0) {
     return { error: "Select at least one group" }
   }
+  // A QR code is scanned by one person, so a link invite addresses exactly one
+  // recipient — batching would silently hand everyone the first token.
+  if (delivery === "link" && emails.length !== 1) {
+    return { error: "A QR code can only be generated for one email at a time" }
+  }
 
-  return { intent: "send", emails, groups, locale, confirmed, revocationId }
+  return { intent: "send", emails, groups, locale, confirmed, revocationId, delivery }
 }

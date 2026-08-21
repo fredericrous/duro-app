@@ -19,6 +19,7 @@ import {
   Button,
   Checkbox,
   Cluster,
+  Dialog,
   Field,
   Fieldset,
   Inline,
@@ -30,6 +31,9 @@ import {
   Text,
 } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
+import { QrCode } from "~/components/QrCode/QrCode"
+import { useCopyFeedback } from "~/hooks/useCopyFeedback"
+import { useDisplayFormat } from "~/hooks/useDisplayFormat"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -213,6 +217,9 @@ function GetStartedChecklist({
   )
 }
 
+/** Big enough to scan from a phone held at arm's length. */
+const QR_SIZE = 224
+
 export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
   "use no memo"
   const { t } = useTranslation()
@@ -221,6 +228,15 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
   const formRef = useRef<HTMLFormElement>(null)
   const isSubmitting = fetcher.state !== "idle"
   const [emails, setEmails] = useState<string[]>([])
+  // The group checkboxes are mirrored into state purely so both send buttons
+  // can stay disabled until a group is picked — the form still submits the
+  // checkboxes' own DOM values.
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([])
+  // The QR dialog's visibility is derived, not stored: it is open whenever the
+  // last result carries a link the admin hasn't dismissed yet. Tracking the
+  // dismissed URL (rather than a boolean set from an effect) means a fresh
+  // invite always reopens it, and re-renders never resurrect a closed one.
+  const [dismissedInviteUrl, setDismissedInviteUrl] = useState<string | null>(null)
   const revalidator = useRevalidator()
   const revalidatorRef = useRef(revalidator)
 
@@ -231,7 +247,10 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
   useEffect(() => {
     if (fetcher.data && "success" in fetcher.data && fetcher.data.success) {
       formRef.current?.reset()
-      startTransition(() => setEmails([]))
+      startTransition(() => {
+        setEmails([])
+        setSelectedGroups([])
+      })
     }
   }, [fetcher.data])
 
@@ -255,8 +274,26 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
     return () => clearInterval(interval)
   }, [pendingInvites])
 
+  // Both buttons post the same form; only `delivery` differs. Building the
+  // FormData here (rather than two nested forms or a submit-button `name`)
+  // keeps a single source of truth for the fields.
+  const submitInvite = (delivery: "email" | "link") => {
+    const form = formRef.current
+    if (!form) return
+    const fd = new FormData(form)
+    fd.set("delivery", delivery)
+    fetcher.submit(fd, { method: "post" })
+  }
+
   const actionData = fetcher.data
   const hasRevocationWarning = actionData && "warning" in actionData && "emails" in actionData
+  const successInvite = actionData && "success" in actionData ? actionData.invite : undefined
+  const qrInvite = successInvite && successInvite.url !== dismissedInviteUrl ? successInvite : undefined
+  // Neither button does anything useful without a recipient and a group, and a
+  // QR code is scanned by one person, so it needs exactly one recipient.
+  const incomplete = emails.length === 0 || selectedGroups.length === 0
+  const sendDisabled = isSubmitting || incomplete
+  const qrDisabled = sendDisabled || emails.length !== 1
 
   return (
     <Stack gap="md">
@@ -275,6 +312,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
               ))}
               <html.input type="hidden" name="confirmed" value="true" />
               <html.input type="hidden" name="revocationId" value={actionData.revocationId} />
+              <html.input type="hidden" name="delivery" value={actionData.delivery} />
               {(actionData.groups as string[]).map((g) => (
                 <html.input key={g} type="hidden" name="groups" value={g} />
               ))}
@@ -310,11 +348,24 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
             <Field.Root required>
               <Field.Label>{t("admin.invites.groupsLabel")}</Field.Label>
               <Cluster gap="ms">
-                {groups.map((g) => (
-                  <Checkbox key={g.id} name="groups" value={`${g.id}|${g.displayName}`}>
-                    {g.displayName}
-                  </Checkbox>
-                ))}
+                {groups.map((g) => {
+                  const value = `${g.id}|${g.displayName}`
+                  return (
+                    <Checkbox
+                      key={g.id}
+                      name="groups"
+                      value={value}
+                      checked={selectedGroups.includes(value)}
+                      onChange={(e) =>
+                        setSelectedGroups((prev) =>
+                          e.target.checked ? [...prev, value] : prev.filter((v) => v !== value),
+                        )
+                      }
+                    >
+                      {g.displayName}
+                    </Checkbox>
+                  )
+                })}
               </Cluster>
             </Field.Root>
 
@@ -323,9 +374,23 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
               <LanguageSelect />
             </Field.Root>
 
-            <Button type="submit" variant="primary" disabled={isSubmitting}>
-              {isSubmitting ? t("admin.invites.submitting") : t("admin.invites.submit")}
-            </Button>
+            <Stack gap="xs">
+              <Inline gap="sm">
+                <Button type="button" variant="primary" disabled={sendDisabled} onClick={() => submitInvite("email")}>
+                  {isSubmitting ? t("admin.invites.submitting") : t("admin.invites.submit")}
+                </Button>
+                <Button type="button" variant="secondary" disabled={qrDisabled} onClick={() => submitInvite("link")}>
+                  {t("admin.invites.qr.button")}
+                </Button>
+              </Inline>
+              <Text as="p" variant="bodySm" color="muted">
+                {incomplete
+                  ? t("admin.invites.needEmailAndGroup")
+                  : emails.length > 1
+                    ? t("admin.invites.qr.singleEmailHint")
+                    : t("admin.invites.qr.hint")}
+              </Text>
+            </Stack>
           </Fieldset.Root>
         </fetcher.Form>
       </CardSection>
@@ -375,7 +440,68 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
           </Table.Root>
         )}
       </CardSection>
+
+      <InviteQrDialog invite={qrInvite} onClose={() => setDismissedInviteUrl(qrInvite?.url ?? null)} />
     </Stack>
+  )
+}
+
+/**
+ * Shown once a "Generate a QR code" invite comes back. The token is a bearer
+ * secret that only ever arrives on the action's POST response, so this dialog
+ * is the single place it is ever displayed — closing it is final, which is why
+ * the link is also copyable.
+ */
+function InviteQrDialog({
+  invite,
+  onClose,
+}: {
+  invite?: { url: string; email: string; expiresAt: string }
+  onClose: () => void
+}) {
+  const { t } = useTranslation()
+  const { formatDateTime } = useDisplayFormat()
+  const { copied, copyFailed, copy } = useCopyFeedback()
+
+  return (
+    <Dialog.Root
+      open={invite != null}
+      onOpenChange={(o) => {
+        if (!o) onClose()
+      }}
+    >
+      <Dialog.Portal size="sm">
+        <Dialog.Header>
+          <Dialog.Title>{t("admin.invites.qr.title")}</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          {invite && (
+            <Stack gap="md" align="center">
+              <Alert variant="success">{t("admin.invites.qr.success", { email: invite.email })}</Alert>
+              <QrCode value={invite.url} label={t("admin.invites.qr.alt")} size={QR_SIZE} />
+              <Text as="p" variant="bodySm" color="muted">
+                {t("admin.invites.qr.emailNote", { email: invite.email })}
+              </Text>
+              <Button variant="secondary" size="small" onClick={() => copy(invite.url)}>
+                {copyFailed
+                  ? t("admin.invites.qr.copyFailed")
+                  : copied
+                    ? t("admin.invites.qr.copied")
+                    : t("admin.invites.qr.copyLink")}
+              </Button>
+              <Text as="p" variant="bodySm" color="muted">
+                {t("admin.invites.qr.expiry", { time: formatDateTime(invite.expiresAt) })}
+              </Text>
+            </Stack>
+          )}
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Button variant="primary" onClick={onClose}>
+            {t("common.done")}
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Portal>
+    </Dialog.Root>
   )
 }
 

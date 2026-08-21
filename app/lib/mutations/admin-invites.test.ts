@@ -62,7 +62,30 @@ describe("parseAdminInvitesMutation", () => {
       locale: "fr",
       confirmed: false,
       revocationId: undefined,
+      delivery: "email",
     })
+  })
+
+  it("defaults delivery to 'email' and accepts an explicit 'link'", () => {
+    const base = { emails: "alice@example.com", groups: ["1|family"] }
+    expect(parseAdminInvitesMutation(fd(base))).toMatchObject({ delivery: "email" })
+    expect(parseAdminInvitesMutation(fd({ ...base, delivery: "email" }))).toMatchObject({ delivery: "email" })
+    expect(parseAdminInvitesMutation(fd({ ...base, delivery: "link" }))).toMatchObject({ delivery: "link" })
+  })
+
+  it("rejects an unknown delivery rather than silently emailing", () => {
+    expect(
+      parseAdminInvitesMutation(fd({ emails: "alice@example.com", groups: ["1|family"], delivery: "carrier-pigeon" })),
+    ).toEqual({ error: "Unsupported delivery" })
+  })
+
+  it("rejects a link invite addressed to more than one email", () => {
+    // One QR code carries one token; batching would hand everyone Alice's.
+    expect(
+      parseAdminInvitesMutation(
+        fd({ emails: "alice@example.com, bob@example.com", groups: ["1|family"], delivery: "link" }),
+      ),
+    ).toEqual({ error: "A QR code can only be generated for one email at a time" })
   })
 
   it("filters out malformed emails (no @-sign)", () => {
@@ -136,6 +159,7 @@ describe("handleAdminInvitesMutation — send revocation prompt", () => {
         groups: ["1|family"],
         locale: "en",
         confirmed: false,
+        delivery: "email" as const,
       }),
     )
 
@@ -158,6 +182,7 @@ describe("handleAdminInvitesMutation — send revocation prompt", () => {
         groups: ["1|family"],
         locale: "en",
         confirmed: false,
+        delivery: "email" as const,
       }),
     )
     // No warning shape — the multi-email path falls through.
@@ -174,6 +199,7 @@ describe("handleAdminInvitesMutation — send revocation prompt", () => {
         groups: ["1|family"],
         locale: "en",
         confirmed: true,
+        delivery: "email" as const,
         revocationId: "rev-1",
       }),
     )

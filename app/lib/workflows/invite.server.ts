@@ -16,6 +16,12 @@ export interface InviteInput {
   groupNames: string[]
   invitedBy: string
   locale?: string
+  /**
+   * How the invite reaches the recipient. "email" sends it inline (the default).
+   * "link" issues the cert and returns the token without sending anything — the
+   * admin hands the link over themselves, e.g. as a QR code scanned in person.
+   */
+  delivery?: "email" | "link"
 }
 
 export interface AcceptInput {
@@ -100,25 +106,28 @@ export const queueInvite = (input: InviteInput) =>
     const storedLocale = existingUser ? yield* prefs.getStoredLocale(existingUser.id) : null
     const locale = storedLocale ?? input.locale ?? "en"
 
-    // Send email inline
-    yield* emailSvc
-      .sendInviteEmail(input.email, invite.token, input.invitedBy, locale, invite.openToken, invite.id)
-      .pipe(
-        Effect.tap((messageId) => inviteRepo.setMessageId(invite.id, messageId)),
-        Effect.tap(() => inviteRepo.markEmailSent(invite.id)),
-        Effect.catchAll((e) =>
-          Effect.gen(function* () {
-            yield* inviteRepo.markFailed(invite.id, e.message)
-            yield* Effect.fail(e)
-          }),
-        ),
-      )
+    // Send email inline, unless the admin is delivering the link out-of-band.
+    if (input.delivery !== "link") {
+      yield* emailSvc
+        .sendInviteEmail(input.email, invite.token, input.invitedBy, locale, invite.openToken, invite.id)
+        .pipe(
+          Effect.tap((messageId) => inviteRepo.setMessageId(invite.id, messageId)),
+          Effect.tap(() => inviteRepo.markEmailSent(invite.id)),
+          Effect.catchAll((e) =>
+            Effect.gen(function* () {
+              yield* inviteRepo.markFailed(invite.id, e.message)
+              yield* Effect.fail(e)
+            }),
+          ),
+        )
+    }
 
     return {
       success: true as const,
-      message: `Invite sent to ${input.email}`,
+      message: input.delivery === "link" ? `Invite ready for ${input.email}` : `Invite sent to ${input.email}`,
       token: invite.token,
       inviteId: invite.id,
+      expiresAt: invite.expiresAt,
     }
   }).pipe(Effect.withSpan("queueInvite", { attributes: { email: input.email } }))
 

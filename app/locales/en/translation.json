@@ -1093,6 +1093,20 @@
         "revoking": "Revoking...",
         "retry": "Retry",
         "retrying": "Retrying..."
+      },
+      "needEmailAndGroup": "Add at least one email and pick at least one group.",
+      "qr": {
+        "button": "Generate a QR code",
+        "hint": "Send the invite by email, or generate a QR code to show in person.",
+        "singleEmailHint": "A QR code can only be generated for one email at a time.",
+        "title": "Invite QR code",
+        "success": "Invite created for {{email}}. Scan this code to get started.",
+        "alt": "QR code linking to the invitation",
+        "emailNote": "The account must be created with {{email}} — the invitation only works for that address.",
+        "copyLink": "Copy link",
+        "copied": "Copied",
+        "copyFailed": "Copy failed — select the link manually",
+        "expiry": "This invitation expires on {{time}}."
       }
     },
     "users": {
