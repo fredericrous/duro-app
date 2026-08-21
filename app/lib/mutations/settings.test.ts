@@ -105,32 +105,35 @@ describe("parseSettingsMutation", () => {
     expect(result).toEqual({ error: "Invalid display preferences" })
   })
 
-  it.each([
-    ["true", true],
-    ["false", false],
-  ])("parses saveOpenInNewTab %j → %j", (raw, expected) => {
+  it.each(["auto", "same_tab", "new_tab"])("parses saveLinkTargetMode %j", (mode) => {
     const fd = new FormData()
-    fd.append("intent", "saveOpenInNewTab")
-    fd.append("openInNewTab", raw)
-    // "false" must round-trip as a real false, not be rejected — turning the
-    // preference back off is a first-class action.
-    expect(parseSettingsMutation(fd, auth)).toEqual({ intent: "saveOpenInNewTab", openInNewTab: expected, auth })
+    fd.append("intent", "saveLinkTargetMode")
+    fd.append("mode", mode)
+    expect(parseSettingsMutation(fd, auth)).toEqual({ intent: "saveLinkTargetMode", mode, auth })
   })
 
-  it.each(["on", "", "1"])("rejects saveOpenInNewTab with a non-boolean value (%j)", (raw) => {
-    // "on" is what a native checkbox would submit — the exact wrong-encoding
-    // trap. Rejecting loudly beats persisting a silent false that looks like
-    // the feature working.
+  it.each(["true", "false", "on", "", "sideways"])("rejects saveLinkTargetMode %j", (mode) => {
+    // "true"/"false" was the previous release's encoding — a stale bundle must
+    // be rejected loudly, not coerced into a wrong-but-plausible mode.
     const fd = new FormData()
-    fd.append("intent", "saveOpenInNewTab")
-    fd.append("openInNewTab", raw)
+    fd.append("intent", "saveLinkTargetMode")
+    fd.append("mode", mode)
     expect(parseSettingsMutation(fd, auth)).toEqual({ error: "Invalid link-target preference" })
   })
 
-  it("rejects saveOpenInNewTab when the field is missing entirely", () => {
+  it("rejects saveLinkTargetMode when the field is missing entirely", () => {
+    const fd = new FormData()
+    fd.append("intent", "saveLinkTargetMode")
+    expect(parseSettingsMutation(fd, auth)).toEqual({ error: "Invalid link-target preference" })
+  })
+
+  it("rejects an unknown intent instead of falling through to saveLocale", () => {
+    // The old catch-all turned a retired intent from a stale bundle into a
+    // baffling "Missing locale".
     const fd = new FormData()
     fd.append("intent", "saveOpenInNewTab")
-    expect(parseSettingsMutation(fd, auth)).toEqual({ error: "Invalid link-target preference" })
+    fd.append("openInNewTab", "true")
+    expect(parseSettingsMutation(fd, auth)).toEqual({ error: "Unsupported action" })
   })
 
   it("parses saveTheme with a valid theme", () => {

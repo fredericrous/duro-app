@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { AppCard } from "./AppCard"
 import { LinkTargetProvider } from "~/hooks/useLinkTarget"
+import type { LinkTargetMode } from "~/lib/link-target"
 import { t } from "~/test/test-utils"
 import type { AppDefinition } from "~/lib/apps"
 
@@ -18,7 +19,9 @@ const app = (over: Partial<AppDefinition> = {}): AppDefinition =>
     ...over,
   }) as AppDefinition
 
-const inProvider = (value: boolean, node: ReactNode) => <LinkTargetProvider value={value}>{node}</LinkTargetProvider>
+const inProvider = (mode: LinkTargetMode, node: ReactNode) => (
+  <LinkTargetProvider value={mode}>{node}</LinkTargetProvider>
+)
 
 describe("AppCard", () => {
   it("navigates in the same tab by default", () => {
@@ -31,8 +34,8 @@ describe("AppCard", () => {
     expect(link).not.toHaveAttribute("rel")
   })
 
-  it("opens a new tab when the user turned the preference on", () => {
-    render(inProvider(true, <AppCard app={app()} />))
+  it("opens a new tab when the user chose new_tab", () => {
+    render(inProvider("new_tab", <AppCard app={app()} />))
     const link = screen.getByRole("link", { name: /Plex/ })
     // Both asserted here: this is the guard against target and rel drifting apart.
     expect(link).toHaveAttribute("target", "_blank")
@@ -40,7 +43,7 @@ describe("AppCard", () => {
   })
 
   it.each(["#", ""])("renders no link at all when the app has no launch URL (%j)", (url) => {
-    render(inProvider(true, <AppCard app={app({ url })} />))
+    render(inProvider("new_tab", <AppCard app={app({ url })} />))
     expect(screen.queryByRole("link")).not.toBeInTheDocument()
     expect(screen.getByText(t("home.appCard.noLaunchUrl"))).toBeInTheDocument()
   })

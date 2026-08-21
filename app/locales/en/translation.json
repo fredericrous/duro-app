@@ -444,8 +444,11 @@
     },
     "links": {
       "heading": "Opening links",
-      "newTabLabel": "Open links in a new tab",
-      "newTabHint": "Applies to links that leave Duro: app tiles, the catalog's Open and Learn more buttons, and the portal links in Settings. Off by default, so they open in this tab and Back returns you to Duro. Either way, Ctrl-click (Cmd-click on a Mac) or middle-click always opens a new tab."
+      "label": "Links that leave Duro",
+      "auto": "Match my device",
+      "sameTab": "This tab",
+      "newTab": "New tab",
+      "hint": "Match my device opens a new tab on computers and laptops, and stays in this tab on phones, TVs and when Duro is installed as an app. Whichever you pick, Ctrl-click (Cmd-click on a Mac) or middle-click always opens a new tab."
     },
     "activity": {
       "recentTitle": "Recent activity",

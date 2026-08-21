@@ -7,6 +7,7 @@ import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 import { EmailService } from "~/lib/services/EmailService.server"
 import { hashToken } from "~/lib/crypto.server"
 import { config } from "~/lib/config.server"
+import { isLinkTargetMode, type LinkTargetMode } from "~/lib/link-target"
 import { resendCert } from "~/lib/workflows/invite.server"
 import { reissueClaimLink } from "~/lib/workflows/cert-reveal.server"
 import { deviceBudget } from "~/lib/workflows/device-budget.server"
@@ -30,7 +31,7 @@ export type SettingsMutation =
   | { intent: "saveLocale"; locale: string; auth: AuthInfo }
   | { intent: "saveDisplayPrefs"; timezone: string | null; timeFormat: string | null; auth: AuthInfo }
   | { intent: "saveTheme"; theme: string; auth: AuthInfo }
-  | { intent: "saveOpenInNewTab"; openInNewTab: boolean; auth: AuthInfo }
+  | { intent: "saveLinkTargetMode"; mode: LinkTargetMode; auth: AuthInfo }
 
 export type SettingsResult =
   | { certSent: true }
@@ -40,7 +41,7 @@ export type SettingsResult =
   | { certRevoked: true }
   | { certRenamed: true }
   | { displayPrefsSaved: true }
-  | { openInNewTabSaved: true }
+  | { linkTargetSaved: true }
   | { error: string }
 
 // ---------------------------------------------------------------------------
@@ -242,14 +243,19 @@ function handleSaveDisplayPrefs(timezone: string | null, timeFormat: string | nu
   )
 }
 
-function handleSaveOpenInNewTab(openInNewTab: boolean, auth: AuthInfo) {
+function handleSaveLinkTargetMode(mode: LinkTargetMode, auth: AuthInfo) {
   return Effect.gen(function* () {
+    // Re-validated here as well as in the parser: defence in depth, the same
+    // shape saveTheme uses.
+    if (!isLinkTargetMode(mode)) {
+      return { error: "Invalid link-target preference" } as SettingsResult
+    }
     const prefs = yield* PreferencesRepo
-    yield* prefs.setOpenLinksInNewTab(auth.user!, openInNewTab)
+    yield* prefs.setLinkTargetMode(auth.user!, mode)
     // No cookie / no _redirect marker (unlike saveLocale and saveTheme): only
     // the dashboard layout loader reads this, and it revalidates after the
     // fetcher post — nothing above it in the tree paints with the value.
-    return { openInNewTabSaved: true as const } as SettingsResult
+    return { linkTargetSaved: true as const } as SettingsResult
   }).pipe(
     Effect.catchAll((e) =>
       Effect.succeed({ error: errorMessage(e, "Failed to save the link-target preference") } as SettingsResult),
@@ -304,8 +310,8 @@ export function handleSettingsMutation(mutation: SettingsMutation) {
       return handleSaveLocale(mutation.locale, mutation.auth)
     case "saveDisplayPrefs":
       return handleSaveDisplayPrefs(mutation.timezone, mutation.timeFormat, mutation.auth)
-    case "saveOpenInNewTab":
-      return handleSaveOpenInNewTab(mutation.openInNewTab, mutation.auth)
+    case "saveLinkTargetMode":
+      return handleSaveLinkTargetMode(mutation.mode, mutation.auth)
     case "saveTheme":
       return handleSaveTheme(mutation.theme, mutation.auth)
   }
@@ -354,16 +360,13 @@ export function parseSettingsMutation(formData: FormData, auth: AuthInfo): Setti
     if (!serialNumber) return { error: "Missing serial number" }
     return { intent, serialNumber, label: parseLabel(formData.get("label")), auth }
   }
-  if (intent === "saveOpenInNewTab") {
-    // FormData is strings, and the traps run both ways: Boolean("false") is
-    // true, and a native unchecked checkbox omits the key entirely, so "absent"
-    // would be indistinguishable from "off". The UI always submits an explicit
-    // "true"/"false", so accept only those — anything else surfaces as the
-    // page's error Alert instead of silently persisting false forever, which
-    // being the default would look exactly like the feature working.
-    const raw = formData.get("openInNewTab")
-    if (raw !== "true" && raw !== "false") return { error: "Invalid link-target preference" }
-    return { intent, openInNewTab: raw === "true", auth }
+  if (intent === "saveLinkTargetMode") {
+    // Only the three known modes. Anything else — including 0033's old
+    // "true"/"false" encoding from a stale bundle — is rejected loudly rather
+    // than silently persisting a wrong value.
+    const mode = formData.get("mode")
+    if (!isLinkTargetMode(mode)) return { error: "Invalid link-target preference" }
+    return { intent, mode, auth }
   }
   if (intent === "saveTheme") {
     const theme = formData.get("theme") as string
@@ -379,8 +382,16 @@ export function parseSettingsMutation(formData: FormData, auth: AuthInfo): Setti
     return { intent, timezone: selectToPref(tzRaw), timeFormat: selectToPref(tfRaw), auth }
   }
 
-  // Default: saveLocale
-  const locale = formData.get("locale") as string
-  if (!locale) return { error: "Missing locale" }
-  return { intent: "saveLocale", locale, auth }
+  // saveLocale is the only intent posted by a real <form> (with an explicit
+  // hidden intent field), so nothing depends on an unconditional fallthrough.
+  // Being explicit matters during a rolling deploy: an old bundle posting a
+  // retired intent used to land here and fail with "Missing locale", which
+  // says nothing about what actually went wrong.
+  if (intent === "saveLocale" || intent === null) {
+    const locale = formData.get("locale") as string
+    if (!locale) return { error: "Missing locale" }
+    return { intent: "saveLocale", locale, auth }
+  }
+
+  return { error: "Unsupported action" }
 }

@@ -2,6 +2,7 @@ import { Context, Effect, Data, Layer } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
 import { MigrationsRan } from "~/lib/db/client.server"
+import { DEFAULT_LINK_TARGET_MODE, isLinkTargetMode, type LinkTargetMode } from "~/lib/link-target"
 
 export class PreferencesError extends Data.TaggedError("PreferencesError")<{
   readonly message: string
@@ -30,12 +31,11 @@ export class PreferencesRepo extends Context.Tag("PreferencesRepo")<
       prefs: { timezone: string | null; timeFormat: string | null },
     ) => Effect.Effect<void, PreferencesError>
     /**
-     * Whether links that leave Duro open in a new tab. NULL in the DB (the user
-     * never chose) collapses to false here — same-tab is the default, so no
-     * consumer has to re-derive that.
+     * How links that leave Duro should open. NULL in the DB (the user never
+     * chose) collapses to the default here, so no consumer re-derives it.
      */
-    readonly getOpenLinksInNewTab: (username: string) => Effect.Effect<boolean>
-    readonly setOpenLinksInNewTab: (username: string, value: boolean) => Effect.Effect<void, PreferencesError>
+    readonly getLinkTargetMode: (username: string) => Effect.Effect<LinkTargetMode>
+    readonly setLinkTargetMode: (username: string, mode: LinkTargetMode) => Effect.Effect<void, PreferencesError>
     /** Stored theme choice, or null when the user hasn't picked one. */
     readonly getTheme: (username: string) => Effect.Effect<string | null>
     readonly setTheme: (username: string, theme: string) => Effect.Effect<void, PreferencesError>
@@ -131,26 +131,23 @@ export const PreferencesRepoLive = Layer.effect(
           "Failed to set display preferences",
         ),
 
-      getOpenLinksInNewTab: (username: string) =>
-        sql`SELECT open_links_in_new_tab FROM user_preferences WHERE username = ${username}`.pipe(
-          // @effect/sql-pg camelCases column names → open_links_in_new_tab =
-          // openLinksInNewTab. Reading the snake_case key here would silently
+      getLinkTargetMode: (username: string) =>
+        sql`SELECT link_target_mode FROM user_preferences WHERE username = ${username}`.pipe(
+          // @effect/sql-pg camelCases column names → link_target_mode =
+          // linkTargetMode. Reading the snake_case key here would silently
           // return undefined forever (see getLastCertRenewal below).
-          // `=== true` rather than a truthiness check so a driver handing back
-          // null/undefined can never leak a non-boolean to callers.
-          Effect.map(
-            (rows) => (rows[0] as { openLinksInNewTab?: boolean | null } | undefined)?.openLinksInNewTab === true,
-          ),
-          Effect.catchAll(() => Effect.succeed(false)),
+          Effect.map((rows) => {
+            const raw = (rows[0] as { linkTargetMode?: string | null } | undefined)?.linkTargetMode
+            return isLinkTargetMode(raw) ? raw : DEFAULT_LINK_TARGET_MODE
+          }),
+          Effect.catchAll(() => Effect.succeed(DEFAULT_LINK_TARGET_MODE)),
         ),
 
-      setOpenLinksInNewTab: (username: string, value: boolean) =>
+      setLinkTargetMode: (username: string, mode: LinkTargetMode) =>
         withErr(
-          sql`INSERT INTO user_preferences (username, locale, updated_at, open_links_in_new_tab)
-              VALUES (${username}, 'en', NOW(), ${value})
-              ON CONFLICT(username) DO UPDATE SET open_links_in_new_tab = ${value}, updated_at = NOW()`.pipe(
-            Effect.asVoid,
-          ),
+          sql`INSERT INTO user_preferences (username, locale, updated_at, link_target_mode)
+              VALUES (${username}, 'en', NOW(), ${mode})
+              ON CONFLICT(username) DO UPDATE SET link_target_mode = ${mode}, updated_at = NOW()`.pipe(Effect.asVoid),
           "Failed to save the link-target preference",
         ),
 

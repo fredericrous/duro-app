@@ -444,8 +444,11 @@
     },
     "links": {
       "heading": "Ouverture des liens",
-      "newTabLabel": "Ouvrir les liens dans un nouvel onglet",
-      "newTabHint": "S’applique aux liens qui quittent Duro : tuiles d’applications, boutons Ouvrir et En savoir plus du catalogue, et liens vers les portails dans les Paramètres. Désactivé par défaut : ils s’ouvrent dans cet onglet et le bouton Retour vous ramène à Duro. Dans tous les cas, un Ctrl-clic (Cmd-clic sur Mac) ou un clic milieu ouvre toujours un nouvel onglet."
+      "label": "Liens qui quittent Duro",
+      "auto": "Suivre l’appareil",
+      "sameTab": "Cet onglet",
+      "newTab": "Nouvel onglet",
+      "hint": "Suivre l’appareil ouvre un nouvel onglet sur les ordinateurs portables et de bureau, et reste dans cet onglet sur les téléphones, les téléviseurs et quand Duro est installé comme application. Quel que soit votre choix, un Ctrl-clic (Cmd-clic sur Mac) ou un clic milieu ouvre toujours un nouvel onglet."
     },
     "activity": {
       "recentTitle": "Activité récente",

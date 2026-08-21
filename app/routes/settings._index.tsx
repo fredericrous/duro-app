@@ -10,7 +10,7 @@ import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { resolveLocale } from "~/lib/i18n.server"
 import { resolveThemePreference } from "~/lib/theme.server"
 import { parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
-import { Alert, Field, Select, Spinner, Stack, Switch } from "@duro-app/ui"
+import { Alert, Field, Select, Spinner, Stack } from "@duro-app/ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { LanguageSelect } from "~/components/LanguageSelect/LanguageSelect"
 import { formatDateTime, prefToSelect, selectToPref, TIMEZONE_OPTIONS, TIME_FORMAT_OPTIONS } from "~/lib/datetime"
@@ -26,20 +26,20 @@ const PREVIEW_SAMPLE = new Date("2026-01-15T14:30:00Z")
 
 export async function loader({ request }: Route.LoaderArgs) {
   const auth = await requireAuth(request)
-  const { locale, timezone, timeFormat, openLinksInNewTab } = await runEffect(
+  const { locale, timezone, timeFormat, linkTargetMode } = await runEffect(
     Effect.gen(function* () {
       const prefs = yield* PreferencesRepo
       const locale = yield* prefs.getLocale(auth.user!)
       const display = yield* prefs.getDisplayPrefs(auth.user!)
-      const openLinksInNewTab = yield* prefs.getOpenLinksInNewTab(auth.user!)
-      return { locale, timezone: display.timezone, timeFormat: display.timeFormat, openLinksInNewTab }
+      const linkTargetMode = yield* prefs.getLinkTargetMode(auth.user!)
+      return { locale, timezone: display.timezone, timeFormat: display.timeFormat, linkTargetMode }
     }),
   )
   return {
     locale,
     timezone,
     timeFormat,
-    openLinksInNewTab,
+    linkTargetMode,
     currentLocale: resolveLocale(request),
     theme: resolveThemePreference(request),
   }
@@ -73,7 +73,6 @@ export default function GeneralSettings({ loaderData }: Route.ComponentProps) {
   const newTabFetcher = useFetcher<typeof action>()
   const [searchParams] = useSearchParams()
 
-  const [newTab, setNewTab] = useState(loaderData.openLinksInNewTab)
   const [tz, setTz] = useState(prefToSelect(loaderData.timezone))
   const [tf, setTf] = useState(prefToSelect(loaderData.timeFormat))
 
@@ -89,7 +88,7 @@ export default function GeneralSettings({ loaderData }: Route.ComponentProps) {
   const justSaved =
     searchParams.has("saved") ||
     Boolean(displayFetcher.data && "displayPrefsSaved" in displayFetcher.data) ||
-    Boolean(newTabFetcher.data && "openInNewTabSaved" in newTabFetcher.data)
+    Boolean(newTabFetcher.data && "linkTargetSaved" in newTabFetcher.data)
 
   // Submitting straight from the select's change handler posts the PREVIOUS
   // locale: the DS select updates its own form value through React state, which
@@ -191,20 +190,37 @@ export default function GeneralSettings({ loaderData }: Route.ComponentProps) {
       <CardSection title={t("settings.links.heading")}>
         <Stack gap="lg">
           <Field.Root>
-            <Switch
-              checked={newTab}
-              onCheckedChange={(next) => {
-                if (next === newTab) return
-                setNewTab(next)
-                newTabFetcher.submit(
-                  { intent: "saveOpenInNewTab", openInNewTab: next ? "true" : "false" },
-                  { method: "post" },
-                )
+            <Field.Label>{t("settings.links.label")}</Field.Label>
+            <Select.Root
+              name="linkTargetMode"
+              defaultValue={loaderData.linkTargetMode}
+              onValueChange={(v) => {
+                if (!v || v === loaderData.linkTargetMode) return
+                newTabFetcher.submit({ intent: "saveLinkTargetMode", mode: v }, { method: "post" })
+              }}
+              initialLabels={{
+                auto: t("settings.links.auto"),
+                same_tab: t("settings.links.sameTab"),
+                new_tab: t("settings.links.newTab"),
               }}
             >
-              {t("settings.links.newTabLabel")}
-            </Switch>
-            <Field.Description>{t("settings.links.newTabHint")}</Field.Description>
+              <Select.Trigger>
+                <Select.Value placeholder={t("settings.links.label")} />
+                <Select.Icon />
+              </Select.Trigger>
+              <Select.Popup>
+                <Select.Item value="auto">
+                  <Select.ItemText>{t("settings.links.auto")}</Select.ItemText>
+                </Select.Item>
+                <Select.Item value="same_tab">
+                  <Select.ItemText>{t("settings.links.sameTab")}</Select.ItemText>
+                </Select.Item>
+                <Select.Item value="new_tab">
+                  <Select.ItemText>{t("settings.links.newTab")}</Select.ItemText>
+                </Select.Item>
+              </Select.Popup>
+            </Select.Root>
+            <Field.Description>{t("settings.links.hint")}</Field.Description>
           </Field.Root>
         </Stack>
       </CardSection>

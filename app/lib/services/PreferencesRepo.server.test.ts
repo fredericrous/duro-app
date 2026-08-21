@@ -2,6 +2,7 @@
 import { describe, expect } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
+import * as SqlClient from "@effect/sql/SqlClient"
 import { makeTestDbLayer } from "~/lib/db/client.server"
 import { PreferencesRepo, PreferencesRepoLive } from "./PreferencesRepo.server"
 
@@ -119,26 +120,41 @@ describe("PreferencesRepo — theme", () => {
 
 describe("PreferencesRepo — link target", () => {
   it.layer(TestLayer)("defaults to same-tab for an unknown user", (it) => {
-    it.effect("missing row → false", () =>
+    it.effect("missing row → same_tab", () =>
       Effect.gen(function* () {
         const repo = yield* PreferencesRepo
-        // NULL/absent collapses to false at this boundary, so no caller has to
-        // re-derive the default.
-        expect(yield* repo.getOpenLinksInNewTab("nobody")).toBe(false)
+        // NULL/absent collapses to the default at this boundary, so no caller
+        // has to re-derive it.
+        expect(yield* repo.getLinkTargetMode("nobody")).toBe("same_tab")
       }),
     )
   })
 
-  it.layer(TestLayer)("round-trips and can be turned back off", (it) => {
-    it.effect("persists true, then false", () =>
+  it.layer(TestLayer)("round-trips every mode", (it) => {
+    it.effect("persists auto, new_tab and back to same_tab", () =>
       Effect.gen(function* () {
         const repo = yield* PreferencesRepo
-        yield* repo.setOpenLinksInNewTab("gina", true)
-        expect(yield* repo.getOpenLinksInNewTab("gina")).toBe(true)
-        // The one that matters: turning it back off must persist a real false,
-        // not be swallowed as "falsy, therefore unset".
-        yield* repo.setOpenLinksInNewTab("gina", false)
-        expect(yield* repo.getOpenLinksInNewTab("gina")).toBe(false)
+        yield* repo.setLinkTargetMode("gina", "auto")
+        expect(yield* repo.getLinkTargetMode("gina")).toBe("auto")
+        yield* repo.setLinkTargetMode("gina", "new_tab")
+        expect(yield* repo.getLinkTargetMode("gina")).toBe("new_tab")
+        // Back to the default value must persist as an explicit choice, not be
+        // mistaken for "never chose".
+        yield* repo.setLinkTargetMode("gina", "same_tab")
+        expect(yield* repo.getLinkTargetMode("gina")).toBe("same_tab")
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("falls back to the default when the column holds garbage", (it) => {
+    it.effect("unknown stored value → same_tab", () =>
+      Effect.gen(function* () {
+        const repo = yield* PreferencesRepo
+        const sql = yield* SqlClient.SqlClient
+        yield* repo.setLinkTargetMode("iris", "auto")
+        // Simulates a row written by a future/rolled-back release.
+        yield* sql`UPDATE user_preferences SET link_target_mode = 'sideways' WHERE username = 'iris'`
+        expect(yield* repo.getLinkTargetMode("iris")).toBe("same_tab")
       }),
     )
   })
@@ -149,14 +165,14 @@ describe("PreferencesRepo — link target", () => {
         const repo = yield* PreferencesRepo
         yield* repo.setLocale("hank", "fr")
         yield* repo.setDisplayPrefs("hank", { timezone: "Asia/Tokyo", timeFormat: "24" })
-        yield* repo.setOpenLinksInNewTab("hank", true)
+        yield* repo.setLinkTargetMode("hank", "auto")
 
         // Every pref is a column of the SAME row, and each setter re-inserts
         // `locale` to satisfy its NOT NULL — so clobbering a sibling is the
         // live failure mode this guards.
         expect(yield* repo.getLocale("hank")).toBe("fr")
         expect(yield* repo.getDisplayPrefs("hank")).toEqual({ timezone: "Asia/Tokyo", timeFormat: "24" })
-        expect(yield* repo.getOpenLinksInNewTab("hank")).toBe(true)
+        expect(yield* repo.getLinkTargetMode("hank")).toBe("auto")
       }),
     )
   })
