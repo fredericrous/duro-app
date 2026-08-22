@@ -156,6 +156,14 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
     ) => Effect.Effect<void, InviteError>
     readonly consumeByToken: (rawToken: string) => Effect.Effect<Invite, InviteError>
     readonly markUsedBy: (id: string, username: string) => Effect.Effect<void, InviteError>
+    /**
+     * Undo `consumeByToken` for an attempt that failed before the account was
+     * usable. `consumeByToken` claims the invite up front so two people cannot
+     * redeem it at once; without this compensation a failed attempt burns the
+     * invite forever and the recipient is met with "Already Joined" while
+     * having no account at all.
+     */
+    readonly releaseById: (id: string) => Effect.Effect<void, InviteError>
     readonly findPending: () => Effect.Effect<Invite[], InviteError>
     readonly incrementAttempt: (tokenHash: string) => Effect.Effect<void, InviteError>
     readonly markCertIssued: (id: string) => Effect.Effect<void, InviteError>
@@ -404,6 +412,14 @@ export const InviteRepoLive = Layer.effect(
         withErr(
           sql`UPDATE invites SET used_by = ${username} WHERE id = ${id}`.pipe(Effect.asVoid),
           "Failed to mark invite as used",
+        ),
+
+      releaseById: (id) =>
+        withErr(
+          // Only un-claim an invite that no one has finished redeeming, so a
+          // late-arriving failure can never revive a genuinely used invite.
+          sql`UPDATE invites SET used_at = NULL WHERE id = ${id} AND used_by IS NULL`.pipe(Effect.asVoid),
+          "Failed to release invite",
         ),
 
       findPending: () =>

@@ -228,6 +228,9 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
   const formRef = useRef<HTMLFormElement>(null)
   const isSubmitting = fetcher.state !== "idle"
   const [emails, setEmails] = useState<string[]>([])
+  // Text typed into the tag input but not yet turned into a tag. It counts as a
+  // recipient for both the button states and the submitted form.
+  const [pendingEmail, setPendingEmail] = useState("")
   // The group checkboxes are mirrored into state purely so both send buttons
   // can stay disabled until a group is picked — the form still submits the
   // checkboxes' own DOM values.
@@ -249,6 +252,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
       formRef.current?.reset()
       startTransition(() => {
         setEmails([])
+        setPendingEmail("")
         setSelectedGroups([])
       })
     }
@@ -274,6 +278,11 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
     return () => clearInterval(interval)
   }, [pendingInvites])
 
+  // Only text that looks like an address counts; a stray keystroke shouldn't
+  // enable the buttons or get submitted as a recipient.
+  const trimmedPending = pendingEmail.trim().toLowerCase()
+  const pendingIsEmail = trimmedPending.includes("@")
+
   // Both buttons post the same form; only `delivery` differs. Building the
   // FormData here (rather than two nested forms or a submit-button `name`)
   // keeps a single source of truth for the fields.
@@ -281,6 +290,9 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
     const form = formRef.current
     if (!form) return
     const fd = new FormData(form)
+    // The tag input's own text never lands in the form — add it here so an
+    // address that was typed but not committed still gets invited.
+    if (pendingIsEmail && !emails.includes(trimmedPending)) fd.append("emails", trimmedPending)
     fd.set("delivery", delivery)
     fetcher.submit(fd, { method: "post" })
   }
@@ -291,9 +303,10 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
   const qrInvite = successInvite && successInvite.url !== dismissedInviteUrl ? successInvite : undefined
   // Neither button does anything useful without a recipient and a group, and a
   // QR code is scanned by one person, so it needs exactly one recipient.
-  const incomplete = emails.length === 0 || selectedGroups.length === 0
+  const recipientCount = emails.length + (pendingIsEmail && !emails.includes(trimmedPending) ? 1 : 0)
+  const incomplete = recipientCount === 0 || selectedGroups.length === 0
   const sendDisabled = isSubmitting || incomplete
-  const qrDisabled = sendDisabled || emails.length !== 1
+  const qrDisabled = sendDisabled || recipientCount !== 1
 
   return (
     <Stack gap="md">
@@ -327,21 +340,38 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
           <Fieldset.Root disabled={isSubmitting} gap="md">
             <Field.Root required>
               <Field.Label>{t("admin.invites.emailLabel")}</Field.Label>
-              <TagGroup.Root
-                name="emails"
-                value={emails}
-                onValueChange={setEmails}
-                onValidate={(v) => (v.includes("@") ? true : t("admin.invites.emailInvalid"))}
+              {/* TagGroup.Input takes only a placeholder, so the text someone
+                  has typed but not yet turned into a tag is invisible to this
+                  component. Watching input events on the wrapper recovers it —
+                  without that, typing an address and clicking Send does
+                  nothing, which reads as a broken button. */}
+              {/* eslint-disable-next-line duro/no-raw-html-element -- html.div
+                  exposes no onInput/onBlur, and those events are the only way
+                  to observe TagGroup's uncommitted input text. */}
+              <div
+                onInput={(e) => setPendingEmail((e.target as HTMLInputElement).value ?? "")}
+                onBlur={(e) => setPendingEmail((e.target as HTMLInputElement).value ?? "")}
               >
-                <TagGroup.List aria-label={t("admin.invites.emailLabel")}>
-                  {emails.map((email) => (
-                    <Tag key={email} value={email}>
-                      {email}
-                    </Tag>
-                  ))}
-                </TagGroup.List>
-                <TagGroup.Input placeholder={t("admin.invites.emailPlaceholder")} />
-              </TagGroup.Root>
+                <TagGroup.Root
+                  name="emails"
+                  value={emails}
+                  onValueChange={(next) => {
+                    setEmails(next)
+                    // Committing a tag empties the input.
+                    setPendingEmail("")
+                  }}
+                  onValidate={(v) => (v.includes("@") ? true : t("admin.invites.emailInvalid"))}
+                >
+                  <TagGroup.List aria-label={t("admin.invites.emailLabel")}>
+                    {emails.map((email) => (
+                      <Tag key={email} value={email}>
+                        {email}
+                      </Tag>
+                    ))}
+                  </TagGroup.List>
+                  <TagGroup.Input placeholder={t("admin.invites.emailPlaceholder")} />
+                </TagGroup.Root>
+              </div>
               <Field.Description>{t("admin.invites.emailHint")}</Field.Description>
             </Field.Root>
 
@@ -386,7 +416,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
               <Text as="p" variant="bodySm" color="muted">
                 {incomplete
                   ? t("admin.invites.needEmailAndGroup")
-                  : emails.length > 1
+                  : recipientCount > 1
                     ? t("admin.invites.qr.singleEmailHint")
                     : t("admin.invites.qr.hint")}
               </Text>

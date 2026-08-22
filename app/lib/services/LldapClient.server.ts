@@ -29,6 +29,42 @@ export class LldapError extends Data.TaggedError("LldapError")<{
   readonly cause?: unknown
 }> {}
 
+/**
+ * base64url (what @serenity-kit/opaque emits) -> standard base64 (what LLDAP's
+ * JSON API expects). Padding is restored because Rust's base64 STANDARD engine
+ * rejects unpadded input.
+ */
+export const toStandardB64 = (urlB64: string): string => {
+  const b64 = urlB64.replace(/-/g, "+").replace(/_/g, "/")
+  return b64 + "=".repeat((4 - (b64.length % 4)) % 4)
+}
+
+/** standard base64 (from LLDAP) -> base64url (what @serenity-kit/opaque takes). */
+export const toUrlB64 = (b64: string): string => b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+
+/**
+ * Parse a JSON body, but fail loudly when the response isn't JSON at all.
+ *
+ * LLDAP serves its admin SPA from a catch-all, so a typo'd API path returns
+ * `200 text/html` rather than a 404. A bare `.json` on that yields an opaque
+ * parse error with no hint that the URL was wrong — which is exactly how a
+ * mistyped OPAQUE route went unnoticed until a real signup hit it.
+ */
+const expectJson = (r: HttpClientResponse.HttpClientResponse) => {
+  const contentType = r.headers["content-type"] ?? ""
+  if (!contentType.includes("json")) {
+    return Effect.flatMap(
+      r.text,
+      (body) =>
+        new LldapError({
+          message: `Expected JSON from ${r.request.url} but got ${contentType || "no content-type"} (status ${r.status}). This usually means the API path does not exist and LLDAP served its admin UI instead.`,
+          cause: body.slice(0, 200),
+        }),
+    )
+  }
+  return r.json
+}
+
 // --- Response schemas ---
 
 const LoginResponse = Schema.Struct({ token: Schema.String })
@@ -214,7 +250,14 @@ export const LldapClientLive = Layer.effect(
           const token = yield* getToken
 
           // Load @serenity-kit/opaque (WASM-based OPAQUE client, opaque-ke 4.0).
-          // Uses LLDAP's /base64 endpoints which accept base64url-encoded raw bytes.
+          //
+          // LLDAP carries OPAQUE messages as STANDARD base64 (`+`, `/`, padded)
+          // on /auth/opaque/register/{start,finish}; @serenity-kit/opaque speaks
+          // base64url (`-`, `_`, unpadded), so every message is translated at
+          // the boundary by toStandardB64 / toUrlB64 below. There are no
+          // "/base64" variants of these routes — posting to one hits LLDAP's
+          // admin-SPA catch-all, which answers 200 text/html, so the request
+          // passes a status check and only fails later on JSON parsing.
           const opaque = yield* Effect.tryPromise({
             try: async () => {
               const mod = await import("@serenity-kit/opaque")
@@ -236,22 +279,27 @@ export const LldapClientLive = Layer.effect(
             catch: (e) => new LldapError({ message: "OPAQUE startRegistration failed", cause: e }),
           })
 
-          // Step 2: POST /auth/opaque/register/start/base64
+          // Step 2: POST /auth/opaque/register/start
           const serverResponse = yield* http
             .execute(
-              HttpClientRequest.post(`${url}/auth/opaque/register/start/base64`).pipe(
+              HttpClientRequest.post(`${url}/auth/opaque/register/start`).pipe(
                 HttpClientRequest.setHeaders({ "Content-Type": "application/json" }),
                 HttpClientRequest.bearerToken(token),
                 HttpClientRequest.bodyUnsafeJson({
                   username: userId,
-                  registration_start_request: registrationRequest,
+                  registration_start_request: toStandardB64(registrationRequest),
                 }),
               ),
             )
             .pipe(
               Effect.flatMap(HttpClientResponse.filterStatusOk),
-              Effect.flatMap((r) => r.json),
-              Effect.mapError((e) => new LldapError({ message: "OPAQUE register/start failed", cause: e })),
+              Effect.flatMap(expectJson),
+              // Keep an already-diagnosed failure (e.g. "LLDAP served HTML, so
+              // that path does not exist") instead of flattening it to a
+              // generic label that says nothing about the cause.
+              Effect.mapError((e) =>
+                e instanceof LldapError ? e : new LldapError({ message: "OPAQUE register/start failed", cause: e }),
+              ),
               Effect.scoped,
             ) as Effect.Effect<{ server_data: string; registration_response: string }, LldapError>
 
@@ -261,27 +309,32 @@ export const LldapClientLive = Layer.effect(
               opaque.client.finishRegistration({
                 password,
                 clientRegistrationState,
-                registrationResponse: serverResponse.registration_response,
+                registrationResponse: toUrlB64(serverResponse.registration_response),
                 keyStretching: { "argon2id-custom": { memory: 19456, iterations: 2, parallelism: 1 } },
               }),
             catch: (e) => new LldapError({ message: "OPAQUE finishRegistration failed", cause: e }),
           })
 
-          // Step 4: POST /auth/opaque/register/finish/base64
+          // Step 4: POST /auth/opaque/register/finish
           yield* http
             .execute(
-              HttpClientRequest.post(`${url}/auth/opaque/register/finish/base64`).pipe(
+              HttpClientRequest.post(`${url}/auth/opaque/register/finish`).pipe(
                 HttpClientRequest.setHeaders({ "Content-Type": "application/json" }),
                 HttpClientRequest.bearerToken(token),
                 HttpClientRequest.bodyUnsafeJson({
                   server_data: serverResponse.server_data,
-                  registration_upload: registrationRecord,
+                  registration_upload: toStandardB64(registrationRecord),
                 }),
               ),
             )
             .pipe(
               Effect.flatMap(HttpClientResponse.filterStatusOk),
-              Effect.mapError((e) => new LldapError({ message: "OPAQUE register/finish failed", cause: e })),
+              // Keep an already-diagnosed failure (e.g. "LLDAP served HTML, so
+              // that path does not exist") instead of flattening it to a
+              // generic label that says nothing about the cause.
+              Effect.mapError((e) =>
+                e instanceof LldapError ? e : new LldapError({ message: "OPAQUE register/finish failed", cause: e }),
+              ),
               Effect.scoped,
             )
         }),

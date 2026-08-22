@@ -170,6 +170,9 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
           }
           return new Error(`Failed to create user: ${msg}`)
         }),
+        // The invite was claimed before this point; hand it back so a failed
+        // attempt can be retried instead of dead-ending on "Already Joined".
+        Effect.tapError(() => inviteRepo.releaseById(invite.id).pipe(Effect.ignore)),
       )
 
     // Set password + add to groups, rollback user on failure
@@ -180,10 +183,15 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
       }
     }).pipe(
       Effect.tapError(() =>
-        users.deleteUser(input.username).pipe(
-          Effect.tap(() => Effect.logWarning(`Rolled back user ${input.username} after configuration failure`)),
-          Effect.ignore,
-        ),
+        Effect.gen(function* () {
+          yield* users.deleteUser(input.username).pipe(
+            Effect.tap(() => Effect.logWarning(`Rolled back user ${input.username} after configuration failure`)),
+            Effect.ignore,
+          )
+          // Rolling back the user without releasing the invite leaves the
+          // recipient with no account AND no way back in.
+          yield* inviteRepo.releaseById(invite.id).pipe(Effect.ignore)
+        }),
       ),
     )
 

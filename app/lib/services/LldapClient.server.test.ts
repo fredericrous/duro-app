@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { FetchHttpClient } from "@effect/platform"
 import { http, HttpResponse, LLDAP_BASE, server } from "~/test/msw-server"
-import { LldapClient, LldapClientLive } from "./LldapClient.server"
+import { LldapClient, LldapClientLive, toStandardB64, toUrlB64 } from "./LldapClient.server"
 
 vi.setConfig({ testTimeout: 15000 })
 
@@ -343,5 +343,83 @@ describe("LldapClient — error surface", () => {
     )
     expect(result._tag).toBe("Failure")
     await rt.dispose()
+  })
+})
+
+// -----------------------------------------------------------------------------
+// setUserPassword — the OPAQUE registration handshake against LLDAP
+// -----------------------------------------------------------------------------
+
+describe("LldapClient — setUserPassword (OPAQUE)", () => {
+  it("completes a real handshake against LLDAP's standard-base64 endpoints", async () => {
+    const opaque = await import("@serenity-kit/opaque")
+    await opaque.ready
+    const serverSetup = opaque.server.createSetup()
+    const paths: string[] = []
+    // A real OPAQUE server: if the client sent the wrong encoding, this cannot
+    // decode the request and the handshake throws — no assertion needed beyond
+    // "it completed".
+    server.use(
+      http.post(`${URL}/auth/opaque/register/start`, async ({ request }) => {
+        paths.push(new global.URL(request.url).pathname)
+        const body = (await request.json()) as { username: string; registration_start_request: string }
+        // LLDAP speaks standard base64; base64url would be a different string.
+        expect(body.registration_start_request).not.toMatch(/[-_]/)
+        const registrationResponse = opaque.server.createRegistrationResponse({
+          serverSetup,
+          userIdentifier: body.username,
+          registrationRequest: toUrlB64(body.registration_start_request),
+        }).registrationResponse
+        return HttpResponse.json({
+          server_data: "srv",
+          registration_response: toStandardB64(registrationResponse),
+        })
+      }),
+      http.post(`${URL}/auth/opaque/register/finish`, async ({ request }) => {
+        paths.push(new global.URL(request.url).pathname)
+        const body = (await request.json()) as { registration_upload: string }
+        expect(body.registration_upload).not.toMatch(/[-_]/)
+        return HttpResponse.json({})
+      }),
+    )
+
+    const runtime = makeRuntime()
+    await runtime.runPromise(
+      Effect.flatMap(LldapClient, (c) => c.setUserPassword("alice", "correct horse battery staple")),
+    )
+
+    // The "/base64" suffixes these calls used to carry do not exist on LLDAP.
+    expect(paths).toEqual(["/auth/opaque/register/start", "/auth/opaque/register/finish"])
+  })
+
+  it("reports the path when LLDAP answers with its admin UI instead of JSON", async () => {
+    // LLDAP serves its SPA from a catch-all, so a wrong API path comes back as
+    // 200 text/html rather than a 404 — the failure that made a mistyped
+    // endpoint look like a crypto error for an entire release.
+    server.use(
+      http.post(`${URL}/auth/opaque/register/start`, () =>
+        HttpResponse.html("<!doctype html><html><title>LLDAP Administration</title></html>"),
+      ),
+    )
+
+    const runtime = makeRuntime()
+    const result = await runtime.runPromise(
+      Effect.flip(Effect.flatMap(LldapClient, (c) => c.setUserPassword("alice", "hunter2"))),
+    )
+    expect(result.message).toContain("/auth/opaque/register/start")
+    expect(result.message).toContain("text/html")
+  })
+})
+
+describe("base64 translation helpers", () => {
+  it("round-trips between base64url and standard base64", () => {
+    const urlish = "abc-def_ghi"
+    expect(toStandardB64(urlish)).toBe("abc+def/ghi=")
+    expect(toUrlB64(toStandardB64(urlish))).toBe(urlish)
+  })
+
+  it("pads standard base64, which Rust's STANDARD engine requires", () => {
+    expect(toStandardB64("YQ")).toBe("YQ==")
+    expect(toStandardB64("YWJj")).toBe("YWJj")
   })
 })

@@ -144,7 +144,10 @@ function PasswordCard() {
         <InputGroup.Addon
           disabled={!revealed || password === null}
           minWidth={72}
-          onClick={() => password !== null && copy(password)}
+          // See InvitePasswordReveal: the password arrives at the start of the
+          // scratch, so without the `revealed` check a touch that lands here
+          // mid-scratch copies a still-hidden password.
+          onClick={() => revealed && password !== null && copy(password)}
         >
           {copied ? t("invite.password.copied") : t("invite.password.copy")}
         </InputGroup.Addon>
