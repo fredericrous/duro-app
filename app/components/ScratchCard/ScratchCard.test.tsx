@@ -127,6 +127,33 @@ describe("ScratchCard", () => {
     expect(currentCtx.fillText).toHaveBeenCalled()
   })
 
+  it("sizes the canvas from the rendered box and the pixel ratio, not the declared width", () => {
+    // On a phone the card is laid out narrower than its declared width. Painting
+    // into a fixed 320px buffer and letting CSS shrink it is what made the
+    // label small and blurry; the buffer has to follow the real box.
+    const rect = { width: 200, height: 48, top: 0, left: 0, right: 200, bottom: 48, x: 0, y: 0, toJSON: () => ({}) }
+    const originalRect = HTMLCanvasElement.prototype.getBoundingClientRect
+    HTMLCanvasElement.prototype.getBoundingClientRect = () => rect as DOMRect
+    const originalDpr = window.devicePixelRatio
+    Object.defineProperty(window, "devicePixelRatio", { value: 2, configurable: true })
+
+    try {
+      render(
+        <ScratchCard width={320} height={48} onReveal={() => {}}>
+          <p>Hidden</p>
+        </ScratchCard>,
+      )
+      const canvas = document.querySelector("canvas") as HTMLCanvasElement
+      expect(canvas.width).toBe(400)
+      expect(canvas.height).toBe(96)
+      // The label is still painted — scratching a blank colour is not the point.
+      expect(currentCtx.fillText).toHaveBeenCalled()
+    } finally {
+      HTMLCanvasElement.prototype.getBoundingClientRect = originalRect
+      Object.defineProperty(window, "devicePixelRatio", { value: originalDpr, configurable: true })
+    }
+  })
+
   it("invokes onScratchStart on the first pointerdown, then never again", () => {
     const onScratchStart = vi.fn()
     render(

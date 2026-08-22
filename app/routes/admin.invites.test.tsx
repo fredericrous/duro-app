@@ -300,6 +300,32 @@ describe("/admin/invites page", () => {
     expect(qr).toBeEnabled()
   })
 
+  it("counts an email that was typed but never turned into a tag", async () => {
+    // The hint says to press Enter, but people type an address and go straight
+    // for the button; that used to leave both buttons dead with no explanation.
+    renderPageWithAction()
+    const send = await screen.findByRole("button", { name: t("admin.invites.submit") })
+    await userEvent.click(screen.getByRole("checkbox", { name: "family" }))
+    expect(send).toBeDisabled()
+
+    await userEvent.type(screen.getByPlaceholderText(t("admin.invites.emailPlaceholder")), "alice@example.com")
+    expect(send).toBeEnabled()
+
+    await userEvent.click(send)
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0].getAll("emails")).toEqual(["alice@example.com"])
+  })
+
+  it("does not submit the pending text twice once it becomes a tag", async () => {
+    renderPageWithAction()
+    await addEmail("alice@example.com")
+    await userEvent.click(screen.getByRole("checkbox", { name: "family" }))
+    await userEvent.click(screen.getByRole("button", { name: t("admin.invites.submit") }))
+
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0].getAll("emails")).toEqual(["alice@example.com"])
+  })
+
   it("keeps only the QR button disabled for a multi-recipient invite", async () => {
     renderPageWithAction()
     await addEmail("alice@example.com")

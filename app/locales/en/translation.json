@@ -548,6 +548,10 @@
       "notInstalled": "It looks like your certificate isn't installed yet. Download the .p12 file above and install it, then click the button below.",
       "hint": "After installing the certificate, you may need to close and reopen your browser for it to be recognized.",
       "retry": "Check again"
+    },
+    "revoked": {
+      "title": "Invitation no longer valid",
+      "message": "This invitation was withdrawn or has already been claimed. Ask the person who invited you to send a new one."
     }
   },
   "createAccount": {

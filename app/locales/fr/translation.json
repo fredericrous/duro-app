@@ -548,6 +548,10 @@
       "notInstalled": "Il semble que votre certificat ne soit pas encore installe. Telechargez le fichier .p12 ci-dessus et installez-le, puis cliquez sur le bouton ci-dessous.",
       "hint": "Apres l'installation du certificat, vous devrez peut-etre fermer et rouvrir votre navigateur pour qu'il soit reconnu.",
       "retry": "Verifier a nouveau"
+    },
+    "revoked": {
+      "title": "Invitation qui n'est plus valable",
+      "message": "Cette invitation a été retirée ou a déjà été utilisée. Demandez à la personne qui vous a invité de vous en envoyer une nouvelle."
     }
   },
   "createAccount": {

@@ -141,6 +141,11 @@ const mockInviteRepo = (store = new Map<string, Invite>()) =>
           })
       }),
     consumeByToken: () => Effect.sync(() => makeInvite()),
+    releaseById: (id) =>
+      Effect.sync(() => {
+        const inv = store.get(id)
+        if (inv && inv.usedBy === null) store.set(id, { ...inv, usedAt: null })
+      }),
     markUsedBy: () => Effect.void,
     findPending: () => Effect.sync(() => [...store.values()].filter((i) => !i.usedAt && !i.failedAt)),
     incrementAttempt: () => Effect.void,

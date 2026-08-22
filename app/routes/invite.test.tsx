@@ -42,7 +42,9 @@ describe("/invite/:token loader", () => {
     expect(data.error).toBe("invalid")
   })
 
-  it("returns already_used when invite.usedAt is set", async () => {
+  it("redirects an accepted invite to the app instead of a dead-end card", async () => {
+    // The account exists — whoever opened this link wants in, not an
+    // explanation that they already joined.
     mockRunEffect.mockResolvedValue({
       invite: {
         id: "i1",
@@ -55,9 +57,31 @@ describe("/invite/:token loader", () => {
     } as never)
 
     const result = await callLoader(loader, { params: { token: "abc" } })
+    expect(result.kind).toBe("response")
+    if (result.kind === "response") {
+      expect(result.response.status).toBe(302)
+      expect(result.response.headers.get("location")).toBe("https://duro.example.com")
+    }
+  })
+
+  it("explains a revoked invite rather than sending it to the app", async () => {
+    // Revoked means there is no account to reach, so redirecting would dump
+    // the visitor on a login screen they can never pass.
+    mockRunEffect.mockResolvedValue({
+      invite: {
+        id: "i1",
+        usedAt: "2026-01-01T00:00:00Z",
+        expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        locale: null,
+        status: { _tag: "Revoked" },
+      },
+      p12Password: null,
+    } as never)
+
+    const result = await callLoader(loader, { params: { token: "abc" } })
     const data = expectData<{ valid: boolean; error: string }>(result)
     expect(data.valid).toBe(false)
-    expect(data.error).toBe("already_used")
+    expect(data.error).toBe("revoked")
   })
 
   it("returns expired when invite has passed expiresAt", async () => {
@@ -226,12 +250,12 @@ describe("InvitePage component", () => {
     expect(screen.getByRole("link")).toHaveAttribute("href", "/reinvite/tok-1")
   })
 
-  it("renders the already-used card when error is `already_used`", async () => {
-    renderInvite({ valid: false, error: "already_used", appName: "Duro", healthUrl: "/health" })
-    // Already-used branch uses t("invite.used.title"). No CTA link on this
-    // tone (info, not actionable).
+  it("renders the no-longer-valid card for a spent or revoked invite", async () => {
+    renderInvite({ valid: false, error: "revoked", appName: "Duro", healthUrl: "/health" })
+    // An accepted invite redirects in the loader, so anything reaching this
+    // branch has no account behind it — info tone, no CTA to offer.
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: t("invite.used.title") })).toBeInTheDocument()
+      expect(screen.getByRole("heading", { name: t("invite.revoked.title") })).toBeInTheDocument()
     })
     expect(screen.queryByRole("link")).not.toBeInTheDocument()
   })

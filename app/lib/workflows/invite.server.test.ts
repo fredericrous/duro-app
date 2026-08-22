@@ -149,6 +149,11 @@ const mockInviteRepo = (store: Map<string, Invite> = new Map(), revocations: Rev
         store.set(id, consumed)
         return consumed
       }),
+    releaseById: (id) =>
+      Effect.sync(() => {
+        const inv = store.get(id)
+        if (inv && inv.usedBy === null) store.set(id, { ...inv, usedAt: null })
+      }),
     markUsedBy: (id, username) =>
       Effect.sync(() => {
         const invite = store.get(id)
@@ -710,6 +715,11 @@ describe("acceptInvite", () => {
           const deleteCall = userCalls.find((c) => c.method === "deleteUser")
           expect(deleteCall).toBeDefined()
           expect(deleteCall!.args).toEqual(["alice"])
+          // ...and the invite handed back. `consumeByToken` claims it before
+          // the account exists, so leaving it claimed after a rollback strands
+          // the recipient on "Already Joined" with nothing to log in to.
+          expect(store.get("inv-1")!.usedAt).toBeNull()
+          expect(store.get("inv-1")!.usedBy).toBeNull()
         }),
       ),
       Effect.provide(layer),

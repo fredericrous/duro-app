@@ -15,21 +15,39 @@ interface ScratchCardProps {
   children: ReactNode
 }
 
-function paintCanvas(canvas: HTMLCanvasElement, width: number, height: number, label: string) {
+/**
+ * Paints the foil and its label.
+ *
+ * The canvas is CSS-stretched to whatever width the layout gives it, so the
+ * backing store is sized from the *rendered* box (times devicePixelRatio)
+ * rather than the declared width. Painting into a fixed 320px buffer and
+ * letting the browser scale it down is what made the label small and soft on a
+ * phone. `fillText`'s maxWidth then condenses the label if the card is narrower
+ * than the words, instead of letting them run past the edge.
+ *
+ * Falls back to the declared size before layout has happened (and under jsdom,
+ * where getBoundingClientRect reports zeroes).
+ */
+function paintCanvas(canvas: HTMLCanvasElement, fallbackWidth: number, fallbackHeight: number, label: string) {
   const ctx = canvas.getContext("2d")
   if (!ctx) return
-  canvas.width = width
-  canvas.height = height
+  const rect = canvas.getBoundingClientRect()
+  const cssWidth = Math.round(rect.width) || fallbackWidth
+  const cssHeight = Math.round(rect.height) || fallbackHeight
+  const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1
+  canvas.width = Math.round(cssWidth * dpr)
+  canvas.height = Math.round(cssHeight * dpr)
+
   // Canvas can't read CSS variables — resolve the theme at draw time so the
   // scratch foil matches light mode too (root.tsx keeps html[data-theme] live).
   const light = document.documentElement.dataset.theme === "light"
   ctx.fillStyle = light ? "#d4d4d4" : "#333"
-  ctx.fillRect(0, 0, width, height)
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
   ctx.fillStyle = light ? "#4a4a4a" : "#999"
-  ctx.font = "14px -apple-system, BlinkMacSystemFont, sans-serif"
+  ctx.font = `${Math.round(14 * dpr)}px -apple-system, BlinkMacSystemFont, sans-serif`
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"
-  ctx.fillText(label, width / 2, height / 2)
+  ctx.fillText(label, canvas.width / 2, canvas.height / 2, canvas.width - 24 * dpr)
 }
 
 export function ScratchCard({
@@ -66,18 +84,32 @@ export function ScratchCard({
   const canvasCallbackRef = useCallback(
     (node: HTMLCanvasElement | null) => {
       canvasRef.current = node
-      if (node) {
+      if (!node) return
+      paintCanvas(node, width, height, label)
+
+      // The card is fluid, so its pixel size isn't known at mount and can change
+      // (rotation, a resize). Repaint only while the foil is still untouched —
+      // repainting mid-scratch would hand the user back the foil they just
+      // rubbed off.
+      if (typeof ResizeObserver === "undefined") return
+      const observer = new ResizeObserver(() => {
+        if (scratchStarted.current || revealed.current) return
         paintCanvas(node, width, height, label)
-      }
+      })
+      observer.observe(node)
+      return () => observer.disconnect()
     },
     [width, height, label],
   )
 
   const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current!.getBoundingClientRect()
+    const canvas = canvasRef.current!
+    const rect = canvas.getBoundingClientRect()
+    // Map CSS pixels to the backing store, which is now sized from the rendered
+    // box rather than the declared width.
     return {
-      x: (e.clientX - rect.left) * (width / rect.width),
-      y: (e.clientY - rect.top) * (height / rect.height),
+      x: (e.clientX - rect.left) * (rect.width ? canvas.width / rect.width : 1),
+      y: (e.clientY - rect.top) * (rect.height ? canvas.height / rect.height : 1),
     }
   }
 
@@ -86,7 +118,9 @@ export function ScratchCard({
     if (!ctx) return
     ctx.globalCompositeOperation = "destination-out"
     ctx.beginPath()
-    ctx.arc(x, y, 20, 0, Math.PI * 2)
+    // Radius follows the backing-store scale so the brush feels the same size
+    // whatever the card was laid out at.
+    ctx.arc(x, y, 20 * ((typeof window !== "undefined" && window.devicePixelRatio) || 1), 0, Math.PI * 2)
     ctx.fill()
   }
 
@@ -140,8 +174,15 @@ export function ScratchCard({
     // descendant combinator (`.container > *:not(.canvas):not(.cover)`) and on
     // pointer-events juggling around the <canvas>; neither is expressible
     // through css.create/html.*.
+    // `width` is a maximum, not a fixed size: at 320px this card used to
+    // overflow a phone screen once the neighbouring copy button was laid out
+    // beside it, which pushed that button under the scratch area — a scratch
+    // then landed on "copy" instead. Letting it shrink keeps the two apart.
     // eslint-disable-next-line duro/no-raw-html-element
-    <div className={`${styles.container}${className ? ` ${className}` : ""}`} style={{ width, height }}>
+    <div
+      className={`${styles.container}${className ? ` ${className}` : ""}`}
+      style={{ width: "100%", maxWidth: width, height }}
+    >
       {children}
       {!fadeOut && (
         <>

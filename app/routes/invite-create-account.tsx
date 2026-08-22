@@ -17,7 +17,14 @@ import { CertGate } from "~/components/CertGate/CertGate"
 import { useDevOverrides } from "~/components/DevToolbar/DevToolbar"
 import { Heading, LinkButton, Stack, StatusIcon, Text } from "@duro-app/ui"
 
-type InviteErrorCode = "missing_token" | "invalid" | "already_used" | "expired" | "too_many_attempts" | "unknown"
+type InviteErrorCode =
+  | "missing_token"
+  | "invalid"
+  | "already_used"
+  | "revoked"
+  | "expired"
+  | "too_many_attempts"
+  | "unknown"
 
 export function meta({ data }: Route.MetaArgs) {
   return [{ title: data?.appName ? `Create Account — ${data.appName}` : "Create Account" }]
@@ -66,10 +73,20 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       })
     }
 
+    if (invite.status._tag === "Accepted") {
+      // The account exists, so this link has nothing left to offer — send them
+      // to the app itself (which puts them through login) rather than a
+      // dead-end card. Someone re-opening an old invite link is trying to get
+      // in, not to read about having already joined.
+      throw redirect(config.homeUrl)
+    }
+
     if (isConsumed(invite.status)) {
+      // Revoked / mid-revocation: there is no account to reach, so an
+      // explanation is the only honest thing to show.
       return {
         valid: false as const,
-        error: "already_used" as InviteErrorCode,
+        error: "revoked" as InviteErrorCode,
         appName: config.appName,
         healthUrl,
       }
@@ -228,8 +245,15 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
 function InviteErrorView({ code, token }: { code: InviteErrorCode; token: string | undefined }) {
   const { t } = useTranslation()
 
-  if (code === "already_used") {
-    return <ErrorCard icon="check-done" tone="info" title={t("invite.used.title")} message={t("invite.used.message")} />
+  if (code === "already_used" || code === "revoked") {
+    return (
+      <ErrorCard
+        icon="check-done"
+        tone="info"
+        title={t("invite.revoked.title")}
+        message={t("invite.revoked.message")}
+      />
+    )
   }
 
   if (code === "expired") {

@@ -57,7 +57,7 @@ describe("/invite/:token/create-account loader", () => {
     expect(data.email).toBe("alice@example.com")
   })
 
-  it("returns 'already_used' when the invite has been consumed", async () => {
+  it("redirects to the app when the invite was already accepted", async () => {
     await seedTestDb(
       Effect.gen(function* () {
         const sql = yield* SqlClient.SqlClient
@@ -69,9 +69,11 @@ describe("/invite/:token/create-account loader", () => {
       }) as Effect.Effect<void, never, never>,
     )
     const result = await callLoader(loader, { params: { token: "tok-used" } })
-    const data = expectData<{ valid: boolean; error?: string }>(result)
-    expect(data.valid).toBe(false)
-    expect(data.error).toBe("already_used")
+    expect(result.kind).toBe("response")
+    if (result.kind === "response") {
+      expect(result.response.status).toBe(302)
+      expect(result.response.headers.get("location")).toBe("https://duro.example.com")
+    }
   })
 
   it("returns 'expired' when the invite's expiresAt is in the past", async () => {
