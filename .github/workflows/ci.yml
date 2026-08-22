@@ -121,6 +121,90 @@ jobs:
           include-hidden-files: true
           retention-days: 1
 
+  # A real OPAQUE handshake against the real LLDAP image production runs.
+  #
+  # This job exists because of a shipped outage: account creation could not
+  # succeed for anyone, because LldapClient posted to OPAQUE routes LLDAP does
+  # not have. LLDAP serves its admin SPA from a catch-all, so the wrong path
+  # answered `200 text/html` — the request passed its status check and died on
+  # JSON parsing, blaming the payload rather than the URL. The unit suite was
+  # green throughout: it mocks the HTTP layer that was itself wrong. Only a live
+  # LLDAP distinguishes "the client speaks this protocol" from "the client
+  # speaks to a server that exists".
+  #
+  # LLDAP runs under Buildah rather than as a `services:` container for two
+  # reasons: the image has no /data and its entrypoint refuses to create one
+  # (a service container cannot override the command to mkdir it), and
+  # service-container semantics under ARC's Kubernetes hooks are explicitly
+  # unreviewed here (see homelab docs/arc-k8s-ci-migration.md). Rootless
+  # `buildah run` uses the host network namespace, so the server is reachable on
+  # localhost of the job pod, and it runs inside the image's own musl rootfs —
+  # the binary is Alpine-linked and will not run on the Debian Node image.
+  integration:
+    name: OPAQUE handshake (real LLDAP)
+    runs-on: duro-app-ci
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: quay.io/buildah/stable
+    env:
+      # Pinned by digest to the exact image the cluster runs, so this test tracks
+      # production rather than a floating tag. Bump both together.
+      LLDAP_IMAGE: ghcr.io/fredericrous/lldap:opaque-ke-4@sha256:cc7953e8ad1f0120c9d61b637556a47f6c84c5a98dc72fc3f797ae5730c9c44a
+      LLDAP_URL: http://localhost:17170
+      # Throwaway credentials for an ephemeral container that holds no real data.
+      LLDAP_ADMIN_PASS: ci-admin-password
+      LLDAP_JWT_SECRET: ci-not-a-secret
+      STORAGE_DRIVER: vfs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start LLDAP
+        run: |
+          set -euo pipefail
+          buildah --storage-driver=vfs from --name lldap "$LLDAP_IMAGE"
+          # Run the binary directly rather than the image's entrypoint, which
+          # insists on a /data the image does not ship and then dies on an
+          # unbound $GID. This is what the homelab Deployment does too. SQLite
+          # under /tmp keeps the whole thing stateless and volume-free.
+          buildah --storage-driver=vfs config \
+            --env LLDAP_JWT_SECRET="$LLDAP_JWT_SECRET" \
+            --env LLDAP_LDAP_USER_PASS="$LLDAP_ADMIN_PASS" \
+            --env LLDAP_LDAP_BASE_DN=dc=ci,dc=test \
+            --env LLDAP_HTTP_PORT=17170 \
+            --env LLDAP_DATABASE_URL="sqlite:///tmp/lldap.db?mode=rwc" \
+            --env LLDAP_KEY_FILE=/tmp/lldap_key \
+            lldap
+          # `buildah run` executes inside the image's own musl rootfs (the
+          # binary is Alpine-linked) while sharing the pod's network namespace,
+          # so the server answers on localhost of this job.
+          buildah --storage-driver=vfs run --net host lldap -- /app/lldap run \
+            > /tmp/lldap.log 2>&1 &
+          for _ in $(seq 1 90); do
+            curl -fsS "$LLDAP_URL/health" >/dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -fsS "$LLDAP_URL/health" \
+            || { echo "::error::LLDAP did not serve /health within 90s"; cat /tmp/lldap.log; exit 1; }
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: LLDAP log (on failure)
+        if: failure()
+        run: cat /tmp/lldap.log || true
+
   coverage-gate:
     name: Coverage gate (merged shards)
     needs: test
