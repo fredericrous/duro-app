@@ -19,6 +19,9 @@ export default defineConfig({
     // Builds the migrated-PGlite snapshot once per run — see its doc comment.
     globalSetup: ["./app/test/global-setup.ts"],
     include: ["app/**/*.test.{ts,tsx}"],
+    // `*.integration.test.ts` needs live services (see vitest.integration.config.ts)
+    // and runs in its own CI job; it would only fail confusingly here.
+    exclude: ["**/node_modules/**", "**/dist/**", "app/**/*.integration.test.ts"],
     css: { modules: { classNameStrategy: "non-scoped" } },
     // Cap worker concurrency. vitest's default reads the NODE's core count,
     // not the CPU-limited runner pod's cgroup quota, so it over-forks: dozens
