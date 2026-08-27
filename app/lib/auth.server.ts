@@ -2,6 +2,7 @@ import { Effect } from "effect"
 import { getSession, createPkceCookie } from "./session.server"
 import { OidcClient } from "./services/OidcClient.server"
 import { runEffect } from "./runtime.server"
+import { resolvePendingCertInvite } from "./workflows/invite.server"
 
 export interface AuthInfo {
   /**
@@ -25,6 +26,24 @@ const DEV_AUTH: AuthInfo = {
 const isDevServer = process.env.NODE_ENV === "development" && process.env.VITEST !== "true"
 
 /**
+ * When an unauthenticated request already carries a valid client certificate
+ * whose invite has no account yet, send it straight to `/setup` instead of the
+ * OIDC login it could never complete. This is the automatic rescue for an
+ * invitee who installed the cert but opened `home` directly (no invite token in
+ * hand). Runs only when there is no session and an Envoy-set XFCC header is
+ * present, so it never touches the authenticated hot path, dev, or non-mTLS
+ * hosts. Returns a 302 Response to throw, or null to fall through to OIDC.
+ */
+async function pendingCertRedirect(request: Request): Promise<Response | null> {
+  const xfcc = request.headers.get("x-forwarded-client-cert")
+  if (!xfcc) return null
+  const resolved = await runEffect(resolvePendingCertInvite(xfcc).pipe(Effect.orDie))
+  if (resolved.kind !== "pending") return null
+  // Relative, same-origin: the request is already on the mTLS host.
+  return new Response(null, { status: 302, headers: { Location: "/setup" } })
+}
+
+/**
  * Require authentication. Returns AuthInfo if the user has a valid session,
  * or throws a redirect to the OIDC login flow.
  */
@@ -37,6 +56,9 @@ export async function requireAuth(request: Request): Promise<AuthInfo> {
   if (isDevServer) {
     return DEV_AUTH
   }
+
+  const certRedirect = await pendingCertRedirect(request)
+  if (certRedirect) throw certRedirect
 
   const { authorizationUrl, codeVerifier, state } = await runEffect(
     Effect.gen(function* () {

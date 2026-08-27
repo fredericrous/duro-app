@@ -94,6 +94,13 @@ export class CertificateRepo extends Context.Tag("CertificateRepo")<
       usernames: string[],
     ) => Effect.Effect<Record<string, UserCertificate[]>, CertificateRepoError>
     readonly findBySerial: (serialNumber: string) => Effect.Effect<UserCertificate | null, CertificateRepoError>
+    /**
+     * Look a certificate up by the canonical integer form of its serial — used
+     * by the cert-authenticated setup flow, where the serial comes from a parsed
+     * client cert and must match Vault's stored colon-hex regardless of
+     * separators or ASN.1 leading-zero padding. Pass `canonicalSerial(...)`.
+     */
+    readonly findBySerialCanonical: (canonical: string) => Effect.Effect<UserCertificate | null, CertificateRepoError>
     /** Marks cert as revoke-pending. Returns affected row count. Enforces ownership via username. */
     readonly markRevokePending: (serialNumber: string, username?: string) => Effect.Effect<number, CertificateRepoError>
     readonly markRevokeCompleted: (serialNumber: string) => Effect.Effect<void, CertificateRepoError>
@@ -237,6 +244,17 @@ export const CertificateRepoLive = Layer.effect(
             Effect.map((rows) => (rows[0] ? toRow(rows[0]) : null)),
           ),
           "Failed to find certificate by serial",
+        ),
+
+      findBySerialCanonical: (canonical: string) =>
+        withErr(
+          // Expression MUST stay byte-identical to migration 0036's index, or
+          // Postgres will not use idx_user_certs_serial_norm.
+          sql`SELECT * FROM user_certificates
+              WHERE ltrim(lower(replace(serial_number, ':', '')), '0') = ${canonical}`.pipe(
+            Effect.map((rows) => (rows[0] ? toRow(rows[0]) : null)),
+          ),
+          "Failed to find certificate by canonical serial",
         ),
 
       markRevokePending: (serialNumber: string, username?: string) =>

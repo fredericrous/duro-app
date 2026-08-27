@@ -2,7 +2,17 @@
 import { describe, expect } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { queueInvite, acceptInvite, revokeInvite, revokeUser, resendCert } from "./invite.server"
+import { readFileSync } from "node:fs"
+import { fileURLToPath } from "node:url"
+import {
+  queueInvite,
+  acceptInvite,
+  acceptInviteById,
+  resolvePendingCertInvite,
+  revokeInvite,
+  revokeUser,
+  resendCert,
+} from "./invite.server"
 import { InviteRepo, InviteError, type Invite, type Revocation, inviteStatus } from "~/lib/services/InviteRepo.server"
 import { UserManager, UserManagerError, type ManagedUser } from "~/lib/services/UserManager.server"
 import { CertManager } from "~/lib/services/CertManager.server"
@@ -161,6 +171,15 @@ const mockInviteRepo = (store: Map<string, Invite> = new Map(), revocations: Rev
       }),
     findPending: () => Effect.sync(() => [...store.values()].filter((i) => !i.usedAt)),
     incrementAttempt: () => Effect.void,
+    incrementAttemptById: () => Effect.void,
+    consumeById: (id) =>
+      Effect.sync(() => {
+        const invite = store.get(id)
+        if (!invite || invite.usedAt) throw new InviteError({ message: "not found" })
+        const consumed = { ...invite, usedAt: new Date().toISOString() }
+        store.set(id, consumed)
+        return consumed
+      }),
     markCertIssued: (id) =>
       Effect.sync(() => {
         const invite = store.get(id)
@@ -351,6 +370,7 @@ const mockCertificateRepo = (calls: { method: string; args: unknown[] }[] = []) 
       calls.push({ method: "revokeAllForUser", args: [_username] })
       return Effect.succeed([])
     },
+    findBySerialCanonical: () => Effect.succeed(null),
     setUserId: (inviteId, userId) => {
       calls.push({ method: "setUserId", args: [inviteId, userId] })
       return Effect.void
@@ -920,6 +940,7 @@ describe("audit emissions", () => {
       markRevokeCompleted: () => Effect.void,
       markRevokeFailed: () => Effect.void,
       revokeAllForUser: () => Effect.succeed(["serial-1"]),
+      findBySerialCanonical: () => Effect.succeed(null),
       setUserId: () => Effect.void,
       updateUsername: () => Effect.void,
     } as any)
@@ -942,4 +963,180 @@ describe("audit emissions", () => {
       ),
     )
   })
+})
+
+describe("acceptInviteById", () => {
+  it.effect("claims a pending invite by id and creates the account", () => {
+    const store = new Map<string, Invite>()
+    store.set("inv-1", makeInvite())
+    const userCalls: { method: string; args: unknown[] }[] = []
+    const layer = Layer.mergeAll(
+      mockInviteRepo(store),
+      mockUserManager(userCalls),
+      mockCertManager([]),
+      mockCertificateRepo(),
+    )
+    return acceptInviteById("inv-1", { username: "alice", password: "s3cretpassword" }).pipe(
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          expect(result.success).toBe(true)
+          expect(store.get("inv-1")!.usedBy).toBe("alice")
+          expect(userCalls[0].method).toBe("createUser")
+        }),
+      ),
+      Effect.provide(layer),
+    )
+  })
+
+  it.effect("recovers a crash-stuck Accepted/usedBy-null invite (no account yet)", () => {
+    const store = new Map<string, Invite>()
+    const stuckAt = new Date(Date.now() - 60_000).toISOString()
+    // used_at set by the up-front claim, but the pod died before markUsedBy.
+    store.set(
+      "inv-1",
+      makeInvite({ usedAt: stuckAt, usedBy: null, status: { _tag: "Accepted", usedAt: stuckAt, usedBy: null } }),
+    )
+    const userCalls: { method: string; args: unknown[] }[] = []
+    const layer = Layer.mergeAll(
+      mockInviteRepo(store),
+      mockUserManager(userCalls),
+      mockCertManager([]),
+      mockCertificateRepo(),
+    )
+    return acceptInviteById("inv-1", { username: "alice", password: "s3cretpassword" }).pipe(
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          expect(result.success).toBe(true)
+          expect(store.get("inv-1")!.usedBy).toBe("alice")
+        }),
+      ),
+      Effect.provide(layer),
+    )
+  })
+
+  it.effect("refuses an invite that already has a real account", () => {
+    const store = new Map<string, Invite>()
+    const at = new Date().toISOString()
+    store.set(
+      "inv-1",
+      makeInvite({ usedAt: at, usedBy: "bob", status: { _tag: "Accepted", usedAt: at, usedBy: "bob" } }),
+    )
+    const layer = Layer.mergeAll(mockInviteRepo(store), mockUserManager([]), mockCertManager([]), mockCertificateRepo())
+    return acceptInviteById("inv-1", { username: "alice", password: "s3cretpassword" }).pipe(
+      Effect.flip,
+      Effect.tap((e) => Effect.sync(() => expect(e).toBeInstanceOf(InviteError))),
+      Effect.provide(layer),
+    )
+  })
+
+  it.effect("forward-recovers when the LLDAP user already exists with the same email", () => {
+    const store = new Map<string, Invite>()
+    store.set("inv-1", makeInvite())
+    const calls: { method: string; args: unknown[] }[] = []
+    // createUser reports the user already exists; getUsers shows it is OUR user
+    // (same id + invite email), so the flow rolls forward to a bound account.
+    const users = Layer.succeed(UserManager, {
+      getUsers: Effect.succeed([{ id: "alice", email: "alice@example.com", displayName: "Alice", creationDate: "" }]),
+      getGroups: Effect.succeed([]),
+      createUser: () => Effect.fail(new UserManagerError({ message: "entity already exists" })),
+      setUserPassword: (u, p) => Effect.sync(() => calls.push({ method: "setUserPassword", args: [u, p] })),
+      addUserToGroup: (u, g) => Effect.sync(() => calls.push({ method: "addUserToGroup", args: [u, g] })),
+      deleteUser: (u) => Effect.sync(() => calls.push({ method: "deleteUser", args: [u] })),
+    })
+    const layer = Layer.mergeAll(mockInviteRepo(store), users, mockCertManager([]), mockCertificateRepo())
+    return acceptInviteById("inv-1", { username: "alice", password: "s3cretpassword" }).pipe(
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          expect(result.success).toBe(true)
+          expect(store.get("inv-1")!.usedBy).toBe("alice")
+          expect(calls.find((c) => c.method === "deleteUser")).toBeUndefined()
+        }),
+      ),
+      Effect.provide(layer),
+    )
+  })
+
+  it.effect("rejects when the username is taken by a DIFFERENT email, releasing the claim", () => {
+    const store = new Map<string, Invite>()
+    store.set("inv-1", makeInvite())
+    const users = Layer.succeed(UserManager, {
+      getUsers: Effect.succeed([
+        { id: "alice", email: "someone.else@example.com", displayName: "X", creationDate: "" },
+      ]),
+      getGroups: Effect.succeed([]),
+      createUser: () => Effect.fail(new UserManagerError({ message: "already exists" })),
+      setUserPassword: () => Effect.void,
+      addUserToGroup: () => Effect.void,
+      deleteUser: () => Effect.void,
+    })
+    const layer = Layer.mergeAll(mockInviteRepo(store), users, mockCertManager([]), mockCertificateRepo())
+    return acceptInviteById("inv-1", { username: "alice", password: "s3cretpassword" }).pipe(
+      Effect.flip,
+      Effect.tap(() =>
+        Effect.sync(() => {
+          // Claim handed back so the invitee can pick another name.
+          expect(store.get("inv-1")!.usedAt).toBeNull()
+        }),
+      ),
+      Effect.provide(layer),
+    )
+  })
+})
+
+describe("resolvePendingCertInvite", () => {
+  const certLayer = (cert: { inviteId: string | null; userId: string | null; revokedAt: string | null } | null) =>
+    Layer.succeed(CertificateRepo, {
+      store: () => Effect.void,
+      setLabel: () => Effect.succeed(0),
+      setClaimedPlatform: () => Effect.void,
+      listValid: () => Effect.succeed([]),
+      listUnrevoked: () => Effect.succeed([]),
+      listRecentNewDevices: () => Effect.succeed([]),
+      findLatestRenewalOf: () => Effect.succeed(null),
+      listAllByUsernames: () => Effect.succeed({}),
+      findBySerial: () => Effect.succeed(null),
+      findBySerialCanonical: () => Effect.succeed(cert ? ({ serialNumber: "0a:1b", ...cert } as never) : null),
+      markRevokePending: () => Effect.succeed(0),
+      markRevokeCompleted: () => Effect.void,
+      markRevokeFailed: () => Effect.void,
+      revokeAllForUser: () => Effect.succeed([]),
+      setUserId: () => Effect.void,
+      updateUsername: () => Effect.void,
+    } as never)
+
+  const xfccPem = readFileSync(
+    fileURLToPath(new URL("../../test/fixtures/client-cert-fixture.pem", import.meta.url)),
+    "utf8",
+  )
+  const xfccOf = `Cert="${encodeURIComponent(xfccPem)}"`
+
+  it.effect("classifies a cert with no account as pending", () => {
+    const store = new Map<string, Invite>()
+    store.set("inv-9", makeInvite({ id: "inv-9" }))
+    const layer = Layer.mergeAll(mockInviteRepo(store), certLayer({ inviteId: "inv-9", userId: null, revokedAt: null }))
+    return resolvePendingCertInvite(xfccOf).pipe(
+      Effect.tap((r) =>
+        Effect.sync(() => expect(r).toEqual({ kind: "pending", inviteId: "inv-9", email: "alice@example.com" })),
+      ),
+      Effect.provide(layer),
+    )
+  })
+
+  it.effect("classifies a cert already tied to a user as has_account", () => {
+    const layer = Layer.mergeAll(
+      mockInviteRepo(new Map()),
+      certLayer({ inviteId: "inv-9", userId: "alice", revokedAt: null }),
+    )
+    return resolvePendingCertInvite(xfccOf).pipe(
+      Effect.tap((r) => Effect.sync(() => expect(r.kind).toBe("has_account"))),
+      Effect.provide(layer),
+    )
+  })
+
+  it.effect("returns no_cert when the header is absent", () =>
+    resolvePendingCertInvite(null).pipe(
+      Effect.tap((r) => Effect.sync(() => expect(r.kind).toBe("no_cert"))),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(new Map()), certLayer(null))),
+    ),
+  )
 })

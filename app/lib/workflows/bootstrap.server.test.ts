@@ -149,6 +149,8 @@ const mockInviteRepo = (store = new Map<string, Invite>()) =>
     markUsedBy: () => Effect.void,
     findPending: () => Effect.sync(() => [...store.values()].filter((i) => !i.usedAt && !i.failedAt)),
     incrementAttempt: () => Effect.void,
+    incrementAttemptById: () => Effect.void,
+    consumeById: () => Effect.sync(() => makeInvite()),
     markCertIssued: (id) =>
       Effect.sync(() => {
         const inv = store.get(id)
@@ -237,6 +239,7 @@ const mockCertificateRepo = () =>
     markRevokeCompleted: () => Effect.void,
     markRevokeFailed: () => Effect.void,
     revokeAllForUser: () => Effect.succeed([]),
+    findBySerialCanonical: () => Effect.succeed(null),
     setUserId: () => Effect.void,
     updateUsername: () => Effect.void,
   })

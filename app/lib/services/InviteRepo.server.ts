@@ -155,6 +155,13 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
       input: { status: DeliveryStatus; detail: string | null; at: string },
     ) => Effect.Effect<void, InviteError>
     readonly consumeByToken: (rawToken: string) => Effect.Effect<Invite, InviteError>
+    /**
+     * Atomic claim by invite id — the cert-authenticated `/setup` flow has no
+     * raw token (it is stored hashed and the invitee never had the URL), so it
+     * resolves the invite from the presented certificate and claims by id.
+     * Same guard as `consumeByToken`: only an unclaimed, unexpired invite wins.
+     */
+    readonly consumeById: (id: string) => Effect.Effect<Invite, InviteError>
     readonly markUsedBy: (id: string, username: string) => Effect.Effect<void, InviteError>
     /**
      * Undo `consumeByToken` for an attempt that failed before the account was
@@ -166,6 +173,8 @@ export class InviteRepo extends Context.Tag("InviteRepo")<
     readonly releaseById: (id: string) => Effect.Effect<void, InviteError>
     readonly findPending: () => Effect.Effect<Invite[], InviteError>
     readonly incrementAttempt: (tokenHash: string) => Effect.Effect<void, InviteError>
+    /** Attempt counter keyed by id, for the cert-authenticated `/setup` flow. */
+    readonly incrementAttemptById: (id: string) => Effect.Effect<void, InviteError>
     readonly markCertIssued: (id: string) => Effect.Effect<void, InviteError>
     readonly markPRCreated: (id: string, prNumber: number) => Effect.Effect<void, InviteError>
     readonly markPRMerged: (id: string) => Effect.Effect<void, InviteError>
@@ -408,6 +417,21 @@ export const InviteRepoLive = Layer.effect(
           return yield* withErr(rowToInvite(rows[0]), "Failed to decode consumed invite")
         }),
 
+      consumeById: (id) =>
+        Effect.gen(function* () {
+          const ts = now()
+          const rows = yield* withErr(
+            sql`UPDATE invites SET used_at = ${ts}
+                WHERE id = ${id} AND used_at IS NULL AND expires_at > ${ts}
+                RETURNING *`,
+            "Failed to consume invite",
+          )
+          if (rows.length === 0) {
+            return yield* new InviteError({ message: "Invite is invalid, expired, or already used" })
+          }
+          return yield* withErr(rowToInvite(rows[0]), "Failed to decode consumed invite")
+        }),
+
       markUsedBy: (id, username) =>
         withErr(
           sql`UPDATE invites SET used_by = ${username} WHERE id = ${id}`.pipe(Effect.asVoid),
@@ -433,6 +457,14 @@ export const InviteRepoLive = Layer.effect(
       incrementAttempt: (tokenHash) =>
         withErr(
           sql`UPDATE invites SET attempts = attempts + 1, last_attempt_at = ${now()} WHERE token_hash = ${tokenHash}`.pipe(
+            Effect.asVoid,
+          ),
+          "Failed to increment attempt",
+        ),
+
+      incrementAttemptById: (id) =>
+        withErr(
+          sql`UPDATE invites SET attempts = attempts + 1, last_attempt_at = ${now()} WHERE id = ${id}`.pipe(
             Effect.asVoid,
           ),
           "Failed to increment attempt",
