@@ -48,6 +48,8 @@ jobs:
       - name: Attestation check
         id: attest
         uses: fredericrous/attest@v1
+        with:
+          platform: any
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
@@ -109,6 +111,8 @@ jobs:
       - name: Attestation check
         id: attest
         uses: fredericrous/attest@v1
+        with:
+          platform: any
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
