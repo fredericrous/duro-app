@@ -9,6 +9,7 @@ import { CertManager } from "~/lib/services/CertManager.server"
 import { config, isOriginAllowed } from "~/lib/config.server"
 import { hashToken } from "~/lib/crypto.server"
 import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
+import { certPlatform, certStore, chromeIntentUrl } from "~/lib/cert-store"
 import { acceptInvite } from "~/lib/workflows/invite.server"
 import { Effect } from "effect"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
@@ -33,6 +34,19 @@ export function meta({ data }: Route.MetaArgs) {
 export async function loader({ request, params }: Route.LoaderArgs) {
   const token = params.token
   const healthUrl = `${config.homeUrl}/health`
+  // Same read as /invite/:token — someone who deep-links straight here in a
+  // browser without a certificate store deserves the same explanation rather
+  // than a "go back and install it" loop they have already been round.
+  const userAgent = request.headers.get("user-agent")
+  const platform = certPlatform(userAgent)
+  const inviteUrl = token ? `${config.inviteBaseUrl}/invite/${token}` : null
+  const store = certStore(userAgent)
+  const browser = {
+    store,
+    onIos: platform === "ios",
+    inviteUrl,
+    chromeUrl: store === "none" && platform === "android" && inviteUrl ? chromeIntentUrl(inviteUrl) : null,
+  }
   if (!token) {
     return {
       valid: false as const,
@@ -115,6 +129,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       email: invite.email,
       appName: config.appName,
       healthUrl,
+      browser,
     }
   } catch (e) {
     if (e instanceof Response) throw e
@@ -236,7 +251,7 @@ export default function CreateAccountPage({ loaderData, actionData }: Route.Comp
           </Text>
         }
       >
-        <CertGate certPromise={certPromise} actionData={actionData} />
+        <CertGate certPromise={certPromise} actionData={actionData} browser={loaderData.browser} />
       </Suspense>
     </CenteredCardPage>
   )

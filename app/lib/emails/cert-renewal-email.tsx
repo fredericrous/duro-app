@@ -3,6 +3,7 @@
 import { EmailShell, Heading, Text, Button, Hr, Section } from "@duro-app/ui-email"
 import { Trans } from "react-i18next/TransWithoutContext"
 import type { TFunction } from "i18next"
+import { CertInstallSteps } from "./cert-install-steps"
 
 interface CertRenewalEmailProps {
   appName: string
@@ -32,12 +33,7 @@ export function CertRenewalEmail({ appName, t, revealUrl }: CertRenewalEmailProp
       <Section>
         <Heading as="h2">{t("email.renewal.install.title")}</Heading>
         <Text>{t("email.renewal.install.body", { appName })}</Text>
-        <Text variant="small">
-          <Trans t={t} i18nKey="email.renewal.install.macos" components={{ strong: <strong /> }} />
-        </Text>
-        <Text variant="small">
-          <Trans t={t} i18nKey="email.renewal.install.windows" components={{ strong: <strong /> }} />
-        </Text>
+        <CertInstallSteps t={t} />
       </Section>
 
       <Hr />

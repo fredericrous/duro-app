@@ -3,13 +3,17 @@ import { useTranslation } from "react-i18next"
 import { useSubmit, useNavigation, useParams } from "react-router"
 import { Schema } from "effect"
 import { Alert, Button, Field, Fieldset, Form, Heading, Input, LinkButton, Text } from "@duro-app/ui"
+import { UnsupportedBrowser } from "~/components/UnsupportedBrowser/UnsupportedBrowser"
+import type { CertStore } from "~/lib/cert-store"
 
 export function CertGate({
   certPromise,
   actionData,
+  browser,
 }: {
   certPromise: Promise<boolean>
   actionData: { error?: string } | undefined
+  browser: { store: CertStore; onIos: boolean; inviteUrl: string | null; chromeUrl: string | null }
 }) {
   const { t } = useTranslation()
   const { token } = useParams()
@@ -48,6 +52,18 @@ export function CertGate({
       ),
     [t],
   )
+
+  if (!certInstalled && browser.store === "none") {
+    // "Go back and install it first" is not advice here — the visitor already
+    // did, in the only place this browser will never look.
+    return (
+      <UnsupportedBrowser
+        onIos={browser.onIos}
+        inviteUrl={browser.inviteUrl ?? undefined}
+        chromeUrl={browser.chromeUrl}
+      />
+    )
+  }
 
   if (!certInstalled) {
     return (

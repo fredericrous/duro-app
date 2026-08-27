@@ -509,6 +509,14 @@
     "bootstrap": "On a fresh deployment, the very first admin is created from a single-use bootstrap token your operator placed in Vault. This wizard reads that token server-side and queues an invite for the email you enter. After the invite is consumed, this page locks itself.",
     "identities": "People and machine identities — human users with their mTLS certificates, plus groups, service accounts, and devices — and the access each one holds."
   },
+  "certInstall": {
+    "android": "<strong>Android:</strong> Open Settings and search for “certificate”, then choose Install a certificate → VPN & app user certificate, pick the .p12 file you downloaded and enter the password. Use Chrome afterwards — Firefox for Android cannot read it.",
+    "ios": "<strong>iPhone / iPad:</strong> Open the .p12 from Files — iOS turns it into a profile. Install it under Settings → General → VPN & Device Management, enter the password when asked, then use Safari.",
+    "macos": "<strong>macOS:</strong> Double-click the .p12 file to open Keychain Access, enter the password when prompted, then trust the certificate.",
+    "windows": "<strong>Windows:</strong> Double-click the .p12 file, follow the Certificate Import Wizard, and enter the password when prompted.",
+    "linux": "<strong>Linux:</strong> Import the .p12 into your browser: Chrome → Settings → Privacy and security → Security → Manage certificates → Your certificates → Import.",
+    "firefox": "<strong>Using Firefox?</strong> Firefox keeps its own certificate store, so installing the .p12 in your system keychain is not enough. Import it again under Settings → Privacy & Security → Certificates → View Certificates → Your Certificates → Import."
+  },
   "invite": {
     "title": "Join {{appName}}",
     "subtitle": "You've been invited as <strong>{{email}}</strong>",
@@ -547,7 +555,16 @@
       "continue": "Continue to Create Account",
       "notInstalled": "It looks like your certificate isn't installed yet. Download the .p12 file above and install it, then click the button below.",
       "hint": "After installing the certificate, you may need to close and reopen your browser for it to be recognized.",
-      "retry": "Check again"
+      "retry": "Check again",
+      "unsupported": {
+        "title": "This browser can’t use certificates",
+        "android": "Firefox for Android has no certificate store of its own, so it cannot see the certificate you installed on this phone — refreshing this page will never get past this step. Open this invite in Chrome to finish.",
+        "ios": "Firefox for iOS cannot present a client certificate — refreshing this page will never get past this step. Open this invite in Safari to finish.",
+        "openChrome": "Open in Chrome",
+        "copyLink": "Copy invite link",
+        "copied": "Link copied",
+        "copyFailed": "Couldn’t copy automatically. Copy the address from the address bar instead."
+      }
     },
     "revoked": {
       "title": "Invitation no longer valid",
@@ -1334,9 +1351,7 @@
       "body": "{{invitedBy}} has invited you to join {{appName}}, {{appDescription}}.",
       "step1": {
         "title": "Step 1: Install Your Certificate",
-        "body": "Click the button below to open your invite page, where you can <strong>download your certificate</strong> and reveal the password to install it.",
-        "macos": "<strong>macOS:</strong> Double-click the .p12 file to open Keychain Access, enter the password when prompted, then trust the certificate.",
-        "windows": "<strong>Windows:</strong> Double-click the .p12 file, follow the Certificate Import Wizard, and enter the password when prompted."
+        "body": "Click the button below to open your invite page, where you can <strong>download your certificate</strong> and reveal the password to install it."
       },
       "step2": {
         "title": "Step 2: Create Your Account",
@@ -1356,9 +1371,7 @@
       },
       "install": {
         "title": "Install Your New Certificate",
-        "body": "Please install this certificate to continue accessing {{appName}} services. You may need to remove the old certificate first.",
-        "macos": "<strong>macOS:</strong> Double-click the .p12 file to open Keychain Access, enter the password when prompted, then trust the certificate. You can remove the old certificate from Keychain Access.",
-        "windows": "<strong>Windows:</strong> Double-click the .p12 file, follow the Certificate Import Wizard, and enter the password when prompted. You can remove the old certificate from the Certificate Manager."
+        "body": "Please install this certificate to continue accessing {{appName}} services. You may need to remove the old certificate first."
       },
       "footer": "Your account and access remain unchanged — only the certificate has been updated. If you didn't expect this, please contact your administrator."
     }

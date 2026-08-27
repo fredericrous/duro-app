@@ -7,7 +7,7 @@ vi.mock("~/lib/runtime.server", async () => {
   return { runEffect: mod.testRunEffect }
 })
 vi.mock("~/lib/config.server", () => ({
-  config: { appName: "Duro", homeUrl: "https://duro.example.com" },
+  config: { appName: "Duro", homeUrl: "https://duro.example.com", inviteBaseUrl: "https://join.example.com" },
   isOriginAllowed: vi.fn().mockReturnValue(true),
 }))
 vi.mock("~/lib/crypto.server", () => ({

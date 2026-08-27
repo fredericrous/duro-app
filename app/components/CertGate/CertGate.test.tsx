@@ -7,11 +7,17 @@ import { t } from "~/test/test-utils"
 
 // CertGate reads useParams/useSubmit/useNavigation and suspends on certPromise,
 // so it needs a data-router context (renderRoute) plus a Suspense boundary.
-const renderGate = (certInstalled: boolean, actionData?: { error?: string }) => {
+const SYSTEM_STORE = { store: "system" as const, onIos: false, inviteUrl: null, chromeUrl: null }
+
+const renderGate = (
+  certInstalled: boolean,
+  actionData?: { error?: string },
+  browser: Parameters<typeof CertGate>[0]["browser"] = SYSTEM_STORE,
+) => {
   const certPromise = Promise.resolve(certInstalled)
   const Wrapper = () => (
     <Suspense fallback={null}>
-      <CertGate certPromise={certPromise} actionData={actionData} />
+      <CertGate certPromise={certPromise} actionData={actionData} browser={browser} />
     </Suspense>
   )
   return renderRoute({
@@ -32,6 +38,25 @@ describe("CertGate", () => {
     })
     const back = screen.getByRole("link", { name: t("createAccount.certRequired.back") })
     expect(back).toHaveAttribute("href", "/invite/tok")
+  })
+
+  it("explains the browser instead of sending a certless browser back to install again", async () => {
+    // Firefox for Android already has the certificate installed on the phone —
+    // "go back and install it" would send it round the same loop forever.
+    renderGate(false, undefined, {
+      store: "none",
+      onIos: false,
+      inviteUrl: "https://join.example.com/invite/tok",
+      chromeUrl: "intent://join.example.com/invite/tok#Intent;scheme=https;package=com.android.chrome;end",
+    })
+    await waitFor(() => {
+      expect(screen.getByText(t("invite.cert.unsupported.title"))).toBeInTheDocument()
+    })
+    expect(screen.queryByText(t("createAccount.certRequired.title"))).not.toBeInTheDocument()
+    expect(screen.getByRole("link", { name: t("invite.cert.unsupported.openChrome") })).toHaveAttribute(
+      "href",
+      "intent://join.example.com/invite/tok#Intent;scheme=https;package=com.android.chrome;end",
+    )
   })
 
   it("renders the create-account form once the cert is installed", async () => {

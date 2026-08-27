@@ -3,6 +3,7 @@
 import { EmailShell, Heading, Text, Button, Hr, Section, Link, Img } from "@duro-app/ui-email"
 import { Trans } from "react-i18next/TransWithoutContext"
 import type { TFunction } from "i18next"
+import { CertInstallSteps } from "./cert-install-steps"
 
 interface InviteEmailProps {
   inviteUrl: string
@@ -40,12 +41,7 @@ export function InviteEmail({
         <Text>
           <Trans t={t} i18nKey="email.invite.step1.body" components={{ strong: <strong /> }} />
         </Text>
-        <Text variant="small">
-          <Trans t={t} i18nKey="email.invite.step1.macos" components={{ strong: <strong /> }} />
-        </Text>
-        <Text variant="small">
-          <Trans t={t} i18nKey="email.invite.step1.windows" components={{ strong: <strong /> }} />
-        </Text>
+        <CertInstallSteps t={t} />
       </Section>
 
       <Section>

@@ -509,6 +509,14 @@
     "bootstrap": "Sur un deploiement neuf, le tout premier admin est cree a partir d'un jeton d'amorcage a usage unique que votre operateur a place dans Vault. Cet assistant lit le jeton cote serveur et met en file d'attente une invitation pour l'adresse e-mail saisie. Une fois l'invitation consommee, cette page se verrouille.",
     "identities": "Les identités humaines et machines — utilisateurs et leurs certificats mTLS, groupes, comptes de service et appareils — et les accès de chacune."
   },
+  "certInstall": {
+    "android": "<strong>Android :</strong> Ouvrez les Paramètres et cherchez « certificat », puis choisissez Installer un certificat → Certificat VPN et applications, sélectionnez le fichier .p12 téléchargé et saisissez le mot de passe. Utilisez ensuite Chrome — Firefox pour Android ne sait pas le lire.",
+    "ios": "<strong>iPhone / iPad :</strong> Ouvrez le fichier .p12 depuis Fichiers — iOS le transforme en profil. Installez-le dans Réglages → Général → VPN et gestion de l’appareil, saisissez le mot de passe, puis utilisez Safari.",
+    "macos": "<strong>macOS :</strong> Double-cliquez sur le fichier .p12 pour ouvrir Trousseau d’accès, saisissez le mot de passe lorsqu’il est demandé, puis faites confiance au certificat.",
+    "windows": "<strong>Windows :</strong> Double-cliquez sur le fichier .p12, suivez l’assistant d’importation de certificat et saisissez le mot de passe lorsqu’il est demandé.",
+    "linux": "<strong>Linux :</strong> Importez le .p12 dans votre navigateur : Chrome → Paramètres → Confidentialité et sécurité → Sécurité → Gérer les certificats → Vos certificats → Importer.",
+    "firefox": "<strong>Vous utilisez Firefox ?</strong> Firefox possède son propre magasin de certificats : l’installer dans le trousseau du système ne suffit pas. Importez-le à nouveau dans Paramètres → Vie privée et sécurité → Certificats → Afficher les certificats → Vos certificats → Importer."
+  },
   "invite": {
     "title": "Rejoindre {{appName}}",
     "subtitle": "Vous avez ete invite en tant que <strong>{{email}}</strong>",
@@ -547,7 +555,16 @@
       "continue": "Continuer pour creer un compte",
       "notInstalled": "Il semble que votre certificat ne soit pas encore installe. Telechargez le fichier .p12 ci-dessus et installez-le, puis cliquez sur le bouton ci-dessous.",
       "hint": "Apres l'installation du certificat, vous devrez peut-etre fermer et rouvrir votre navigateur pour qu'il soit reconnu.",
-      "retry": "Verifier a nouveau"
+      "retry": "Verifier a nouveau",
+      "unsupported": {
+        "title": "Ce navigateur ne gère pas les certificats",
+        "android": "Firefox pour Android n’a pas de magasin de certificats et ne voit donc pas celui que vous avez installé sur ce téléphone — actualiser cette page ne débloquera jamais cette étape. Ouvrez cette invitation dans Chrome pour continuer.",
+        "ios": "Firefox pour iOS ne peut pas présenter de certificat client — actualiser cette page ne débloquera jamais cette étape. Ouvrez cette invitation dans Safari pour continuer.",
+        "openChrome": "Ouvrir dans Chrome",
+        "copyLink": "Copier le lien d’invitation",
+        "copied": "Lien copié",
+        "copyFailed": "Copie automatique impossible. Copiez l’adresse depuis la barre d’adresse."
+      }
     },
     "revoked": {
       "title": "Invitation qui n'est plus valable",
@@ -1334,9 +1351,7 @@
       "body": "{{invitedBy}} vous a invite a rejoindre {{appName}}, {{appDescription}}.",
       "step1": {
         "title": "Etape 1 : Installez votre certificat",
-        "body": "Cliquez sur le bouton ci-dessous pour ouvrir votre page d'invitation, ou vous pourrez <strong>telecharger votre certificat</strong> et reveler le mot de passe pour l'installer.",
-        "macos": "<strong>macOS :</strong> Double-cliquez sur le fichier .p12 pour ouvrir Trousseau d'acces, entrez le mot de passe lorsqu'il est demande, puis faites confiance au certificat.",
-        "windows": "<strong>Windows :</strong> Double-cliquez sur le fichier .p12, suivez l'assistant d'importation de certificat et entrez le mot de passe lorsqu'il est demande."
+        "body": "Cliquez sur le bouton ci-dessous pour ouvrir votre page d'invitation, ou vous pourrez <strong>telecharger votre certificat</strong> et reveler le mot de passe pour l'installer."
       },
       "step2": {
         "title": "Etape 2 : Creez votre compte",
@@ -1356,9 +1371,7 @@
       },
       "install": {
         "title": "Installez votre nouveau certificat",
-        "body": "Veuillez installer ce certificat pour continuer a acceder aux services de {{appName}}. Vous devrez peut-etre supprimer l'ancien certificat au prealable.",
-        "macos": "<strong>macOS :</strong> Double-cliquez sur le fichier .p12 pour ouvrir Trousseau d'acces, entrez le mot de passe lorsqu'il est demande, puis faites confiance au certificat. Vous pouvez supprimer l'ancien certificat depuis Trousseau d'acces.",
-        "windows": "<strong>Windows :</strong> Double-cliquez sur le fichier .p12, suivez l'assistant d'importation de certificat et entrez le mot de passe lorsqu'il est demande. Vous pouvez supprimer l'ancien certificat depuis le Gestionnaire de certificats."
+        "body": "Veuillez installer ce certificat pour continuer a acceder aux services de {{appName}}. Vous devrez peut-etre supprimer l'ancien certificat au prealable."
       },
       "footer": "Votre compte et vos acces restent inchanges — seul le certificat a ete mis a jour. Si vous n'attendiez pas cela, veuillez contacter votre administrateur."
     }

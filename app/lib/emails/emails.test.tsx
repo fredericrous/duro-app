@@ -38,6 +38,37 @@ describe("email templates (@duro-app/ui-email)", () => {
     expect(html).toContain("https://join.example/e/open")
   })
 
+  it.each([
+    [
+      "InviteEmail",
+      async (t: Awaited<ReturnType<typeof fixedT>>) =>
+        render(
+          InviteEmail({
+            inviteUrl: "https://join.example/invite/tok",
+            reinviteUrl: "https://join.example/reinvite/tok",
+            invitedBy: "admin",
+            appName: "Duro",
+            appDescription: "a dashboard",
+            t,
+          }),
+        ),
+    ],
+    [
+      "CertRenewalEmail",
+      async (t: Awaited<ReturnType<typeof fixedT>>) =>
+        render(CertRenewalEmail({ appName: "Duro", revealUrl: "https://join.example/cert/tok", t })),
+    ],
+  ])("%s: spells out how to install the .p12 on every platform", async (_name, renderEmail) => {
+    // An email cannot know which device opens it, and the mobile lines are the
+    // ones that were missing when an invitee got stranded on a phone.
+    const html = await renderEmail(await fixedT())
+    for (const platform of ["Android:", "iPhone / iPad:", "macOS:", "Windows:", "Using Firefox?"]) {
+      expect(html).toContain(platform)
+    }
+    // A moved or misspelled key renders as the key itself rather than failing.
+    expect(html).not.toContain("certInstall.")
+  })
+
   it("CertRenewalEmail: renders the reveal link + dark/light", async () => {
     const t = await fixedT()
     const html = await render(CertRenewalEmail({ appName: "Duro", t, revealUrl: "https://join.example/cert/tok" }))
