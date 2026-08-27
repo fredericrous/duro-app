@@ -62,6 +62,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Attestation check
+        id: attest
+        uses: fredericrous/attest@v1
+        with:
+          platform: any
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
@@ -72,6 +78,7 @@ jobs:
         run: npm ci
 
       - name: Run tests (shard)
+        if: ${{ !contains(fromJSON(steps.attest.outputs.gates), 'pre-push-run-tests-js') }}
         run: npx vitest run --shard=${{ matrix.shard }}/2
 
   build:

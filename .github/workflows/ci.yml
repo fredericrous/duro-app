@@ -45,6 +45,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Attestation check
+        id: attest
+        uses: fredericrous/attest@v1
+        with:
+          platform: any
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
@@ -73,6 +79,7 @@ jobs:
           kill $SERVER_PID
 
       - name: Type check
+        if: ${{ !contains(fromJSON(steps.attest.outputs.gates), 'pre-push-run-tests-js') }}
         run: npm run typecheck
 
       - name: Format check
@@ -101,6 +108,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Attestation check
+        id: attest
+        uses: fredericrous/attest@v1
+        with:
+          platform: any
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
@@ -111,6 +124,7 @@ jobs:
         run: npm ci
 
       - name: Run tests (shard, coverage blob)
+        if: ${{ !contains(fromJSON(steps.attest.outputs.gates), 'pre-push-run-tests-js') }}
         run: npx vitest run --coverage --reporter=blob --shard=${{ matrix.shard }}/2
 
       - name: Upload shard report
