@@ -614,7 +614,13 @@
       "invalid_username": "Le nom d'utilisateur doit comporter 3 à 32 caractères — lettres, chiffres, tirets ou tirets bas.",
       "password_too_short": "Le mot de passe doit comporter au moins 12 caractères.",
       "password_mismatch": "Les mots de passe ne correspondent pas.",
-      "create_failed": "Impossible de créer votre compte. Réessayez ou demandez une nouvelle invitation à un administrateur."
+      "create_failed": "Impossible de créer votre compte. Réessayez ou demandez une nouvelle invitation à un administrateur.",
+      "already_setup": "Vous avez déjà configuré ce compte. Connectez-vous pour continuer."
+    }
+  },
+  "setup": {
+    "error": {
+      "noCert": "Cette page a besoin du certificat que vous avez installé. Ouvrez-la dans le navigateur où se trouve le certificat et vérifiez que le certificat est installé."
     }
   },
   "reinvite": {

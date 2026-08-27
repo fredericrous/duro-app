@@ -362,3 +362,40 @@ describe("CertificateRepo — markRevokePending affected count", () => {
     )
   })
 })
+
+describe("CertificateRepo — findBySerialCanonical", () => {
+  it.layer(TestLayer)("matches regardless of separators, case, and leading-zero padding", (it) => {
+    it.effect("vault colon-hex stored, parsed forms all resolve", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        // Vault stores lowercase colon-hex with an ASN.1 leading-zero byte.
+        yield* repo.store(sample({ serialNumber: "0a:1b:2c:3d:4e:5f", username: "carol" }))
+
+        // canonicalSerial(...) of each representation is "a1b2c3d4e5f".
+        const found = yield* repo.findBySerialCanonical("a1b2c3d4e5f")
+        expect(found?.username).toBe("carol")
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("resolves a bare-hex stored serial too", (it) => {
+    it.effect("no-colon stored form", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        yield* repo.store(sample({ serialNumber: "0A1B2C3D4E5F", username: "dave" }))
+        const found = yield* repo.findBySerialCanonical("a1b2c3d4e5f")
+        expect(found?.username).toBe("dave")
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("returns null for an unknown canonical serial", (it) => {
+    it.effect("miss → null", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        const found = yield* repo.findBySerialCanonical("deadbeef")
+        expect(found).toBeNull()
+      }),
+    )
+  })
+})

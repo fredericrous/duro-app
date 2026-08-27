@@ -2,13 +2,14 @@ import { Effect } from "effect"
 import * as crypto from "node:crypto"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { CertManager } from "~/lib/services/CertManager.server"
-import { InviteRepo } from "~/lib/services/InviteRepo.server"
+import { InviteRepo, InviteError, type Invite } from "~/lib/services/InviteRepo.server"
 import { EmailService } from "~/lib/services/EmailService.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { revokeSerialForUser } from "./cert-revocation.server"
+import { parseXfccCert, canonicalSerial } from "~/lib/client-cert.server"
 
 export interface InviteInput {
   email: string
@@ -133,22 +134,31 @@ export const queueInvite = (input: InviteInput) =>
 
 // --- Accept Invite ---
 
-export const acceptInvite = (token: string, input: AcceptInput) =>
+/**
+ * Shared tail of both accept paths: given an invite already atomically claimed
+ * (used_at set, but no account yet), create the LLDAP user, set the password
+ * and groups, then bind the certificate to the real user and clean up.
+ *
+ * Idempotent enough to survive a retry after a partial crash: if the LLDAP user
+ * already exists AND its email matches this invite, we treat that as our own
+ * earlier attempt and roll forward (bind + finish) instead of erroring — a hard
+ * pod kill between createUser and the DB bind must converge to a usable account,
+ * not dead-end. A username that already belongs to a DIFFERENT email is a real
+ * collision: release the claim so the invitee can pick another name.
+ */
+const finishAccept = (invite: Invite, input: AcceptInput) =>
   Effect.gen(function* () {
     const inviteRepo = yield* InviteRepo
     const users = yield* UserManager
     const cert = yield* CertManager
     const certRepo = yield* CertificateRepo
 
-    // Atomic consume — marks invite as used
-    const invite = yield* inviteRepo.consumeByToken(token)
-
     const groups = yield* Effect.try({
       try: () => JSON.parse(invite.groups) as number[],
       catch: () => new Error("Invalid groups JSON in invite"),
     })
 
-    // Create user with compensating rollback on failure
+    // Create the user, or roll forward onto our own half-created one.
     yield* users
       .createUser({
         id: input.username,
@@ -158,28 +168,54 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
         lastName: "",
       })
       .pipe(
-        Effect.mapError((e: any) => {
-          const msg = String(e?.message ?? e)
-          if (
+        Effect.catchAll((e: unknown) => {
+          const msg = String((e as { message?: unknown })?.message ?? e)
+          const alreadyExists =
             msg.includes("UNIQUE") ||
             msg.includes("unique") ||
             msg.includes("already exists") ||
             msg.includes("duplicate")
-          ) {
-            return new Error(`A user with this email or username already exists`)
+          if (!alreadyExists) {
+            // Genuine failure — hand the invite back so the attempt can retry.
+            return inviteRepo
+              .releaseById(invite.id)
+              .pipe(Effect.ignore, Effect.andThen(Effect.fail(new Error(`Failed to create user: ${msg}`))))
           }
-          return new Error(`Failed to create user: ${msg}`)
+          // Already exists: is it ours (same email) or someone else's name?
+          return users.getUsers.pipe(
+            Effect.catchAll(() => Effect.succeed([] as Array<{ id: string; email: string }>)),
+            Effect.flatMap((existing) => {
+              const match = existing.find((u) => u.id === input.username)
+              if (match && match.email.toLowerCase() === invite.email.toLowerCase()) {
+                // Our own earlier attempt — roll forward.
+                return Effect.logInfo(
+                  `finishAccept: recovering existing user ${input.username} for invite ${invite.id}`,
+                )
+              }
+              // Someone else already holds this username.
+              return inviteRepo
+                .releaseById(invite.id)
+                .pipe(
+                  Effect.ignore,
+                  Effect.andThen(Effect.fail(new Error(`A user with this email or username already exists`))),
+                )
+            }),
+          )
         }),
-        // The invite was claimed before this point; hand it back so a failed
-        // attempt can be retried instead of dead-ending on "Already Joined".
-        Effect.tapError(() => inviteRepo.releaseById(invite.id).pipe(Effect.ignore)),
       )
 
-    // Set password + add to groups, rollback user on failure
+    // Set password + groups; a failure here rolls the user back and releases.
     yield* Effect.gen(function* () {
       yield* users.setUserPassword(input.username, input.password)
       for (const gid of groups) {
-        yield* users.addUserToGroup(input.username, gid)
+        // Tolerate "already a member" so a rolled-forward retry is idempotent.
+        yield* users.addUserToGroup(input.username, gid).pipe(
+          Effect.catchAll((e) => {
+            const msg = String((e as { message?: unknown })?.message ?? e).toLowerCase()
+            if (msg.includes("already") || msg.includes("member") || msg.includes("duplicate")) return Effect.void
+            return Effect.fail(e)
+          }),
+        )
       }
     }).pipe(
       Effect.tapError(() =>
@@ -188,8 +224,6 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
             Effect.tap(() => Effect.logWarning(`Rolled back user ${input.username} after configuration failure`)),
             Effect.ignore,
           )
-          // Rolling back the user without releasing the invite leaves the
-          // recipient with no account AND no way back in.
           yield* inviteRepo.releaseById(invite.id).pipe(Effect.ignore)
         }),
       ),
@@ -197,26 +231,66 @@ export const acceptInvite = (token: string, input: AcceptInput) =>
 
     yield* inviteRepo.markUsedBy(invite.id, input.username)
 
-    // Associate cert records with the real user
     yield* certRepo
       .setUserId(invite.id, input.username)
       .pipe(
-        Effect.catchAll((e) => Effect.logWarning("acceptInvite: failed to set userId on cert", { error: String(e) })),
+        Effect.catchAll((e) => Effect.logWarning("finishAccept: failed to set userId on cert", { error: String(e) })),
       )
     const certUsername = certUsernameFromEmail(invite.email)
     yield* certRepo
       .updateUsername(certUsername, input.username)
       .pipe(
         Effect.catchAll((e) =>
-          Effect.logWarning("acceptInvite: failed to update username on cert", { error: String(e) }),
+          Effect.logWarning("finishAccept: failed to update username on cert", { error: String(e) }),
         ),
       )
 
-    // Clean up P12 secret
     yield* cert.deleteP12Secret(invite.id)
 
     return { success: true as const }
+  })
+
+export const acceptInvite = (token: string, input: AcceptInput) =>
+  Effect.gen(function* () {
+    const inviteRepo = yield* InviteRepo
+    const invite = yield* inviteRepo.consumeByToken(token)
+    return yield* finishAccept(invite, input)
   }).pipe(Effect.withSpan("acceptInvite", { attributes: { username: input.username } }))
+
+/**
+ * Accept an invite identified by its id rather than a raw token. The
+ * cert-authenticated `/setup` flow has no token — it resolves the invite from
+ * the presented client certificate — so it lands here.
+ *
+ * Handles the crash-stuck `Accepted`/`usedBy == null` state (a pod killed
+ * between the up-front `used_at` claim and `markUsedBy`): there is no account,
+ * so `releaseById` first (which only un-claims when `used_by` is null), then
+ * claim atomically by id. A genuinely used invite (`usedBy != null`) or a
+ * revoked/expired one is refused up front.
+ */
+export const acceptInviteById = (inviteId: string, input: AcceptInput) =>
+  Effect.gen(function* () {
+    const inviteRepo = yield* InviteRepo
+    const existing = yield* inviteRepo.findById(inviteId)
+    if (!existing) {
+      return yield* new InviteError({ message: "Invite is invalid, expired, or already used" })
+    }
+    const status = existing.status
+    if (status._tag === "Accepted" && status.usedBy !== null) {
+      return yield* new InviteError({ message: "Invite is invalid, expired, or already used" })
+    }
+    if (status._tag === "Revoked" || status._tag === "Revoking") {
+      return yield* new InviteError({ message: "Invite is invalid, expired, or already used" })
+    }
+    if (new Date(existing.expiresAt) < new Date()) {
+      return yield* new InviteError({ message: "Invite is invalid, expired, or already used" })
+    }
+    // Reset a stuck up-front claim (no-op for a genuinely pending invite), then
+    // claim atomically so two concurrent /setup submits cannot both proceed.
+    yield* inviteRepo.releaseById(inviteId).pipe(Effect.ignore)
+    const invite = yield* inviteRepo.consumeById(inviteId)
+    return yield* finishAccept(invite, input)
+  }).pipe(Effect.withSpan("acceptInviteById", { attributes: { username: input.username, inviteId } }))
 
 // --- Revoke Pending Invite (full cleanup) ---
 
@@ -397,3 +471,43 @@ export const resendCert = (email: string, username: string, opts: ResendCertOpti
 
     return { success: true as const, message: `Certificate sent to ${email}`, renewalId: tempId }
   }).pipe(Effect.withSpan("resendCert", { attributes: { email, username } }))
+
+/**
+ * Classify what a presented client certificate means for the invite flow, from
+ * the Envoy-set `x-forwarded-client-cert` header. Shared by the `/setup` route
+ * and by `requireAuth`'s pending-invite redirect so both read identity the same
+ * way. Identity is the certificate only — safe because the mTLS listener
+ * (optional:false + XFCC SanitizeSet) guarantees Envoy set this header from a
+ * handshake it validated against the daddyshome CA.
+ */
+export type CertInviteResolution =
+  | { kind: "no_cert" }
+  | { kind: "invalid" }
+  | { kind: "revoked" }
+  | { kind: "expired" }
+  | { kind: "too_many_attempts" }
+  | { kind: "has_account" }
+  | { kind: "pending"; inviteId: string; email: string }
+
+export const resolvePendingCertInvite = (xfcc: string | null | undefined) =>
+  Effect.gen(function* () {
+    const parsed = parseXfccCert(xfcc)
+    if (!parsed) return { kind: "no_cert" } as CertInviteResolution
+
+    const certRepo = yield* CertificateRepo
+    const inviteRepo = yield* InviteRepo
+    const cert = yield* certRepo.findBySerialCanonical(canonicalSerial(parsed.serial))
+    if (!cert) return { kind: "invalid" } as CertInviteResolution
+    if (cert.revokedAt !== null) return { kind: "revoked" } as CertInviteResolution
+    if (cert.userId !== null) return { kind: "has_account" } as CertInviteResolution
+    if (!cert.inviteId) return { kind: "invalid" } as CertInviteResolution
+
+    const invite = yield* inviteRepo.findById(cert.inviteId)
+    if (!invite) return { kind: "invalid" } as CertInviteResolution
+    const status = invite.status
+    if (status._tag === "Accepted" && status.usedBy !== null) return { kind: "has_account" } as CertInviteResolution
+    if (status._tag === "Revoked" || status._tag === "Revoking") return { kind: "revoked" } as CertInviteResolution
+    if (new Date(invite.expiresAt) < new Date()) return { kind: "expired" } as CertInviteResolution
+    if (invite.attempts >= 5) return { kind: "too_many_attempts" } as CertInviteResolution
+    return { kind: "pending", inviteId: invite.id, email: invite.email } as CertInviteResolution
+  })

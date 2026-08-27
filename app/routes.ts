@@ -41,6 +41,7 @@ export default [
   route("auth/callback", "routes/auth.callback.tsx"),
   route("auth/logout", "routes/auth.logout.ts"),
   route("health", "routes/health.ts"),
+  route("setup", "routes/setup.tsx"),
   route("health/ready", "routes/health.ready.ts"),
   route("e/:openToken", "routes/invite.open.$openToken.ts"),
   route("c/:token", "routes/invite.click.$token.ts"),
