@@ -9,6 +9,7 @@ import { CertManager } from "~/lib/services/CertManager.server"
 import { config, isOriginAllowed } from "~/lib/config.server"
 import { hashToken } from "~/lib/crypto.server"
 import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
+import { certPlatform, certStore, chromeIntentUrl } from "~/lib/cert-store"
 import { Effect } from "effect"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
@@ -33,6 +34,23 @@ export function meta({ data }: Route.MetaArgs) {
 export async function loader({ request, params }: Route.LoaderArgs) {
   const token = params.token
   const healthUrl = `${config.homeUrl}/health`
+  // Read off the User-Agent, not the probe: a browser with no certificate
+  // store fails the probe exactly like one whose user hasn't installed theirs
+  // yet, and only the UA can tell the page which of the two it is looking at.
+  const userAgent = request.headers.get("user-agent")
+  const store = certStore(userAgent)
+  const platform = certPlatform(userAgent)
+  const inviteUrl = token ? `${config.inviteBaseUrl}/invite/${token}` : null
+  const browser = {
+    store,
+    onIos: platform === "ios",
+    installKey: platform ? (`certInstall.${platform}` as const) : null,
+    inviteUrl,
+    // An escape hatch only for browsers that need one. Only Android has an
+    // intent: scheme that can hand a URL to a named browser; everywhere else
+    // the copyable link is the whole of it.
+    chromeUrl: store === "none" && platform === "android" && inviteUrl ? chromeIntentUrl(inviteUrl) : null,
+  }
   if (!token) {
     return {
       valid: false as const,
@@ -118,6 +136,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       hasPassword: p12Password !== null,
       appName: config.appName,
       healthUrl,
+      browser,
     }
   } catch (e) {
     if (e instanceof Response) throw e
@@ -242,6 +261,8 @@ export default function InvitePage({ loaderData }: Route.ComponentProps) {
     return <ErrorCard title={t("invite.error.title")} message={t(messageKey)} />
   }
 
+  const { browser } = loaderData
+
   return (
     <CenteredCardPage>
       <Stack gap="lg">
@@ -262,15 +283,31 @@ export default function InvitePage({ loaderData }: Route.ComponentProps) {
           )}
         </Stack>
 
-        {effectiveCertStatus !== "installed" && (
+        {effectiveCertStatus !== "installed" && browser.store !== "none" && (
           <Stack gap="md">
             <LinkButton href={`/invite/${params.token}/download`} variant="primary" fullWidth>
               {t("invite.download.button")}
             </LinkButton>
+            {/* The steps for THIS device only. The email has to list every
+                platform because it cannot know where it will be opened; this
+                page can, and a single correct instruction beats four that the
+                reader has to sort through on a phone. */}
+            {browser.installKey ? (
+              <Text as="p" color="muted" variant="bodySm">
+                <Trans i18nKey={browser.installKey} components={{ strong: <html.strong /> }} />
+              </Text>
+            ) : null}
             <InvitePasswordReveal hasPassword={loaderData.hasPassword} />
           </Stack>
         )}
-        <CertCheck status={effectiveCertStatus} onRecheck={recheck} />
+        <CertCheck
+          status={effectiveCertStatus}
+          onRecheck={recheck}
+          store={browser.store}
+          onIos={browser.onIos}
+          inviteUrl={browser.inviteUrl ?? undefined}
+          chromeUrl={browser.chromeUrl}
+        />
       </Stack>
     </CenteredCardPage>
   )

@@ -4,7 +4,7 @@ vi.mock("~/lib/runtime.server", () => ({
   runEffect: vi.fn(),
 }))
 vi.mock("~/lib/config.server", () => ({
-  config: { appName: "Duro", homeUrl: "https://duro.example.com" },
+  config: { appName: "Duro", homeUrl: "https://duro.example.com", inviteBaseUrl: "https://join.example.com" },
   isOriginAllowed: vi.fn().mockReturnValue(true),
 }))
 vi.mock("~/lib/crypto.server", () => ({
@@ -26,6 +26,21 @@ beforeEach(() => {
 })
 
 describe("/invite/:token loader", () => {
+  const freshInvite = () =>
+    ({
+      invite: {
+        id: "i-fresh",
+        email: "alice@example.com",
+        usedAt: null,
+        expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        locale: null,
+        status: { _tag: "Pending", certIssued: true, emailSent: true, certVerified: false },
+        groups: "[1, 2]",
+        groupNames: '["family", "media"]',
+      },
+      p12Password: "ThisIsTheP12Password!",
+    }) as never
+
   it("returns missing_token error when params.token is absent", async () => {
     const result = await callLoader(loader, { params: {} })
     const data = expectData<{ valid: boolean; error: string }>(result)
@@ -103,19 +118,7 @@ describe("/invite/:token loader", () => {
   })
 
   it("returns the welcome data when the invite is fresh + unused", async () => {
-    mockRunEffect.mockResolvedValue({
-      invite: {
-        id: "i-fresh",
-        email: "alice@example.com",
-        usedAt: null,
-        expiresAt: new Date(Date.now() + 86400000).toISOString(),
-        locale: null,
-        status: { _tag: "Pending", certIssued: true, emailSent: true, certVerified: false },
-        groups: "[1, 2]",
-        groupNames: '["family", "media"]',
-      },
-      p12Password: "ThisIsTheP12Password!",
-    } as never)
+    mockRunEffect.mockResolvedValue(freshInvite())
     const result = await callLoader(loader, { params: { token: "abc" } })
     const data = expectData<{
       valid: boolean
@@ -130,6 +133,65 @@ describe("/invite/:token loader", () => {
     expect(data.hasPassword).toBe(true)
     expect(JSON.stringify(data)).not.toContain("ThisIsTheP12Password!")
     expect(data.groupNames).toEqual(["family", "media"])
+  })
+
+  describe("what the visitor's browser can do with a certificate", () => {
+    // The cert probe cannot tell "not installed yet" from "this browser has no
+    // certificate store at all" — both just fail. Only the User-Agent can, and
+    // the loader is where the page gets told.
+    const FIREFOX_ANDROID = "Mozilla/5.0 (Android 14; Mobile; rv:126.0) Gecko/126.0 Firefox/126.0"
+    const FIREFOX_MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:126.0) Gecko/126.0 Firefox/126.0"
+    const CHROME_ANDROID =
+      "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+
+    type Browser = {
+      store: string
+      onIos: boolean
+      installKey: string | null
+      inviteUrl: string | null
+      chromeUrl: string | null
+    }
+
+    const loadWithUA = async (userAgent?: string) => {
+      mockRunEffect.mockResolvedValue(freshInvite())
+      const result = await callLoader(loader, {
+        params: { token: "abc" },
+        headers: userAgent ? { "user-agent": userAgent } : undefined,
+      })
+      return expectData<{ browser: Browser }>(result).browser
+    }
+
+    it("flags Firefox for Android and hands it a way into Chrome", async () => {
+      const browser = await loadWithUA(FIREFOX_ANDROID)
+      expect(browser.store).toBe("none")
+      expect(browser.installKey).toBe("certInstall.android")
+      expect(browser.inviteUrl).toBe("https://join.example.com/invite/abc")
+      expect(browser.chromeUrl).toBe(
+        "intent://join.example.com/invite/abc#Intent;scheme=https;package=com.android.chrome;end",
+      )
+    })
+
+    it("marks desktop Firefox as needing its own import, not a different browser", async () => {
+      const browser = await loadWithUA(FIREFOX_MAC)
+      expect(browser.store).toBe("own")
+      expect(browser.installKey).toBe("certInstall.macos")
+      // Firefox on a desktop can finish here, so it gets no escape hatch.
+      expect(browser.chromeUrl).toBeNull()
+    })
+
+    it("leaves a browser that reads the system store alone", async () => {
+      const browser = await loadWithUA(CHROME_ANDROID)
+      expect(browser.store).toBe("system")
+      expect(browser.installKey).toBe("certInstall.android")
+      // Chrome on Android is already the browser the escape hatch points at.
+      expect(browser.chromeUrl).toBeNull()
+    })
+
+    it("assumes the system store when there is no User-Agent to read", async () => {
+      const browser = await loadWithUA()
+      expect(browser.store).toBe("system")
+      expect(browser.installKey).toBeNull()
+    })
   })
 
   it("returns the 'unknown' error fallback when runEffect throws", async () => {
@@ -260,6 +322,14 @@ describe("InvitePage component", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument()
   })
 
+  const SYSTEM_BROWSER = {
+    store: "system",
+    onIos: false,
+    installKey: "certInstall.macos",
+    inviteUrl: "https://join.example.com/invite/abc",
+    chromeUrl: null,
+  }
+
   it("renders the welcome view when the invite is valid", async () => {
     renderInvite({
       valid: true,
@@ -268,6 +338,7 @@ describe("InvitePage component", () => {
       groupNames: ["Media Team"],
       hasPassword: true,
       healthUrl: "/health",
+      browser: SYSTEM_BROWSER,
     })
     // The valid branch uses t("invite.title", { appName }) for the page
     // heading — assert the exact rendered string.
@@ -281,5 +352,31 @@ describe("InvitePage component", () => {
     expect(
       screen.getByText((_, node) => node?.tagName === "P" && Boolean(node.textContent?.includes("alice@example.com"))),
     ).toBeInTheDocument()
+  })
+
+  it("stops offering a download to a browser that could never use it", async () => {
+    // Firefox for Android: downloading the .p12 again and re-revealing the
+    // password is exactly the loop this state exists to break, so the whole
+    // install column goes away and only the way out is left.
+    renderInvite({
+      valid: true,
+      appName: "Duro",
+      email: "alice@example.com",
+      groupNames: [],
+      hasPassword: true,
+      healthUrl: "/health",
+      browser: {
+        store: "none",
+        onIos: false,
+        installKey: "certInstall.android",
+        inviteUrl: "https://join.example.com/invite/abc",
+        chromeUrl: "intent://join.example.com/invite/abc#Intent;scheme=https;package=com.android.chrome;end",
+      },
+    })
+    await waitFor(() => {
+      expect(screen.getByText(t("invite.cert.unsupported.title"))).toBeInTheDocument()
+    })
+    expect(screen.queryByRole("link", { name: t("invite.download.button") })).not.toBeInTheDocument()
+    expect(screen.getByRole("link", { name: t("invite.cert.unsupported.openChrome") })).toBeInTheDocument()
   })
 })
