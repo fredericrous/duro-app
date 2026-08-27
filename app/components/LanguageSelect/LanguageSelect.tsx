@@ -3,7 +3,7 @@ import { supportedLngs } from "~/lib/i18n"
 
 const languageNames: Record<string, string> = {
   en: "English",
-  fr: "Francais",
+  fr: "Français",
 }
 
 interface LanguageSelectProps {

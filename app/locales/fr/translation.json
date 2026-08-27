@@ -1,12 +1,12 @@
 {
   "common": {
     "appTitle": "Duro",
-    "logout": "Deconnexion",
+    "logout": "Déconnexion",
     "admin": "Admin",
     "cancel": "Annuler",
     "email": "E-mail",
     "groups": "Groupes",
-    "settings": "Parametres",
+    "settings": "Paramètres",
     "save": "Enregistrer",
     "language": "Langue",
     "actions": "Actions",
@@ -47,12 +47,12 @@
   },
   "header": {
     "welcome": "Bienvenue, {{user}}",
-    "requestAccess": "Demander l'acces",
+    "requestAccess": "Demander l'accès",
     "devices": "Appareils",
     "myRequests": "Mes demandes",
     "requestDialog": {
       "loading": "Chargement des applications disponibles…",
-      "empty": "Vous avez deja acces a toutes les applications qui vous sont accessibles. Si vous pensez qu'il en manque, contactez un administrateur.",
+      "empty": "Vous avez déjà accès à toutes les applications qui vous sont accessibles. Si vous pensez qu'il en manque, contactez un administrateur.",
       "outcome": {
         "thisApp": "cette application",
         "auto_approved": "Accès accordé — vous avez maintenant accès à {{app}}.",
@@ -66,43 +66,43 @@
   "home": {
     "title": "Accueil - Duro",
     "description": "Votre tableau de bord personnel",
-    "requestAnotherCta": "Demander l'acces a une autre application",
+    "requestAnotherCta": "Demander l'accès à une autre application",
     "appCard": {
-      "noLaunchUrl": "Aucune URL de lancement configuree"
+      "noLaunchUrl": "Aucune URL de lancement configurée"
     }
   },
   "noAccess": {
-    "title": "Acces refuse",
-    "messageUser": "Bonjour {{user}}, vous n'avez pas la permission d'acceder aux applications.",
-    "messageAnon": "Vous n'avez pas la permission d'acceder aux applications.",
+    "title": "Accès refusé",
+    "messageUser": "Bonjour {{user}}, vous n'avez pas la permission d'accéder aux applications.",
+    "messageAnon": "Vous n'avez pas la permission d'accéder aux applications.",
     "hint": "Veuillez contacter un administrateur si vous pensez qu'il s'agit d'une erreur.",
-    "requestCta": "Demander l'acces",
-    "requestSubmitted": "Votre demande d'acces a ete soumise. Un administrateur l'examinera bientot.",
-    "alreadyPending": "Vous avez deja une demande en attente pour ceci. Un administrateur l'examinera bientot.",
-    "autoApproved": "Acces accorde. L'application devrait apparaitre sur votre page d'accueil.",
+    "requestCta": "Demander l'accès",
+    "requestSubmitted": "Votre demande d'accès a été soumise. Un administrateur l'examinera bientôt.",
+    "alreadyPending": "Vous avez déjà une demande en attente pour ceci. Un administrateur l'examinera bientôt.",
+    "autoApproved": "Accès accordé. L'application devrait apparaître sur votre page d'accueil.",
     "form": {
       "application": "Application",
       "applicationPlaceholder": "Choisissez une application…",
-      "role": "Role",
-      "rolePlaceholder": "Choisissez un role…",
-      "alreadyHave": "Vous avez deja : {{roles}}",
-      "noRequestableRoles": "Vous detenez deja tous les roles disponibles sur cette application.",
-      "noResults": "Aucun resultat",
-      "justification": "Pourquoi avez-vous besoin de cet acces ?",
-      "justificationPlaceholder": "Expliquez brievement l'usage prevu.",
-      "justificationHint": "Ce message sera partage avec l'administrateur qui validera votre demande.",
+      "role": "Rôle",
+      "rolePlaceholder": "Choisissez un rôle…",
+      "alreadyHave": "Vous avez déjà : {{roles}}",
+      "noRequestableRoles": "Vous détenez déjà tous les rôles disponibles sur cette application.",
+      "noResults": "Aucun résultat",
+      "justification": "Pourquoi avez-vous besoin de cet accès ?",
+      "justificationPlaceholder": "Expliquez brièvement l'usage prévu.",
+      "justificationHint": "Ce message sera partagé avec l'administrateur qui validera votre demande.",
       "submit": "Envoyer la demande",
       "submitting": "Envoi…"
     },
     "error": {
       "missing_application": "Veuillez choisir une application.",
-      "missing_target": "Choisissez un role a demander.",
-      "role_entitlement_conflict": "Choisissez soit un role soit une permission, pas les deux.",
-      "role_entitlement_app_mismatch": "Ce role ou cette permission n'appartient pas a l'application choisie.",
-      "principal_not_found": "Votre compte n'est pas encore entierement provisionne. Reessayez dans un instant ou contactez un administrateur.",
-      "submit_failed": "L'envoi de la demande a echoue. Veuillez reessayer.",
-      "not_authenticated": "Vous devez etre connecte pour demander l'acces.",
-      "unknown": "Une erreur s'est produite. Veuillez reessayer."
+      "missing_target": "Choisissez un rôle à demander.",
+      "role_entitlement_conflict": "Choisissez soit un rôle soit une permission, pas les deux.",
+      "role_entitlement_app_mismatch": "Ce rôle ou cette permission n'appartient pas à l'application choisie.",
+      "principal_not_found": "Votre compte n'est pas encore entièrement provisionné. Réessayez dans un instant ou contactez un administrateur.",
+      "submit_failed": "L'envoi de la demande a échoué. Veuillez réessayer.",
+      "not_authenticated": "Vous devez être connecté pour demander l'accès.",
+      "unknown": "Une erreur s'est produite. Veuillez réessayer."
     }
   },
   "apps": {
@@ -115,11 +115,11 @@
     },
     "status": {
       "open": "Ouvert",
-      "granted": "Accorde",
-      "partiallyGranted": "Acces partiel",
+      "granted": "Accordé",
+      "partiallyGranted": "Accès partiel",
       "pending": "En attente",
-      "requestable": "Demander l'acces",
-      "canUpgrade": "Demander plus d'acces",
+      "requestable": "Demander l'accès",
+      "canUpgrade": "Demander plus d'accès",
       "inviteOnly": "Sur invitation"
     },
     "pendingHint": "En attente d'approbation.",
@@ -142,26 +142,26 @@
   },
   "requests": {
     "title": "Mes demandes",
-    "empty": "Vous n'avez encore demande acces a aucune application.",
+    "empty": "Vous n'avez encore demandé accès à aucune application.",
     "cancel": "Annuler",
-    "cancelled": "Demande annulee.",
+    "cancelled": "Demande annulée.",
     "cancelFailed": "Impossible d'annuler cette demande.",
     "cols": {
       "status": "Statut",
       "application": "Application",
-      "role": "Role",
+      "role": "Rôle",
       "entitlement": "Permission",
       "justification": "Justification",
-      "created": "Cree",
+      "created": "Créé",
       "action": "Action"
     },
     "error": {
       "not_owned": "Cette demande ne vous appartient pas.",
-      "not_cancellable": "Cette demande n'est plus en attente et ne peut pas etre annulee.",
-      "cancel_failed": "Impossible d'annuler cette demande. Veuillez reessayer.",
+      "not_cancellable": "Cette demande n'est plus en attente et ne peut pas être annulée.",
+      "cancel_failed": "Impossible d'annuler cette demande. Veuillez réessayer.",
       "missing_request_id": "Identifiant de demande manquant.",
-      "principal_not_found": "Votre compte n'est pas encore entierement provisionne.",
-      "not_authenticated": "Vous devez etre connecte.",
+      "principal_not_found": "Votre compte n'est pas encore entièrement provisionné.",
+      "not_authenticated": "Vous devez être connecté.",
       "not_found": "Cette invitation n'existe plus.",
       "not_yours": "Cette invitation ne vous est pas adressée.",
       "not_pending": "Cette invitation a déjà été traitée.",
@@ -201,32 +201,32 @@
     "renewing": "Envoi...",
     "issuing": "Envoi...",
     "devicePlaceholder": "Nom de l'appareil (ex. MacBook Pro)",
-    "confirm": "Un certificat pour votre nouvel appareil sera envoye a {{email}}. Continuer ?",
+    "confirm": "Un certificat pour votre nouvel appareil sera envoyé à {{email}}. Continuer ?",
     "confirmButton": "Oui, envoyer",
-    "success": "Certificat envoye a votre e-mail. Ouvrez le lien dans cet e-mail pour reveler le mot de passe d'installation.",
+    "success": "Certificat envoyé à votre e-mail. Ouvrez le lien dans cet e-mail pour révéler le mot de passe d'installation.",
     "nextAvailable": "Vous pourrez ajouter un autre appareil {{time}}",
     "list": {
       "device": "Appareil",
       "unnamed": "Appareil sans nom",
       "rename": "Renommer",
-      "renamed": "Appareil renomme.",
-      "serial": "N° de serie",
-      "issued": "Emis le",
+      "renamed": "Appareil renommé.",
+      "serial": "N° de série",
+      "issued": "Émis le",
       "expires": "Expire le",
-      "revoke": "Revoquer",
-      "revoking": "Revocation...",
-      "revokeConfirm": "Revoquer ce certificat ?",
-      "revokeYes": "Oui, revoquer",
-      "revoked": "Certificat revoque.",
-      "revokeFailed": "La revocation a echoue. Reessayer ?",
+      "revoke": "Révoquer",
+      "revoking": "Révocation...",
+      "revokeConfirm": "Révoquer ce certificat ?",
+      "revokeYes": "Oui, révoquer",
+      "revoked": "Certificat révoqué.",
+      "revokeFailed": "La révocation a échoué. Réessayer ?",
       "empty": "Aucun appareil.",
-      "expired": "Expire",
+      "expired": "Expiré",
       "expiresInDays_one": "Expire dans {{count}} jour",
       "expiresInDays_other": "Expire dans {{count}} jours"
     },
-    "renewTooSoon": "Cet appareil a ete renouvele recemment. Reessayez plus tard.",
-    "renewNextAvailable": "Renouvelable a nouveau {{time}}",
-    "replaced": "Remplace — revoque des que vous ouvrez le lien de l'e-mail",
+    "renewTooSoon": "Cet appareil a été renouvelé récemment. Réessayez plus tard.",
+    "renewNextAvailable": "Renouvelable à nouveau {{time}}",
+    "replaced": "Remplacé — révoqué dès que vous ouvrez le lien de l'e-mail",
     "sort": {
       "label": "Trier par",
       "name": "Nom",
@@ -260,72 +260,72 @@
     "ai": "IA",
     "automation": "Automatisation",
     "storage": "Stockage",
-    "development": "Developpement",
+    "development": "Développement",
     "admin": "Admin"
   },
   "settings": {
-    "title": "Parametres - Duro",
-    "heading": "Parametres",
+    "title": "Paramètres - Duro",
+    "heading": "Paramètres",
     "languageLabel": "Langue",
-    "languageHint": "Choisissez votre langue preferee pour l'interface.",
-    "saved": "Parametres enregistres.",
+    "languageHint": "Choisissez votre langue préférée pour l'interface.",
+    "saved": "Paramètres enregistrés.",
     "saving": "Enregistrement...",
     "security": {
-      "heading": "Compte et securite",
-      "description": "Votre mot de passe, l'authentification multifacteur, les sessions et l'e-mail sont geres par votre fournisseur d'identite.",
-      "openPortal": "Ouvrir le portail du fournisseur d'identite",
-      "managedBy": "S'ouvre dans un nouvel onglet. Vous devrez peut-etre vous reconnecter ici apres modification."
+      "heading": "Compte et sécurité",
+      "description": "Votre mot de passe, l'authentification multifacteur, les sessions et l'e-mail sont gérés par votre fournisseur d'identité.",
+      "openPortal": "Ouvrir le portail du fournisseur d'identité",
+      "managedBy": "S'ouvre dans un nouvel onglet. Vous devrez peut-être vous reconnecter ici après modification."
     },
     "apiKeys": {
-      "heading": "Cles API",
-      "empty": "Vous n'avez pas encore cree de cle API. Utilisez-en une pour qu'un outil CLI ou un script appelle duro en votre nom.",
-      "created": "creee le {{date}}",
+      "heading": "Clés API",
+      "empty": "Vous n'avez pas encore créé de clé API. Utilisez-en une pour qu'un outil CLI ou un script appelle duro en votre nom.",
+      "created": "créée le {{date}}",
       "expires": "expire le {{date}}",
-      "revokedOn": "revoquee le {{date}}",
-      "revoke": "Revoquer",
+      "revokedOn": "révoquée le {{date}}",
+      "revoke": "Révoquer",
       "status": {
         "active": "Active",
-        "expired": "Expiree",
-        "revoked": "Revoquee"
+        "expired": "Expirée",
+        "revoked": "Révoquée"
       },
       "scopes": {
-        "wildcardChip": "Acces total"
+        "wildcardChip": "Accès total"
       },
       "create": {
-        "heading": "Creer une nouvelle cle",
-        "description": "La cle n'est affichee qu'une seule fois. Choisissez le moindre privilege ; vous pourrez toujours creer une seconde cle avec une portee plus large.",
-        "submit": "Creer la cle API",
-        "submitting": "Creation..."
+        "heading": "Créer une nouvelle clé",
+        "description": "La clé n'est affichée qu'une seule fois. Choisissez le moindre privilège ; vous pourrez toujours créer une seconde clé avec une portée plus large.",
+        "submit": "Créer la clé API",
+        "submitting": "Création..."
       },
       "fields": {
         "name": "Nom",
         "namePlaceholder": "ex. Claude CLI sur mon Mac",
-        "nameHint": "Pour vous uniquement — sert a identifier la cle dans la liste ci-dessous. 100 caracteres maximum.",
-        "scopes": "Portees",
-        "scopesHint": "Ce que cette cle est autorisee a faire. Tenez-vous au minimum dont l'outil appelant a besoin.",
-        "recommended": "recommande",
-        "expiry": "Expire apres",
-        "expiryHint": "Apres ce delai, la cle cesse de fonctionner. Vous pourrez toujours en creer une nouvelle.",
+        "nameHint": "Pour vous uniquement — sert à identifier la clé dans la liste ci-dessous. 100 caractères maximum.",
+        "scopes": "Portées",
+        "scopesHint": "Ce que cette clé est autorisée à faire. Tenez-vous au minimum dont l'outil appelant a besoin.",
+        "recommended": "recommandé",
+        "expiry": "Expire après",
+        "expiryHint": "Après ce délai, la clé cesse de fonctionner. Vous pourrez toujours en créer une nouvelle.",
         "expiryOption_one": "{{count}} jour",
         "expiryOption_other": "{{count}} jours",
-        "wildcardLabel": "Accorder un acces total (remplace les portees ci-dessus)",
-        "wildcardWarning": "A n'utiliser que si vous ne pouvez pas choisir une portee plus stricte. Une fuite de cette cle donne au porteur tout ce que vous pouvez faire."
+        "wildcardLabel": "Accorder un accès total (remplace les portées ci-dessus)",
+        "wildcardWarning": "À n'utiliser que si vous ne pouvez pas choisir une portée plus stricte. Une fuite de cette clé donne au porteur tout ce que vous pouvez faire."
       },
       "reveal": {
-        "title": "{{name}} creee",
-        "warning": "Copiez cette cle maintenant. Apres la fermeture de cette boite de dialogue, elle ne sera plus jamais affichee — seul son apercu le sera.",
-        "rawKeyLabel": "Votre nouvelle cle API",
-        "fallbackLabel": "Probleme pour copier ? Selectionnez le texte ci-dessous manuellement.",
-        "ackSaved": "J'ai enregistre cette cle en lieu sur.",
+        "title": "{{name}} créée",
+        "warning": "Copiez cette clé maintenant. Après la fermeture de cette boîte de dialogue, elle ne sera plus jamais affichée — seul son aperçu le sera.",
+        "rawKeyLabel": "Votre nouvelle clé API",
+        "fallbackLabel": "Problème pour copier ? Sélectionnez le texte ci-dessous manuellement.",
+        "ackSaved": "J'ai enregistré cette clé en lieu sûr.",
         "copy": "Copier",
-        "copied": "Copie !",
-        "done": "Termine"
+        "copied": "Copié !",
+        "done": "Terminé"
       },
       "revokeConfirm": {
-        "title": "Revoquer cette cle API ?",
-        "body": "{{name}} cessera de fonctionner immediatement. Les appels qui l'utilisent renverront HTTP 401.",
-        "warning": "Si vous utilisez cette cle dans un outil en ce moment (ex. Claude CLI), vous devrez mettre a jour sa configuration avec une nouvelle cle.",
-        "confirm": "Oui, revoquer"
+        "title": "Révoquer cette clé API ?",
+        "body": "{{name}} cessera de fonctionner immédiatement. Les appels qui l'utilisent renverront HTTP 401.",
+        "warning": "Si vous utilisez cette clé dans un outil en ce moment (ex. Claude CLI), vous devrez mettre à jour sa configuration avec une nouvelle clé.",
+        "confirm": "Oui, révoquer"
       }
     },
     "nav": {
@@ -465,48 +465,48 @@
     }
   },
   "recover": {
-    "title": "Recuperer l'acces",
+    "title": "Récupérer l'accès",
     "subtitle": "Vous avez perdu l'appareil avec votre certificat ? Saisissez l'e-mail de votre compte et un administrateur examinera votre demande.",
     "emailLabel": "E-mail du compte",
     "emailPlaceholder": "vous@example.com",
     "noteLabel": "Note (facultatif)",
     "notePlaceholder": "ex. j'ai perdu mon ordinateur portable",
-    "noteHint": "Contexte pour aider l'administrateur a reconnaitre votre demande.",
-    "submit": "Demander la recuperation",
+    "noteHint": "Contexte pour aider l'administrateur à reconnaître votre demande.",
+    "submit": "Demander la récupération",
     "sent": {
-      "title": "Demande recue",
-      "message": "Si ce compte existe, un administrateur a ete notifie. Une fois approuvee, vous recevrez un e-mail avec un lien vers un nouveau certificat."
+      "title": "Demande reçue",
+      "message": "Si ce compte existe, un administrateur a été notifié. Une fois approuvée, vous recevrez un e-mail avec un lien vers un nouveau certificat."
     }
   },
   "welcome": {
     "title": "Bienvenue",
     "heading": "Bienvenue, {{user}} !",
-    "message": "Votre compte a ete cree et tout est pret. Vous avez maintenant acces a votre tableau de bord personnel.",
+    "message": "Votre compte a été créé et tout est prêt. Vous avez maintenant accès à votre tableau de bord personnel.",
     "cta": "Aller au tableau de bord"
   },
   "auth": {
     "logout": {
-      "confirmTitle": "Se deconnecter ?",
-      "confirmBody": "Vous serez deconnecte de Duro et de toutes les applications partageant cette session SSO.",
-      "confirmHint": "Vous pouvez vous reconnecter a tout moment depuis l'accueil.",
-      "confirmButton": "Se deconnecter"
+      "confirmTitle": "Se déconnecter ?",
+      "confirmBody": "Vous serez déconnecté de Duro et de toutes les applications partageant cette session SSO.",
+      "confirmHint": "Vous pouvez vous reconnecter à tout moment depuis l'accueil.",
+      "confirmButton": "Se déconnecter"
     }
   },
   "glossary": {
     "help": "Qu'est-ce que c'est ?",
-    "principals": "Un principal est tout ce qui peut recevoir un acces : un utilisateur, un groupe ou un compte de service. Les utilisateurs representent des personnes ; les groupes regroupent les utilisateurs par role ; les comptes de service representent des systemes automatises.",
-    "grants": "Un octroi lie un principal a un role (ou un droit) sur une application precise. C'est l'enregistrement qui dit \"alice peut ecrire sur nas\". Les octrois peuvent expirer et etre revoques.",
-    "applications": "Une application est tout ce dont Duro gouverne l'acces : une application web, un partage monte, un service gere. Chaque application possede ses propres roles, droits et ressources.",
-    "entitlements": "Un droit est une permission fine comme \"read\" ou \"admin\", limitee a une application. Les roles regroupent des droits ; les octrois lient des principals soit a un role, soit a un droit individuel.",
-    "authzPlayground": "Un outil en lecture seule pour tester les decisions d'acces. Choisissez un principal, une application et une action ; le moteur renvoie ALLOW ou DENY avec les octrois correspondants et le raisonnement. Executer une verification ne change rien.",
-    "audit": "Un journal en ajout seul de chaque evenement de gouvernance : octrois crees ou revoques, principals modifies, demandes d'acces tranchees. Filtrez par acteur, cible ou type d'evenement pour enqueter sur \"qui a fait quoi\".",
-    "accessRequests": "Demandes d'acces a une application initiees par les utilisateurs. Chaque demande est evaluee par un admin (ou une politique) et devient un octroi une fois approuvee.",
-    "appsCatalog": "Toutes les applications gouvernees par Duro. Les badges indiquent votre statut sur chacune : Accorde (vous avez un role), Acces partiel (vous avez un role mais d'autres sont disponibles), En attente (demande en attente d'approbation), Ouvert (aucune permission necessaire), Sur invitation (un admin doit vous inviter), Demander l'acces (vous pouvez demander un role).",
-    "myRequests": "Vos demandes d'acces sur toutes les applications. Les demandes en attente peuvent etre annulees ici ; les lignes approuvees/rejetees/annulees sont conservees comme historique.",
-    "invitations": "Une invitation d'acces pre-cree les octrois qu'une personne recevra a l'acceptation. A distinguer du flux Invitations utilisateur qui provisionne un compte dans le fournisseur d'identite.",
+    "principals": "Un principal est tout ce qui peut recevoir un accès : un utilisateur, un groupe ou un compte de service. Les utilisateurs représentent des personnes ; les groupes regroupent les utilisateurs par rôle ; les comptes de service représentent des systèmes automatisés.",
+    "grants": "Un octroi lie un principal à un rôle (ou un droit) sur une application précise. C'est l'enregistrement qui dit \"alice peut écrire sur nas\". Les octrois peuvent expirer et être révoqués.",
+    "applications": "Une application est tout ce dont Duro gouverne l'accès : une application web, un partage monté, un service géré. Chaque application possède ses propres rôles, droits et ressources.",
+    "entitlements": "Un droit est une permission fine comme \"read\" ou \"admin\", limitée à une application. Les rôles regroupent des droits ; les octrois lient des principals soit à un rôle, soit à un droit individuel.",
+    "authzPlayground": "Un outil en lecture seule pour tester les décisions d'accès. Choisissez un principal, une application et une action ; le moteur renvoie ALLOW ou DENY avec les octrois correspondants et le raisonnement. Exécuter une vérification ne change rien.",
+    "audit": "Un journal en ajout seul de chaque événement de gouvernance : octrois créés ou révoqués, principals modifiés, demandes d'accès tranchées. Filtrez par acteur, cible ou type d'événement pour enquêter sur \"qui a fait quoi\".",
+    "accessRequests": "Demandes d'accès à une application initiées par les utilisateurs. Chaque demande est évaluée par un admin (ou une politique) et devient un octroi une fois approuvée.",
+    "appsCatalog": "Toutes les applications gouvernées par Duro. Les badges indiquent votre statut sur chacune : Accordé (vous avez un rôle), Accès partiel (vous avez un rôle mais d'autres sont disponibles), En attente (demande en attente d'approbation), Ouvert (aucune permission nécessaire), Sur invitation (un admin doit vous inviter), Demander l'accès (vous pouvez demander un rôle).",
+    "myRequests": "Vos demandes d'accès sur toutes les applications. Les demandes en attente peuvent être annulées ici ; les lignes approuvées/rejetées/annulées sont conservées comme historique.",
+    "invitations": "Une invitation d'accès pré-crée les octrois qu'une personne recevra à l'acceptation. À distinguer du flux Invitations utilisateur qui provisionne un compte dans le fournisseur d'identité.",
     "groupMappings": "Une correspondance de groupe relie un groupe OIDC à un groupe de principaux Duro ou à un rôle d'application : les membres de ce groupe dans votre fournisseur d'identité obtiennent automatiquement l'accès associé à la connexion.",
     "plugins": "Un plugin étend une application avec un comportement personnalisé (provisionnement, synchronisation, notifications). Cette page affiche le manifeste d'un plugin, ses installations et son activité récente.",
-    "bootstrap": "Sur un deploiement neuf, le tout premier admin est cree a partir d'un jeton d'amorcage a usage unique que votre operateur a place dans Vault. Cet assistant lit le jeton cote serveur et met en file d'attente une invitation pour l'adresse e-mail saisie. Une fois l'invitation consommee, cette page se verrouille.",
+    "bootstrap": "Sur un déploiement neuf, le tout premier admin est créé à partir d'un jeton d'amorçage à usage unique que votre opérateur a placé dans Vault. Cet assistant lit le jeton côté serveur et met en file d'attente une invitation pour l'adresse e-mail saisie. Une fois l'invitation consommée, cette page se verrouille.",
     "identities": "Les identités humaines et machines — utilisateurs et leurs certificats mTLS, groupes, comptes de service et appareils — et les accès de chacune."
   },
   "certInstall": {
@@ -519,43 +519,43 @@
   },
   "invite": {
     "title": "Rejoindre {{appName}}",
-    "subtitle": "Vous avez ete invite en tant que <strong>{{email}}</strong>",
+    "subtitle": "Vous avez été invité en tant que <strong>{{email}}</strong>",
     "groupsLabel": "Groupes : {{groups}}",
     "expired": {
-      "title": "Invitation expiree",
-      "message": "Cette invitation a expire. Vous pouvez en demander une nouvelle ci-dessous.",
+      "title": "Invitation expirée",
+      "message": "Cette invitation a expiré. Vous pouvez en demander une nouvelle ci-dessous.",
       "cta": "Demander une nouvelle invitation"
     },
     "used": {
-      "title": "Deja inscrit",
-      "message": "Cette invitation a deja ete utilisee. Si vous avez besoin d'aide, contactez la personne qui vous a invite."
+      "title": "Déjà inscrit",
+      "message": "Cette invitation a déjà été utilisée. Si vous avez besoin d'aide, contactez la personne qui vous a invité."
     },
     "error": {
       "title": "Impossible de rejoindre",
       "invalid": "Ce lien d'invitation est invalide ou introuvable.",
-      "missingToken": "Il manque des informations a ce lien d'invitation.",
+      "missingToken": "Il manque des informations à ce lien d'invitation.",
       "tooManyAttempts": "Trop de tentatives. Veuillez contacter un administrateur.",
-      "unknown": "Une erreur s'est produite lors du chargement de cette invitation. Veuillez reessayer, ou contacter votre administrateur si le probleme persiste."
+      "unknown": "Une erreur s'est produite lors du chargement de cette invitation. Veuillez réessayer, ou contacter votre administrateur si le problème persiste."
     },
     "download": {
-      "button": "Telecharger le certificat (.p12)"
+      "button": "Télécharger le certificat (.p12)"
     },
     "password": {
       "title": "Mot de passe du certificat",
-      "warning": "Grattez pour reveler le mot de passe de votre certificat. Sauvegardez-le — vous en aurez besoin pour installer le certificat que vous telechargez ci-dessus.",
-      "consumed": "Le mot de passe du certificat a deja ete revele. Si vous avez besoin d'une nouvelle invitation, utilisez le lien dans votre e-mail d'invitation original.",
+      "warning": "Grattez pour révéler le mot de passe de votre certificat. Sauvegardez-le — vous en aurez besoin pour installer le certificat que vous téléchargez ci-dessus.",
+      "consumed": "Le mot de passe du certificat a déjà été révélé. Si vous avez besoin d'une nouvelle invitation, utilisez le lien dans votre e-mail d'invitation original.",
       "copy": "Copier",
-      "copied": "Copie !",
+      "copied": "Copié !",
       "oneTime": "Sauvegardez ce mot de passe — vous en aurez besoin pour installer le certificat.",
       "copyFailed": "Copie automatique impossible. Sélectionnez la valeur ci-dessus et copiez-la manuellement."
     },
     "cert": {
-      "checking": "Verification du certificat...",
-      "detected": "Certificat detecte",
-      "continue": "Continuer pour creer un compte",
-      "notInstalled": "Il semble que votre certificat ne soit pas encore installe. Telechargez le fichier .p12 ci-dessus et installez-le, puis cliquez sur le bouton ci-dessous.",
-      "hint": "Apres l'installation du certificat, vous devrez peut-etre fermer et rouvrir votre navigateur pour qu'il soit reconnu.",
-      "retry": "Verifier a nouveau",
+      "checking": "Vérification du certificat...",
+      "detected": "Certificat détecté",
+      "continue": "Continuer pour créer un compte",
+      "notInstalled": "Il semble que votre certificat ne soit pas encore installé. Téléchargez le fichier .p12 ci-dessus et installez-le, puis cliquez sur le bouton ci-dessous.",
+      "hint": "Après l'installation du certificat, vous devrez peut-être fermer et rouvrir votre navigateur pour qu'il soit reconnu.",
+      "retry": "Vérifier à nouveau",
       "unsupported": {
         "title": "Ce navigateur ne gère pas les certificats",
         "android": "Firefox pour Android n’a pas de magasin de certificats et ne voit donc pas celui que vous avez installé sur ce téléphone — actualiser cette page ne débloquera jamais cette étape. Ouvrez cette invitation dans Chrome pour continuer.",
@@ -572,35 +572,35 @@
     }
   },
   "createAccount": {
-    "title": "Creer un compte",
-    "heading": "Creez votre compte",
+    "title": "Créer un compte",
+    "heading": "Créez votre compte",
     "subtitle": "Configuration pour <strong>{{email}}</strong>",
-    "certCheck": "Verification du certificat...",
+    "certCheck": "Vérification du certificat...",
     "certRequired": {
       "title": "Certificat requis",
-      "message": "Votre certificat n'est pas encore installe. Retournez en arriere pour l'installer d'abord, puis revenez ici.",
-      "back": "Retour a l'invitation"
+      "message": "Votre certificat n'est pas encore installé. Retournez en arrière pour l'installer d'abord, puis revenez ici.",
+      "back": "Retour à l'invitation"
     },
     "username": {
       "label": "Nom d'utilisateur",
       "placeholder": "Choisissez un nom d'utilisateur",
-      "hint": "3-32 caracteres : lettres, chiffres, tirets, underscores"
+      "hint": "3-32 caractères : lettres, chiffres, tirets, underscores"
     },
     "password": {
       "label": "Mot de passe",
       "placeholder": "Choisissez un mot de passe fort",
-      "hint": "Au moins 12 caracteres"
+      "hint": "Au moins 12 caractères"
     },
     "confirm": {
       "label": "Confirmer le mot de passe",
       "placeholder": "Confirmez votre mot de passe",
       "mismatch": "Les mots de passe ne correspondent pas"
     },
-    "submit": "Creer le compte",
-    "submitting": "Creation du compte...",
+    "submit": "Créer le compte",
+    "submitting": "Création du compte...",
     "validation": {
-      "usernameFormat": "Le nom d'utilisateur doit contenir 3 a 32 caracteres (lettres, chiffres, tirets, underscores)",
-      "passwordLength": "Le mot de passe doit contenir au moins 12 caracteres",
+      "usernameFormat": "Le nom d'utilisateur doit contenir 3 à 32 caractères (lettres, chiffres, tirets, underscores)",
+      "passwordLength": "Le mot de passe doit contenir au moins 12 caractères",
       "passwordMismatch": "Les mots de passe ne correspondent pas"
     },
     "success": {
@@ -620,21 +620,21 @@
   "reinvite": {
     "title": "Demander une nouvelle invitation",
     "heading": "Demander une nouvelle invitation",
-    "message": "Votre invitation precedente pour <strong>{{email}}</strong> a expire ou le mot de passe du certificat a deja ete revele. Vous pouvez demander une nouvelle invitation ci-dessous.",
+    "message": "Votre invitation précédente pour <strong>{{email}}</strong> a expiré ou le mot de passe du certificat a déjà été révélé. Vous pouvez demander une nouvelle invitation ci-dessous.",
     "submit": "Envoyez-moi une nouvelle invitation",
     "submitting": "Envoi...",
     "success": {
-      "title": "Nouvelle invitation envoyee",
-      "message": "Un nouvel e-mail d'invitation a ete envoye a <strong>{{email}}</strong>. Verifiez votre boite de reception pour le nouveau lien et certificat."
+      "title": "Nouvelle invitation envoyée",
+      "message": "Un nouvel e-mail d'invitation a été envoyé à <strong>{{email}}</strong>. Vérifiez votre boîte de réception pour le nouveau lien et certificat."
     },
     "error": {
-      "title": "Impossible de reinviter",
-      "missingToken": "Il manque des informations a ce lien.",
+      "title": "Impossible de réinviter",
+      "missingToken": "Il manque des informations à ce lien.",
       "invalid": "Ce lien est invalide ou introuvable.",
-      "alreadyUsed": "Cette invitation a deja ete utilisee pour creer un compte. Si vous avez besoin d'aide, contactez la personne qui vous a invite.",
-      "stillValid": "Votre invitation est encore valide. Verifiez votre e-mail pour retrouver le lien d'origine.",
-      "unknown": "Une erreur s'est produite. Veuillez reessayer, ou contacter votre administrateur si le probleme persiste.",
-      "sendFailed": "L'envoi de la nouvelle invitation a echoue. Veuillez reessayer."
+      "alreadyUsed": "Cette invitation a déjà été utilisée pour créer un compte. Si vous avez besoin d'aide, contactez la personne qui vous a invité.",
+      "stillValid": "Votre invitation est encore valide. Vérifiez votre e-mail pour retrouver le lien d'origine.",
+      "unknown": "Une erreur s'est produite. Veuillez réessayer, ou contacter votre administrateur si le problème persiste.",
+      "sendFailed": "L'envoi de la nouvelle invitation a échoué. Veuillez réessayer."
     }
   },
   "admin": {
@@ -700,12 +700,12 @@
       }
     },
     "recovery": {
-      "heading": "Recuperation d'appareil",
-      "description": "Demandes en attente d'utilisateurs ayant perdu tous leurs appareils. L'approbation emet un nouveau certificat, envoye par e-mail au compte.",
-      "empty": "Aucune demande de recuperation en attente.",
+      "heading": "Récupération d'appareil",
+      "description": "Demandes en attente d'utilisateurs ayant perdu tous leurs appareils. L'approbation émet un nouveau certificat, envoyé par e-mail au compte.",
+      "empty": "Aucune demande de récupération en attente.",
       "approve": "Approuver",
       "deny": "Refuser",
-      "revokeOthers": "Revoquer les autres appareils de cet utilisateur",
+      "revokeOthers": "Révoquer les autres appareils de cet utilisateur",
       "approved": "Récupération approuvée — un nouveau certificat a été envoyé",
       "denied": "Demande de récupération refusée",
       "confirmApproveTitle": "Approuver la récupération d'appareil ?",
@@ -714,7 +714,7 @@
       "confirmDenyBody": "La demande est rejetée et aucun certificat n'est émis. L'utilisateur devra soumettre une nouvelle demande.",
       "col": {
         "email": "Compte",
-        "requested": "Demande le",
+        "requested": "Demandé le",
         "ip": "IP",
         "note": "Note"
       }
@@ -724,63 +724,63 @@
       "users": "Utilisateurs"
     },
     "setup": {
-      "heading": "Configurez votre deploiement",
-      "subtitle": "Creez le premier compte admin pour {{appName}}. Cette page n'est accessible que tant qu'aucun admin n'existe.",
+      "heading": "Configurez votre déploiement",
+      "subtitle": "Créez le premier compte admin pour {{appName}}. Cette page n'est accessible que tant qu'aucun admin n'existe.",
       "emailLabel": "Adresse e-mail de l'admin",
-      "submit": "Creer l'invitation admin",
-      "submitting": "Creation de l'invitation…",
+      "submit": "Créer l'invitation admin",
+      "submitting": "Création de l'invitation…",
       "success": {
-        "title": "Invitation prete",
-        "body": "Une invitation pour {{email}} a ete mise en file d'attente et envoyee par e-mail. Vous pouvez aussi continuer ici :",
+        "title": "Invitation prête",
+        "body": "Une invitation pour {{email}} a été mise en file d'attente et envoyée par e-mail. Vous pouvez aussi continuer ici :",
         "urlLabel": "URL d'invitation",
         "continue": "Continuer vers l'invitation"
       },
       "resent": {
-        "title": "Certificat renvoye",
-        "body": "Un utilisateur pour {{email}} existe deja : un nouveau certificat client mTLS lui a donc ete envoye par e-mail. Le compte administrateur existant a ete conserve tel quel."
+        "title": "Certificat renvoyé",
+        "body": "Un utilisateur pour {{email}} existe déjà : un nouveau certificat client mTLS lui a donc été envoyé par e-mail. Le compte administrateur existant a été conservé tel quel."
       },
       "error": {
-        "no_token": "Aucun jeton d'amorcage trouve dans Vault. Verifiez que votre operateur a place un jeton dans secret/data/duro/bootstrap-token avant d'ouvrir cette page.",
-        "vault_unreachable": "Vault est injoignable. Verifiez VAULT_ADDR et la configuration du compte de service Kubernetes du deploiement.",
-        "vault_invalid_response": "Le secret d'amorcage dans Vault a une structure invalide. Champs attendus : token, expires_at.",
-        "token_mismatch": "Le jeton fourni ne correspond pas a celui stocke dans Vault.",
-        "token_expired": "Le jeton d'amorcage a expire. Generez-en un nouveau et reessayez.",
+        "no_token": "Aucun jeton d'amorçage trouvé dans Vault. Vérifiez que votre opérateur a placé un jeton dans secret/data/duro/bootstrap-token avant d'ouvrir cette page.",
+        "vault_unreachable": "Vault est injoignable. Vérifiez VAULT_ADDR et la configuration du compte de service Kubernetes du déploiement.",
+        "vault_invalid_response": "Le secret d'amorçage dans Vault a une structure invalide. Champs attendus : token, expires_at.",
+        "token_mismatch": "Le jeton fourni ne correspond pas à celui stocké dans Vault.",
+        "token_expired": "Le jeton d'amorçage a expiré. Générez-en un nouveau et réessayez.",
         "email_invalid": "Veuillez saisir une adresse e-mail valide.",
-        "email_in_use": "Un utilisateur avec cette adresse existe deja dans l'annuaire. Choisissez-en une autre ou supprimez d'abord l'utilisateur existant.",
-        "admin_group_missing": "Le groupe admin n'est pas encore provisionne dans l'annuaire. Creez-le avant l'amorcage.",
-        "bootstrap_in_progress": "Une autre soumission d'amorcage est deja en cours. Reessayez dans un instant.",
-        "queue_failed": "L'invitation a ete rejetee lors de la mise en file d'attente — probablement une erreur SMTP ou PKI. Verifiez les journaux du serveur et reessayez.",
+        "email_in_use": "Un utilisateur avec cette adresse existe déjà dans l'annuaire. Choisissez-en une autre ou supprimez d'abord l'utilisateur existant.",
+        "admin_group_missing": "Le groupe admin n'est pas encore provisionné dans l'annuaire. Créez-le avant l'amorçage.",
+        "bootstrap_in_progress": "Une autre soumission d'amorçage est déjà en cours. Réessayez dans un instant.",
+        "queue_failed": "L'invitation a été rejetée lors de la mise en file d'attente — probablement une erreur SMTP ou PKI. Vérifiez les journaux du serveur et réessayez.",
         "missing_email": "Veuillez saisir une adresse e-mail.",
-        "wrong_origin": "Origine de la requete non autorisee."
+        "wrong_origin": "Origine de la requête non autorisée."
       }
     },
     "checklist": {
       "title": "Pour commencer",
-      "subtitle": "Quelques etapes pour rendre ce deploiement utile :",
+      "subtitle": "Quelques étapes pour rendre ce déploiement utile :",
       "addApplication": "Ajouter une application",
-      "inviteTeammate": "Inviter un coequipier",
+      "inviteTeammate": "Inviter un coéquipier",
       "configurePlugins": "Configurer les extensions"
     },
     "nav": {
       "title": "Navigation",
       "menu": "Menu",
-      "peopleAccess": "Personnes et acces",
+      "peopleAccess": "Personnes et accès",
       "requestsInvites": "Demandes et invitations",
-      "auditRecovery": "Audit et recuperation",
+      "auditRecovery": "Audit et récupération",
       "advanced": "Avance",
-      "accessManagement": "Gestion des acces",
+      "accessManagement": "Gestion des accès",
       "applications": "Applications",
       "principals": "Principaux",
       "grants": "Octrois",
       "groupMappings": "Mappage des groupes",
       "workflows": "Flux de travail",
-      "accessRequests": "Demandes d'acces",
-      "invitations": "Invitations d'acces",
-      "security": "Securite",
-      "authzPlayground": "Bac a sable Authz",
+      "accessRequests": "Demandes d'accès",
+      "invitations": "Invitations d'accès",
+      "security": "Sécurité",
+      "authzPlayground": "Bac à sable Authz",
       "auditLog": "Journal d'audit",
-      "recovery": "Recuperation d'appareil",
-      "system": "Systeme",
+      "recovery": "Récupération d'appareil",
+      "system": "Système",
       "plugins": "Extensions",
       "invites": "Invitations utilisateur",
       "users": "Utilisateurs",
@@ -793,17 +793,17 @@
       "displayName": "Nom d'affichage",
       "type": "Type",
       "slug": "Identifiant",
-      "accessMode": "Mode d'acces",
+      "accessMode": "Mode d'accès",
       "enabled": "Active",
-      "owner": "Proprietaire",
+      "owner": "Propriétaire",
       "email": "E-mail",
       "yes": "Oui",
       "no": "Non",
       "principal": "Principal",
-      "role": "Role",
+      "role": "Rôle",
       "entitlement": "Droit",
       "resource": "Ressource",
-      "grantedBy": "Octroye par",
+      "grantedBy": "Octroyé par",
       "expires": "Expire",
       "never": "Jamais",
       "all": "Tous",
@@ -813,8 +813,8 @@
       "application": "Application",
       "applicationPlaceholder": "Choisissez une application…",
       "justification": "Justification",
-      "created": "Cree le",
-      "eventType": "Type d'evenement",
+      "created": "Créé le",
+      "eventType": "Type d'événement",
       "actor": "Acteur",
       "targetType": "Type de cible",
       "target": "Cible",
@@ -833,35 +833,35 @@
       "readiness": "Maturité"
     },
     "empty": {
-      "principals": "Aucun principal pour l'instant. Synchronisez votre fournisseur d'identite ou invitez des utilisateurs pour commencer.",
-      "applications": "Aucune application pour l'instant. Cliquez sur « Synchroniser depuis le cluster » ou definissez-en une dans votre configuration de gouvernance.",
-      "grants": "Aucun octroi actif. Ouvrez une application pour assigner un role a un principal.",
-      "accessRequests": "Aucune demande d'acces pour l'instant.",
-      "audit": "Aucun evenement d'audit ne correspond aux filtres actuels.",
+      "principals": "Aucun principal pour l'instant. Synchronisez votre fournisseur d'identité ou invitez des utilisateurs pour commencer.",
+      "applications": "Aucune application pour l'instant. Cliquez sur « Synchroniser depuis le cluster » ou définissez-en une dans votre configuration de gouvernance.",
+      "grants": "Aucun octroi actif. Ouvrez une application pour assigner un rôle à un principal.",
+      "accessRequests": "Aucune demande d'accès pour l'instant.",
+      "audit": "Aucun événement d'audit ne correspond aux filtres actuels.",
       "users": "Aucun utilisateur pour l'instant. Invitez quelqu'un depuis la page Invitations utilisateur."
     },
     "audit": {
       "title": "Journal d'audit",
-      "filterPlaceholder": "Filtrer par type d'evenement...",
+      "filterPlaceholder": "Filtrer par type d'événement...",
       "filterByActor": "Filtrer par acteur…",
       "filterByTarget": "Filtrer par identifiant de cible…",
       "filterByApplication": "Filtrer par application…",
-      "clearFilters": "Reinitialiser les filtres",
-      "loadFailed": "Impossible de charger les evenements d'audit : {{error}}",
-      "previous": "Precedent",
+      "clearFilters": "Réinitialiser les filtres",
+      "loadFailed": "Impossible de charger les événements d'audit : {{error}}",
+      "previous": "Précédent",
       "next": "Suivant",
       "page": "Page {{page}}",
-      "viewMetadata": "Voir les metadonnees",
-      "hideMetadata": "Masquer les metadonnees",
+      "viewMetadata": "Voir les métadonnées",
+      "hideMetadata": "Masquer les métadonnées",
       "narrativeFallback": "{{eventType}}",
       "narrativeWithTarget": "{{eventType}} sur {{targetType}} {{targetId}}",
       "narrativeWithActor": "{{actor}} {{eventType}}",
       "narrativeFull": "{{actor}} {{eventType}} sur {{targetType}} {{targetId}}"
     },
     "authz": {
-      "title": "Bac a sable d'autorisation",
-      "subtitle": "Executez le moteur d'autorisation contre un principal/application/action et voyez la decision actuelle.",
-      "readOnlyNotice": "Lecture seule — executer une verification ici ne modifie aucun octroi, permission, ou etat.",
+      "title": "Bac à sable d'autorisation",
+      "subtitle": "Exécutez le moteur d'autorisation contre un principal/application/action et voyez la décision actuelle.",
+      "readOnlyNotice": "Lecture seule — exécuter une vérification ici ne modifie aucun octroi, permission, ou état.",
       "principalPlaceholder": "Choisir un principal…",
       "applicationPlaceholder": "Choisir une application…",
       "actionLabel": "Action",
@@ -873,11 +873,11 @@
       "resourcePlaceholder": "Choisir une ressource…",
       "resourceHint": "Optionnel — limite le contrôle à une ressource précise de cette application.",
       "resourceNone": "Cette application n'a aucune ressource — laisser vide.",
-      "checkAccess": "Verifier l'acces",
-      "checking": "Verification…",
-      "result": "Resultat",
-      "allowed": "ACCES AUTORISE",
-      "denied": "ACCES REFUSE",
+      "checkAccess": "Vérifier l'accès",
+      "checking": "Vérification…",
+      "result": "Résultat",
+      "allowed": "ACCÈS AUTORISÉ",
+      "denied": "ACCÈS REFUSÉ",
       "reasons": "Raisons :",
       "matchedGrants": "Octrois correspondants :",
       "diagnostics": "Diagnostics :",
@@ -885,12 +885,12 @@
       "groupIds": "ID des groupes",
       "none": "aucun",
       "candidateGrants": "Octrois candidats",
-      "evaluationMs": "Temps d'evaluation : {{ms}}ms"
+      "evaluationMs": "Temps d'évaluation : {{ms}}ms"
     },
     "principals": {
       "filterByName": "Filtrer par nom...",
       "filterByType": "Filtrer par type...",
-      "noResults": "Aucun resultat",
+      "noResults": "Aucun résultat",
       "noEmail": "Aucun e-mail",
       "groupsTitle": "Groupes ({{count}})",
       "noGrants": "Aucun grant actif.",
@@ -1011,29 +1011,29 @@
     },
     "grants": {
       "title": "Octrois actifs ({{count}})",
-      "createGrant": "Creer un octroi",
-      "revoke": "Revoquer",
-      "revoking": "Revocation...",
+      "createGrant": "Créer un octroi",
+      "revoke": "Révoquer",
+      "revoking": "Révocation...",
       "revoked": "Octroi révoqué",
       "confirmRevokeTitle": "Révoquer cet octroi ?",
       "confirmRevokeBody": "Cela retire l'accès immédiatement. Le principal perd ce rôle jusqu'à ce qu'il soit ré-octroyé.",
       "new": {
-        "title": "Creer un octroi",
-        "creating": "Creation…",
-        "rolePlaceholder": "Choisissez un role",
+        "title": "Créer un octroi",
+        "creating": "Création…",
+        "rolePlaceholder": "Choisissez un rôle",
         "pickAppFirst": "Choisissez d'abord une application",
-        "noRoles": "Cette application n'a pas encore de role. Creez-en un avant d'accorder un acces.",
+        "noRoles": "Cette application n'a pas encore de rôle. Créez-en un avant d'accorder un accès.",
         "principalPlaceholder": "Cherchez un utilisateur ou un groupe…",
-        "ldapNote": "Cette application est provisionnee via LDAP. Les octrois de groupe pour les applications provisionnees arrivent en phase 2 — seuls les utilisateurs sont proposes ici.",
+        "ldapNote": "Cette application est provisionnée via LDAP. Les octrois de groupe pour les applications provisionnées arrivent en phase 2 — seuls les utilisateurs sont proposés ici.",
         "reasonLabel": "Raison (optionnel)",
         "reasonPlaceholder": "Pourquoi cet octroi ?",
-        "expiresHint": "Date locale. L'octroi expire a minuit UTC le jour choisi.",
+        "expiresHint": "Date locale. L'octroi expire à minuit UTC le jour choisi.",
         "neverExpires": "N'expire jamais"
       }
     },
     "accessRequests": {
-      "title": "Demandes d'acces ({{count}})",
-      "decisionHint": "Approuver accorde le role demande. Rejeter refuse la demande de maniere permanente. Annuler marque la demande comme obsolete (par exemple, le demandeur a quitte l'organisation).",
+      "title": "Demandes d'accès ({{count}})",
+      "decisionHint": "Approuver accorde le rôle demandé. Rejeter refuse la demande de manière permanente. Annuler marque la demande comme obsolète (par exemple, le demandeur a quitté l'organisation).",
       "detail": {
         "heading": "Demande d'accès",
         "created": "Créée le {{date}}",
@@ -1061,58 +1061,58 @@
       }
     },
     "detailPanel": {
-      "label": "Panneau de details",
+      "label": "Panneau de détails",
       "close": "Fermer"
     },
     "invites": {
       "sendTitle": "Envoyer une invitation",
       "emailLabel": "E-mails",
       "emailPlaceholder": "Ajouter un e-mail...",
-      "emailHint": "Appuyez sur Entree ou virgule pour ajouter",
+      "emailHint": "Appuyez sur Entrée ou virgule pour ajouter",
       "emailInvalid": "E-mail invalide",
       "groupsLabel": "Groupes",
       "languageLabel": "Langue de l'invitation",
       "submit": "Envoyer l'invitation",
       "submitting": "Envoi...",
-      "proceedAnyway": "Continuer quand meme",
+      "proceedAnyway": "Continuer quand même",
       "activeTitle": "Invitations actives",
-      "failedTitle": "Invitations echouees",
+      "failedTitle": "Invitations échouées",
       "noActive": "Aucune invitation active",
       "cols": {
         "email": "E-mail",
         "groups": "Groupes",
         "status": "Statut",
         "progress": "Progression",
-        "invitedBy": "Invite par",
+        "invitedBy": "Invité par",
         "expires": "Expire",
         "error": "Erreur",
-        "failedAt": "Echoue le",
+        "failedAt": "Échoué le",
         "actions": "Actions"
       },
       "badge": {
-        "failed": "Echoue",
-        "sent": "Envoye",
-        "certIssued": "Cert emis",
+        "failed": "Échoué",
+        "sent": "Envoyé",
+        "certIssued": "Cert émis",
         "processing": "Traitement..."
       },
       "funnel": {
-        "sent": "Envoye",
-        "delivered": "Delivre",
-        "bounced": "Rejete",
-        "deferred": "Livraison differee — nouvelle tentative",
+        "sent": "Envoyé",
+        "delivered": "Délivré",
+        "bounced": "Rejeté",
+        "deferred": "Livraison différée — nouvelle tentative",
         "bounceReason": "Rejet : {{reason}}",
         "opened": "Ouvert",
         "clicked": "Clique",
-        "installed": "Cert installe",
+        "installed": "Cert installé",
         "last": "Dernier : {{stage}} · {{date}}",
-        "proxyHint": "Ouvertures/clics peuvent inclure des prechargements du proxy mail"
+        "proxyHint": "Ouvertures/clics peuvent inclure des préchargements du proxy mail"
       },
       "action": {
         "resend": "Renvoyer",
         "resending": "Renvoi...",
-        "revoke": "Revoquer",
-        "revoking": "Revocation...",
-        "retry": "Reessayer",
+        "revoke": "Révoquer",
+        "revoking": "Révocation...",
+        "retry": "Réessayer",
         "retrying": "Nouvelle tentative..."
       },
       "needEmailAndGroup": "Ajoutez au moins un e-mail et choisissez au moins un groupe.",
@@ -1132,14 +1132,14 @@
     },
     "users": {
       "title": "Utilisateurs",
-      "revokedTitle": "Utilisateurs revoques",
+      "revokedTitle": "Utilisateurs révoqués",
       "cols": {
         "username": "Nom d'utilisateur",
         "displayName": "Nom d'affichage",
         "email": "E-mail",
-        "created": "Cree le",
+        "created": "Créé le",
         "reason": "Raison",
-        "revoked": "Revoque le",
+        "revoked": "Révoqué le",
         "by": "Par",
         "actions": "Actions"
       },
@@ -1149,11 +1149,11 @@
         "sendingCert": "Envoi...",
         "certSent": "Certificat envoyé par e-mail",
         "certSendFailed": "Échec de l'envoi du certificat : {{error}}",
-        "revoke": "Revoquer",
-        "confirmRevoke": "Confirmer la revocation",
-        "revoking": "Revocation...",
+        "revoke": "Révoquer",
+        "confirmRevoke": "Confirmer la révocation",
+        "revoking": "Révocation...",
         "reasonPlaceholder": "Raison (optionnel)",
-        "reinvite": "Reinviter",
+        "reinvite": "Réinviter",
         "processing": "Traitement...",
         "viewCerts": "Certificats",
         "revokeLabel": "Révoquer {{user}}",
@@ -1161,18 +1161,18 @@
         "confirmRevokeUserBody": "Révoquer {{user}} désactive son compte et révoque ses certificats. L'accès est perdu immédiatement et l'utilisateur devra être réinvité."
       },
       "certs": {
-        "serial": "N° de serie",
-        "issued": "Emis le",
+        "serial": "N° de série",
+        "issued": "Émis le",
         "expires": "Expire le",
         "status": "Statut",
         "active": "Actif",
-        "expired": "Expire",
-        "revoked": "Revoque",
-        "pending": "Revocation...",
-        "failed": "Echoue",
-        "revokeCert": "Revoquer",
-        "revokeAll": "Tout revoquer",
-        "revokeAllConfirm": "Revoquer tous les certificats de cet utilisateur ?",
+        "expired": "Expiré",
+        "revoked": "Révoqué",
+        "pending": "Révocation...",
+        "failed": "Échoué",
+        "revokeCert": "Révoquer",
+        "revokeAll": "Tout révoquer",
+        "revokeAllConfirm": "Révoquer tous les certificats de cet utilisateur ?",
         "empty": "Aucun certificat",
         "count": "{{count}} certificat(s)",
         "usersSelected": "{{count}} utilisateur(s) sélectionné(s)",
@@ -1180,11 +1180,11 @@
         "revokeAllForUsers": "Révoquer les certs de {{count}} utilisateur(s)",
         "revokeSelected": "Révoquer {{count}} certificat(s)",
         "certsRevoked": "{{count}} certificat(s) révoqué(s)",
-        "confirmRevokeUsersTitle": "Revoquer les certificats des utilisateurs selectionnes ?",
-        "confirmRevokeCertsTitle": "Revoquer les certificats selectionnes ?",
-        "confirmRevokeUsersBody": "Tous les certificats actifs de {{count}} utilisateur(s) seront revoques. Les utilisateurs perdront l'acces jusqu'a l'emission d'un nouveau certificat.",
-        "confirmRevokeCertsBody": "{{count}} certificat(s) seront revoques. Les appareils utilisant ces certificats perdront immediatement l'acces.",
-        "confirmRevokeWarning": "Cette action est irreversible. De nouveaux certificats devront etre emis pour restaurer l'acces."
+        "confirmRevokeUsersTitle": "Révoquer les certificats des utilisateurs sélectionnés ?",
+        "confirmRevokeCertsTitle": "Révoquer les certificats sélectionnés ?",
+        "confirmRevokeUsersBody": "Tous les certificats actifs de {{count}} utilisateur(s) seront révoqués. Les utilisateurs perdront l'accès jusqu'à l'émission d'un nouveau certificat.",
+        "confirmRevokeCertsBody": "{{count}} certificat(s) seront révoqués. Les appareils utilisant ces certificats perdront immédiatement l'accès.",
+        "confirmRevokeWarning": "Cette action est irréversible. De nouveaux certificats devront être émis pour restaurer l'accès."
       }
     },
     "identities": {
@@ -1339,57 +1339,57 @@
     "404": "404",
     "title": "Oups !",
     "details": "Une erreur inattendue s'est produite.",
-    "404msg": "La page demandee n'a pas pu etre trouvee.",
+    "404msg": "La page demandée n'a pas pu être trouvée.",
     "generic": "Une erreur est survenue",
     "goHome": "Retour à l'accueil"
   },
   "email": {
     "invite": {
-      "subject": "Vous avez ete invite a rejoindre {{appName}}",
-      "preview": "Vous avez ete invite a rejoindre {{appName}}",
+      "subject": "Vous avez été invité à rejoindre {{appName}}",
+      "preview": "Vous avez été invité à rejoindre {{appName}}",
       "heading": "Bienvenue sur {{appName}}",
-      "body": "{{invitedBy}} vous a invite a rejoindre {{appName}}, {{appDescription}}.",
+      "body": "{{invitedBy}} vous a invité à rejoindre {{appName}}, {{appDescription}}.",
       "step1": {
-        "title": "Etape 1 : Installez votre certificat",
-        "body": "Cliquez sur le bouton ci-dessous pour ouvrir votre page d'invitation, ou vous pourrez <strong>telecharger votre certificat</strong> et reveler le mot de passe pour l'installer."
+        "title": "Étape 1 : Installez votre certificat",
+        "body": "Cliquez sur le bouton ci-dessous pour ouvrir votre page d'invitation, où vous pourrez <strong>télécharger votre certificat</strong> et révéler le mot de passe pour l'installer."
       },
       "step2": {
-        "title": "Etape 2 : Creez votre compte",
-        "body": "Apres avoir installe votre certificat, cliquez sur le bouton ci-dessous pour creer votre compte."
+        "title": "Étape 2 : Créez votre compte",
+        "body": "Après avoir installé votre certificat, cliquez sur le bouton ci-dessous pour créer votre compte."
       },
-      "cta": "Creer votre compte",
-      "footer": "Ce lien expire dans 7 jours. Besoin d'une nouvelle invitation ? <a href=\"{{reinviteUrl}}\">Demandez-en une ici</a>. Si vous n'attendiez pas cette invitation, vous pouvez ignorer cet e-mail en toute securite."
+      "cta": "Créer votre compte",
+      "footer": "Ce lien expire dans 7 jours. Besoin d'une nouvelle invitation ? <a href=\"{{reinviteUrl}}\">Demandez-en une ici</a>. Si vous n'attendiez pas cette invitation, vous pouvez ignorer cet e-mail en toute sécurité."
     },
     "renewal": {
       "subject": "Votre nouveau certificat {{appName}}",
       "preview": "Votre nouveau certificat {{appName}}",
       "heading": "Nouveau certificat",
-      "body": "Un nouveau certificat de securite pour {{appName}} a ete emis.",
+      "body": "Un nouveau certificat de sécurité pour {{appName}} a été émis.",
       "reveal": {
-        "body": "Revelez son mot de passe a usage unique et telechargez le fichier <strong>certificate.p12</strong> sur la page securisee ci-dessous. Le lien est valable 24 heures.",
-        "cta": "Reveler le mot de passe et telecharger le certificat"
+        "body": "Révélez son mot de passe à usage unique et téléchargez le fichier <strong>certificate.p12</strong> sur la page sécurisée ci-dessous. Le lien est valable 24 heures.",
+        "cta": "Révéler le mot de passe et télécharger le certificat"
       },
       "install": {
         "title": "Installez votre nouveau certificat",
-        "body": "Veuillez installer ce certificat pour continuer a acceder aux services de {{appName}}. Vous devrez peut-etre supprimer l'ancien certificat au prealable."
+        "body": "Veuillez installer ce certificat pour continuer à accéder aux services de {{appName}}. Vous devrez peut-être supprimer l'ancien certificat au préalable."
       },
-      "footer": "Votre compte et vos acces restent inchanges — seul le certificat a ete mis a jour. Si vous n'attendiez pas cela, veuillez contacter votre administrateur."
+      "footer": "Votre compte et vos accès restent inchangés — seul le certificat a été mis à jour. Si vous n'attendiez pas cela, veuillez contacter votre administrateur."
     }
   },
   "certReveal": {
     "title": "Votre certificat",
-    "subtitle": "Grattez ci-dessous pour reveler le mot de passe a usage unique du certificat emis pour <strong>{{email}}</strong>, puis telechargez-le. Vous aurez besoin des deux pour installer <strong>certificate.p12</strong>.",
-    "download": "Telecharger le certificat (.p12)",
+    "subtitle": "Grattez ci-dessous pour révéler le mot de passe à usage unique du certificat émis pour <strong>{{email}}</strong>, puis téléchargez-le. Vous aurez besoin des deux pour installer <strong>certificate.p12</strong>.",
+    "download": "Télécharger le certificat (.p12)",
     "revealed": {
-      "title": "Mot de passe deja revele",
-      "note": "Le mot de passe a usage unique pour <strong>{{email}}</strong> a deja ete affiche. Vous pouvez toujours telecharger le certificat ci-dessous tant que ce lien est valide."
+      "title": "Mot de passe déjà révélé",
+      "note": "Le mot de passe à usage unique pour <strong>{{email}}</strong> a déjà été affiché. Vous pouvez toujours télécharger le certificat ci-dessous tant que ce lien est valide."
     },
     "error": {
-      "title": "Impossible de reveler le mot de passe",
-      "invalid": "Ce lien de revelation est invalide ou introuvable.",
-      "expired": "Ce lien de revelation a expire. Demandez un nouveau certificat pour obtenir un nouveau lien.",
-      "consumed": "Ce mot de passe a deja ete revele. Demandez un nouveau certificat si vous en avez encore besoin.",
-      "unknown": "Une erreur s'est produite. Reessayez ou demandez un nouveau certificat."
+      "title": "Impossible de révéler le mot de passe",
+      "invalid": "Ce lien de révélation est invalide ou introuvable.",
+      "expired": "Ce lien de révélation a expiré. Demandez un nouveau certificat pour obtenir un nouveau lien.",
+      "consumed": "Ce mot de passe a déjà été révélé. Demandez un nouveau certificat si vous en avez encore besoin.",
+      "unknown": "Une erreur s'est produite. Réessayez ou demandez un nouveau certificat."
     },
     "name": {
       "hint": "Nommez cet appareil — le nom sous lequel il apparaîtra dans votre liste d’appareils.",
