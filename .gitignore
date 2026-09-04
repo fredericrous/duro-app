@@ -18,4 +18,4 @@ coverage/
 scripts/mcp/node_modules
 
 # Duro session-hook cache (duro hook install)
-.claude/.duro-session.cache
+.claude/.duro-session.cache*
