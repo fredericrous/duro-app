@@ -16,3 +16,6 @@ pgdata/
 coverage/
 .mcp.json
 scripts/mcp/node_modules
+
+# Duro session-hook cache (duro hook install)
+.claude/.duro-session.cache*
