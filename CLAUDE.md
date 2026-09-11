@@ -1,10 +1,28 @@
 # duro-app
 
-React Router 7 (SSR) + Effect + react-strict-dom access-governance app.
+React Router (framework mode, SSR) + Effect + react-strict-dom
+access-governance app.
 Package manager: npm. Scripts: `dev`, `build`, `typecheck`, `test`, `lint`,
 `format`.
 
-## Duro design system (@duro-app/ui v1)
+## Architecture decisions
+
+Not restated here. They are vendored from the fleet corpus and the session
+hook prints the current ones; ask for any of them by name:
+
+```console
+$ aval resolve ui.design-system --scope duro-stack
+$ aval heads
+```
+
+Which UI library, which config enforces it, which SQL layer, which effects
+runtime and web framework — all decided there, once, and this repository keeps
+no records of its own. A local record deciding one of those slots is a
+contradiction, not a preference: change it in
+[`fredericrous/decisions`](https://github.com/fredericrous/decisions) and run
+`aval add github:fredericrous/decisions` here.
+
+## Duro design system
 
 Machine-queryable docs — run once per session:
 `npx @duro-app/cli manifest --json`
@@ -18,14 +36,13 @@ admin one, `duro_list_groups` and friends), which is unrelated. The `duro_ds_` p
 arrived in `@duro-app/cli` v2 — an unpinned `npx` resolves to it, while the UI deps below
 stay on 1.x.
 
-Lint: `@duro-app/eslint-config` (shared duro-stack flat config — `react` +
-`effect` + `tests` presets) enforces the critical rules (html.\* elements,
-deep token imports, form kit over bare `html.input`, no deprecated Table
-parts; warns on raw px/hex with token equivalents and on `flexGrow` in
-`css.create`), the UI-library policy (`@duro-app/ui` only; `@effect/sql`
-not Kysely; `@effect/opentelemetry` via subpath), and accessibility-first
-test selectors (no `getByTestId`). Errors gate at commit (amont) and CI;
-warnings inform — severity is the gate, never `--max-warnings`.
+Lint: the shared duro-stack flat config (`react` + `effect` + `tests`
+presets) enforces the critical rules (html.\* elements, deep token imports,
+form kit over bare `html.input`, no deprecated Table parts; warns on raw
+px/hex with token equivalents and on `flexGrow` in `css.create`), the
+UI-library and SQL-layer policies, `@effect/opentelemetry` via subpath, and
+accessibility-first test selectors (no `getByTestId`). Errors gate, warnings
+inform — severity is the gate, never `--max-warnings`.
 
 v1 notes: Icon/StatusIcon `size` is a token (`sm|md|lg|xl|xxl` = 16/18/24/36/48px);
 Dialog/Drawer/DetailPanel `closeAnimationDuration` is a motion token

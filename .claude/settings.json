@@ -4,8 +4,16 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "command": "sh .claude/hooks/duro-catalog.sh"
+            "command": "sh .claude/hooks/duro-catalog.sh",
+            "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "sh .claude/hooks/aval-heads.sh",
+            "type": "command"
           }
         ]
       }

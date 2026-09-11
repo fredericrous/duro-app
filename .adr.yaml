@@ -1,0 +1,12 @@
+# Architecture decisions this repository answers from.
+#
+# It keeps no records of its own: every decision below was made in the fleet
+# corpus and is vendored, not restated. A record here deciding one of those
+# slots is a contradiction, which is what makes one decision one decision.
+#
+# `aval add github:fredericrous/decisions` refreshes the pack; nothing tells
+# this repository when a fleet decision changes, so `aval add --check` asks.
+packs:
+  - .adr/packs/decisions.yaml
+scopes: []
+keys:
