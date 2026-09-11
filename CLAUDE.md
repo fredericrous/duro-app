@@ -11,7 +11,12 @@ Machine-queryable docs — run once per session:
 Then: `npx @duro-app/cli <Component>` (props+usage) ·
 `npx @duro-app/cli <recipe> --source-only` · `npx @duro-app/cli spacing|icons|rules` ·
 free text (e.g. `npx @duro-app/cli "tags that wrap"`) searches usage metadata.
-MCP server: `claude mcp add duro -- npx -y -p @duro-app/cli -p @modelcontextprotocol/sdk duro mcp`
+MCP server: `claude mcp add duro-ds -- npx -y -p @duro-app/cli -p @modelcontextprotocol/sdk duro mcp`
+— tools `duro_ds_lookup` / `duro_ds_list` / `duro_ds_manifest`. Name it `duro-ds`, not
+`duro`: this repo's own `.mcp.json` already registers a `duro` server (the LLDAP identity
+admin one, `duro_list_groups` and friends), which is unrelated. The `duro_ds_` prefix
+arrived in `@duro-app/cli` v2 — an unpinned `npx` resolves to it, while the UI deps below
+stay on 1.x.
 
 Lint: `@duro-app/eslint-config` (shared duro-stack flat config — `react` +
 `effect` + `tests` presets) enforces the critical rules (html.\* elements,
