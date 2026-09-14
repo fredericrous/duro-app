@@ -6,3 +6,9 @@ node_modules/
 # inline comments), which prettier rewrites to one — see the 1.52.0 publish
 # failure. Helm templates are not valid standalone YAML for prettier anyway.
 chart/
+
+# Written by `aval add` and marked "do not edit" in its own header: prettier
+# reflows the generated quoting, and the next `aval add` writes it straight
+# back. CI's format:check only covers app/, so this only ever fought the
+# pre-commit hook.
+.adr/packs/
