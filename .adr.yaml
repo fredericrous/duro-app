@@ -7,6 +7,6 @@
 # `aval add github:fredericrous/decisions` refreshes the pack; nothing tells
 # this repository when a fleet decision changes, so `aval add --check` asks.
 packs:
-  - .adr/packs/decisions.yaml
+  - .adr/packs/decisions.pack
 scopes: []
 keys:
