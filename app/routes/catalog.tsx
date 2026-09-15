@@ -19,6 +19,7 @@ import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { loadAppsCatalogForPrincipal, type AppCatalogEntry, type AppCatalogState } from "~/lib/apps-catalog.server"
 import { filterByQuery } from "~/lib/search"
 import { useAppSearchParams, shouldRevalidateAppSearch } from "~/hooks/useAppSearchParams"
+import { typography } from "@duro-app/tokens/tokens/typography.css"
 
 export function meta() {
   return [{ title: "Catalog - Duro" }]
@@ -122,7 +123,7 @@ const styles = css.create({
     color: colors.accent,
   },
   learnMore: {
-    fontSize: 12,
+    fontSize: typography.fontSizeXs,
     color: colors.accent,
     textDecoration: {
       default: "none",

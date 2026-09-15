@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import { useDisplayFormat } from "~/hooks/useDisplayFormat"
 import { useCopyFeedback } from "~/hooks/useCopyFeedback"
 import { css, html } from "react-strict-dom"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { radii, spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 import {
   Alert,
@@ -28,6 +28,7 @@ import {
   WILDCARD_SCOPE,
   type SettingsApiKeysResult,
 } from "~/lib/mutations/settings-api-keys"
+import { typography, typeScale } from "@duro-app/tokens/tokens/typography.css"
 
 interface RevealData {
   rawKey: string
@@ -62,10 +63,10 @@ const styles = css.create({
   },
   keyBlock: {
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-    fontSize: 13,
+    fontSize: typeScale.fontSize2,
     wordBreak: "break-all",
     padding: spacing.sm,
-    borderRadius: 6,
+    borderRadius: radii.sm,
     backgroundColor: colors.bgCard,
     color: colors.text,
     borderWidth: 1,
@@ -76,9 +77,9 @@ const styles = css.create({
     width: "100%",
     minHeight: 64,
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-    fontSize: 12,
+    fontSize: typography.fontSizeXs,
     padding: spacing.sm,
-    borderRadius: 6,
+    borderRadius: radii.sm,
     backgroundColor: colors.bgCard,
     color: colors.text,
     borderWidth: 1,

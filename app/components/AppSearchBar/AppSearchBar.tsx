@@ -2,7 +2,7 @@ import { useRef } from "react"
 import { Icon, Input, InputGroup, Stack, Toggle, ToggleGroup } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { radii, spacing } from "@duro-app/tokens/tokens/spacing.css"
 
 const styles = css.create({
   // Inline SVG wrapper for the leading magnifier — the DS Icon catalog only
@@ -140,13 +140,13 @@ function SearchGlyph() {
 const skeletonStyles = css.create({
   input: {
     height: 36,
-    borderRadius: 6,
+    borderRadius: radii.sm,
     backgroundColor: colors.bgCard,
   },
   chip: {
     height: 28,
     width: 92,
-    borderRadius: 14,
+    borderRadius: radii.full,
     backgroundColor: colors.bgCard,
   },
   chipRow: {

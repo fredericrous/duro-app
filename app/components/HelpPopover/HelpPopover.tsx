@@ -4,6 +4,7 @@ import { css, html } from "react-strict-dom"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { shadows } from "@duro-app/tokens/tokens/shadows.css"
 import { spacing, radii } from "@duro-app/tokens/tokens/spacing.css"
+import { typography } from "@duro-app/tokens/tokens/typography.css"
 
 const detailsStyle: CSSProperties = {
   display: "inline-block",
@@ -47,10 +48,10 @@ const styles = css.create({
     borderColor: colors.border,
     borderRadius: radii.sm,
     boxShadow: shadows.md,
-    fontSize: "0.875rem",
+    fontSize: typography.fontSizeSm,
     lineHeight: 1.4,
     whiteSpace: "normal",
-    fontWeight: 400,
+    fontWeight: typography.fontWeightNormal,
   },
 })
 

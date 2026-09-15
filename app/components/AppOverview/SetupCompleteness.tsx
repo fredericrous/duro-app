@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { css, html } from "react-strict-dom"
 import { Button, Heading, Icon, Inline, Panel, Stack, Text } from "@duro-app/ui"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { radii, spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { duration, easing } from "@duro-app/tokens/tokens/motion.css"
 import { useReducedMotion } from "~/lib/useReducedMotion"
@@ -139,8 +139,8 @@ const styles = css.create({
   }),
   segment: {
     height: 6,
-    borderRadius: 999,
-    backgroundColor: "var(--color-border)",
+    borderRadius: radii.full,
+    backgroundColor: colors.border,
     transitionProperty: "background-color",
     transitionDuration: {
       default: duration.slow,

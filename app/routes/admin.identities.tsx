@@ -124,7 +124,7 @@ const styles = css.create({
   nameCell: {
     display: "flex",
     flexDirection: "column",
-    gap: 2,
+    gap: spacing.xs,
   },
   secondary: {
     color: colors.textMuted,

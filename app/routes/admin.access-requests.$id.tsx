@@ -269,12 +269,12 @@ const styles = css.create({
   field: {
     display: "flex",
     flexDirection: "column",
-    gap: 2,
+    gap: spacing.xs,
   },
   approvalRow: {
     display: "flex",
     flexDirection: "column",
-    gap: 2,
+    gap: spacing.xs,
     paddingBottom: spacing.sm,
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
