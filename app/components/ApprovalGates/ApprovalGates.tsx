@@ -99,7 +99,7 @@ export function ApprovalGates({ application, roles, entitlements, principals, po
   const policyVersion = policies.map((p) => `${p.id}@${p.updatedAt}`).join("|")
 
   return (
-    <Grid minColumnWidth="320px" gap="md">
+    <Grid layout="split" gap="md">
       <CardSection title={t("admin.applications.gates.scopesTitle")}>
         <List.Root selectionMode="single" aria-label={t("admin.applications.gates.scopesLabel")}>
           <ScopeItem

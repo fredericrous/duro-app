@@ -1,50 +1,12 @@
-import { useState, useCallback } from "react"
+import { useCallback } from "react"
 import { Outlet, useLocation, useNavigate, useRouteLoaderData } from "react-router"
-import { css, html } from "react-strict-dom"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/settings"
 import { requireAuth } from "~/lib/auth.server"
 import { config } from "~/lib/config.server"
-import { Button, Drawer, Icon, PageShell, SideNav, Stack } from "@duro-app/ui"
+import { Icon, SideNav } from "@duro-app/ui"
 import { Header } from "~/components/Header/Header"
-import { useMediaQuery } from "~/hooks/useMediaQuery"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { breakpoints } from "@duro-app/tokens/tokens/breakpoints.css"
-
-const styles = css.create({
-  outerFlex: {
-    display: "flex",
-    minHeight: 0,
-    flex: 1,
-  },
-  pageWrap: {
-    flex: 1,
-    minWidth: 0,
-    maxWidth: "100%",
-    overflowX: "clip",
-  },
-  layoutRow: {
-    display: "flex",
-    flex: 1,
-    minHeight: 0,
-    gap: spacing.lg,
-  },
-  sideNav: {
-    width: 220,
-    flexShrink: 0,
-  },
-  mainContent: {
-    flex: 1,
-    minWidth: 0,
-    paddingTop: spacing.md,
-  },
-  mobileHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingBottom: spacing.sm,
-  },
-})
+import { AppShell, type AppShellNavProps } from "~/components/AppShell/AppShell"
 
 export function meta() {
   return [{ title: "Settings - Duro" }]
@@ -75,86 +37,56 @@ export default function SettingsLayout({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
-  const isWide = useMediaQuery(`(min-width: ${breakpoints.md})`, true)
-  const [navDrawerOpen, setNavDrawerOpen] = useState(false)
 
   const dashboardData = useRouteLoaderData("routes/dashboard") as { user: string; isAdmin: boolean } | undefined
 
   const activeValue = deriveActiveValue(location.pathname)
 
-  const handleValueChange = useCallback(
-    (value: string) => {
-      const path = navMap[value]
-      if (path) navigate(path)
-      setNavDrawerOpen(false)
-    },
-    [navigate],
-  )
-
-  const navContent = (
-    <SideNav.Root value={activeValue} onValueChange={handleValueChange}>
-      <SideNav.Section label={t("settings.nav.title", "Settings")}>
-        <SideNav.Item value="general" icon={<Icon name="user-plus" size="md" />}>
-          {t("settings.nav.general", "General")}
-        </SideNav.Item>
-        <SideNav.Item value="activity" icon={<Icon name="clock" size="md" />}>
-          {t("settings.nav.activity", "Activity")}
-        </SideNav.Item>
-        <SideNav.Item value="api-keys" icon={<Icon name="key" size="md" />}>
-          {t("settings.nav.apiKeys", "API keys")}
-        </SideNav.Item>
-        {loaderData.hasGit && (
-          <SideNav.Item value="git" icon={<Icon name="git-branch" size="md" />}>
-            {t("settings.nav.git", "Git access")}
+  const nav = useCallback(
+    ({ onSelect }: AppShellNavProps) => (
+      <SideNav.Root
+        value={activeValue}
+        onValueChange={(value) => {
+          const path = navMap[value]
+          if (path) navigate(path)
+          onSelect()
+        }}
+      >
+        <SideNav.Section label={t("settings.nav.title", "Settings")}>
+          <SideNav.Item value="general" icon={<Icon name="user-plus" size="md" />}>
+            {t("settings.nav.general", "General")}
           </SideNav.Item>
-        )}
-        {loaderData.hasSecurity && (
-          <SideNav.Item value="security" icon={<Icon name="shield" size="md" />}>
-            {t("settings.nav.security", "Security")}
+          <SideNav.Item value="activity" icon={<Icon name="clock" size="md" />}>
+            {t("settings.nav.activity", "Activity")}
           </SideNav.Item>
-        )}
-      </SideNav.Section>
-    </SideNav.Root>
+          <SideNav.Item value="api-keys" icon={<Icon name="key" size="md" />}>
+            {t("settings.nav.apiKeys", "API keys")}
+          </SideNav.Item>
+          {loaderData.hasGit && (
+            <SideNav.Item value="git" icon={<Icon name="git-branch" size="md" />}>
+              {t("settings.nav.git", "Git access")}
+            </SideNav.Item>
+          )}
+          {loaderData.hasSecurity && (
+            <SideNav.Item value="security" icon={<Icon name="shield" size="md" />}>
+              {t("settings.nav.security", "Security")}
+            </SideNav.Item>
+          )}
+        </SideNav.Section>
+      </SideNav.Root>
+    ),
+    [activeValue, loaderData.hasGit, loaderData.hasSecurity, navigate, t],
   )
 
   return (
-    <html.div style={styles.outerFlex}>
-      <html.div style={styles.pageWrap}>
-        <PageShell
-          maxWidth="lg"
-          header={<Header user={dashboardData?.user ?? ""} isAdmin={dashboardData?.isAdmin ?? false} />}
-        >
-          {isWide ? (
-            <html.div style={styles.layoutRow}>
-              <html.div style={styles.sideNav}>{navContent}</html.div>
-              <html.div style={styles.mainContent}>
-                <Outlet />
-              </html.div>
-            </html.div>
-          ) : (
-            <>
-              <html.div style={styles.mobileHeader}>
-                <Button variant="secondary" size="small" onClick={() => setNavDrawerOpen(true)}>
-                  {t("settings.nav.menu", "Menu")}
-                </Button>
-              </html.div>
-              <Stack gap="lg">
-                <Outlet />
-              </Stack>
-            </>
-          )}
-        </PageShell>
-      </html.div>
-
-      <Drawer.Root open={navDrawerOpen} onOpenChange={setNavDrawerOpen} anchor="left">
-        <Drawer.Portal size="sm">
-          <Drawer.Header>
-            <Drawer.Title>{t("settings.nav.title", "Settings")}</Drawer.Title>
-            <Drawer.Close aria-label={t("common.close", "Close")} />
-          </Drawer.Header>
-          <Drawer.Body>{navContent}</Drawer.Body>
-        </Drawer.Portal>
-      </Drawer.Root>
-    </html.div>
+    <AppShell
+      header={<Header user={dashboardData?.user ?? ""} isAdmin={dashboardData?.isAdmin ?? false} />}
+      nav={nav}
+      navTitle={t("settings.nav.title", "Settings")}
+      menuLabel={t("settings.nav.menu", "Menu")}
+      closeLabel={t("common.close", "Close")}
+    >
+      <Outlet />
+    </AppShell>
   )
 }
