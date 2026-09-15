@@ -2,6 +2,12 @@ export default {
   plugins: {
     "react-strict-dom/postcss-plugin": {
       include: [
+        // The token sources too: a `css.defineConsts` value (breakpoints.md
+        // in a `@media` key) is substituted for its literal only when the
+        // plugin has compiled the file that defines it. Without this entry
+        // the query came out as `@media (min-width: var(--md-…))`, which no
+        // browser matches, and the rail never appeared.
+        "node_modules/@duro-app/tokens/src/**/*.{ts,tsx}",
         "app/components/**/*.{ts,tsx}",
         "app/hooks/**/*.{ts,tsx}",
         "app/lib/**/*.{ts,tsx}",

@@ -30,11 +30,12 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   } as unknown as typeof ResizeObserver
 }
 
-// jsdom doesn't ship matchMedia. `useMediaQuery` (used by the admin layout
-// for wide-vs-narrow split) calls window.matchMedia synchronously during
-// render; without this stub it throws. The stub always reports a match so
-// the admin layout renders its wide variant in tests — the narrow variant
-// is exercised explicitly via overrides where it matters.
+// jsdom doesn't ship matchMedia. `useMediaQuery` (admin.tsx: DetailPanel vs
+// navigate on narrow screens; theme and link-target hooks) calls
+// window.matchMedia synchronously during render; without this stub it
+// throws. The stub always reports a match so admin renders its wide variant
+// in tests — the narrow variant is exercised via overrides where it matters.
+// The page shell itself (AppShell) is CSS-responsive and needs no query.
 if (typeof window !== "undefined" && typeof window.matchMedia === "undefined") {
   window.matchMedia = ((query: string) => ({
     matches: true,

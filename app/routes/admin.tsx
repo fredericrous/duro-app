@@ -2,56 +2,17 @@ import { useEffect, useState, useRef, useCallback, type ReactNode } from "react"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { Outlet, useLocation, useNavigate, useRouteLoaderData, useOutletContext, useRevalidator } from "react-router"
-import { css, html } from "react-strict-dom"
+import { html } from "react-strict-dom"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/admin"
 import { getAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"
 import { runEffect } from "~/lib/runtime.server"
-import { Badge, Button, DetailPanel, Drawer, Icon, Inline, PageShell, SideNav, Stack } from "@duro-app/ui"
+import { Badge, DetailPanel, Icon, Inline, SideNav, Stack } from "@duro-app/ui"
 import { Header } from "~/components/Header/Header"
+import { AppShell, type AppShellNavProps } from "~/components/AppShell/AppShell"
 import { useMediaQuery } from "~/hooks/useMediaQuery"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { breakpoints } from "@duro-app/tokens/tokens/breakpoints.css"
-
-const styles = css.create({
-  outerFlex: {
-    display: "flex",
-    minHeight: 0,
-    flex: 1,
-  },
-  pageWrap: {
-    flex: 1,
-    minWidth: 0,
-    // Safety net: nothing in the admin content may push the page wider than
-    // the viewport (which would shove the header's account menu off-screen on
-    // mobile). `clip` — not `hidden` — so it doesn't create a scroll container
-    // or break sticky positioning / table scroll-ports nested inside.
-    maxWidth: "100%",
-    overflowX: "clip",
-  },
-  layoutRow: {
-    display: "flex",
-    flex: 1,
-    minHeight: 0,
-    gap: spacing.lg,
-  },
-  sideNav: {
-    width: 220,
-    flexShrink: 0,
-  },
-  mainContent: {
-    flex: 1,
-    minWidth: 0,
-    paddingTop: spacing.md,
-  },
-  mobileHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingBottom: spacing.sm,
-  },
-})
 
 // Side-nav label with optional pending count chip. Co-located here because
 // it's only used for admin navigation and depends on the loader's count shape.
@@ -194,7 +155,6 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   const [sidePanelOpen, setSidePanelOpen] = useState(false)
   const [sidePanelContent, setSidePanelContent] = useState<ReactNode | null>(null)
   const onCloseRef = useRef<(() => void) | null>(null)
-  const [navDrawerOpen, setNavDrawerOpen] = useState(false)
 
   const handlePanelOpenChange = useCallback((open: boolean) => {
     setSidePanelOpen(open)
@@ -204,15 +164,6 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   }, [])
 
   const activeValue = deriveActiveValue(location.pathname)
-
-  const handleValueChange = useCallback(
-    (value: string) => {
-      const path = navMap[value]
-      if (path) navigate(path)
-      setNavDrawerOpen(false)
-    },
-    [navigate],
-  )
 
   const showDetail = useCallback(
     (content: ReactNode, detailPath: string) => {
@@ -236,8 +187,15 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
     isWide,
   }
 
-  const navContent = (
-    <SideNav.Root value={activeValue} onValueChange={handleValueChange}>
+  const nav = ({ onSelect }: AppShellNavProps) => (
+    <SideNav.Root
+      value={activeValue}
+      onValueChange={(value) => {
+        const path = navMap[value]
+        if (path) navigate(path)
+        onSelect()
+      }}
+    >
       {/* Flat menu: static (non-collapsible) Section headers + per-item icons,
           grouped by the admin's job rather than the data model. Item values
           (and thus navMap/URLs) are unchanged. */}
@@ -290,55 +248,27 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   )
 
   return (
-    <html.div style={styles.outerFlex}>
-      <html.div style={styles.pageWrap}>
-        <PageShell
-          maxWidth="lg"
-          header={<Header user={dashboardData?.user ?? ""} isAdmin={dashboardData?.isAdmin ?? false} />}
-        >
-          {isWide ? (
-            <html.div style={styles.layoutRow}>
-              <html.div style={styles.sideNav}>{navContent}</html.div>
-              <html.div style={styles.mainContent}>
-                <Stack gap="lg">
-                  <Outlet context={outletContext} />
-                </Stack>
-              </html.div>
-            </html.div>
-          ) : (
-            <>
-              <html.div style={styles.mobileHeader}>
-                <Button variant="secondary" size="small" onClick={() => setNavDrawerOpen(true)}>
-                  {t("admin.nav.menu", "Menu")}
-                </Button>
-              </html.div>
-              <Stack gap="lg">
-                <Outlet context={outletContext} />
-              </Stack>
-            </>
-          )}
-        </PageShell>
-      </html.div>
-
-      {/* Navigation drawer for narrow screens */}
-      <Drawer.Root open={navDrawerOpen} onOpenChange={setNavDrawerOpen} anchor="left">
-        <Drawer.Portal size="sm">
-          <Drawer.Header>
-            <Drawer.Title>{t("admin.nav.title", "Navigation")}</Drawer.Title>
-            <Drawer.Close aria-label={t("admin.detailPanel.close")} />
-          </Drawer.Header>
-          <Drawer.Body>{navContent}</Drawer.Body>
-        </Drawer.Portal>
-      </Drawer.Root>
-
-      {/* DetailPanel rendered at layout level — pushes entire page left */}
-      {isWide && (
-        <DetailPanel.Root open={sidePanelOpen} onOpenChange={handlePanelOpenChange}>
-          <DetailPanel.Content size="md" label={t("admin.detailPanel.label")}>
-            {sidePanelContent}
-          </DetailPanel.Content>
-        </DetailPanel.Root>
-      )}
-    </html.div>
+    <AppShell
+      header={<Header user={dashboardData?.user ?? ""} isAdmin={dashboardData?.isAdmin ?? false} />}
+      nav={nav}
+      navTitle={t("admin.nav.title", "Navigation")}
+      menuLabel={t("admin.nav.menu", "Menu")}
+      closeLabel={t("admin.detailPanel.close")}
+      aside={
+        // DetailPanel at layout level — pushes the entire page left. Wide only:
+        // on narrow screens showDetail navigates to the detail route instead.
+        isWide && (
+          <DetailPanel.Root open={sidePanelOpen} onOpenChange={handlePanelOpenChange}>
+            <DetailPanel.Content size="md" label={t("admin.detailPanel.label")}>
+              {sidePanelContent}
+            </DetailPanel.Content>
+          </DetailPanel.Root>
+        )
+      }
+    >
+      <Stack gap="lg">
+        <Outlet context={outletContext} />
+      </Stack>
+    </AppShell>
   )
 }
