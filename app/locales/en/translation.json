@@ -927,7 +927,8 @@
         "resources": "Resources",
         "grants": "Grants",
         "requests": "Requests",
-        "settings": "Settings"
+        "settings": "Settings",
+        "approvals": "Approvals"
       },
       "sections": {
         "roles": "Roles",
@@ -935,7 +936,8 @@
         "resources": "Resources",
         "grants": "Active grants",
         "requests": "Pending requests",
-        "settings": "Application Settings"
+        "settings": "Application Settings",
+        "approvals": "Approval gates"
       },
       "empty": {
         "roles": "No roles yet. Roles bundle entitlements and are what you grant to people.",
@@ -979,7 +981,13 @@
         "grant_created": "Grant created",
         "grant_failed": "Failed to create grant",
         "sync_failed": "Sync failed",
-        "synced": "Synced {{total}} apps: {{created}} created, {{updated}} updated, {{disabled}} disabled"
+        "synced": "Synced {{total}} apps: {{created}} created, {{updated}} updated, {{disabled}} disabled",
+        "gate_saved": "Gate saved",
+        "gate_cleared": "Back to the whole-app gate",
+        "gate_needs_approver": "Slot at least one person, or open the door",
+        "gate_no_owner": "This app has no owner yet — assign one in Settings first",
+        "gate_scope_unknown": "That role or entitlement no longer exists",
+        "invalid_gate": "The gate could not be read"
       },
       "setup": {
         "title": "Setup completeness",
@@ -1012,6 +1020,64 @@
           "configured": "Set up, but has no roles or entitlements yet, so nothing can be granted.",
           "grantable": "Ready to grant — has roles/entitlements, but no one holds access yet.",
           "provisioned": "In use — at least one person holds an active grant."
+        }
+      },
+      "gates": {
+        "scopesTitle": "Where a request lands",
+        "scopesLabel": "Scopes",
+        "wholeApp": "Whole app",
+        "wholeAppHint": "default for every request",
+        "roles": "Roles",
+        "entitlements": "Entitlements",
+        "noneYet": "No roles or entitlements yet — requests land on the whole app.",
+        "status": {
+          "openDoor": "open door",
+          "gates_one": "{{count}} gate",
+          "gates_other": "{{count}} gates",
+          "inherits": "follows whole app",
+          "noGate": "no gate yet"
+        },
+        "editorTitle": "Gates for {{scope}}",
+        "editorTitleApp": "Gates for the whole app",
+        "source": {
+          "own": "Own gate",
+          "inherited": "Follows the whole-app gate",
+          "none": "No gate yet"
+        },
+        "track": {
+          "request": "Request",
+          "granted": "Granted",
+          "grantedHint": "provisions",
+          "mustOpen": "must open",
+          "canOpen": "can open",
+          "empty": "no one is asked"
+        },
+        "openDoorWarning": "Open door: every request on {{scope}} is approved the moment it is asked. Nobody is notified.",
+        "noGateWarning": "Nothing guards {{scope}} yet — requests are approved automatically until you slot someone.",
+        "modeLabel": "Gates open when",
+        "mode": {
+          "none": "Open door",
+          "one_of": "Any one opens",
+          "all_of": "All must open"
+        },
+        "owner": "Owner",
+        "ownerUnset": "no owner",
+        "removeGate": "Remove {{name}} from the gates",
+        "rosterTitle": "Roster",
+        "rosterHint": "Tap a person to slot them",
+        "rosterEmpty": "Everyone is already at a gate.",
+        "addToGates": "Slot {{name}}",
+        "tryIt": "Try it",
+        "save": "Save gate",
+        "saving": "Saving…",
+        "reset": "Undo changes",
+        "clear": "Use the whole-app gate instead",
+        "unsaved": "Unsaved changes",
+        "outcome": {
+          "none": "If someone asks for {{scope}}: granted right away, no one is asked.",
+          "one_of": "If someone asks for {{scope}}: waits until one of {{names}} says yes.",
+          "all_of": "If someone asks for {{scope}}: waits for {{names}} — every one of them must say yes.",
+          "nobody": "nobody"
         }
       }
     },

@@ -14,7 +14,8 @@ import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { AccessRequestRepo, type AccessRequestEnriched } from "~/lib/governance/AccessRequestRepo.server"
 import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
-import type { Role, Entitlement, Resource, Grant, Principal } from "~/lib/governance/types"
+import { ApprovalPolicyRepo } from "~/lib/governance/ApprovalPolicyRepo.server"
+import type { Role, Entitlement, Resource, Grant, Principal, ApprovalPolicy } from "~/lib/governance/types"
 import { useReactTable, getCoreRowModel, createColumnHelper } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
@@ -42,6 +43,7 @@ import { CardSection } from "~/components/CardSection/CardSection"
 import { AnimatedNumber } from "~/components/motion/AnimatedNumber"
 import { AppOverview } from "~/components/AppOverview/AppOverview"
 import { QuickGrantDialog } from "~/components/QuickGrantDialog/QuickGrantDialog"
+import { ApprovalGates } from "~/components/ApprovalGates/ApprovalGates"
 
 // ---------------------------------------------------------------------------
 // Loader
@@ -61,6 +63,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       const grantRepo = yield* GrantRepo
       const principalRepo = yield* PrincipalRepo
       const connectedSystems = yield* ConnectedSystemRepo
+      const approvalPolicyRepo = yield* ApprovalPolicyRepo
 
       const requestRepo = yield* AccessRequestRepo
 
@@ -73,6 +76,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       const grants = yield* grantRepo.findActiveForApp(appId)
       const principals = yield* principalRepo.list()
       const pendingRequests = yield* requestRepo.listAllEnriched({ applicationId: appId, status: "pending" })
+      const approvalPolicies = yield* approvalPolicyRepo.listByApplication(appId)
       const pluginSystem = yield* connectedSystems.findByApplicationAndType(appId, "plugin")
       const ldapProvisioned = pluginSystem !== null && pluginSystem.status === "active"
 
@@ -88,6 +92,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         grants,
         principals,
         pendingRequests,
+        approvalPolicies,
         ldapProvisioned,
         pluginInfo,
       }
@@ -218,6 +223,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
     grants,
     principals,
     pendingRequests,
+    approvalPolicies,
     ldapProvisioned,
     pluginInfo,
   } = loaderData
@@ -350,6 +356,9 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
           </Tabs.Tab>
           <Tabs.Tab value="requests">
             {t("admin.applications.tabs.requests")} (<AnimatedNumber value={pendingRequests.length} />)
+          </Tabs.Tab>
+          <Tabs.Tab value="approvals">
+            {t("admin.applications.tabs.approvals")} (<AnimatedNumber value={approvalPolicies.length} />)
           </Tabs.Tab>
           <Tabs.Tab value="settings">{t("admin.applications.tabs.settings")}</Tabs.Tab>
         </Tabs.List>
@@ -535,6 +544,16 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
                 </Table.Root>
               )}
             </CardSection>
+          )}
+
+          {activeTab === "approvals" && (
+            <ApprovalGates
+              application={application}
+              roles={roles as Role[]}
+              entitlements={entitlements as Entitlement[]}
+              principals={principals as Principal[]}
+              policies={approvalPolicies as ApprovalPolicy[]}
+            />
           )}
 
           {activeTab === "settings" && (
