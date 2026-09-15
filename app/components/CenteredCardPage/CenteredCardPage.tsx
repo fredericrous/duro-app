@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { Card } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
+import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
 const styles = css.create({
   page: {
@@ -8,7 +9,7 @@ const styles = css.create({
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: 32,
+    padding: spacing.xl,
   },
   cardWrapper: {
     maxWidth: 480,

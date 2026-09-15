@@ -12,6 +12,7 @@ import { Badge, Button, DetailPanel, Drawer, Icon, Inline, PageShell, SideNav, S
 import { Header } from "~/components/Header/Header"
 import { useMediaQuery } from "~/hooks/useMediaQuery"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { breakpoints } from "@duro-app/tokens/tokens/breakpoints.css"
 
 const styles = css.create({
   outerFlex: {
@@ -140,7 +141,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
-  const isWide = useMediaQuery("(min-width: 768px)", true)
+  const isWide = useMediaQuery(`(min-width: ${breakpoints.md})`, true)
   const dashboardData = useRouteLoaderData("routes/dashboard") as {
     user: string
     isAdmin: boolean

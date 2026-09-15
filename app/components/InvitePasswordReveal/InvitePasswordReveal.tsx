@@ -6,6 +6,7 @@ import { useCopyFeedback } from "~/hooks/useCopyFeedback"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
 import { Card, Heading, Icon, Input, InputGroup, Stack, Text } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
+import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
 const styles = css.create({
   oneTimeHidden: {
@@ -15,7 +16,7 @@ const styles = css.create({
     display: "flex",
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: spacing.sm,
   },
 })
 

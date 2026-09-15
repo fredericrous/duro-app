@@ -2,6 +2,7 @@ import { useRef } from "react"
 import { Icon, Input, InputGroup, Stack, Toggle, ToggleGroup } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
 const styles = css.create({
   // Inline SVG wrapper for the leading magnifier — the DS Icon catalog only
@@ -19,7 +20,7 @@ const styles = css.create({
     // Muted suffix (e.g. "Media · 8") so the count never competes with the
     // label for the user's eye but is still readable at a glance.
     opacity: 0.6,
-    marginLeft: 4,
+    marginLeft: spacing.xs,
     fontVariantNumeric: "tabular-nums",
   },
   // CSS visually-hidden — content readable by screen readers, invisible on
@@ -151,7 +152,7 @@ const skeletonStyles = css.create({
   chipRow: {
     display: "flex",
     flexDirection: "row",
-    gap: 8,
+    gap: spacing.sm,
     flexWrap: "wrap",
   },
 })

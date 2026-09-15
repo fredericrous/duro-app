@@ -1,0 +1,81 @@
+name: UI handoff
+
+# A separate workflow rather than a job in ci.yml, deliberately: this one
+# needs `edited` in its trigger so that filling in the PR body re-runs the
+# check, and putting `edited` on ci.yml would rerun every build and test
+# shard each time someone touches a description.
+#
+# What it enforces is fleet decision ui.mockup-handoff (ADR-0016,
+# handoff.prove-fidelity): a PR that ships a screen shows the picked
+# artboard beside the built route, or says it ships no screen. Lint proves a
+# screen uses the tokens; nothing but a human comparing two pictures proves
+# it is the screen that was chosen.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  changes:
+    name: Detect UI changes
+    runs-on: duro-app
+    outputs:
+      ui: ${{ steps.filter.outputs.ui }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            ui:
+              - 'app/routes/**'
+              - 'app/components/**'
+              - 'docs/mockups/**'
+
+  handoff:
+    name: Mockup side-by-side is in the PR
+    runs-on: duro-app
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
+    env:
+      # The body arrives through env, never interpolated into the script:
+      # a multi-line body with quotes is data, not shell.
+      PR_BODY: ${{ github.event.pull_request.body }}
+    steps:
+      - name: The body carries the mockup section or the explicit opt-out
+        run: |
+          set -euo pipefail
+          if grep -qE '^Mockup: none' <<< "$PR_BODY"; then
+            echo "No screen shipped — opt-out present."
+            exit 0
+          fi
+          section="$(awk '/^## Mockup/{on=1; next} /^## /{on=0} on' <<< "$PR_BODY")"
+          fail=0
+          if ! grep -qE 'https?://\S+' <<< "$section"; then
+            echo "::error::## Mockup has no canvas URL"; fail=1
+          fi
+          if ! grep -qiE 'direction [A-Z]\b' <<< "$section"; then
+            echo "::error::## Mockup names no direction (e.g. 'direction C')"; fail=1
+          fi
+          if ! grep -qE 'docs/mockups/[A-Za-z0-9._-]+' <<< "$section"; then
+            echo "::error::## Mockup names no committed artboard folder (docs/mockups/<screen>)"; fail=1
+          fi
+          images="$(grep -oE '!\[[^]]*\]\([^)]+\)|<img [^>]+>' <<< "$section" | wc -l | tr -d ' ')"
+          if [ "$images" -lt 2 ]; then
+            echo "::error::## Mockup shows $images image(s); the artboard and the live screenshot are both required"; fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then
+            echo "This PR touches app/routes or app/components. Either fill in the ## Mockup"
+            echo "section (canvas URL · direction · docs/mockups/<screen> · two images) or"
+            echo "write a line 'Mockup: none' if it ships no screen. See /duro-mockup."
+            exit 1
+          fi
+          echo "Mockup section complete."

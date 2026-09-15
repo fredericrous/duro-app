@@ -6,14 +6,15 @@ import { config } from "~/lib/config.server"
 import { Button, Heading, StatusIcon, Text } from "@duro-app/ui"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { css, html } from "react-strict-dom"
+import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
 const styles = css.create({
   centered: {
     textAlign: "center",
-    padding: 48,
+    padding: spacing.xxl,
   },
   bigIcon: {
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   ctaLink: {
     textDecoration: "none",
