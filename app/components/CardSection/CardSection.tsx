@@ -1,10 +1,11 @@
 import type { ReactNode } from "react"
 import { Heading, Panel } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
+import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
 const styles = css.create({
   wrapper: {
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   headerRow: {
     display: "flex",

@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Badge, Button, Dialog, Inline, LinkButton, Menu, Stack, Text } from "@duro-app/ui"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { typeScale } from "@duro-app/tokens/tokens/typography.css"
+import { typeScale, typography } from "@duro-app/tokens/tokens/typography.css"
 import { css, html } from "react-strict-dom"
 
 const styles = css.create({
@@ -21,7 +21,7 @@ const styles = css.create({
   },
   logo: {
     fontSize: typeScale.fontSize9,
-    fontWeight: 700,
+    fontWeight: typography.fontWeightBold,
     letterSpacing: typeScale.letterSpacingTight,
     textDecoration: "none",
     color: colors.text,

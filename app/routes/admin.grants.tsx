@@ -31,6 +31,7 @@ import { Table } from "@duro-app/ui/table"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
+import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
 type GrantWithNames = Grant & {
   principalName: string
@@ -336,7 +337,7 @@ const styles = css.create({
     display: "inline-flex",
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: spacing.xs,
     cursor: "pointer",
     userSelect: "none",
   },

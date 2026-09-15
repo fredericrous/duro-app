@@ -33,6 +33,8 @@ import {
 
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { typography } from "@duro-app/tokens/tokens/typography.css"
 import {
   ActionBar,
   Badge,
@@ -115,18 +117,18 @@ const styles = css.create({
     display: "inline-flex",
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: spacing.xs,
     cursor: "pointer",
     userSelect: "none",
   },
   nameCell: {
     display: "flex",
     flexDirection: "column",
-    gap: 2,
+    gap: spacing.xs,
   },
   secondary: {
-    color: "var(--textMuted, #888)",
-    fontSize: 12,
+    color: colors.textMuted,
+    fontSize: typography.fontSizeXs,
   },
 })
 

@@ -22,6 +22,7 @@ import { Badge, EmptyState, Stack, Tooltip } from "@duro-app/ui"
 import { Table } from "@duro-app/ui/table"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
+import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request)
@@ -205,7 +206,7 @@ const styles = css.create({
     display: "inline-flex",
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: spacing.xs,
     cursor: "pointer",
     userSelect: "none",
   },

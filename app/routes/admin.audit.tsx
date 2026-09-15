@@ -355,7 +355,7 @@ const styles = css.create({
     display: "inline-flex",
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: spacing.xs,
     cursor: "pointer",
     userSelect: "none",
   },

@@ -13,7 +13,7 @@ notes=".claude/duro-hook.local.md"
 
 # npx resolution dominates session start; the catalog only changes on upgrade.
 if [ ! -s "$cache" ] || [ -n "$(find "$cache" -mtime +7 2>/dev/null)" ]; then
-  if npx -y @duro-app/cli@^1.2.0 hook session-start >"$cache.tmp" 2>/dev/null; then
+  if npx -y @duro-app/cli@^3.0.0 hook session-start >"$cache.tmp" 2>/dev/null; then
     mv "$cache.tmp" "$cache"
   else
     rm -f "$cache.tmp"

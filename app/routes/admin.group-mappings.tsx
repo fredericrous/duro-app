@@ -25,6 +25,7 @@ import { Table } from "@duro-app/ui/table"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
+import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
 type TFunc = (key: string, opts?: Record<string, unknown>) => string
 
@@ -420,7 +421,7 @@ const styles = css.create({
     display: "inline-flex",
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: spacing.xs,
     cursor: "pointer",
     userSelect: "none",
   },

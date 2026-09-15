@@ -5,6 +5,7 @@ import { Button, Heading, Stack, StatusIcon, Text } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
 import { RequestAccessForm } from "~/components/RequestAccessForm/RequestAccessForm"
 import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
+import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
 const styles = css.create({
   container: {
@@ -12,10 +13,10 @@ const styles = css.create({
     flexDirection: "column",
     alignItems: "center",
     textAlign: "center",
-    padding: 32,
+    padding: spacing.xl,
   },
   icon: {
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   ctaWrap: {
     width: "100%",
