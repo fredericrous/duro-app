@@ -4,13 +4,13 @@ import { useTranslation } from "react-i18next"
 import { css, html } from "react-strict-dom"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { spacing, radii } from "@duro-app/tokens/tokens/spacing.css"
-import { typography } from "@duro-app/tokens/tokens/typography.css"
 import { duration, easing } from "@duro-app/tokens/tokens/motion.css"
 import {
   Badge,
   Button,
   Callout,
   Cluster,
+  Grid,
   Icon,
   Inline,
   List,
@@ -99,7 +99,7 @@ export function ApprovalGates({ application, roles, entitlements, principals, po
   const policyVersion = policies.map((p) => `${p.id}@${p.updatedAt}`).join("|")
 
   return (
-    <html.div style={styles.board}>
+    <Grid minColumnWidth="320px" gap="md">
       <CardSection title={t("admin.applications.gates.scopesTitle")}>
         <List.Root selectionMode="single" aria-label={t("admin.applications.gates.scopesLabel")}>
           <ScopeItem
@@ -127,7 +127,7 @@ export function ApprovalGates({ application, roles, entitlements, principals, po
           save or clear (a successful save leaves the draft equal to the
           saved gate, so the remount is invisible). */}
       <GateEditor key={`${selected.key}:${policyVersion}`} row={selected} owner={owner} people={people} />
-    </html.div>
+    </Grid>
   )
 }
 
@@ -275,10 +275,10 @@ function GateEditor({ row, owner, people }: { row: ScopeRow; owner: Principal | 
           {/* The track */}
           <html.div style={styles.track} role="group" aria-label={t("admin.applications.gates.tryIt")}>
             <TrackNode label={t("admin.applications.gates.track.request")} />
-            <Connector />
             {mode !== "none" &&
               rules.map((rule) => (
                 <Fragment key={rule.approverType === "app_owner" ? "owner" : rule.approverPrincipalId}>
+                  <Connector />
                   <html.div style={styles.node}>
                     <SlotIn animate={!reducedMotion} style={styles.gate}>
                       <Tag
@@ -296,11 +296,11 @@ function GateEditor({ row, owner, people }: { row: ScopeRow; owner: Principal | 
                         : t("admin.applications.gates.track.canOpen")}
                     </Text>
                   </html.div>
-                  <Connector />
                 </Fragment>
               ))}
             {mode !== "none" && rules.length === 0 && (
               <>
+                <Connector />
                 <html.div style={styles.node}>
                   <html.div style={[styles.gate, styles.gateEmpty]}>
                     <Text variant="caption" color="muted">
@@ -308,9 +308,9 @@ function GateEditor({ row, owner, people }: { row: ScopeRow; owner: Principal | 
                     </Text>
                   </html.div>
                 </html.div>
-                <Connector />
               </>
             )}
+            <Connector />
             <TrackNode
               label={t("admin.applications.gates.track.granted")}
               hint={t("admin.applications.gates.track.grantedHint")}
@@ -442,7 +442,11 @@ function TrackNode({
 }
 
 function Connector() {
-  return <html.div style={styles.connector} aria-hidden={true} />
+  return (
+    <html.div style={styles.connector} aria-hidden={true}>
+      <html.div style={styles.connectorLine} />
+    </html.div>
+  )
 }
 
 /**
@@ -465,17 +469,6 @@ function SlotIn({ animate, style, children }: { animate: boolean; style: StylePr
 type StyleProp = React.ComponentProps<typeof html.div>["style"]
 
 const styles = css.create({
-  // Scopes are a narrow list; the track needs the width. Two columns weighted
-  // 1:2 from tablet up, a single stacked column on phones.
-  board: {
-    display: "grid",
-    gridTemplateColumns: {
-      default: "minmax(0, 1fr)",
-      "@media (min-width: 768px)": "minmax(240px, 1fr) minmax(0, 2fr)",
-    },
-    gap: spacing.md,
-    alignItems: "start",
-  },
   groupLabel: {
     paddingTop: spacing.sm,
     paddingBottom: spacing.xs,
@@ -495,13 +488,11 @@ const styles = css.create({
     flexDirection: "column",
     alignItems: "center",
     gap: spacing.xs,
-    minWidth: 96,
   },
   box: {
-    minWidth: 96,
-    height: 48,
-    paddingLeft: spacing.ms,
-    paddingRight: spacing.ms,
+    height: spacing.xxl,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.md,
     borderRadius: radii.sm,
     borderWidth: 1,
     borderStyle: "solid",
@@ -521,7 +512,7 @@ const styles = css.create({
     backgroundColor: colors.warningBg,
   },
   gate: {
-    height: 48,
+    height: spacing.xxl,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -544,12 +535,20 @@ const styles = css.create({
     paddingLeft: spacing.ms,
     paddingRight: spacing.ms,
   },
+  // Same height as a node box so the line sits at its vertical centre
+  // without a hand-computed offset.
   connector: {
-    width: 24,
-    height: 2,
-    marginTop: 23,
-    backgroundColor: colors.border,
+    width: spacing.lg,
+    height: spacing.xxl,
+    display: "flex",
+    alignItems: "center",
     flexShrink: 0,
+  },
+  connectorLine: {
+    width: "100%",
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
   },
   tryIt: {
     display: "flex",
@@ -561,6 +560,5 @@ const styles = css.create({
     borderStyle: "solid",
     borderColor: colors.border,
     backgroundColor: colors.bg,
-    fontFamily: typography.fontFamily,
   },
 })
