@@ -12,8 +12,9 @@ import { breakpoints } from "@duro-app/tokens/tokens/breakpoints.css"
  * Wide (≥ md): rail + content side by side; the split collapses on the
  * width of its own container, so an open DetailPanel stacks it gracefully.
  * Narrow: the rail is hidden by CSS and a Menu button opens the same nav in
- * a left Drawer. The only JavaScript here is the drawer's open state — no
- * media query, so the server and the first client paint agree.
+ * a left Drawer, switched on the same container width the split measures.
+ * The only JavaScript here is the drawer's open state — no media query, so
+ * the server and the first client paint agree.
  */
 
 export interface AppShellNavProps {
@@ -54,17 +55,23 @@ const styles = css.create({
     maxWidth: "100%",
     overflowX: "clip",
   },
-  // The rail exists only from md up; below, the drawer carries the nav.
+  // Rail and Menu button switch on the SAME width the Grid split measures —
+  // its container, not the viewport. A viewport query here would show the
+  // rail at 768–816px while the split, measuring the page minus its padding,
+  // had already stacked it above the content.
+  shell: {
+    containerType: "inline-size",
+  },
   rail: {
     display: {
       default: "none",
-      [`@media (min-width: ${breakpoints.md})`]: "block",
+      [`@container (min-width: ${breakpoints.md})`]: "block",
     },
   },
   menuBar: {
     display: {
       default: "flex",
-      [`@media (min-width: ${breakpoints.md})`]: "none",
+      [`@container (min-width: ${breakpoints.md})`]: "none",
     },
     alignItems: "center",
   },
@@ -88,15 +95,17 @@ export function AppShell({ header, nav, navTitle, menuLabel, closeLabel, childre
     <html.div style={styles.outerFlex}>
       <html.div style={styles.pageWrap}>
         <PageShell maxWidth="lg" header={header}>
-          <html.div style={styles.menuBar}>
-            <Button variant="secondary" size="small" onClick={() => setDrawerOpen(true)}>
-              {menuLabel}
-            </Button>
+          <html.div style={styles.shell}>
+            <html.div style={styles.menuBar}>
+              <Button variant="secondary" size="small" onClick={() => setDrawerOpen(true)}>
+                {menuLabel}
+              </Button>
+            </html.div>
+            <Grid layout="split-wide" gap="xl">
+              <html.div style={styles.rail}>{nav({ onSelect: closeDrawer })}</html.div>
+              <html.div style={styles.main}>{children}</html.div>
+            </Grid>
           </html.div>
-          <Grid layout="split-wide" gap="xl">
-            <html.div style={styles.rail}>{nav({ onSelect: closeDrawer })}</html.div>
-            <html.div style={styles.main}>{children}</html.div>
-          </Grid>
         </PageShell>
       </html.div>
 

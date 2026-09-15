@@ -12,7 +12,7 @@ export default defineConfig({
       babelConfig: {
         presets: [
           "@babel/preset-typescript",
-          ["react-strict-dom/babel-preset", { dev: true, platform: "web" }],
+          ["react-strict-dom/babel-preset", { dev: true, platform: "web", rootDir: process.cwd() }],
         ],
         plugins: [["babel-plugin-react-compiler"]],
       },
@@ -30,7 +30,7 @@ export default defineConfig({
       babelConfig: {
         presets: [
           "@babel/preset-typescript",
-          ["react-strict-dom/babel-preset", { dev: true, platform: "web" }],
+          ["react-strict-dom/babel-preset", { dev: true, platform: "web", rootDir: process.cwd() }],
         ],
       },
     }),
