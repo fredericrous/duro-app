@@ -927,7 +927,8 @@
         "resources": "Ressources",
         "grants": "Octrois",
         "requests": "Demandes",
-        "settings": "Paramètres"
+        "settings": "Paramètres",
+        "approvals": "Approbations"
       },
       "sections": {
         "roles": "Rôles",
@@ -935,7 +936,8 @@
         "resources": "Ressources",
         "grants": "Octrois actifs",
         "requests": "Demandes en attente",
-        "settings": "Paramètres de l'application"
+        "settings": "Paramètres de l'application",
+        "approvals": "Portes d'approbation"
       },
       "empty": {
         "roles": "Aucun rôle pour l'instant. Les rôles regroupent des droits et sont ce que vous accordez aux personnes.",
@@ -979,7 +981,13 @@
         "grant_created": "Octroi créé",
         "grant_failed": "Échec de la création de l'octroi",
         "sync_failed": "Échec de la synchronisation",
-        "synced": "{{total}} applications synchronisées : {{created}} créées, {{updated}} mises à jour, {{disabled}} désactivées"
+        "synced": "{{total}} applications synchronisées : {{created}} créées, {{updated}} mises à jour, {{disabled}} désactivées",
+        "gate_saved": "Porte enregistrée",
+        "gate_cleared": "Retour à la porte de toute l'application",
+        "gate_needs_approver": "Placez au moins une personne, ou ouvrez la porte",
+        "gate_no_owner": "Cette application n'a pas encore de responsable — attribuez-en un dans les Paramètres",
+        "gate_scope_unknown": "Ce rôle ou ce droit n'existe plus",
+        "invalid_gate": "La porte n'a pas pu être lue"
       },
       "setup": {
         "title": "Progression de la configuration",
@@ -1012,6 +1020,64 @@
           "configured": "Configurée, mais sans rôle ni permission — rien ne peut encore être accordé.",
           "grantable": "Prête à être attribuée — possède des rôles/permissions, mais personne n'y a encore accès.",
           "provisioned": "En service — au moins une personne détient un accès actif."
+        }
+      },
+      "gates": {
+        "scopesTitle": "Où arrive une demande",
+        "scopesLabel": "Périmètres",
+        "wholeApp": "Toute l'application",
+        "wholeAppHint": "par défaut pour chaque demande",
+        "roles": "Rôles",
+        "entitlements": "Droits",
+        "noneYet": "Aucun rôle ni droit pour l'instant — les demandes arrivent sur toute l'application.",
+        "status": {
+          "openDoor": "porte ouverte",
+          "gates_one": "{{count}} porte",
+          "gates_other": "{{count}} portes",
+          "inherits": "suit toute l'application",
+          "noGate": "aucune porte"
+        },
+        "editorTitle": "Portes pour {{scope}}",
+        "editorTitleApp": "Portes pour toute l'application",
+        "source": {
+          "own": "Porte propre",
+          "inherited": "Suit la porte de toute l'application",
+          "none": "Aucune porte"
+        },
+        "track": {
+          "request": "Demande",
+          "granted": "Accordé",
+          "grantedHint": "provisionne",
+          "mustOpen": "doit ouvrir",
+          "canOpen": "peut ouvrir",
+          "empty": "personne n'est sollicité"
+        },
+        "openDoorWarning": "Porte ouverte : chaque demande sur {{scope}} est approuvée dès qu'elle est faite. Personne n'est prévenu.",
+        "noGateWarning": "Rien ne garde {{scope}} pour l'instant — les demandes sont approuvées automatiquement tant que vous ne placez personne.",
+        "modeLabel": "Les portes s'ouvrent quand",
+        "mode": {
+          "none": "Porte ouverte",
+          "one_of": "Une seule suffit",
+          "all_of": "Toutes doivent s'ouvrir"
+        },
+        "owner": "Responsable",
+        "ownerUnset": "aucun responsable",
+        "removeGate": "Retirer {{name}} des portes",
+        "rosterTitle": "Équipe",
+        "rosterHint": "Touchez une personne pour la placer",
+        "rosterEmpty": "Tout le monde est déjà à une porte.",
+        "addToGates": "Placer {{name}}",
+        "tryIt": "Essayer",
+        "save": "Enregistrer la porte",
+        "saving": "Enregistrement…",
+        "reset": "Annuler les modifications",
+        "clear": "Utiliser la porte de toute l'application",
+        "unsaved": "Modifications non enregistrées",
+        "outcome": {
+          "none": "Si quelqu'un demande {{scope}} : accordé immédiatement, personne n'est sollicité.",
+          "one_of": "Si quelqu'un demande {{scope}} : en attente jusqu'à ce qu'une personne parmi {{names}} dise oui.",
+          "all_of": "Si quelqu'un demande {{scope}} : en attente de {{names}} — chacune doit dire oui.",
+          "nobody": "personne"
         }
       }
     },

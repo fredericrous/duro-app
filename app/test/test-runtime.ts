@@ -10,6 +10,7 @@ import { RbacRepoLive } from "~/lib/governance/RbacRepo.server"
 import { GrantRepoLive } from "~/lib/governance/GrantRepo.server"
 import { ConnectedSystemRepoLive } from "~/lib/governance/ConnectedSystemRepo.server"
 import { ConnectorMappingRepoLive } from "~/lib/governance/ConnectorMappingRepo.server"
+import { ApprovalPolicyRepoLive } from "~/lib/governance/ApprovalPolicyRepo.server"
 import { AuthzEngineLive } from "~/lib/governance/AuthzEngine.server"
 import { AccessRequestRepoLive } from "~/lib/governance/AccessRequestRepo.server"
 import { AccessInvitationRepoLive } from "~/lib/governance/AccessInvitationRepo.server"
@@ -50,6 +51,7 @@ const GovernanceRepos = Layer.mergeAll(
   GrantRepoLive,
   ConnectedSystemRepoLive,
   ConnectorMappingRepoLive,
+  ApprovalPolicyRepoLive,
 )
 
 // PluginHost intentionally NOT included by default. It pulls LldapClientLive

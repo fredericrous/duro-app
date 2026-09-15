@@ -6,7 +6,9 @@ import { RbacRepo } from "~/lib/governance/RbacRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { AppSyncService } from "~/lib/governance/AppSyncService.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
-import { AccessMode, type Principal } from "~/lib/governance/types"
+import { AccessMode, ApprovalMode, type Principal } from "~/lib/governance/types"
+import { ApprovalPolicyRepo } from "~/lib/governance/ApprovalPolicyRepo.server"
+import { ApprovalPolicyRuleSchema, GateScopeType } from "~/lib/governance/approval-gates"
 import { activateGrant } from "~/lib/workflows/grant-activation.server"
 
 // ---------------------------------------------------------------------------
@@ -59,6 +61,23 @@ const CreateGrantFields = Schema.Struct({
   expiresAt: ExpiresAt,
 })
 
+/**
+ * Approval gate for one scope. `rules` arrives as the JSON the board
+ * serialises (`[{approverType, approverPrincipalId?}]`); an application-wide
+ * gate posts an empty scopeId.
+ */
+const SaveApprovalGateFields = Schema.Struct({
+  scopeType: GateScopeType,
+  scopeId: FormOptionalText,
+  mode: ApprovalMode,
+  rules: Schema.parseJson(Schema.Array(ApprovalPolicyRuleSchema)),
+})
+
+const ClearApprovalGateFields = Schema.Struct({
+  scopeType: GateScopeType,
+  scopeId: FormOptionalText,
+})
+
 export type AdminApplicationMutation =
   | ({ intent: "createRole" } & typeof CreateRoleFields.Type)
   | ({ intent: "createEntitlement" } & typeof CreateRoleFields.Type)
@@ -66,12 +85,15 @@ export type AdminApplicationMutation =
   | ({ intent: "createResource" } & typeof CreateResourceFields.Type)
   | { intent: "syncNow" }
   | ({ intent: "createGrant" } & typeof CreateGrantFields.Type)
+  | ({ intent: "saveApprovalGate" } & typeof SaveApprovalGateFields.Type)
+  | ({ intent: "clearApprovalGate" } & typeof ClearApprovalGateFields.Type)
 
 export type AdminApplicationParseError =
   | { error: "slug_and_name_required" }
   | { error: "invalid_settings" }
   | { error: "resource_type_and_name_required" }
   | { error: "principal_and_role_required" }
+  | { error: "invalid_gate" }
   | { error: "Unknown intent" }
 
 export function parseAdminApplicationMutation(
@@ -101,6 +123,10 @@ export function parseAdminApplicationMutation(
       return { intent: "syncNow" }
     case "createGrant":
       return decodeAs("createGrant", CreateGrantFields, { error: "principal_and_role_required" })
+    case "saveApprovalGate":
+      return decodeAs("saveApprovalGate", SaveApprovalGateFields, { error: "invalid_gate" })
+    case "clearApprovalGate":
+      return decodeAs("clearApprovalGate", ClearApprovalGateFields, { error: "invalid_gate" })
     default:
       return { error: "Unknown intent" }
   }
@@ -216,6 +242,71 @@ export function handleAdminApplicationMutation(appId: string, actor: Principal, 
             Effect.succeed({ error: "grant_failed" as const, detail: e instanceof Error ? e.message : String(e) }),
           ),
         )
+      }
+
+      case "saveApprovalGate": {
+        const scopeId = mutation.scopeType === "application" ? null : (mutation.scopeId ?? null)
+        // Validation the schema can't express: the scope must belong to THIS
+        // application (never let one app's admin page write a policy keyed to
+        // another app's role), and a gate that asks someone must name someone
+        // who can answer — a `principal` rule with no id, or `app_owner` on an
+        // ownerless app, would leave every request stuck pending forever.
+        if (mutation.scopeType !== "application") {
+          if (!scopeId) return { error: "gate_scope_unknown" as const }
+          const rbac = yield* RbacRepo
+          const known =
+            mutation.scopeType === "role"
+              ? (yield* rbac.listRoles(appId)).some((r) => r.id === scopeId)
+              : (yield* rbac.listEntitlements(appId)).some((e) => e.id === scopeId)
+          if (!known) return { error: "gate_scope_unknown" as const }
+        }
+        const rules = mutation.mode === "none" ? [] : mutation.rules
+        if (mutation.mode !== "none") {
+          if (rules.length === 0) return { error: "gate_needs_approver" as const }
+          if (rules.some((r) => r.approverType === "principal" && !r.approverPrincipalId)) {
+            return { error: "gate_needs_approver" as const }
+          }
+          if (rules.some((r) => r.approverType === "app_owner")) {
+            const appRepo = yield* ApplicationRepo
+            const app = yield* appRepo.findById(appId)
+            if (!app?.ownerId) return { error: "gate_no_owner" as const }
+          }
+        }
+        const repo = yield* ApprovalPolicyRepo
+        const audit = yield* AuditService
+        const policy = yield* repo.upsert({
+          applicationId: appId,
+          scopeType: mutation.scopeType,
+          scopeId,
+          mode: mutation.mode,
+          rules,
+        })
+        yield* audit.emit({
+          eventType: "approval_policy.saved",
+          actorId: actor.id,
+          targetType: "approval_policy",
+          targetId: policy.id,
+          applicationId: appId,
+          metadata: { scopeType: mutation.scopeType, scopeId, mode: mutation.mode, rules },
+        })
+        return { success: true, message: "gate_saved" as const }
+      }
+
+      case "clearApprovalGate": {
+        const scopeId = mutation.scopeType === "application" ? null : (mutation.scopeId ?? null)
+        const repo = yield* ApprovalPolicyRepo
+        const removed = yield* repo.deleteByScope(appId, mutation.scopeType, scopeId)
+        if (removed) {
+          const audit = yield* AuditService
+          yield* audit.emit({
+            eventType: "approval_policy.cleared",
+            actorId: actor.id,
+            targetType: "approval_policy",
+            applicationId: appId,
+            metadata: { scopeType: mutation.scopeType, scopeId },
+          })
+        }
+        return { success: true, message: "gate_cleared" as const }
       }
     }
   })

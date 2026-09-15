@@ -322,6 +322,7 @@ const baseLoaderData = () => ({
   grants: [] as unknown[],
   principals: [{ id: "p-alice", displayName: "Alice", externalId: "alice", principalType: "user" as const }],
   pendingRequests: [] as unknown[],
+  approvalPolicies: [] as unknown[],
   ldapProvisioned: false,
   pluginInfo: null,
 })
@@ -692,5 +693,99 @@ describe("AdminApplicationDetailPage dialog round-trips", () => {
     )
     expect(capture.fields.resourceType).toBe("library")
     expect(capture.fields.displayName).toBe("Library Folder")
+  })
+})
+
+describe("/admin/applications/:id action — approval gates (real DB)", () => {
+  beforeEach(() => {
+    mockGetAuth.mockResolvedValue({ user: "admin", sub: "admin-sub" } as never)
+    mockCheckDecision.mockResolvedValue({ allow: true } as never)
+  })
+
+  const seedRole = Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`INSERT INTO roles (id, application_id, slug, display_name) VALUES ('r-admin', 'app-1', 'admin', 'Admin')`
+  })
+
+  const gateForm = (fields: Record<string, string>) => ({
+    params: { id: "app-1" },
+    headers: { Origin: "http://localhost" },
+    formData: { intent: "saveApprovalGate", scopeType: "application", scopeId: "", mode: "one_of", ...fields },
+  })
+
+  it("saves a gate, the loader lists it, and a second save on the same scope replaces it", async () => {
+    await seedTestDb(seedApp)
+
+    const first = await callAction(action, gateForm({ rules: JSON.stringify([{ approverType: "app_owner" }]) }))
+    expect(expectData<{ success?: boolean; message?: string }>(first).message).toBe("gate_saved")
+
+    const second = await callAction(
+      action,
+      gateForm({
+        mode: "all_of",
+        rules: JSON.stringify([
+          { approverType: "app_owner" },
+          { approverType: "principal", approverPrincipalId: "p-admin" },
+        ]),
+      }),
+    )
+    expect(expectData<{ success?: boolean }>(second).success).toBe(true)
+
+    const data = expectData<{ approvalPolicies: Array<{ scopeType: string; mode: string; rules: unknown }> }>(
+      await callLoader(loader, { params: { id: "app-1" } }),
+    )
+    expect(data.approvalPolicies).toHaveLength(1)
+    expect(data.approvalPolicies[0].mode).toBe("all_of")
+  })
+
+  it("refuses a gate that asks nobody, and a role that is not this app's", async () => {
+    await seedTestDb(seedApp)
+
+    const empty = await callAction(action, gateForm({ rules: "[]" }))
+    expect(expectData<{ error?: string }>(empty).error).toBe("gate_needs_approver")
+
+    const foreign = await callAction(action, gateForm({ scopeType: "role", scopeId: "r-elsewhere", rules: "[]" }))
+    expect(expectData<{ error?: string }>(foreign).error).toBe("gate_scope_unknown")
+
+    const malformed = await callAction(action, gateForm({ rules: "not json" }))
+    expect(expectData<{ error?: string }>(malformed).error).toBe("invalid_gate")
+  })
+
+  it("an open door stores no rules, and clearing a role gate removes only that scope", async () => {
+    await seedTestDb(seedApp)
+    await seedTestDb(seedRole)
+
+    await callAction(action, gateForm({ rules: JSON.stringify([{ approverType: "app_owner" }]) }))
+    const open = await callAction(
+      action,
+      gateForm({
+        scopeType: "role",
+        scopeId: "r-admin",
+        mode: "none",
+        rules: JSON.stringify([{ approverType: "app_owner" }]),
+      }),
+    )
+    expect(expectData<{ success?: boolean }>(open).success).toBe(true)
+
+    const data = expectData<{ approvalPolicies: Array<{ scopeType: string; mode: string; rules: unknown[] }> }>(
+      await callLoader(loader, { params: { id: "app-1" } }),
+    )
+    expect(data.approvalPolicies.map((p) => [p.scopeType, p.mode])).toEqual([
+      ["application", "one_of"],
+      ["role", "none"],
+    ])
+    expect(data.approvalPolicies[1].rules).toEqual([])
+
+    const cleared = await callAction(action, {
+      params: { id: "app-1" },
+      headers: { Origin: "http://localhost" },
+      formData: { intent: "clearApprovalGate", scopeType: "role", scopeId: "r-admin" },
+    })
+    expect(expectData<{ message?: string }>(cleared).message).toBe("gate_cleared")
+
+    const after = expectData<{ approvalPolicies: Array<{ scopeType: string }> }>(
+      await callLoader(loader, { params: { id: "app-1" } }),
+    )
+    expect(after.approvalPolicies.map((p) => p.scopeType)).toEqual(["application"])
   })
 })

@@ -42,6 +42,7 @@ import m0033 from "./migrations/pg/0033_add_open_in_new_tab_preference"
 import m0034 from "./migrations/pg/0034_add_link_target_mode"
 import m0035 from "./migrations/pg/0035_drop_open_links_in_new_tab"
 import m0036 from "./migrations/pg/0036_index_cert_serial_normalized"
+import m0037 from "./migrations/pg/0037_approval_policy_unique_scope"
 
 const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
@@ -120,6 +121,7 @@ const migrations: Array<
   [34, "add_link_target_mode", m0034],
   [35, "drop_open_links_in_new_tab", m0035],
   [36, "index_cert_serial_normalized", m0036],
+  [37, "approval_policy_unique_scope", m0037],
 ]
 
 const runMigrations = Effect.gen(function* () {
