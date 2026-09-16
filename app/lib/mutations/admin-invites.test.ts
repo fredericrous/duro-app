@@ -221,3 +221,68 @@ describe("handleAdminInvitesMutation — retry/resend", () => {
     expect(result).toEqual({ error: "Invite not found" })
   })
 })
+
+// =============================================================================
+// handleAdminInvitesMutation — showing an existing invite's QR code again
+// =============================================================================
+
+const seedPendingInvite = (expiresInMs = 86400_000) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const expires = new Date(Date.now() + expiresInMs).toISOString()
+    yield* sql`INSERT INTO invites (id, token, token_hash, email, groups, group_names, invited_by, locale, expires_at)
+               VALUES ('inv-1', 'token-1', 'hashed-token-1', 'alice@example.com', '[1]', '["family"]', 'admin', 'en', ${expires})`
+  })
+
+describe("handleAdminInvitesMutation — showLink", () => {
+  it("hands back the pending invite's link: same token, nothing re-issued", async () => {
+    await seedTestDb(seedPendingInvite())
+    const result = await testRunEffect(handleAdminInvitesMutation({ intent: "showLink", inviteId: "inv-1" }))
+    expect("success" in result && result.invite).toBeTruthy()
+    if ("success" in result && result.invite) {
+      expect(result.invite.url).toMatch(/\/invite\/token-1$/)
+      expect(result.invite.email).toBe("alice@example.com")
+    }
+  })
+
+  it("refuses once the invite is no longer pending", async () => {
+    await seedTestDb(seedPendingInvite(-1000))
+    const expired = await testRunEffect(handleAdminInvitesMutation({ intent: "showLink", inviteId: "inv-1" }))
+    expect(expired).toEqual({ error: "Invite is no longer pending" })
+    const unknown = await testRunEffect(handleAdminInvitesMutation({ intent: "showLink", inviteId: "nope" }))
+    expect(unknown).toEqual({ error: "Invite is no longer pending" })
+  })
+
+  it("treats a second QR request for an already-invited address as 'show it again'", async () => {
+    // Used to fail with "Pending invite already exists" and leave the admin
+    // with no way back to the code.
+    await seedTestDb(seedPendingInvite())
+    const result = await testRunEffect(
+      handleAdminInvitesMutation({
+        intent: "send",
+        emails: ["alice@example.com"],
+        groups: ["1|family"],
+        locale: "en",
+        confirmed: false,
+        delivery: "link" as const,
+      }),
+    )
+    expect("success" in result && result.invite?.url).toMatch(/\/invite\/token-1$/)
+
+    const rows = await testRunEffect(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        return yield* sql<{ id: string }>`SELECT id FROM invites WHERE email = 'alice@example.com'`
+      }),
+    )
+    expect(rows).toHaveLength(1)
+  })
+
+  it("parses showLink with inviteId", () => {
+    expect(parseAdminInvitesMutation(fd({ intent: "showLink", inviteId: "inv-1" }))).toEqual({
+      intent: "showLink",
+      inviteId: "inv-1",
+    })
+    expect(parseAdminInvitesMutation(fd({ intent: "showLink" }))).toEqual({ error: "Missing invite ID" })
+  })
+})
