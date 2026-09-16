@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest"
-import { screen, fireEvent, waitFor, within } from "@testing-library/react"
+import { act, screen, fireEvent, waitFor, within } from "@testing-library/react"
 import { ApprovalGates } from "./ApprovalGates"
 import { renderRoute } from "~/test/render-route"
 import { t } from "~/test/test-utils"
@@ -214,6 +214,9 @@ describe("ApprovalGates drag and drop", () => {
       name: t("admin.applications.gates.addToGates", undefined, { name: "Marie" }),
     })
     const item = marie.parentElement as HTMLElement
+    // The board's pointer listeners attach in passive effects, which React may
+    // still be holding when findByRole resolves on a cold run. Flush them.
+    await act(async () => {})
 
     pointer("pointerdown", item, 0, 0)
     pointer("pointermove", document, 40, 40) // past the threshold: the drag starts
