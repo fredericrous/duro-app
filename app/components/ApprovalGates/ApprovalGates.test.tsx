@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest"
-import { screen, fireEvent, waitFor, within } from "@testing-library/react"
+import { act, screen, fireEvent, waitFor, within } from "@testing-library/react"
 import { ApprovalGates } from "./ApprovalGates"
 import { renderRoute } from "~/test/render-route"
 import { t } from "~/test/test-utils"
@@ -185,5 +185,63 @@ describe("ApprovalGates", () => {
     await screen.findByText(t("admin.applications.gates.editorTitleApp"))
     expect(screen.queryByRole("button", { name: t("admin.applications.gates.clear") })).toBeNull()
     vi.restoreAllMocks()
+  })
+})
+
+// Drag is the fast path on top of the buttons. The DS proves the gesture in
+// real Chromium; this file owns the wiring — a drop on the track puts the
+// person into the draft at the dropped index. jsdom has no layout, so every
+// rect is 0×0 and a release at the origin resolves to the first registered
+// zone, which is the track.
+describe("ApprovalGates drag and drop", () => {
+  const pointer = (type: string, target: EventTarget, x: number, y: number) =>
+    target.dispatchEvent(
+      new (window as unknown as { PointerEvent: typeof MouseEvent }).PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        button: 0,
+        buttons: type === "pointerup" ? 0 : 1,
+        pointerId: 1,
+        pointerType: "mouse",
+      } as PointerEventInit),
+    )
+
+  it("dropping a roster person on the track slots them at the dropped index", async () => {
+    renderBoard([policy({ id: "app-wide" })])
+    const marie = await screen.findByRole("button", {
+      name: t("admin.applications.gates.addToGates", undefined, { name: "Marie" }),
+    })
+    const item = marie.parentElement as HTMLElement
+    // The board's pointer listeners attach in passive effects, which React may
+    // still be holding when findByRole resolves on a cold run. Flush them.
+    await act(async () => {})
+
+    pointer("pointerdown", item, 0, 0)
+    pointer("pointermove", document, 40, 40) // past the threshold: the drag starts
+    pointer("pointerup", document, 0, 0) // released over the (zero-rect) track
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: t("admin.applications.gates.addToGates", undefined, { name: "Marie" }) }),
+      ).toBeNull()
+    })
+    // Marie is now a gate, ahead of the owner since she landed at index 0:
+    // the outcome sentence lists gates in track order.
+    const names = new Intl.ListFormat("en", { style: "long", type: "disjunction" }).format([
+      "Marie",
+      `${t("admin.applications.gates.owner")} · daddy`,
+    ])
+    expect(
+      screen.getByText(
+        t("admin.applications.gates.outcome.one_of", undefined, {
+          scope: t("admin.applications.gates.wholeApp"),
+          names,
+        }),
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("status")).toHaveTextContent("Dropped Marie")
+    expect(screen.getByText(t("admin.applications.gates.unsaved"))).toBeInTheDocument()
   })
 })
