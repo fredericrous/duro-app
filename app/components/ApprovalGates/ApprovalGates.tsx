@@ -10,6 +10,8 @@ import {
   Button,
   Callout,
   Cluster,
+  DragDrop,
+  type DragDropEvent,
   Grid,
   Icon,
   Inline,
@@ -222,6 +224,24 @@ function GateEditor({ row, owner, people }: { row: ScopeRow; owner: Principal | 
     if (mode === "none") setMode("one_of")
   }
   const removeRule = (rule: ApprovalPolicyRule) => setRules((prev) => prev.filter((r) => !sameApprover(r, rule)))
+  /** Put a rule at a position in the track: from the roster (new gate) or
+   *  from elsewhere in the track (reorder). */
+  const placeRule = (rule: ApprovalPolicyRule, index: number) => {
+    setRules((prev) => {
+      const without = prev.filter((r) => !sameApprover(r, rule))
+      const at = Math.max(0, Math.min(index, without.length))
+      return [...without.slice(0, at), rule, ...without.slice(at)]
+    })
+    if (mode === "none") setMode("one_of")
+  }
+  // Drag is the fast path; the roster buttons and the gate remove buttons
+  // remain the click and keyboard path for the same moves.
+  const onDrop = ({ item, target }: DragDropEvent<ApprovalPolicyRule>) => {
+    if (target.zone === "track") placeRule(item.data, target.index)
+    else if (item.zone === "track") removeRule(item.data)
+  }
+  const ruleKey = (rule: ApprovalPolicyRule) =>
+    rule.approverType === "app_owner" ? "owner" : `p:${rule.approverPrincipalId}`
 
   const roster: Array<{ rule: ApprovalPolicyRule; name: string; disabled?: boolean }> = [
     { rule: OWNER_RULE, name: nameOf(OWNER_RULE), disabled: owner === null },
@@ -258,161 +278,185 @@ function GateEditor({ row, owner, people }: { row: ScopeRow; owner: Principal | 
   }
 
   return (
-    <Stack gap="md">
-      <CardSection
-        title={
-          isApp
-            ? t("admin.applications.gates.editorTitleApp")
-            : t("admin.applications.gates.editorTitle", { scope: scopeName })
-        }
-        action={
-          <Badge variant={gate.source === "own" ? "info" : gate.source === "none" ? "warning" : "default"}>
-            {t(`admin.applications.gates.source.${gate.source}`)}
-          </Badge>
-        }
-      >
-        <Stack gap="md">
-          {/* The track */}
-          <html.div style={styles.track} role="group" aria-label={t("admin.applications.gates.tryIt")}>
-            <TrackNode label={t("admin.applications.gates.track.request")} />
-            {mode !== "none" &&
-              rules.map((rule) => (
-                <Fragment key={rule.approverType === "app_owner" ? "owner" : rule.approverPrincipalId}>
-                  <Connector />
-                  <html.div style={styles.node}>
-                    <SlotIn animate={!reducedMotion} style={styles.gate}>
-                      <Tag
-                        variant="info"
-                        removable
-                        onRemove={() => removeRule(rule)}
-                        aria-label={t("admin.applications.gates.removeGate", { name: nameOf(rule) })}
-                      >
-                        {nameOf(rule)}
-                      </Tag>
-                    </SlotIn>
-                    <Text variant="caption" color="muted">
-                      {mode === "all_of"
-                        ? t("admin.applications.gates.track.mustOpen")
-                        : t("admin.applications.gates.track.canOpen")}
-                    </Text>
-                  </html.div>
-                </Fragment>
-              ))}
-            {mode !== "none" && rules.length === 0 && (
-              <>
+    <DragDrop.Root<ApprovalPolicyRule> onDrop={onDrop}>
+      <Stack gap="md">
+        <CardSection
+          title={
+            isApp
+              ? t("admin.applications.gates.editorTitleApp")
+              : t("admin.applications.gates.editorTitle", { scope: scopeName })
+          }
+          action={
+            <Badge variant={gate.source === "own" ? "info" : gate.source === "none" ? "warning" : "default"}>
+              {t(`admin.applications.gates.source.${gate.source}`)}
+            </Badge>
+          }
+        >
+          <Stack gap="md">
+            {/* The track: a drop zone for roster people (slot) and for its own
+              gates (reorder). */}
+            <DragDrop.Zone id="track" label={t("admin.applications.gates.editorTitleApp")} orientation="horizontal">
+              <html.div style={styles.track} role="group" aria-label={t("admin.applications.gates.tryIt")}>
+                <TrackNode label={t("admin.applications.gates.track.request")} />
+                {mode !== "none" &&
+                  rules.map((rule) => (
+                    <Fragment key={ruleKey(rule)}>
+                      <Connector />
+                      <html.div style={styles.node}>
+                        <SlotIn animate={!reducedMotion} style={styles.gate}>
+                          <DragDrop.Item
+                            id={ruleKey(rule)}
+                            zone="track"
+                            label={nameOf(rule)}
+                            data={rule}
+                            disabled={saving}
+                          >
+                            <Tag
+                              variant="info"
+                              removable
+                              onRemove={() => removeRule(rule)}
+                              aria-label={t("admin.applications.gates.removeGate", { name: nameOf(rule) })}
+                            >
+                              {nameOf(rule)}
+                            </Tag>
+                          </DragDrop.Item>
+                        </SlotIn>
+                        <Text variant="caption" color="muted">
+                          {mode === "all_of"
+                            ? t("admin.applications.gates.track.mustOpen")
+                            : t("admin.applications.gates.track.canOpen")}
+                        </Text>
+                      </html.div>
+                    </Fragment>
+                  ))}
+                {mode !== "none" && rules.length === 0 && (
+                  <>
+                    <Connector />
+                    <html.div style={styles.node}>
+                      <html.div style={[styles.gate, styles.gateEmpty]}>
+                        <Text variant="caption" color="muted">
+                          {t("admin.applications.gates.track.empty")}
+                        </Text>
+                      </html.div>
+                    </html.div>
+                  </>
+                )}
                 <Connector />
-                <html.div style={styles.node}>
-                  <html.div style={[styles.gate, styles.gateEmpty]}>
-                    <Text variant="caption" color="muted">
-                      {t("admin.applications.gates.track.empty")}
-                    </Text>
-                  </html.div>
-                </html.div>
-              </>
+                <TrackNode
+                  label={t("admin.applications.gates.track.granted")}
+                  hint={t("admin.applications.gates.track.grantedHint")}
+                  tone={mode === "none" ? "warning" : "success"}
+                />
+              </html.div>
+            </DragDrop.Zone>
+
+            {mode === "none" && (
+              <Callout variant="warning">
+                {gate.source === "none" && !dirty
+                  ? t("admin.applications.gates.noGateWarning", { scope: scopeName })
+                  : t("admin.applications.gates.openDoorWarning", { scope: scopeName })}
+              </Callout>
             )}
-            <Connector />
-            <TrackNode
-              label={t("admin.applications.gates.track.granted")}
-              hint={t("admin.applications.gates.track.grantedHint")}
-              tone={mode === "none" ? "warning" : "success"}
-            />
-          </html.div>
 
-          {mode === "none" && (
-            <Callout variant="warning">
-              {gate.source === "none" && !dirty
-                ? t("admin.applications.gates.noGateWarning", { scope: scopeName })
-                : t("admin.applications.gates.openDoorWarning", { scope: scopeName })}
-            </Callout>
-          )}
-
-          <Inline gap="sm" align="center">
-            <Text variant="bodySm" color="muted">
-              {t("admin.applications.gates.modeLabel")}
-            </Text>
-            <ToggleGroup
-              value={[mode]}
-              onValueChange={(v) => {
-                const next = v[0] as ApprovalMode | undefined
-                if (next) setMode(next)
-              }}
-              multiple={false}
-              size="small"
-            >
-              <Toggle value="none">{t("admin.applications.gates.mode.none")}</Toggle>
-              <Toggle value="one_of">{t("admin.applications.gates.mode.one_of")}</Toggle>
-              <Toggle value="all_of">{t("admin.applications.gates.mode.all_of")}</Toggle>
-            </ToggleGroup>
-          </Inline>
-        </Stack>
-      </CardSection>
-
-      <CardSection
-        title={t("admin.applications.gates.rosterTitle")}
-        action={
-          <Text variant="caption" color="muted">
-            {t("admin.applications.gates.rosterHint")}
-          </Text>
-        }
-      >
-        {roster.length === 0 ? (
-          <Text variant="bodySm" color="muted">
-            {t("admin.applications.gates.rosterEmpty")}
-          </Text>
-        ) : (
-          <Cluster gap="sm">
-            {roster.map((entry) => (
-              <Button
-                key={entry.rule.approverType === "app_owner" ? "owner" : entry.rule.approverPrincipalId}
-                variant="secondary"
+            <Inline gap="sm" align="center">
+              <Text variant="bodySm" color="muted">
+                {t("admin.applications.gates.modeLabel")}
+              </Text>
+              <ToggleGroup
+                value={[mode]}
+                onValueChange={(v) => {
+                  const next = v[0] as ApprovalMode | undefined
+                  if (next) setMode(next)
+                }}
+                multiple={false}
                 size="small"
-                disabled={entry.disabled || saving}
-                aria-label={t("admin.applications.gates.addToGates", { name: entry.name })}
-                onClick={() => addRule(entry.rule)}
               >
-                {entry.name}
+                <Toggle value="none">{t("admin.applications.gates.mode.none")}</Toggle>
+                <Toggle value="one_of">{t("admin.applications.gates.mode.one_of")}</Toggle>
+                <Toggle value="all_of">{t("admin.applications.gates.mode.all_of")}</Toggle>
+              </ToggleGroup>
+            </Inline>
+          </Stack>
+        </CardSection>
+
+        <CardSection
+          title={t("admin.applications.gates.rosterTitle")}
+          action={
+            <Text variant="caption" color="muted">
+              {t("admin.applications.gates.rosterHint")}
+            </Text>
+          }
+        >
+          {/* Dropping a gate back here unslots it. */}
+          <DragDrop.Zone id="roster" label={t("admin.applications.gates.rosterTitle")}>
+            {roster.length === 0 ? (
+              <Text variant="bodySm" color="muted">
+                {t("admin.applications.gates.rosterEmpty")}
+              </Text>
+            ) : (
+              <Cluster gap="sm">
+                {roster.map((entry) => (
+                  <DragDrop.Item
+                    key={ruleKey(entry.rule)}
+                    id={ruleKey(entry.rule)}
+                    zone="roster"
+                    label={entry.name}
+                    data={entry.rule}
+                    disabled={entry.disabled || saving}
+                  >
+                    <Button
+                      variant="secondary"
+                      size="small"
+                      disabled={entry.disabled || saving}
+                      aria-label={t("admin.applications.gates.addToGates", { name: entry.name })}
+                      onClick={() => addRule(entry.rule)}
+                    >
+                      {entry.name}
+                    </Button>
+                  </DragDrop.Item>
+                ))}
+              </Cluster>
+            )}
+          </DragDrop.Zone>
+        </CardSection>
+
+        <html.div style={styles.tryIt}>
+          <Inline gap="sm" align="center">
+            <Icon name="route" size="md" />
+            <Text variant="label">{t("admin.applications.gates.tryIt")}</Text>
+          </Inline>
+          <Text variant="bodySm" color="muted" as="p">
+            {outcome}
+          </Text>
+        </html.div>
+
+        <Inline gap="sm" align="center" justify="between">
+          <Inline gap="sm" align="center">
+            <Button variant="primary" disabled={!dirty || saving} onClick={() => submit("saveApprovalGate")}>
+              {saving ? t("admin.applications.gates.saving") : t("admin.applications.gates.save")}
+            </Button>
+            {dirty && (
+              <Button
+                variant="link"
+                disabled={saving}
+                onClick={() => {
+                  setMode(gate.mode)
+                  setRules(gate.rules)
+                }}
+              >
+                {t("admin.applications.gates.reset")}
               </Button>
-            ))}
-          </Cluster>
-        )}
-      </CardSection>
-
-      <html.div style={styles.tryIt}>
-        <Inline gap="sm" align="center">
-          <Icon name="route" size="md" />
-          <Text variant="label">{t("admin.applications.gates.tryIt")}</Text>
-        </Inline>
-        <Text variant="bodySm" color="muted" as="p">
-          {outcome}
-        </Text>
-      </html.div>
-
-      <Inline gap="sm" align="center" justify="between">
-        <Inline gap="sm" align="center">
-          <Button variant="primary" disabled={!dirty || saving} onClick={() => submit("saveApprovalGate")}>
-            {saving ? t("admin.applications.gates.saving") : t("admin.applications.gates.save")}
-          </Button>
-          {dirty && (
-            <Button
-              variant="link"
-              disabled={saving}
-              onClick={() => {
-                setMode(gate.mode)
-                setRules(gate.rules)
-              }}
-            >
-              {t("admin.applications.gates.reset")}
+            )}
+            {dirty && <Badge variant="warning">{t("admin.applications.gates.unsaved")}</Badge>}
+          </Inline>
+          {!isApp && gate.source === "own" && (
+            <Button variant="secondary" size="small" disabled={saving} onClick={() => submit("clearApprovalGate")}>
+              {t("admin.applications.gates.clear")}
             </Button>
           )}
-          {dirty && <Badge variant="warning">{t("admin.applications.gates.unsaved")}</Badge>}
         </Inline>
-        {!isApp && gate.source === "own" && (
-          <Button variant="secondary" size="small" disabled={saving} onClick={() => submit("clearApprovalGate")}>
-            {t("admin.applications.gates.clear")}
-          </Button>
-        )}
-      </Inline>
-    </Stack>
+      </Stack>
+    </DragDrop.Root>
   )
 }
 
