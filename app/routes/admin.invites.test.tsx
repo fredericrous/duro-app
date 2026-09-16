@@ -251,8 +251,14 @@ describe("InviteFunnel delivery rendering", () => {
 /** Every FormData the page posts, so a test can assert what reached the server. */
 let posted: FormData[] = []
 
+/** Resolves when the test says so, so the dialog's loading state is observable. */
+let releaseAction: () => void = () => {}
+
 /** Like `renderPage`, but with an action that records what the form posted. */
-function renderPageWithAction(actionResult: unknown = { success: true, message: "ok" }) {
+function renderPageWithAction(
+  actionResult: unknown = { success: true, message: "ok" },
+  opts: { pendingInvites?: unknown[]; hold?: boolean } = {},
+) {
   posted = []
   return renderRoute({
     parentLoaderId: "routes/dashboard",
@@ -262,17 +268,31 @@ function renderPageWithAction(actionResult: unknown = { success: true, message: 
       Component: AdminInvitesPage as never,
       loader: () => ({
         groups: [{ id: 1, displayName: "family" }],
-        pendingInvites: [],
+        pendingInvites: opts.pendingInvites ?? [],
         failedInvites: [],
         checklist: { showAddApplication: false, showInviteTeammate: false, showConfigurePlugins: false },
       }),
       action: async ({ request }: { request: Request }) => {
         const form = await request.formData()
         posted.push(form)
+        if (opts.hold) await new Promise<void>((resolve) => (releaseAction = resolve))
         return actionResult
       },
     },
   })
+}
+
+const pendingAlice = {
+  id: "i1",
+  email: "alice@example.com",
+  groups: "[1]",
+  groupNames: '["family"]',
+  invitedBy: "admin",
+  locale: "en",
+  createdAt: "2026-01-01T00:00:00Z",
+  expiresAt: "2099-01-08T00:00:00Z",
+  usedAt: null,
+  status: { _tag: "Pending", certIssued: true, emailSent: true, certVerified: false },
 }
 
 const addEmail = async (value: string) => {
@@ -360,6 +380,69 @@ describe("/admin/invites page", () => {
     expect(
       within(dialog).getByText(t("admin.invites.qr.emailNote", undefined, { email: "alice@example.com" })),
     ).toBeInTheDocument()
+  })
+
+  it("opens the QR dialog on the click, with a loader, and shows the code in place", async () => {
+    // Locking the phone or a stray thumb used to lose the code for good: the
+    // dialog only opened once the answer was back, and nothing reopened it.
+    const expiresAt = new Date(Date.now() + 7 * 86_400_000).toISOString()
+    renderPageWithAction(
+      {
+        success: true,
+        message: "Invite ready for alice@example.com",
+        invite: { url: "https://join.example.com/invite/tok-1", email: "alice@example.com", expiresAt },
+      },
+      { hold: true },
+    )
+    await addEmail("alice@example.com")
+    await userEvent.click(screen.getByRole("checkbox", { name: "family" }))
+    await userEvent.click(screen.getByRole("button", { name: t("admin.invites.qr.button") }))
+
+    // Before the server answers: the dialog is already up, saying it's working.
+    const dialog = await screen.findByRole("dialog")
+    expect(within(dialog).getByText(t("admin.invites.qr.preparing"))).toBeInTheDocument()
+    expect(within(dialog).queryByRole("img", { name: t("admin.invites.qr.alt") })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole("button", { name: t("admin.invites.qr.copyLink") })).toBeDisabled()
+
+    releaseAction()
+    expect(await within(dialog).findByRole("img", { name: t("admin.invites.qr.alt") })).toBeInTheDocument()
+    expect(within(dialog).getByRole("button", { name: t("admin.invites.qr.copyLink") })).toBeEnabled()
+  })
+
+  it("shows the QR code again for a pending invite without issuing a new one", async () => {
+    const expiresAt = new Date(Date.now() + 7 * 86_400_000).toISOString()
+    renderPageWithAction(
+      {
+        success: true,
+        message: "Invite ready for alice@example.com",
+        invite: { url: "https://join.example.com/invite/tok-1", email: "alice@example.com", expiresAt },
+      },
+      { pendingInvites: [pendingAlice] },
+    )
+    await userEvent.click(await screen.findByRole("button", { name: t("admin.invites.action.showQr") }))
+
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0].get("intent")).toBe("showLink")
+    expect(posted[0].get("inviteId")).toBe("i1")
+
+    const dialog = await screen.findByRole("dialog")
+    expect(await within(dialog).findByRole("img", { name: t("admin.invites.qr.alt") })).toBeInTheDocument()
+
+    // Closing is not final: the same row brings the code back.
+    await userEvent.click(within(dialog).getByRole("button", { name: t("common.done") }))
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole("button", { name: t("admin.invites.action.showQr") }))
+    await waitFor(() => expect(posted).toHaveLength(2))
+    expect(await screen.findByRole("dialog")).toBeInTheDocument()
+  })
+
+  it("reports a failure inside the dialog instead of a dead button", async () => {
+    renderPageWithAction({ error: "Invite is no longer pending" }, { pendingInvites: [pendingAlice] })
+    await userEvent.click(await screen.findByRole("button", { name: t("admin.invites.action.showQr") }))
+
+    const dialog = await screen.findByRole("dialog")
+    expect(await within(dialog).findByText("Invite is no longer pending")).toBeInTheDocument()
+    expect(within(dialog).getByRole("button", { name: t("common.close") })).toBeInTheDocument()
   })
 
   it("does not open the QR dialog for an ordinary emailed invite", async () => {

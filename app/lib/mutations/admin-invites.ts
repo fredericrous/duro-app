@@ -1,7 +1,7 @@
 import { Effect } from "effect"
 import { config } from "~/lib/config.server"
 import { errorMessage } from "~/lib/error-message"
-import { InviteRepo } from "~/lib/services/InviteRepo.server"
+import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
 import { queueInvite, revokeInvite } from "~/lib/workflows/invite.server"
 
 // ---------------------------------------------------------------------------
@@ -12,6 +12,8 @@ export type AdminInvitesMutation =
   | { intent: "revoke"; inviteId: string }
   | { intent: "retry"; inviteId: string }
   | { intent: "resend"; inviteId: string }
+  /** Hand over an existing pending invite again (QR / copy link): no new token, nothing sent. */
+  | { intent: "showLink"; inviteId: string }
   | {
       intent: "send"
       emails: string[]
@@ -28,11 +30,11 @@ export type AdminInvitesResult =
       success: true
       message: string
       /**
-       * Present only for `delivery: "link"`. The invite token is a bearer
-       * secret, so it rides this POST response and nothing else — never an
-       * SSR-rendered GET.
+       * Present for `delivery: "link"` and `showLink`. The invite token is a
+       * bearer secret, so it rides this POST response and nothing else — never
+       * an SSR-rendered GET.
        */
-      invite?: { url: string; email: string; expiresAt: string }
+      invite?: InviteLink
     }
   | { error: string }
   | {
@@ -42,6 +44,22 @@ export type AdminInvitesResult =
       groups: string[]
       delivery: "email" | "link"
     }
+
+export interface InviteLink {
+  url: string
+  email: string
+  expiresAt: string
+}
+
+/** The link a recipient scans or opens; the same one the invite email carries. */
+const linkFor = (invite: { token: string; email: string; expiresAt: string }): InviteLink => ({
+  url: `${config.inviteBaseUrl}/invite/${invite.token}`,
+  email: invite.email,
+  expiresAt: invite.expiresAt,
+})
+
+const isPending = (invite: Invite): boolean =>
+  invite.status._tag === "Pending" && new Date(invite.expiresAt) > new Date()
 
 // ---------------------------------------------------------------------------
 // Dispatcher
@@ -53,6 +71,15 @@ export function handleAdminInvitesMutation(mutation: AdminInvitesMutation) {
       case "revoke": {
         yield* revokeInvite(mutation.inviteId)
         return { success: true as const, message: "Invite revoked" }
+      }
+
+      // The admin can show the QR code as often as they like until the person
+      // has actually joined: same invite, same token, nothing re-issued.
+      case "showLink": {
+        const repo = yield* InviteRepo
+        const invite = yield* repo.findById(mutation.inviteId)
+        if (!invite || !isPending(invite)) return { error: "Invite is no longer pending" } as AdminInvitesResult
+        return { success: true as const, message: `Invite ready for ${invite.email}`, invite: linkFor(invite) }
       }
 
       case "retry":
@@ -103,9 +130,20 @@ export function handleAdminInvitesMutation(mutation: AdminInvitesMutation) {
           return name
         })
 
+        // A second "Generate a QR code" for an address that is already invited
+        // is a request to see the code again, not a second invite: hand the
+        // existing link back instead of failing on the pending-invite check.
+        if (mutation.delivery === "link") {
+          const email = mutation.emails[0]
+          const existing = (yield* repo.findPending()).find((i) => i.email === email && isPending(i))
+          if (existing) {
+            return { success: true as const, message: `Invite ready for ${email}`, invite: linkFor(existing) }
+          }
+        }
+
         const errors: string[] = []
         let sent = 0
-        let link: { url: string; email: string; expiresAt: string } | undefined
+        let link: InviteLink | undefined
 
         for (const email of mutation.emails) {
           yield* queueInvite({
@@ -119,11 +157,7 @@ export function handleAdminInvitesMutation(mutation: AdminInvitesMutation) {
             Effect.tap((invite) => {
               sent++
               if (mutation.delivery === "link") {
-                link = {
-                  url: `${config.inviteBaseUrl}/invite/${invite.token}`,
-                  email,
-                  expiresAt: invite.expiresAt,
-                }
+                link = linkFor({ token: invite.token, email, expiresAt: invite.expiresAt })
               }
               return Effect.void
             }),
@@ -182,7 +216,7 @@ export function parseAdminInvitesMutation(formData: FormData): AdminInvitesMutat
     if (!inviteId) return { error: "Missing invite ID" }
     return { intent, inviteId }
   }
-  if (intent === "retry" || intent === "resend") {
+  if (intent === "retry" || intent === "resend" || intent === "showLink") {
     const inviteId = formData.get("inviteId") as string
     if (!inviteId) return { error: "Missing invite ID" }
     return { intent, inviteId }

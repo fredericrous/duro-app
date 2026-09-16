@@ -1180,6 +1180,7 @@
         "proxyHint": "Opened/clicked may include mail-proxy auto-loads"
       },
       "action": {
+        "showQr": "Show QR code",
         "resend": "Resend",
         "resending": "Resending...",
         "revoke": "Revoke",
@@ -1193,13 +1194,15 @@
         "hint": "Send the invite by email, or generate a QR code to show in person.",
         "singleEmailHint": "A QR code can only be generated for one email at a time.",
         "title": "Invite QR code",
-        "success": "Invite created for {{email}}. Scan this code to get started.",
+        "success": "Invitation for {{email}}. Scan this code to get started.",
         "alt": "QR code linking to the invitation",
         "emailNote": "The account must be created with {{email}} — the invitation only works for that address.",
         "copyLink": "Copy link",
         "copied": "Copied",
         "copyFailed": "Copy failed — select the link manually",
-        "expiry": "This invitation expires on {{time}}."
+        "expiry": "This invitation expires on {{time}}.",
+        "preparing": "Preparing the invitation…",
+        "errorTitle": "Couldn’t show the QR code"
       }
     },
     "users": {

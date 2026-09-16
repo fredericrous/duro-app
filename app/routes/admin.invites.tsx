@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useRef, useState } from "react"
-import { html } from "react-strict-dom"
+import { css, html } from "react-strict-dom"
 import { useFetcher, useRevalidator } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/admin.invites"
@@ -11,7 +11,12 @@ import { UserManager } from "~/lib/services/UserManager.server"
 import { InviteRepo, type Invite } from "~/lib/services/InviteRepo.server"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
-import { handleAdminInvitesMutation, parseAdminInvitesMutation } from "~/lib/mutations/admin-invites"
+import {
+  handleAdminInvitesMutation,
+  parseAdminInvitesMutation,
+  type AdminInvitesResult,
+  type InviteLink,
+} from "~/lib/mutations/admin-invites"
 import { classifyOpenUA } from "~/lib/invite-open-ua"
 import {
   Alert,
@@ -24,6 +29,7 @@ import {
   Fieldset,
   Inline,
   LinkButton,
+  Spinner,
   Stack,
   Table,
   Tag,
@@ -217,8 +223,27 @@ function GetStartedChecklist({
   )
 }
 
-/** Big enough to scan from a phone held at arm's length. */
+/** Big enough to scan from a phone held at arm's length. The pending
+ *  placeholder reserves exactly this footprint, so the dialog never resizes
+ *  under the admin's eyes when the code arrives. */
 const QR_SIZE = 224
+
+const styles = css.create({
+  qrSlot: {
+    width: QR_SIZE,
+    height: QR_SIZE,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+})
+
+/**
+ * What the QR dialog is showing. One click opens it immediately — every
+ * outcome (link, failure) then lands INSIDE it, the same contract as the
+ * device claim dialog: a click that only flips a button state is not feedback.
+ */
+type QrState = { kind: "pending" } | { kind: "ready"; invite: InviteLink } | { kind: "error"; message: string }
 
 export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
   "use no memo"
@@ -235,11 +260,17 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
   // can stay disabled until a group is picked — the form still submits the
   // checkboxes' own DOM values.
   const [selectedGroups, setSelectedGroups] = useState<string[]>([])
-  // The QR dialog's visibility is derived, not stored: it is open whenever the
-  // last result carries a link the admin hasn't dismissed yet. Tracking the
-  // dismissed URL (rather than a boolean set from an effect) means a fresh
-  // invite always reopens it, and re-renders never resurrect a closed one.
-  const [dismissedInviteUrl, setDismissedInviteUrl] = useState<string | null>(null)
+  // TagGroup keeps its own uncommitted text, which `form.reset()` never
+  // reaches: an address left in the box after a send looked entered while the
+  // buttons stayed dead. Remounting the input on success clears it for real.
+  const [emailsKey, setEmailsKey] = useState(0)
+  // One QR dialog session per click. `staleData` is whatever the fetcher held
+  // when the session opened, so an earlier answer is never mistaken for this
+  // one's; the dialog is open for exactly as long as a session exists.
+  const [qrSession, setQrSession] = useState<{ staleData: AdminInvitesResult | undefined } | null>(null)
+  // Which intent the page fetcher last posted: only a fresh invite clears the
+  // form, showing an existing one again must not eat what the admin typed.
+  const lastIntent = useRef<"send" | "showLink">("send")
   const revalidator = useRevalidator()
   const revalidatorRef = useRef(revalidator)
 
@@ -248,12 +279,13 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
   })
 
   useEffect(() => {
-    if (fetcher.data && "success" in fetcher.data && fetcher.data.success) {
+    if (fetcher.data && "success" in fetcher.data && fetcher.data.success && lastIntent.current === "send") {
       formRef.current?.reset()
       startTransition(() => {
         setEmails([])
         setPendingEmail("")
         setSelectedGroups([])
+        setEmailsKey((k) => k + 1)
       })
     }
   }, [fetcher.data])
@@ -294,13 +326,36 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
     // address that was typed but not committed still gets invited.
     if (pendingIsEmail && !emails.includes(trimmedPending)) fd.append("emails", trimmedPending)
     fd.set("delivery", delivery)
+    lastIntent.current = "send"
+    // The QR dialog opens on the click, with a loader, and the code lands in it.
+    if (delivery === "link") setQrSession({ staleData: fetcher.data })
     fetcher.submit(fd, { method: "post" })
+  }
+
+  // The same invite can be handed over as many times as needed until the
+  // person has joined: no new token, nothing sent, just the code again.
+  const showQr = (inviteId: string) => {
+    lastIntent.current = "showLink"
+    setQrSession({ staleData: fetcher.data })
+    fetcher.submit({ intent: "showLink", inviteId }, { method: "post" })
   }
 
   const actionData = fetcher.data
   const hasRevocationWarning = actionData && "warning" in actionData && "emails" in actionData
-  const successInvite = actionData && "success" in actionData ? actionData.invite : undefined
-  const qrInvite = successInvite && successInvite.url !== dismissedInviteUrl ? successInvite : undefined
+  // Only THIS session's answer counts — `fetcher.data` outlives the dialog.
+  const qrResult = qrSession !== null && fetcher.data !== qrSession.staleData ? fetcher.data : undefined
+  const qrState: QrState | null =
+    qrSession === null
+      ? null
+      : qrResult === undefined
+        ? { kind: "pending" }
+        : "success" in qrResult && qrResult.invite
+          ? { kind: "ready", invite: qrResult.invite }
+          : "error" in qrResult
+            ? { kind: "error", message: qrResult.error }
+            : // A revocation prompt (or a success without a link) is answered on
+              // the page, not in the dialog.
+              null
   // Neither button does anything useful without a recipient and a group, and a
   // QR code is scanned by one person, so it needs exactly one recipient.
   const recipientCount = emails.length + (pendingIsEmail && !emails.includes(trimmedPending) ? 1 : 0)
@@ -329,7 +384,14 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
               {(actionData.groups as string[]).map((g) => (
                 <html.input key={g} type="hidden" name="groups" value={g} />
               ))}
-              <Button type="submit" variant="primary">
+              <Button
+                type="submit"
+                variant="primary"
+                onClick={() => {
+                  lastIntent.current = "send"
+                  if (actionData.delivery === "link") setQrSession({ staleData: fetcher.data })
+                }}
+              >
                 {t("admin.invites.proceedAnyway")}
               </Button>
             </fetcher.Form>
@@ -353,6 +415,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
                 onBlur={(e) => setPendingEmail((e.target as HTMLInputElement).value ?? "")}
               >
                 <TagGroup.Root
+                  key={emailsKey}
                   name="emails"
                   value={emails}
                   onValueChange={(next) => {
@@ -464,70 +527,92 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
             </Table.Header>
             <Table.Body>
               {pendingInvites.map((i) => (
-                <PendingInviteRow key={i.id} invite={i} />
+                <PendingInviteRow key={i.id} invite={i} onShowQr={showQr} busy={isSubmitting} />
               ))}
             </Table.Body>
           </Table.Root>
         )}
       </CardSection>
 
-      <InviteQrDialog invite={qrInvite} onClose={() => setDismissedInviteUrl(qrInvite?.url ?? null)} />
+      <InviteQrDialog state={qrState} onClose={() => setQrSession(null)} />
     </Stack>
   )
 }
 
 /**
- * Shown once a "Generate a QR code" invite comes back. The token is a bearer
- * secret that only ever arrives on the action's POST response, so this dialog
- * is the single place it is ever displayed — closing it is final, which is why
- * the link is also copyable.
+ * The QR handoff for an invite. Opens on the click with a loader and shows the
+ * code in place once the action answers. The token is a bearer secret that
+ * only ever arrives on the action's POST response, so this dialog is the only
+ * place it is displayed — but closing it is not final: every pending invite
+ * has a "Show QR code" action that brings the same link back.
  */
-function InviteQrDialog({
-  invite,
-  onClose,
-}: {
-  invite?: { url: string; email: string; expiresAt: string }
-  onClose: () => void
-}) {
+function InviteQrDialog({ state, onClose }: { state: QrState | null; onClose: () => void }) {
   const { t } = useTranslation()
   const { formatDateTime } = useDisplayFormat()
   const { copied, copyFailed, copy } = useCopyFeedback()
 
   return (
     <Dialog.Root
-      open={invite != null}
+      open={state !== null}
       onOpenChange={(o) => {
         if (!o) onClose()
       }}
     >
       <Dialog.Portal size="sm">
         <Dialog.Header>
-          <Dialog.Title>{t("admin.invites.qr.title")}</Dialog.Title>
+          <Dialog.Title>
+            {state?.kind === "error" ? t("admin.invites.qr.errorTitle") : t("admin.invites.qr.title")}
+          </Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
-          {invite && (
+          {state?.kind === "error" && <Alert variant="error">{state.message}</Alert>}
+          {(state?.kind === "pending" || state?.kind === "ready") && (
             <Stack gap="md" align="center">
-              <Alert variant="success">{t("admin.invites.qr.success", { email: invite.email })}</Alert>
-              <QrCode value={invite.url} label={t("admin.invites.qr.alt")} size={QR_SIZE} />
-              <Text as="p" variant="bodySm" color="muted">
-                {t("admin.invites.qr.emailNote", { email: invite.email })}
-              </Text>
-              <Button variant="secondary" size="small" onClick={() => copy(invite.url)}>
+              {state.kind === "ready" ? (
+                <Alert variant="success">{t("admin.invites.qr.success", { email: state.invite.email })}</Alert>
+              ) : (
+                <Text as="p" variant="bodySm" color="muted">
+                  {t("admin.invites.qr.preparing")}
+                </Text>
+              )}
+              {/* The placeholder occupies exactly the QR's footprint, so the
+                  code appears in place instead of shoving the dialog around.
+                  The Spinner takes no label: the line above already says it. */}
+              <html.div style={styles.qrSlot}>
+                {state.kind === "ready" ? (
+                  <QrCode value={state.invite.url} label={t("admin.invites.qr.alt")} size={QR_SIZE} />
+                ) : (
+                  <Spinner size="lg" />
+                )}
+              </html.div>
+              {state.kind === "ready" && (
+                <Text as="p" variant="bodySm" color="muted">
+                  {t("admin.invites.qr.emailNote", { email: state.invite.email })}
+                </Text>
+              )}
+              <Button
+                variant="secondary"
+                size="small"
+                disabled={state.kind !== "ready"}
+                onClick={() => state.kind === "ready" && copy(state.invite.url)}
+              >
                 {copyFailed
                   ? t("admin.invites.qr.copyFailed")
                   : copied
                     ? t("admin.invites.qr.copied")
                     : t("admin.invites.qr.copyLink")}
               </Button>
-              <Text as="p" variant="bodySm" color="muted">
-                {t("admin.invites.qr.expiry", { time: formatDateTime(invite.expiresAt) })}
-              </Text>
+              {state.kind === "ready" && (
+                <Text as="p" variant="bodySm" color="muted">
+                  {t("admin.invites.qr.expiry", { time: formatDateTime(state.invite.expiresAt) })}
+                </Text>
+              )}
             </Stack>
           )}
         </Dialog.Body>
         <Dialog.Footer>
           <Button variant="primary" onClick={onClose}>
-            {t("common.done")}
+            {state?.kind === "ready" ? t("common.done") : t("common.close")}
           </Button>
         </Dialog.Footer>
       </Dialog.Portal>
@@ -535,7 +620,17 @@ function InviteQrDialog({
   )
 }
 
-function PendingInviteRow({ invite }: { invite: Invite }) {
+function PendingInviteRow({
+  invite,
+  onShowQr,
+  busy,
+}: {
+  invite: Invite
+  /** Opens the page's QR dialog for this invite — the page owns the dialog. */
+  onShowQr: (inviteId: string) => void
+  /** The page fetcher is mid-flight (another QR request, a send). */
+  busy: boolean
+}) {
   const { t } = useTranslation()
   const revokeFetcher = useFetcher()
   const resendFetcher = useFetcher()
@@ -553,6 +648,15 @@ function PendingInviteRow({ invite }: { invite: Invite }) {
       <Table.Cell>{new Date(invite.expiresAt).toLocaleDateString()}</Table.Cell>
       <Table.Cell isActions>
         <Inline gap="sm">
+          <Button
+            type="button"
+            variant="secondary"
+            size="small"
+            disabled={busy || isResending || isRevoking}
+            onClick={() => onShowQr(invite.id)}
+          >
+            {t("admin.invites.action.showQr")}
+          </Button>
           <resendFetcher.Form method="post">
             <html.input type="hidden" name="intent" value="resend" />
             <html.input type="hidden" name="inviteId" value={invite.id} />
