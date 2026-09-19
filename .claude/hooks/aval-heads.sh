@@ -19,6 +19,29 @@ command -v aval >/dev/null 2>&1 || exit 0
 heads=$(aval heads 2>/dev/null) || exit 0
 [ -n "$heads" ] || exit 0
 
+# Vendored packs: are they still what their sources publish? This is the one
+# network call here, and it is bounded on every side: at most once an hour per
+# repository (a stamp under the user's cache directory, never in the
+# repository), a budget that kills the remote call, and a voice only when a
+# pack is BEHIND or EDITED. "Could not ask" prints nothing — a notice that
+# fires on a flaky network is the one nobody reads on the day it matters.
+# `aval add --check` by hand answers in full.
+stale=""
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/aval"
+stamp="$cache/$(printf '%s' "$PWD" | cksum | cut -d' ' -f1).pack-check"
+if [ -z "$(find "$stamp" -mmin -60 2>/dev/null)" ]; then
+  mkdir -p "$cache" 2>/dev/null && : > "$stamp" 2>/dev/null
+  stale=$(aval add --check --quiet --budget 5 2>/dev/null)
+  [ $? -eq 1 ] || stale=""
+fi
+if [ -n "$stale" ]; then
+  cat <<'STALE'
+VENDORED DECISIONS ARE BEHIND THEIR SOURCE. The fleet has decided something
+this repository has not adopted yet, so the heads below may be superseded:
+STALE
+  printf '%s\n\n' "$stale"
+fi
+
 cat <<'PREAMBLE'
 ARCHITECTURE DECISIONS — these are decided. Do not re-litigate them, and do
 not restate them in another file; that is the duplication this corpus exists
