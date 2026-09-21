@@ -6,17 +6,15 @@ on:
   pull_request:
     branches: [main]
 
-# Hosted runners for everything that does not need the cluster (2026-09-21).
-# 90 days of ARC history: queue p90 of 15 min on the test shards whose p50 is
-# 7-9 min, 3.7 min on Build & Test; ubuntu-latest picks up in seconds with
-# 4 vCPU / 16 GB and costs nothing on a public repo. Only `migration-check`
-# still runs on the `duro-app` ARC set: it creates a MigrationCheck with the
-# runner pod's service account. Phase 2 moves that check in-cluster.
+# Hosted runners only (2026-09-21). 90 days of ARC history: queue p90 of
+# 15 min on the test shards whose p50 is 7-9 min, 3.7 min on Build & Test;
+# ubuntu-latest picks up in seconds with 4 vCPU / 16 GB and costs nothing on a
+# public repo. The migration check, the one job that needed the cluster, is
+# now pull-based: see `pr-image` at the bottom.
 jobs:
   # Detect whether this PR actually changes DB migrations. The prod-data-clone
-  # migration check spins up a fresh Ceph-snapshot CNPG clone (~7-10 min, and
-  # flaky when the clone provisioning brushes the timeout), so we only pay for
-  # it when the schema could actually be affected.
+  # migration check restores a full CNPG clone in the cluster (~12 min warm),
+  # so we only pay for it when the schema could actually be affected.
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
@@ -251,118 +249,59 @@ jobs:
         # raise it.
         run: npx vitest run --merge-reports --coverage
 
-  migration-check:
-    name: Migration check (prod-data clone)
+  # Pull-based migration check (phase 2, 2026-09-21). The cluster does the
+  # work: this job only publishes the artifact and hands the check over. It
+  # builds the PR image, pushes ghcr.io/fredericrous/duro-app:pr-<head sha> and
+  # adds the `migration-check` label; homelab's Flux ResourceSetInputProvider
+  # lists labelled PRs every 2 min and creates one MigrationCheck per PR, which
+  # homelab-preview-operator runs (prod-data clone + this image + /health/ready)
+  # and reports back as the "Migration check (prod-data clone)" check run on
+  # the head sha. No kubectl, no service account, no cluster access here.
+  #
+  # Same path filter as before (233 of 263 runs in 90 days were skipped by it).
+  # The image is built from the PR merge ref that actions/checkout gives a
+  # pull_request run, i.e. the change on top of main, and tagged with the head
+  # sha the check run attaches to.
+  pr-image:
+    name: PR image for the migration check
     needs: changes
-    # Only run when migrations (or the DB client) actually change — most PRs
-    # don't, and the clone is slow + flaky. Guards schema-changing PRs only.
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.migrations == 'true' }}
-    # The one job still on ARC: it needs the runner pod's service account to
-    # create the MigrationCheck. Phase 2 (pull-based lane) retires it.
-    runs-on: duro-app
-    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
-      packages: read
+      packages: write
+      pull-requests: write
     env:
-      MC_NS: migration-check
-      MC_NAME: duro-${{ github.run_id }}-${{ github.run_attempt }}
+      IMAGE: ghcr.io/fredericrous/duro-app:pr-${{ github.event.pull_request.head.sha }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          node-version: 24
-          cache: npm
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install kubectl
-        run: |
-          curl -fsSLo /tmp/kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          sudo install -m 0755 /tmp/kubectl /usr/local/bin/kubectl
-          kubectl version --client
+      # NPM_REGISTRY stays at the Dockerfile default (public npm); every
+      # dependency, @duro-app/* included, is public.
+      - name: Build and push the PR image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Configure in-cluster kubeconfig (scoped SA)
-        run: |
-          SA=/var/run/secrets/kubernetes.io/serviceaccount
-          kubectl config set-cluster k8s \
-            --server="https://kubernetes.default.svc" \
-            --certificate-authority="$SA/ca.crt" --embed-certs=true
-          kubectl config set-credentials sa --token="$(cat $SA/token)"
-          kubectl config set-context ctx --cluster=k8s --user=sa --namespace="$MC_NS"
-          kubectl config use-context ctx
-
-      - name: Request a prod-data clone (MigrationCheck)
-        run: |
-          cat <<YAML | kubectl apply -f -
-          apiVersion: preview.homelab.io/v1
-          kind: MigrationCheck
-          metadata:
-            name: ${MC_NAME}
-            namespace: ${MC_NS}
-          spec:
-            appName: duro
-            # Must exceed the Ready wait (~25m) plus build + migrate + serve, or
-            # the operator GCs the clone mid-test.
-            ttlSeconds: 2700
-          YAML
-
-      - name: Wait for clone to be Ready
-        run: |
-          for i in $(seq 1 300); do   # up to ~25m — warm clone bring-up measured ~11.5m (IO-bound postgres startup off an encrypted 30Gi snapshot); cold snapshots spike higher
-            phase=$(kubectl -n "$MC_NS" get migrationcheck "$MC_NAME" -o jsonpath='{.status.phase}' 2>/dev/null || true)
-            echo "phase=$phase ($i)"
-            case "$phase" in
-              Ready)  exit 0 ;;
-              Failed) echo "::error::MigrationCheck failed: $(kubectl -n "$MC_NS" get migrationcheck "$MC_NAME" -o jsonpath='{.status.message}')"; exit 1 ;;
-            esac
-            sleep 5
-          done
-          echo "::error::clone did not become Ready in time"; exit 1
-
-      - name: Read clone DATABASE_URL
-        id: db
-        run: |
-          secret=$(kubectl -n "$MC_NS" get migrationcheck "$MC_NAME" -o jsonpath='{.status.connectionSecretName}')
-          url=$(kubectl -n "$MC_NS" get secret "$secret" -o jsonpath='{.data.DATABASE_URL}' | base64 -d)
-          echo "::add-mask::$url"
-          echo "database_url=$url" >> "$GITHUB_OUTPUT"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      # Boot against the prod-data clone: building AppLayer runs the in-process
-      # migrations (DbLive/MigratorLive in app/lib/db/client.server.ts) against
-      # real data, then /health/ready (DB-aware `SELECT 1`) proves a DB-backed
-      # request works. The dummy LLDAP/SMTP/Vault/SESSION vars satisfy the
-      # Live layers' build-time Config reads (they construct clients lazily and
-      # never connect at build), so AppLayer fully builds and /health/ready can
-      # return 200 — otherwise the layer build would fail and mask migrations.
-      - name: Run migrations + serve against clone
+      - name: Hand the check to the cluster
         env:
-          DATABASE_URL: ${{ steps.db.outputs.database_url }}
-          SESSION_SECRET: ci-migration-check-dummy-session-secret
-          LLDAP_ADMIN_PASS: ci-dummy
-          NAS_VAULT_ADDR: http://127.0.0.1:8200
-          NAS_VAULT_TOKEN: ci-dummy
-          SMTP_HOST: localhost
-          SMTP_USER: ci-dummy
-          SMTP_PASS: ci-dummy
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npm run start & SERVER_PID=$!
-          ok=
-          for i in $(seq 1 60); do   # generous: migrations run on first boot
-            if curl -fsS http://localhost:3000/health/ready | grep -q '"status":"ready"'; then ok=1; break; fi
-            sleep 2
-          done
-          kill $SERVER_PID 2>/dev/null || true
-          [ -n "$ok" ] || { echo "::error::migrations/health failed against the prod-data clone"; exit 1; }
-          echo "migrations applied + /health/ready green against prod-data clone"
-
-      - name: Tear down the clone
-        if: always()
-        run: kubectl -n "$MC_NS" delete migrationcheck "$MC_NAME" --ignore-not-found --wait=false
+          gh pr edit ${{ github.event.pull_request.number }} --add-label migration-check
+          echo "pushed $IMAGE and labelled the PR; the cluster runs the check from here"
