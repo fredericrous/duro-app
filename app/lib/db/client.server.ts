@@ -54,6 +54,7 @@ const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.t
 // against a prod-data clone and reports back as the "Migration check
 // (prod-data clone)" check run. See .github/workflows/ci.yml.
 // Second run: operator 0.10.1 with runAsUser pinned on the probe.
+// Third run: operator 0.10.2 gates the app on pg_isready.
 // ---------------------------------------------------------------------------
 
 // connectionTTL bounds the lifetime of any pooled connection so a stuck
