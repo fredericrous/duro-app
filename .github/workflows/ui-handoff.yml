@@ -26,7 +26,7 @@ defaults:
 jobs:
   changes:
     name: Detect UI changes
-    runs-on: duro-app
+    runs-on: ubuntu-latest
     outputs:
       ui: ${{ steps.filter.outputs.ui }}
     steps:
@@ -42,7 +42,7 @@ jobs:
 
   handoff:
     name: Mockup side-by-side is in the PR
-    runs-on: duro-app
+    runs-on: ubuntu-latest
     needs: changes
     if: needs.changes.outputs.ui == 'true'
     env:

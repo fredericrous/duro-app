@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# Hosted runners for everything that does not need the cluster (2026-09-21).
+# 90 days of ARC history: queue p90 of 15 min on the test shards whose p50 is
+# 7-9 min, 3.7 min on Build & Test; ubuntu-latest picks up in seconds with
+# 4 vCPU / 16 GB and costs nothing on a public repo. Only `migration-check`
+# still runs on the `duro-app` ARC set: it creates a MigrationCheck with the
+# runner pod's service account. Phase 2 moves that check in-cluster.
 jobs:
   # Detect whether this PR actually changes DB migrations. The prod-data-clone
   # migration check spins up a fresh Ceph-snapshot CNPG clone (~7-10 min, and
@@ -13,7 +19,7 @@ jobs:
   # it when the schema could actually be affected.
   changes:
     name: Detect changes
-    runs-on: duro-app
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: read
@@ -31,13 +37,12 @@ jobs:
 
   build-and-test:
     name: Build & Test
-    runs-on: duro-app
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
 
-    # No `services: postgres:` — the dind-less self-hosted runner has no
-    # docker socket, and the test suite already runs against PGlite via
+    # No `services: postgres:` — the test suite runs against PGlite via
     # makeTestDbLayer in app/lib/db/client.server.ts. PgClientLive (which
     # would consume DATABASE_URL) is not built by any test layer.
 
@@ -88,15 +93,15 @@ jobs:
       - name: Lint
         run: npm run lint
 
-  # The suite is sharded across two runner pods: each pod keeps the same
-  # per-worker CPU budget as before (maxWorkers: 2 under its cgroup quota),
-  # so wall time roughly halves without re-introducing the fork-starvation
-  # flakes that capped concurrency in the first place. Coverage is collected
-  # per shard as a blob and merged+gated in `coverage-gate` — per-shard
-  # coverage numbers alone would be meaningless against the thresholds.
+  # The suite is sharded across two runners: each keeps the same per-worker
+  # budget (maxWorkers: 2, see vitest.config.ts), so wall time roughly halves
+  # without re-introducing the fork-starvation flakes that capped concurrency
+  # in the first place. Coverage is collected per shard as a blob and
+  # merged+gated in `coverage-gate` — per-shard coverage numbers alone would
+  # be meaningless against the thresholds.
   test:
     name: Test (shard ${{ matrix.shard }}/2)
-    runs-on: duro-app
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
@@ -146,22 +151,18 @@ jobs:
   # LLDAP distinguishes "the client speaks this protocol" from "the client
   # speaks to a server that exists".
   #
-  # LLDAP runs under Buildah rather than as a `services:` container for two
-  # reasons: the image has no /data and its entrypoint refuses to create one
-  # (a service container cannot override the command to mkdir it), and
-  # service-container semantics under ARC's Kubernetes hooks are explicitly
-  # unreviewed here (see homelab docs/arc-k8s-ci-migration.md). Rootless
-  # `buildah run` uses the host network namespace, so the server is reachable on
-  # localhost of the job pod, and it runs inside the image's own musl rootfs —
-  # the binary is Alpine-linked and will not run on the Debian Node image.
+  # LLDAP runs as a plain `docker run` rather than a `services:` container:
+  # the image has no /data and its entrypoint refuses to create one, and a
+  # service container cannot override the entrypoint. `--network host` puts
+  # the server on localhost of the runner, and it runs inside the image's own
+  # musl rootfs (the binary is Alpine-linked). Under ARC this was a rootless
+  # Buildah dance because the pod had no docker socket; hosted runners have one.
   integration:
     name: OPAQUE handshake (real LLDAP)
-    runs-on: duro-app-ci
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
-    container:
-      image: quay.io/buildah/stable
     env:
       # Pinned by digest to the exact image the cluster runs, so this test tracks
       # production rather than a floating tag. Bump both together.
@@ -170,7 +171,6 @@ jobs:
       # Throwaway credentials for an ephemeral container that holds no real data.
       LLDAP_ADMIN_PASS: ci-admin-password
       LLDAP_JWT_SECRET: ci-not-a-secret
-      STORAGE_DRIVER: vfs
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -185,44 +185,42 @@ jobs:
         run: npm ci
 
       - name: Start LLDAP
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          buildah --storage-driver=vfs from --name lldap "$LLDAP_IMAGE"
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
           # Run the binary directly rather than the image's entrypoint, which
           # insists on a /data the image does not ship and then dies on an
           # unbound $GID. This is what the homelab Deployment does too. SQLite
           # under /tmp keeps the whole thing stateless and volume-free.
-          buildah --storage-driver=vfs config \
-            --env LLDAP_JWT_SECRET="$LLDAP_JWT_SECRET" \
-            --env LLDAP_LDAP_USER_PASS="$LLDAP_ADMIN_PASS" \
-            --env LLDAP_LDAP_BASE_DN=dc=ci,dc=test \
-            --env LLDAP_HTTP_PORT=17170 \
-            --env LLDAP_DATABASE_URL="sqlite:///tmp/lldap.db?mode=rwc" \
-            --env LLDAP_KEY_FILE=/tmp/lldap_key \
-            lldap
-          # `buildah run` executes inside the image's own musl rootfs (the
-          # binary is Alpine-linked) while sharing the pod's network namespace,
-          # so the server answers on localhost of this job.
-          buildah --storage-driver=vfs run --net host lldap -- /app/lldap run \
-            > /tmp/lldap.log 2>&1 &
+          docker run -d --name lldap --network host \
+            -e LLDAP_JWT_SECRET="$LLDAP_JWT_SECRET" \
+            -e LLDAP_LDAP_USER_PASS="$LLDAP_ADMIN_PASS" \
+            -e LLDAP_LDAP_BASE_DN=dc=ci,dc=test \
+            -e LLDAP_HTTP_PORT=17170 \
+            -e LLDAP_DATABASE_URL="sqlite:///tmp/lldap.db?mode=rwc" \
+            -e LLDAP_KEY_FILE=/tmp/lldap_key \
+            --entrypoint /app/lldap "$LLDAP_IMAGE" run
           for _ in $(seq 1 90); do
             curl -fsS "$LLDAP_URL/health" >/dev/null 2>&1 && break
             sleep 1
           done
           curl -fsS "$LLDAP_URL/health" \
-            || { echo "::error::LLDAP did not serve /health within 90s"; cat /tmp/lldap.log; exit 1; }
+            || { echo "::error::LLDAP did not serve /health within 90s"; docker logs lldap; exit 1; }
 
       - name: Integration tests
         run: npm run test:integration
 
       - name: LLDAP log (on failure)
         if: failure()
-        run: cat /tmp/lldap.log || true
+        run: docker logs lldap || true
 
   coverage-gate:
     name: Coverage gate (merged shards)
     needs: test
-    runs-on: duro-app
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
@@ -259,6 +257,8 @@ jobs:
     # Only run when migrations (or the DB client) actually change — most PRs
     # don't, and the clone is slow + flaky. Guards schema-changing PRs only.
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.migrations == 'true' }}
+    # The one job still on ARC: it needs the runner pod's service account to
+    # create the MigrationCheck. Phase 2 (pull-based lane) retires it.
     runs-on: duro-app
     timeout-minutes: 30
     permissions:

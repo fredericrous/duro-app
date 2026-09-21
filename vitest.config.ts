@@ -28,8 +28,9 @@ export default defineConfig({
     // of per-file PGlite instances + migrations run at once on a couple of CPUs
     // (made worse by v8 coverage instrumentation), starving each setup hook
     // past its timeout. Two workers in CI keeps PGlite setup fast and the suite
-    // deterministic; locally (more CPUs) allow four. The runner's memory limit
-    // was raised to 8Gi to hold two such forks (see homelab arc runners.yaml).
+    // deterministic; locally (more CPUs) allow four. CI moved from 2-CPU ARC
+    // pods to 4-vCPU hosted runners on 2026-09-21; the cap is kept on purpose
+    // until a run with 4 proves it does not re-introduce the flakes.
     // (vitest 4 replaced poolOptions.forks.maxForks with top-level maxWorkers.)
     maxWorkers: process.env.CI ? 2 : 4,
     // Bounded CI-only retry. The residual flake in this suite is not app-logic

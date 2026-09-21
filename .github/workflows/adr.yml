@@ -20,7 +20,7 @@ defaults:
 jobs:
   adr:
     name: architecture decisions resolve
-    runs-on: duro-app
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
