@@ -48,6 +48,11 @@ const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.t
 
 // ---------------------------------------------------------------------------
 // PgClient layer (Config-driven — resolves DATABASE_URL at layer build time)
+//
+// In CI a change to this file (or to migrations/) makes the `pr-image` job
+// publish the PR image and label the PR; the cluster then boots that image
+// against a prod-data clone and reports back as the "Migration check
+// (prod-data clone)" check run. See .github/workflows/ci.yml.
 // ---------------------------------------------------------------------------
 
 // connectionTTL bounds the lifetime of any pooled connection so a stuck
