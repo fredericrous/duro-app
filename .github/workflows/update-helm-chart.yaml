@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to update (without v prefix)'
+        description: "Version to update (without v prefix)"
         required: true
         type: string
 
 jobs:
   update-chart:
     name: Update Helm Chart Version
-    runs-on: duro-app
+    runs-on: ubuntu-latest
     steps:
       - name: Check required secrets
         run: |
