@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
-import { parseXfccCert, canonicalSerial } from "./client-cert.server"
+import { parseXfccCert, canonicalSerial, isIssuedBy } from "./client-cert.server"
 
 // Throwaway self-signed cert (serial 0x0A1B2C3D4E5F) — NOT a credential, only a
 // parsing fixture. Its leading-zero nibble exercises ASN.1 zero-padding.
@@ -11,6 +11,18 @@ const FIXTURE_PEM = readFileSync(
   "utf8",
 )
 const FIXTURE_CANON = "a1b2c3d4e5f"
+
+// Public certificates only (no keys are committed): a client-CA-like RSA root
+// and its leaf, an impostor root with the SAME subject DN and a leaf it
+// signed, and an EC break-glass-like root and its leaf.
+const trustFixture = (name: string) =>
+  readFileSync(fileURLToPath(new URL(`../test/fixtures/xfcc-trust/${name}.pem`, import.meta.url)), "utf8")
+const CLIENT_CA = trustFixture("client-ca")
+const LEAF_CLIENT_CA = trustFixture("leaf-client-ca")
+const IMPOSTOR_CA = trustFixture("impostor-ca")
+const LEAF_IMPOSTOR_CA = trustFixture("leaf-impostor-ca")
+const BREAKGLASS_CA = trustFixture("breakglass-ca")
+const LEAF_BREAKGLASS_CA = trustFixture("leaf-breakglass-ca")
 
 /** Build an XFCC header the way Envoy's SanitizeSet does. */
 const xfcc = (pem: string, extra = "") =>
@@ -45,6 +57,44 @@ describe("parseXfccCert", () => {
     expect(
       parseXfccCert(`Cert="${encodeURIComponent("-----BEGIN CERTIFICATE-----\ngarbage\n-----END CERTIFICATE-----")}"`),
     ).toBeNull()
+  })
+})
+
+describe("parseXfccCert — key types and PEM", () => {
+  it("parses an EC certificate (node-forge could not) and returns its PEM", () => {
+    const parsed = parseXfccCert(xfcc(LEAF_BREAKGLASS_CA))
+    expect(parsed).not.toBeNull()
+    expect(canonicalSerial(parsed!.serial)).toBe("d1e2f3061")
+    expect(parsed!.pem).toContain("BEGIN CERTIFICATE")
+  })
+
+  it("returns the RSA leaf's PEM unchanged for issuer checks", () => {
+    const parsed = parseXfccCert(xfcc(LEAF_CLIENT_CA))
+    expect(canonicalSerial(parsed!.serial)).toBe("b1c2d3e4f")
+    expect(isIssuedBy(parsed!.pem, CLIENT_CA)).toBe(true)
+  })
+})
+
+describe("isIssuedBy", () => {
+  it("accepts a leaf the CA signed", () => {
+    expect(isIssuedBy(LEAF_CLIENT_CA, CLIENT_CA)).toBe(true)
+    expect(isIssuedBy(LEAF_BREAKGLASS_CA, BREAKGLASS_CA)).toBe(true)
+  })
+
+  it("rejects a leaf from a different CA that has the SAME subject DN", () => {
+    // A name comparison would accept this; the signature check must not.
+    expect(isIssuedBy(LEAF_IMPOSTOR_CA, CLIENT_CA)).toBe(false)
+    expect(isIssuedBy(LEAF_CLIENT_CA, IMPOSTOR_CA)).toBe(false)
+  })
+
+  it("rejects a break-glass leaf against the client CA, and vice versa", () => {
+    expect(isIssuedBy(LEAF_BREAKGLASS_CA, CLIENT_CA)).toBe(false)
+    expect(isIssuedBy(LEAF_CLIENT_CA, BREAKGLASS_CA)).toBe(false)
+  })
+
+  it("returns false (never throws) on garbage input", () => {
+    expect(isIssuedBy("not-a-pem", CLIENT_CA)).toBe(false)
+    expect(isIssuedBy(LEAF_CLIENT_CA, "not-a-pem")).toBe(false)
   })
 })
 

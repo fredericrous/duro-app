@@ -10,6 +10,7 @@ import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { revokeSerialForUser } from "./cert-revocation.server"
 import { parseXfccCert, canonicalSerial } from "~/lib/client-cert.server"
+import { ClientCaTrust } from "~/lib/services/ClientCaTrust.server"
 
 export interface InviteInput {
   email: string
@@ -493,6 +494,15 @@ export const resolvePendingCertInvite = (xfcc: string | null | undefined) =>
   Effect.gen(function* () {
     const parsed = parseXfccCert(xfcc)
     if (!parsed) return { kind: "no_cert" } as CertInviteResolution
+
+    // The listener may trust more than one root (the break-glass CA), and a
+    // serial is only unique within one issuer: resolve only certificates the
+    // pki-client CA provably signed. Anything else falls through to OIDC.
+    const trust = yield* ClientCaTrust
+    if (!(yield* trust.isIssuedByClientCa(parsed.pem))) {
+      yield* Effect.logWarning("Client certificate not issued by the pki-client CA; not resolving it as an invite")
+      return { kind: "invalid" } as CertInviteResolution
+    }
 
     const certRepo = yield* CertificateRepo
     const inviteRepo = yield* InviteRepo

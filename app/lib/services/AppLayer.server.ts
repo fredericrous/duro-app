@@ -2,6 +2,7 @@ import { Layer } from "effect"
 import { FetchHttpClient } from "@effect/platform"
 import { LldapUserManagerLive } from "./LldapClient.server"
 import { VaultCertManagerLive } from "./VaultPki.server"
+import { ClientCaTrustLive, ClientCaTrustDev } from "./ClientCaTrust.server"
 import { EmailServiceLive, EmailServiceDev } from "./EmailService.server"
 import { OidcClientLive, OidcClientDev } from "./OidcClient.server"
 import { CertManagerDev } from "./CertManager.server"
@@ -98,6 +99,7 @@ export const AppLayer = Layer.mergeAll(
   // Existing services
   isDevServer ? UserManagerDev : LldapUserManagerLive,
   isDevServer ? CertManagerDev : VaultCertManagerLive,
+  isDevServer ? ClientCaTrustDev : ClientCaTrustLive,
   isDevServer ? EmailServiceDev : EmailServiceLive,
   isDevServer ? OidcClientDev : OidcClientLive,
   InviteRepoLive,
