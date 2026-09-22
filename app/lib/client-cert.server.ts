@@ -1,4 +1,4 @@
-import forge from "node-forge"
+import { X509Certificate } from "node:crypto"
 
 /**
  * Read a client certificate out of the Envoy `x-forwarded-client-cert` (XFCC)
@@ -8,8 +8,9 @@ import forge from "node-forge"
  * `clientValidation.optional: false`, and the ClientTrafficPolicy forwards the
  * cert with `xForwardedClientCert.mode: SanitizeSet` — meaning Envoy STRIPS any
  * client-supplied XFCC and sets its own from the verified handshake. So a value
- * reaching this code is trustworthy: it can only describe the certificate the
- * TLS layer already validated against the daddyshome CA. Never parse a
+ * reaching this code describes a certificate the TLS layer already validated
+ * against the listener's trust bundle — which may hold more than one root, so
+ * use `isIssuedBy` before trusting WHICH CA issued it. Never parse a
  * client-supplied cert header on a listener without that guarantee.
  *
  * XFCC grammar (Envoy): comma-separated elements, one per proxy hop; each is
@@ -90,27 +91,48 @@ function splitElements(header: string): string[] {
 }
 
 /**
- * Extract the presented client certificate's serial from an XFCC header.
- * Returns null when the header is absent, malformed, or carries no parseable
- * `Cert=` PEM. Never throws on bad input — a parse failure is "no cert", not a
+ * Extract the presented client certificate's serial (and its PEM, for issuer
+ * checks) from an XFCC header. Returns null when the header is absent,
+ * malformed, or carries no parseable `Cert=` PEM. Never throws on bad input — a parse failure is "no cert", not a
  * 500. Callers MUST NOT log the raw header or the decoded certificate body.
  */
-export function parseXfccCert(xfcc: string | null | undefined): { serial: string } | null {
+export function parseXfccCert(xfcc: string | null | undefined): { serial: string; pem: string } | null {
   if (!xfcc) return null
   try {
     for (const element of splitElements(xfcc)) {
       const pairs = parseElement(element)
       const certValue = pairs.get("cert")
       if (!certValue) continue
-      // The Cert value is a URL-encoded PEM.
+      // The Cert value is a URL-encoded PEM. node:crypto parses RSA and EC
+      // certificates alike; node-forge could not read an EC key, so an EC
+      // cert used to fall through to "no cert" by accident rather than design.
       const pem = decodeURIComponent(certValue)
-      const cert = forge.pki.certificateFromPem(pem)
-      if (cert.serialNumber) return { serial: cert.serialNumber }
+      const cert = new X509Certificate(pem)
+      if (cert.serialNumber) return { serial: cert.serialNumber, pem }
     }
   } catch {
     return null
   }
   return null
+}
+
+/**
+ * Did the client CA sign this certificate? A cryptographic check — issuer name
+ * AND signature — never a name comparison: two CAs can share a subject DN.
+ * Envoy only admits certificates chaining to a CA in its trust bundle, and that
+ * bundle can hold more than one root (the break-glass CA is trusted on
+ * `home.daddyshome.fr` alongside the client CA), so "Envoy verified it" does
+ * not mean "the client CA issued it". Invite resolution keys on a serial that
+ * is only unique within one issuer, hence this guard. Never throws.
+ */
+export function isIssuedBy(certPem: string, caPem: string): boolean {
+  try {
+    const cert = new X509Certificate(certPem)
+    const ca = new X509Certificate(caPem)
+    return cert.checkIssued(ca) && cert.verify(ca.publicKey)
+  } catch {
+    return false
+  }
 }
 
 /**
