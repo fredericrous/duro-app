@@ -31,7 +31,7 @@ jobs:
       # corpus that no longer resolves.
       - name: Ensure aval
         env:
-          AVAL_VERSION: 1.5.0
+          AVAL_VERSION: 1.7.1
         run: |
           set -euo pipefail
           # The baked binary is an optimisation, not the pin. Accepting whatever
@@ -62,6 +62,14 @@ jobs:
       # parses and that nothing here contradicts it.
       - name: aval check
         run: aval check
+
+      # The areas in .adr.yaml are a reviewed declaration of which parts of
+      # this repository are a command line or a UI; they decide which fleet
+      # rules the session hook shows. This says when a package stops matching
+      # them (exit 1) or could not be inspected (exit 3). Detection is
+      # advisory: a false positive belongs under `disclaims:` in .adr.yaml.
+      - name: The declared areas still describe the repository
+        run: aval traits --check
 
       # The pack is a copy. Nothing tells this repository when the fleet
       # decides something new, so a copy that fell behind would keep
