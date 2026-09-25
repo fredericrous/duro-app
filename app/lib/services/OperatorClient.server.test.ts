@@ -101,3 +101,40 @@ describe("OperatorClient (Dev) — listApps", () => {
     await rt.dispose()
   })
 })
+
+describe("OperatorClient (Live) — listAppsIfChanged", () => {
+  const app = { id: "plex", name: "Plex", url: "https://plex.local", category: "media", groups: ["u"], priority: 1 }
+
+  it("returns the apps and the operator's ETag", async () => {
+    server.use(http.get(`${OPERATOR_BASE}/api/v1/apps`, () => HttpResponse.json([app], { headers: { ETag: '"v1"' } })))
+    const rt = makeRuntime()
+    const res = await rt.runPromise(Effect.flatMap(OperatorClient, (c) => c.listAppsIfChanged(null)))
+    await rt.dispose()
+    expect(res).toEqual({ changed: true, apps: [app], etag: '"v1"' })
+  })
+
+  it("sends If-None-Match and reports a 304 as unchanged", async () => {
+    let sent: string | null = null
+    server.use(
+      http.get(`${OPERATOR_BASE}/api/v1/apps`, ({ request }) => {
+        sent = request.headers.get("if-none-match")
+        return new HttpResponse(null, { status: 304, headers: { ETag: '"v1"' } })
+      }),
+    )
+    const rt = makeRuntime()
+    const res = await rt.runPromise(Effect.flatMap(OperatorClient, (c) => c.listAppsIfChanged('"v1"')))
+    await rt.dispose()
+    expect(sent).toBe('"v1"')
+    expect(res).toEqual({ changed: false })
+  })
+
+  it("fails on a server error rather than reporting an empty list", async () => {
+    server.use(http.get(`${OPERATOR_BASE}/api/v1/apps`, () => new HttpResponse("boom", { status: 500 })))
+    const rt = makeRuntime()
+    const res = await rt.runPromise(
+      Effect.flatMap(OperatorClient, (c) => c.listAppsIfChanged(null)).pipe(Effect.either),
+    )
+    await rt.dispose()
+    expect(res._tag).toBe("Left")
+  })
+})
