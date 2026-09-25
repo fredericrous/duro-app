@@ -4,16 +4,19 @@
 #
 # Injects the consult-first preamble plus the component catalog into agent
 # context at SessionStart, so "check the design system before building UI" is
-# ambient context instead of a step an agent has to remember.
+# ambient context instead of a step an agent has to remember. Then runs
+# `duro doctor`, which says nothing unless this repo's build wiring flattens
+# the components' styles.
 #
 # Do not hand-edit. Repo-specific caveats go in
 # .claude/duro-hook.local.md — appended below, and left alone by regeneration.
 cache=".claude/.duro-session.cache"
 notes=".claude/duro-hook.local.md"
+doctor=".claude/.duro-session.cache.doctor"
 
 # npx resolution dominates session start; the catalog only changes on upgrade.
 if [ ! -s "$cache" ] || [ -n "$(find "$cache" -mtime +7 2>/dev/null)" ]; then
-  if npx -y @duro-app/cli@^3.0.0 hook session-start >"$cache.tmp" 2>/dev/null; then
+  if npx -y @duro-app/cli@^3.4.0 hook session-start >"$cache.tmp" 2>/dev/null; then
     mv "$cache.tmp" "$cache"
   else
     rm -f "$cache.tmp"
@@ -21,10 +24,31 @@ if [ ! -s "$cache" ] || [ -n "$(find "$cache" -mtime +7 2>/dev/null)" ]; then
 fi
 
 # Offline with no cache yet: stay silent rather than fail the session.
-[ -s "$cache" ] || exit 0
-cat "$cache"
+if [ -s "$cache" ]; then
+  cat "$cache"
+  if [ -s "$notes" ]; then
+    echo
+    cat "$notes"
+  fi
+fi
 
-if [ -s "$notes" ]; then
+# duro doctor reads build config, entries and stylesheets. Re-run it when one
+# of those changes rather than on a timer, so an edit shows up next session
+# and a healthy repo only pays for npx after touching its config.
+key=$(find . -maxdepth 4 \( -name node_modules -o -name .git -o -name dist -o -name build \) -prune -o \
+  -type f \( -name package.json -o -name pnpm-workspace.yaml -o -name '*.css' -o -name 'vite*' \
+  -o -name 'babel*' -o -name '.babelrc*' -o -name '*.babel.*' -o -name 'postcss*' \
+  -o -name 'root.tsx' -o -name 'main.tsx' -o -name 'index.tsx' \) -exec cksum {} + 2>/dev/null |
+  sort | cksum)
+if [ "$key" != "$(cat "$doctor.key" 2>/dev/null)" ]; then
+  if npx -y @duro-app/cli@^3.4.0 doctor --session >"$doctor.tmp" 2>/dev/null; then
+    mv "$doctor.tmp" "$doctor"
+    echo "$key" >"$doctor.key"
+  else
+    rm -f "$doctor.tmp"
+  fi
+fi
+if [ -s "$doctor" ]; then
   echo
-  cat "$notes"
+  cat "$doctor"
 fi
