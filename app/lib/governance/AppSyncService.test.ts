@@ -56,8 +56,10 @@ const clusterApps: ClusterApp[] = [
 
 type OperatorClientService = Context.Tag.Service<typeof OperatorClient>
 
-const stubOperatorClient = (apps: ClusterApp[]): OperatorClientService => ({
+const stubOperatorClient = (apps: ClusterApp[], etag = "etag-1"): OperatorClientService => ({
   listApps: () => Effect.succeed(apps),
+  listAppsIfChanged: (seen) =>
+    Effect.succeed(seen === etag ? { changed: false as const } : { changed: true as const, apps, etag }),
 })
 
 /**
@@ -205,19 +207,84 @@ describe("AppSyncService", () => {
     expect(state.removedEnabled).toBe(false) // previously-synced + now absent → disabled
   })
 
-  it("handles empty cluster (disables all)", async () => {
-    const result = await Effect.gen(function* () {
+  it("refuses to sync an empty list instead of disabling everything", async () => {
+    // An operator whose cache is not filled yet answers []; syncing that used to
+    // disable every app. Now it is an error and nothing changes.
+    const state = await Effect.gen(function* () {
       yield* seedExistingApps([
         { slug: "jellyfin", displayName: "Jellyfin" },
         { slug: "gitea", displayName: "Gitea" },
       ])
       const sync = yield* AppSyncService
-      return yield* sync.syncFromCluster()
+      const outcome = yield* sync.syncFromCluster().pipe(Effect.either)
+      const apps = yield* (yield* ApplicationRepo).list()
+      return {
+        outcome,
+        enabled: apps
+          .filter((a) => a.enabled)
+          .map((a) => a.slug)
+          .sort(),
+      }
     }).pipe(Effect.provide(layersFor([])), Effect.runPromise)
 
-    expect(result.created).toBe(0)
+    expect(state.outcome._tag).toBe("Left")
+    expect(state.enabled).toEqual(["gitea", "jellyfin"])
+  })
+
+  it("refuses to disable many apps at once, but still creates and updates", async () => {
+    // 6 synced apps, 4 missing from the list: more than max(2, 20%) = 2, so this
+    // looks like a broken list rather than four real removals.
+    const state = await Effect.gen(function* () {
+      yield* seedExistingApps([
+        { slug: "jellyfin", displayName: "Jellyfin" },
+        { slug: "a", displayName: "A" },
+        { slug: "b", displayName: "B" },
+        { slug: "c", displayName: "C" },
+        { slug: "d", displayName: "D" },
+        { slug: "e", displayName: "E" },
+      ])
+      const sync = yield* AppSyncService
+      const result = yield* sync.syncFromCluster()
+      const apps = yield* (yield* ApplicationRepo).list()
+      return { result, disabledSlugs: apps.filter((a) => !a.enabled).map((a) => a.slug) }
+    }).pipe(Effect.provide(layersFor([clusterApps[0]!])), Effect.runPromise)
+
+    expect(state.result.disabled).toBe(0)
+    expect(state.result.disableRefused).toBe(5)
+    expect(state.disabledSlugs).toEqual([])
+  })
+
+  it("still disables a genuine, small removal", async () => {
+    const result = await Effect.gen(function* () {
+      yield* seedExistingApps([
+        { slug: "jellyfin", displayName: "Jellyfin" },
+        { slug: "gitea", displayName: "Gitea" },
+        { slug: "grafana", displayName: "Grafana" },
+        { slug: "old-1", displayName: "Old 1" },
+        { slug: "old-2", displayName: "Old 2" },
+      ])
+      const sync = yield* AppSyncService
+      return yield* sync.syncFromCluster()
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
+
     expect(result.disabled).toBe(2)
-    expect(result.total).toBe(0)
+    expect(result.disableRefused).toBeUndefined()
+  })
+
+  it("syncIfChanged does nothing when the operator's list is unchanged", async () => {
+    const state = await Effect.gen(function* () {
+      const sync = yield* AppSyncService
+      const first = yield* sync.syncIfChanged(null)
+      const second = yield* sync.syncIfChanged(first.changed ? first.etag : null)
+      const apps = yield* (yield* ApplicationRepo).list()
+      return { first, second, count: apps.length }
+    }).pipe(Effect.provide(layersFor(clusterApps)), Effect.runPromise)
+
+    expect(state.first.changed).toBe(true)
+    expect(state.first.changed && state.first.etag).toBe("etag-1")
+    expect(state.first.changed && state.first.result.created).toBe(3)
+    expect(state.second).toEqual({ changed: false })
+    expect(state.count).toBe(3)
   })
 
   it("handles empty DB (creates all)", async () => {

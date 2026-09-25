@@ -37,7 +37,11 @@ export function handleAdminApplicationsMutation(mutation: AdminApplicationsMutat
         const result = yield* syncService.syncFromCluster()
         return {
           success: true as const,
-          message: `Synced ${result.total} apps: ${result.created} created, ${result.updated} updated, ${result.disabled} disabled`,
+          message:
+            `Synced ${result.total} apps: ${result.created} created, ${result.updated} updated, ${result.disabled} disabled` +
+            (result.disableRefused
+              ? `; refused to disable ${result.disableRefused} at once (the operator list looks wrong, check it)`
+              : ""),
         }
       }
 

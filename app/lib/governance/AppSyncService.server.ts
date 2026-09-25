@@ -1,6 +1,6 @@
 import { Context, Effect, Data, Layer } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
-import { OperatorClient, type OperatorClientError } from "~/lib/services/OperatorClient.server"
+import { type ClusterApp, OperatorClient, type OperatorClientError } from "~/lib/services/OperatorClient.server"
 import { ApplicationRepo, type ApplicationRepoError } from "./ApplicationRepo.server"
 import { RbacRepo, type RbacRepoError } from "./RbacRepo.server"
 import { ConnectedSystemRepo, type ConnectedSystemRepoError } from "./ConnectedSystemRepo.server"
@@ -17,7 +17,31 @@ export interface SyncResult {
   updated: number
   disabled: number
   total: number
+  /**
+   * Apps the sync would have disabled but did not, because there were too many
+   * at once to be a real removal (see MAX_DISABLE_*). Logged as an error.
+   */
+  disableRefused?: number
 }
+
+/** A conditional sync: nothing to do when the operator's list is unchanged. */
+export type ConditionalSyncResult =
+  | { readonly changed: false }
+  | { readonly changed: true; readonly result: SyncResult; readonly etag: string | null }
+
+/**
+ * The disable guard. A sync disables every previously synced app missing from
+ * the operator's list; fine behind a human's click, dangerous unattended: an
+ * operator mid-restart, a half-populated informer cache, or a namespace deleted
+ * by mistake would switch off apps (and every grant check on them) wholesale.
+ * More than this many disables in one pass is treated as a bad list, not a
+ * real removal: none are applied, the rest of the sync still runs.
+ */
+export const MAX_DISABLE_ABSOLUTE = 2
+export const MAX_DISABLE_FRACTION = 0.2
+
+export const disableLimit = (syncedApps: number): number =>
+  Math.max(MAX_DISABLE_ABSOLUTE, Math.floor(syncedApps * MAX_DISABLE_FRACTION))
 
 export class AppSyncError extends Data.TaggedError("AppSyncError")<{
   readonly message: string
@@ -32,6 +56,11 @@ export class AppSyncService extends Context.Tag("AppSyncService")<
   AppSyncService,
   {
     readonly syncFromCluster: () => Effect.Effect<SyncResult, AppSyncError>
+    /**
+     * Sync only if the operator's list changed since `etag` (null = always).
+     * What the worker calls every minute; a 304 costs one tiny request.
+     */
+    readonly syncIfChanged: (etag: string | null) => Effect.Effect<ConditionalSyncResult, AppSyncError>
   }
 >() {}
 
@@ -158,110 +187,143 @@ export const AppSyncServiceLive = Layer.effect(
         }
       })
 
+    const syncApps = (clusterApps: readonly ClusterApp[]) =>
+      Effect.gen(function* () {
+        // An empty list is never "every app was removed"; it is an operator
+        // that has not filled its cache yet. Syncing it would disable them all.
+        if (clusterApps.length === 0) {
+          return yield* new AppSyncError({ message: "Operator returned no apps; refusing to sync an empty list" })
+        }
+
+        const existingApps = yield* appRepo.list().pipe(Effect.mapError(wrapAppRepoErr("Failed to list applications")))
+
+        const existingBySlug = new Map(existingApps.map((a) => [a.slug, a]))
+        const clusterSlugs = new Set(clusterApps.map((a) => a.id))
+
+        let created = 0
+        let updated = 0
+        let disabled = 0
+
+        for (const app of clusterApps) {
+          const existing = existingBySlug.get(app.id)
+          const now = new Date().toISOString()
+
+          if (!existing) {
+            yield* sql
+              .withTransaction(
+                Effect.gen(function* () {
+                  const createdApp = yield* appRepo
+                    .create({
+                      slug: app.id,
+                      displayName: app.name,
+                      description: app.category,
+                      lastSyncedAt: now,
+                    })
+                    .pipe(Effect.mapError(wrapAppRepoErr(`Failed to create app ${app.id}`)))
+
+                  yield* seedDefaultRbac(createdApp.id).pipe(
+                    Effect.mapError(wrapRbacRepoErr(`Failed to seed starter RBAC for ${app.id}`)),
+                    Effect.provideService(RbacRepo, rbac),
+                  )
+
+                  yield* ensureAdminSeesApp(createdApp.id, app.id)
+
+                  yield* ensurePluginProvisioning(createdApp.id, app.id)
+                }),
+              )
+              .pipe(
+                Effect.mapError((e) =>
+                  e instanceof AppSyncError
+                    ? e
+                    : new AppSyncError({ message: `Transaction failed for ${app.id}`, cause: e }),
+                ),
+              )
+            created++
+          } else {
+            yield* sql
+              .withTransaction(
+                Effect.gen(function* () {
+                  const fields: { displayName?: string; lastSyncedAt: string } = { lastSyncedAt: now }
+                  if (existing.displayName !== app.name) {
+                    fields.displayName = app.name
+                    updated++
+                  }
+                  yield* appRepo
+                    .update(existing.id, fields)
+                    .pipe(Effect.mapError(wrapAppRepoErr(`Failed to update app ${app.id}`)))
+
+                  yield* seedDefaultRbac(existing.id).pipe(
+                    Effect.mapError(wrapRbacRepoErr(`Failed to ensure starter RBAC for ${app.id}`)),
+                    Effect.provideService(RbacRepo, rbac),
+                  )
+
+                  yield* ensureAdminSeesApp(existing.id, existing.slug)
+
+                  yield* ensurePluginProvisioning(existing.id, existing.slug)
+                }),
+              )
+              .pipe(
+                Effect.mapError((e) =>
+                  e instanceof AppSyncError
+                    ? e
+                    : new AppSyncError({ message: `Transaction failed for existing ${app.id}`, cause: e }),
+                ),
+              )
+          }
+        }
+
+        // Only auto-disable apps that were previously discovered from the
+        // cluster (last_synced_at set) but are now gone. Never disable an app
+        // that never came from a sync (last_synced_at null) — e.g. the
+        // migration-seeded `duro` portal, which is intentionally absent from the
+        // operator list. Disabling it would make the AuthzEngine (which resolves
+        // only `enabled = TRUE` apps) stop resolving `duro`, breaking the admin
+        // gate and locking admins out.
+        const toDisable = existingApps.filter(
+          (existing) => !clusterSlugs.has(existing.slug) && existing.enabled && existing.lastSyncedAt != null,
+        )
+        const synced = existingApps.filter((a) => a.lastSyncedAt != null && a.enabled).length
+        const limit = disableLimit(synced)
+        if (toDisable.length > limit) {
+          yield* Effect.logError(
+            `app sync: refusing to disable ${toDisable.length} of ${synced} synced apps at once (limit ${limit}); ` +
+              `the operator list is more likely wrong than that many apps removed. Missing: ` +
+              toDisable.map((a) => a.slug).join(", "),
+          )
+          return {
+            created,
+            updated,
+            disabled: 0,
+            total: clusterApps.length,
+            disableRefused: toDisable.length,
+          } satisfies SyncResult
+        }
+        for (const existing of toDisable) {
+          yield* appRepo
+            .update(existing.id, { enabled: false })
+            .pipe(Effect.mapError(wrapAppRepoErr(`Failed to disable app ${existing.slug}`)))
+          disabled++
+        }
+
+        return { created, updated, disabled, total: clusterApps.length } satisfies SyncResult
+      })
+
+    const fromOperator = (e: OperatorClientError) => new AppSyncError({ message: e.message, cause: e.cause })
+
     return {
-      syncFromCluster: () =>
-        Effect.gen(function* () {
-          const clusterApps = yield* operator
-            .listApps()
-            .pipe(Effect.mapError((e: OperatorClientError) => new AppSyncError({ message: e.message, cause: e.cause })))
+      syncFromCluster: () => operator.listApps().pipe(Effect.mapError(fromOperator), Effect.flatMap(syncApps)),
 
-          const existingApps = yield* appRepo
-            .list()
-            .pipe(Effect.mapError(wrapAppRepoErr("Failed to list applications")))
-
-          const existingBySlug = new Map(existingApps.map((a) => [a.slug, a]))
-          const clusterSlugs = new Set(clusterApps.map((a) => a.id))
-
-          let created = 0
-          let updated = 0
-          let disabled = 0
-
-          for (const app of clusterApps) {
-            const existing = existingBySlug.get(app.id)
-            const now = new Date().toISOString()
-
-            if (!existing) {
-              yield* sql
-                .withTransaction(
-                  Effect.gen(function* () {
-                    const createdApp = yield* appRepo
-                      .create({
-                        slug: app.id,
-                        displayName: app.name,
-                        description: app.category,
-                        lastSyncedAt: now,
-                      })
-                      .pipe(Effect.mapError(wrapAppRepoErr(`Failed to create app ${app.id}`)))
-
-                    yield* seedDefaultRbac(createdApp.id).pipe(
-                      Effect.mapError(wrapRbacRepoErr(`Failed to seed starter RBAC for ${app.id}`)),
-                      Effect.provideService(RbacRepo, rbac),
-                    )
-
-                    yield* ensureAdminSeesApp(createdApp.id, app.id)
-
-                    yield* ensurePluginProvisioning(createdApp.id, app.id)
-                  }),
+      syncIfChanged: (etag) =>
+        operator.listAppsIfChanged(etag).pipe(
+          Effect.mapError(fromOperator),
+          Effect.flatMap((res) =>
+            res.changed
+              ? syncApps(res.apps).pipe(
+                  Effect.map((result): ConditionalSyncResult => ({ changed: true, result, etag: res.etag })),
                 )
-                .pipe(
-                  Effect.mapError((e) =>
-                    e instanceof AppSyncError
-                      ? e
-                      : new AppSyncError({ message: `Transaction failed for ${app.id}`, cause: e }),
-                  ),
-                )
-              created++
-            } else {
-              yield* sql
-                .withTransaction(
-                  Effect.gen(function* () {
-                    const fields: { displayName?: string; lastSyncedAt: string } = { lastSyncedAt: now }
-                    if (existing.displayName !== app.name) {
-                      fields.displayName = app.name
-                      updated++
-                    }
-                    yield* appRepo
-                      .update(existing.id, fields)
-                      .pipe(Effect.mapError(wrapAppRepoErr(`Failed to update app ${app.id}`)))
-
-                    yield* seedDefaultRbac(existing.id).pipe(
-                      Effect.mapError(wrapRbacRepoErr(`Failed to ensure starter RBAC for ${app.id}`)),
-                      Effect.provideService(RbacRepo, rbac),
-                    )
-
-                    yield* ensureAdminSeesApp(existing.id, existing.slug)
-
-                    yield* ensurePluginProvisioning(existing.id, existing.slug)
-                  }),
-                )
-                .pipe(
-                  Effect.mapError((e) =>
-                    e instanceof AppSyncError
-                      ? e
-                      : new AppSyncError({ message: `Transaction failed for existing ${app.id}`, cause: e }),
-                  ),
-                )
-            }
-          }
-
-          for (const existing of existingApps) {
-            // Only auto-disable apps that were previously discovered from the
-            // cluster (last_synced_at set) but are now gone. Never disable an app
-            // that never came from a sync (last_synced_at null) — e.g. the
-            // migration-seeded `duro` portal, which is intentionally absent from the
-            // operator list. Disabling it would make the AuthzEngine (which resolves
-            // only `enabled = TRUE` apps) stop resolving `duro`, breaking the admin
-            // gate and locking admins out.
-            if (!clusterSlugs.has(existing.slug) && existing.enabled && existing.lastSyncedAt != null) {
-              yield* appRepo
-                .update(existing.id, { enabled: false })
-                .pipe(Effect.mapError(wrapAppRepoErr(`Failed to disable app ${existing.slug}`)))
-              disabled++
-            }
-          }
-
-          return { created, updated, disabled, total: clusterApps.length } satisfies SyncResult
-        }),
+              : Effect.succeed<ConditionalSyncResult>({ changed: false }),
+          ),
+        ),
     }
   }),
 )
