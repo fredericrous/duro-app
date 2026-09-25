@@ -79,7 +79,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "~19.1.7",
     "@vitest/coverage-v8": "^4.1.0",
-    "amont": "^1.5.0",
+    "amont": "^1.40.0",
     "babel-plugin-react-compiler": "1.0.0",
     "esbuild": "^0.28.0",
     "eslint": "^10.0.3",
