@@ -132,6 +132,12 @@
       "availableOnHome": "Available on Home",
       "askAdmin": "Ask an admin"
     },
+    "via": {
+      "role": "Role: {{role}}",
+      "roleOnApp": "Via {{role}} ({{app}})",
+      "entitlement": "{{entitlement}} granted",
+      "group": "{{source}}, through {{group}}"
+    },
     "learnMore": "Learn more"
   },
   "search": {

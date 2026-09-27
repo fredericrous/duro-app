@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach, beforeAll, afterAll, afterEach } from "vitest"
+import { describe, expect, it, vi, beforeEach } from "vitest"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 
@@ -132,6 +132,7 @@ const entry = (
     state: string
     description: string | null
     homepage: string | null
+    accessVia: AppCatalogEntry["accessVia"]
   }>,
 ): AppCatalogEntry =>
   ({
@@ -153,6 +154,7 @@ const entry = (
     pendingTargets: [],
     roles: [],
     requestableRoleIds: [],
+    accessVia: overrides.accessVia ?? [],
   }) as unknown as AppCatalogEntry
 
 const renderCatalog = (
@@ -209,6 +211,31 @@ describe("CatalogPage component — populated", () => {
     expect(chipLabels.some((l) => l.includes("Open"))).toBe(true)
     expect(chipLabels.some((l) => l.includes("Request access"))).toBe(true)
     expect(chipLabels.some((l) => l.includes("Pending"))).toBe(true)
+  })
+
+  it("says where the user's access comes from, e.g. the duro admin role", async () => {
+    // An admin's access arrives through the duro admin role's bundle, not a
+    // role on the app: the row must say so instead of offering a request.
+    renderCatalog([
+      entry({
+        slug: "wiki",
+        displayName: "Wiki",
+        state: "granted_full",
+        accessVia: [{ role: "Administrator", roleApp: "Duro", entitlement: null, group: null }],
+      }),
+      entry({
+        slug: "photos",
+        displayName: "Photos",
+        state: "granted_full",
+        accessVia: [{ role: null, roleApp: null, entitlement: "Access", group: "Family" }],
+      }),
+    ])
+
+    await waitFor(() => {
+      expect(screen.getByText("Via Administrator (Duro)")).toBeInTheDocument()
+    })
+    expect(screen.getByText("Access granted, through Family")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Request access" })).not.toBeInTheDocument()
   })
 
   it("shows the description and a Learn more link when the app has a homepage", async () => {
