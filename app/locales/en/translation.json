@@ -130,7 +130,9 @@
     "viewRequests": "View",
     "action": {
       "availableOnHome": "Available on Home",
-      "askAdmin": "Ask an admin"
+      "askAdmin": "Ask an admin",
+      "manage": "Manage",
+      "requestRole": "Request a role"
     },
     "via": {
       "role": "Role: {{role}}",
