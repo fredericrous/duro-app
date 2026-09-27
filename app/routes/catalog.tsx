@@ -341,11 +341,18 @@ function CatalogBody({
                       empty cell that reads like missing UI. */}
                   <Table.Cell>
                     <Inline justify="end">
-                      {entry.state === "granted_full" && (
-                        <Text variant="bodySm" color="muted">
-                          {t("apps.action.availableOnHome")}
-                        </Text>
-                      )}
+                      {entry.state === "granted_full" &&
+                        (entry.app.accessMode === "request" && entry.requestableRoleIds.length > 0 ? (
+                          // Access held without a role on the app (the admin
+                          // bundle, a group): Granted, and a role can still be asked for.
+                          <Button variant="secondary" onClick={() => openRequestDialog(entry.app.id)}>
+                            {t("apps.status.canUpgrade")}
+                          </Button>
+                        ) : (
+                          <Text variant="bodySm" color="muted">
+                            {t("apps.action.availableOnHome")}
+                          </Text>
+                        ))}
                       {entry.state === "invite_only" && (
                         <Text variant="bodySm" color="muted">
                           {t("apps.action.askAdmin")}
