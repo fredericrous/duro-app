@@ -61,9 +61,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   // change. Empty string when no match — the row falls back to no icon.
   // Sync work — returned directly on loaderData.
   const iconBySlug: Record<string, string> = {}
+  // Same registry, for the row's Open button: governance applications carry
+  // no URL of their own (the operator's DashboardApps do).
+  const urlBySlug: Record<string, string> = {}
   try {
     for (const a of loadApps()) {
       if (a.id && a.icon) iconBySlug[a.id] = a.icon
+      if (a.id && a.url) urlBySlug[a.id] = a.url
     }
   } catch {
     // loadApps reads /data/apps.json — falls through to default if missing.
@@ -75,6 +79,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     appsCatalogPromise: loadCatalog(request),
     iconBySlug,
+    urlBySlug,
   }
 }
 
@@ -140,7 +145,7 @@ const styles = css.create({
 
 export default function AppsPage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
-  const { appsCatalogPromise, iconBySlug } = loaderData
+  const { appsCatalogPromise, iconBySlug, urlBySlug } = loaderData
   const dashboardData = useRouteLoaderData("routes/dashboard") as { user?: string; isAdmin?: boolean } | undefined
   const user = dashboardData?.user ?? ""
   const isAdmin = dashboardData?.isAdmin ?? false
@@ -157,7 +162,7 @@ export default function AppsPage({ loaderData }: Route.ComponentProps) {
           }
         >
           <Suspense fallback={<AppSearchBarSkeleton />}>
-            <CatalogBody promise={appsCatalogPromise} iconBySlug={iconBySlug} />
+            <CatalogBody promise={appsCatalogPromise} iconBySlug={iconBySlug} urlBySlug={urlBySlug} isAdmin={isAdmin} />
           </Suspense>
         </CardSection>
       </Stack>
@@ -168,9 +173,14 @@ export default function AppsPage({ loaderData }: Route.ComponentProps) {
 function CatalogBody({
   promise,
   iconBySlug,
+  urlBySlug,
+  isAdmin,
 }: {
   promise: Promise<AppCatalogEntry[]>
   iconBySlug: Record<string, string>
+  urlBySlug: Record<string, string>
+  /** Duro admins grant roles themselves: they get "Manage", never a request to themselves. */
+  isAdmin: boolean
 }) {
   const { t } = useTranslation()
   // Hoisted out of the row map below — a hook must not be called per row.
@@ -300,6 +310,17 @@ function CatalogBody({
           <Table.Body>
             {sortedCatalog.map((entry) => {
               const icon = iconBySlug[entry.app.slug]
+              const appUrl = entry.app.url ?? urlBySlug[entry.app.slug]
+              const hasAccess = entry.state === "granted_full" || entry.state === "granted_can_upgrade"
+              const canAskRole = entry.app.accessMode === "request" && entry.requestableRoleIds.length > 0
+              // An admin grants roles; a request from them would land in their own queue.
+              const manage = (
+                <Link to={`/admin/applications/${entry.app.id}`}>
+                  <Button variant="link" size="small">
+                    {t("apps.action.manage")}
+                  </Button>
+                </Link>
+              )
               return (
                 <Table.Row key={entry.app.id}>
                   <Table.Cell>
@@ -335,46 +356,59 @@ function CatalogBody({
                     </Stack>
                   </Table.Cell>
                   {/* Action cell: right-aligned by convention for BI/admin
-                      tables. States with no clickable affordance (granted_full,
-                      invite_only) show muted microcopy pointing to the NEXT
-                      step (where to use it / how to get it) rather than an
-                      empty cell that reads like missing UI. */}
+                      tables. Rows with access lead with Open; states with no
+                      clickable affordance show muted microcopy pointing to the
+                      NEXT step rather than an empty cell that reads like
+                      missing UI. Admins get Manage wherever others would ask. */}
                   <Table.Cell>
                     <Inline justify="end">
-                      {entry.state === "granted_full" &&
-                        (entry.app.accessMode === "request" && entry.requestableRoleIds.length > 0 ? (
-                          // Access held without a role on the app (the admin
-                          // bundle, a group): Granted, and a role can still be asked for.
-                          <Button variant="secondary" onClick={() => openRequestDialog(entry.app.id)}>
-                            {t("apps.status.canUpgrade")}
-                          </Button>
+                      {hasAccess && (
+                        // What you own, you use: the row's main action is Open
+                        // (App Store "Open" vs "Get"). Asking for another role is
+                        // the quiet secondary; an admin, who would only be asking
+                        // themselves, gets Manage instead.
+                        <>
+                          {isAdmin
+                            ? manage
+                            : canAskRole && (
+                                <Button variant="link" size="small" onClick={() => openRequestDialog(entry.app.id)}>
+                                  {t("apps.action.requestRole")}
+                                </Button>
+                              )}
+                          {appUrl ? (
+                            <LinkButton href={appUrl} variant="secondary" {...linkProps}>
+                              {t("apps.openLaunch")}
+                            </LinkButton>
+                          ) : (
+                            <Text variant="bodySm" color="muted">
+                              {t("apps.action.availableOnHome")}
+                            </Text>
+                          )}
+                        </>
+                      )}
+                      {entry.state === "invite_only" &&
+                        (isAdmin ? (
+                          manage
                         ) : (
                           <Text variant="bodySm" color="muted">
-                            {t("apps.action.availableOnHome")}
+                            {t("apps.action.askAdmin")}
                           </Text>
                         ))}
-                      {entry.state === "invite_only" && (
-                        <Text variant="bodySm" color="muted">
-                          {t("apps.action.askAdmin")}
-                        </Text>
-                      )}
-                      {entry.state === "requestable" && (
-                        <Button variant="primary" onClick={() => openRequestDialog(entry.app.id)}>
-                          {t("apps.status.requestable")}
-                        </Button>
-                      )}
-                      {entry.state === "granted_can_upgrade" && (
-                        <Button variant="secondary" onClick={() => openRequestDialog(entry.app.id)}>
-                          {t("apps.status.canUpgrade")}
-                        </Button>
-                      )}
+                      {entry.state === "requestable" &&
+                        (isAdmin ? (
+                          manage
+                        ) : (
+                          <Button variant="primary" onClick={() => openRequestDialog(entry.app.id)}>
+                            {t("apps.status.requestable")}
+                          </Button>
+                        ))}
                       {entry.state === "pending" && (
                         <Link to="/requests">
                           <Button variant="secondary">{t("apps.viewRequest")}</Button>
                         </Link>
                       )}
-                      {entry.state === "open" && entry.app.url && (
-                        <LinkButton href={entry.app.url} variant="secondary" {...linkProps}>
+                      {entry.state === "open" && appUrl && (
+                        <LinkButton href={appUrl} variant="secondary" {...linkProps}>
                           {t("apps.openLaunch")}
                         </LinkButton>
                       )}

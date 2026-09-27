@@ -120,7 +120,7 @@ describe("/catalog loader — appsCatalogPromise (real DB)", () => {
 // setup handle the HTTP boundary; no per-file bootstrap.
 // ===========================================================================
 
-import { screen, waitFor } from "@testing-library/react"
+import { screen, waitFor, within } from "@testing-library/react"
 import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
 import CatalogPage from "./catalog"
 import { renderRoute } from "~/test/render-route"
@@ -162,6 +162,7 @@ const renderCatalog = (
   catalog: AppCatalogEntry[],
   url = "/catalog",
   dashboard: { user: string; isAdmin: boolean } = { user: "alice", isAdmin: false },
+  urlBySlug: Record<string, string> = {},
 ) => {
   // Pre-resolve the promise ONCE so router revalidations don't re-trip
   // Suspense in a loop (same pattern as home.test.tsx).
@@ -172,7 +173,7 @@ const renderCatalog = (
     route: {
       path: "/catalog",
       Component: CatalogPage as never,
-      loader: () => ({ appsCatalogPromise, iconBySlug: {} }),
+      loader: () => ({ appsCatalogPromise, iconBySlug: {}, urlBySlug }),
     },
     url,
   })
@@ -239,21 +240,62 @@ describe("CatalogPage component — populated", () => {
     expect(screen.queryByRole("button", { name: "Request access" })).not.toBeInTheDocument()
   })
 
-  it("reads Granted, not Partial, for access held without a role, and still offers a role", async () => {
-    renderCatalog([
-      entry({
-        slug: "photos",
-        displayName: "Photos",
-        state: "granted_full",
-        requestableRoleIds: ["role-editor"],
-        accessVia: [{ role: "Administrator", roleApp: "Duro", entitlement: null, group: null }],
-      }),
-    ])
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Request more access" })).toBeInTheDocument()
+  describe("rows the user can already open", () => {
+    const granted = entry({
+      slug: "photos",
+      displayName: "Photos",
+      state: "granted_full",
+      requestableRoleIds: ["role-editor"],
+      accessVia: [{ role: "Administrator", roleApp: "Duro", entitlement: null, group: null }],
     })
-    expect(screen.queryByText("Partial access")).not.toBeInTheDocument()
+    const urls = { photos: "https://photos.example.test" }
+
+    it("leads with Open, and offers a role as the quiet secondary", async () => {
+      renderCatalog([granted], "/catalog", { user: "alice", isAdmin: false }, urls)
+
+      const open = await screen.findByRole("link", { name: "Open" })
+      expect(open).toHaveAttribute("href", "https://photos.example.test")
+      expect(screen.getByRole("button", { name: "Request a role" })).toBeInTheDocument()
+      expect(screen.queryByText("Partial access")).not.toBeInTheDocument()
+      expect(screen.queryByRole("button", { name: "Request more access" })).not.toBeInTheDocument()
+    })
+
+    it("gives an admin Manage instead of a request to themselves", async () => {
+      renderCatalog([granted], "/catalog", { user: "admin", isAdmin: true }, urls)
+
+      await screen.findByRole("link", { name: "Open" })
+      expect(screen.getByRole("button", { name: "Manage" }).closest("a")).toHaveAttribute(
+        "href",
+        "/admin/applications/app-photos",
+      )
+      expect(screen.queryByRole("button", { name: "Request a role" })).not.toBeInTheDocument()
+    })
+
+    it("never has an admin request from themselves, even without access yet", async () => {
+      renderCatalog([entry({ slug: "wiki", displayName: "Wiki", state: "requestable" })], "/catalog", {
+        user: "admin",
+        isAdmin: true,
+      })
+
+      await screen.findByRole("button", { name: "Manage" })
+      // Scoped to the row: the "Request access" state chip above the table stays.
+      const row = screen.getByRole("row", { name: /Wiki/ })
+      expect(within(row).queryByRole("button", { name: "Request access" })).not.toBeInTheDocument()
+    })
+
+    it("offers no role when none is left to ask for", async () => {
+      renderCatalog([{ ...granted, requestableRoleIds: [] }], "/catalog", { user: "alice", isAdmin: false }, urls)
+
+      await screen.findByRole("link", { name: "Open" })
+      expect(screen.queryByRole("button", { name: "Request a role" })).not.toBeInTheDocument()
+    })
+
+    it("falls back to 'Available on Home' when the app has no URL", async () => {
+      renderCatalog([granted])
+
+      await screen.findByText("Available on Home")
+      expect(screen.queryByRole("link", { name: "Open" })).not.toBeInTheDocument()
+    })
   })
 
   it("shows the description and a Learn more link when the app has a homepage", async () => {
