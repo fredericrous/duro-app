@@ -61,8 +61,10 @@ describe("loadAppsCatalogForPrincipal", () => {
         const wiki = catalog.find((e) => e.app.slug === "wiki")!
         const crm = catalog.find((e) => e.app.slug === "crm")!
 
-        // Access through the bundle, but the Editor role is still requestable.
-        expect(wiki.state).toBe("granted_can_upgrade")
+        // Access through the bundle reads as Granted, not Partial; the Editor
+        // role stays requestable as an action.
+        expect(wiki.state).toBe("granted_full")
+        expect(wiki.requestableRoleIds).toHaveLength(1)
         expect(wiki.accessVia).toEqual([{ role: "Administrator", roleApp: "Duro", entitlement: null, group: null }])
         // Invite-only: nothing more to ask for — not "Ask an admin".
         expect(crm.state).toBe("granted_full")
@@ -75,7 +77,7 @@ describe("loadAppsCatalogForPrincipal", () => {
         const catalog = yield* loadAppsCatalogForPrincipal("p-member")
         const wiki = catalog.find((e) => e.app.slug === "wiki")!
         const crm = catalog.find((e) => e.app.slug === "crm")!
-        expect(wiki.state).toBe("granted_can_upgrade")
+        expect(wiki.state).toBe("granted_full")
         expect(wiki.accessVia).toEqual([{ role: null, roleApp: null, entitlement: "Access", group: "Family" }])
         expect(crm.state).toBe("invite_only")
         expect(crm.accessVia).toEqual([])

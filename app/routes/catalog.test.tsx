@@ -133,6 +133,7 @@ const entry = (
     description: string | null
     homepage: string | null
     accessVia: AppCatalogEntry["accessVia"]
+    requestableRoleIds: string[]
   }>,
 ): AppCatalogEntry =>
   ({
@@ -153,7 +154,7 @@ const entry = (
     grantedRoleIds: [],
     pendingTargets: [],
     roles: [],
-    requestableRoleIds: [],
+    requestableRoleIds: overrides.requestableRoleIds ?? [],
     accessVia: overrides.accessVia ?? [],
   }) as unknown as AppCatalogEntry
 
@@ -236,6 +237,23 @@ describe("CatalogPage component — populated", () => {
     })
     expect(screen.getByText("Access granted, through Family")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Request access" })).not.toBeInTheDocument()
+  })
+
+  it("reads Granted, not Partial, for access held without a role, and still offers a role", async () => {
+    renderCatalog([
+      entry({
+        slug: "photos",
+        displayName: "Photos",
+        state: "granted_full",
+        requestableRoleIds: ["role-editor"],
+        accessVia: [{ role: "Administrator", roleApp: "Duro", entitlement: null, group: null }],
+      }),
+    ])
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Request more access" })).toBeInTheDocument()
+    })
+    expect(screen.queryByText("Partial access")).not.toBeInTheDocument()
   })
 
   it("shows the description and a Learn more link when the app has a homepage", async () => {

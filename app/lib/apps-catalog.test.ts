@@ -56,8 +56,8 @@ describe("computeState", () => {
   })
 
   describe("access that does not come from a role on the app", () => {
-    it("counts access granted another way (the admin role bundle, a group)", () => {
-      expect(computeState({ accessMode: "request" }, set(), set(), set(), 2, true)).toBe("granted_can_upgrade")
+    it("reads as granted, not partial: no role on the app is held (the admin role bundle, a group)", () => {
+      expect(computeState({ accessMode: "request" }, set(), set(), set(), 2, true)).toBe("granted_full")
     })
 
     it("has nothing more to ask for on an invite-only app", () => {

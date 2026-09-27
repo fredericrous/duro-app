@@ -67,10 +67,14 @@ export const computeState = (
   if (grantedRoleIds.size === 0 && !hasAccess) {
     return app.accessMode === "invite_only" ? "invite_only" : "requestable"
   }
-  if (totalRoles > 0 && grantedRoleIds.size >= totalRoles) return "granted_full"
-  // Access without every role: more can be requested only where requests are
-  // accepted and there is something left to ask for.
-  if (app.accessMode === "invite_only" || totalRoles === 0) return "granted_full"
+  // Access that holds no role on the app (the admin bundle, a group's access
+  // entitlement) is access, not partial access: "partial" means holding some of
+  // the app's roles but not all, and reading it on every app an admin can open
+  // said the opposite of the truth. Roles left to ask for are an action, shown
+  // from `requestableRoleIds`, not a state.
+  if (grantedRoleIds.size === 0) return "granted_full"
+  if (grantedRoleIds.size >= totalRoles) return "granted_full"
+  if (app.accessMode === "invite_only") return "granted_full"
   return "granted_can_upgrade"
 }
 
