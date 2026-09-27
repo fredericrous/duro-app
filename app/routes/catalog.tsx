@@ -16,7 +16,12 @@ import { AppSearchBar, AppSearchBarSkeleton } from "~/components/AppSearchBar/Ap
 import { runEffect } from "~/lib/runtime.server"
 import { loadApps } from "~/lib/apps.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
-import { loadAppsCatalogForPrincipal, type AppCatalogEntry, type AppCatalogState } from "~/lib/apps-catalog.server"
+import {
+  loadAppsCatalogForPrincipal,
+  type AccessSource,
+  type AppCatalogEntry,
+  type AppCatalogState,
+} from "~/lib/apps-catalog.server"
 import { filterByQuery } from "~/lib/search"
 import { useAppSearchParams, shouldRevalidateAppSearch } from "~/hooks/useAppSearchParams"
 import { typography } from "@duro-app/tokens/tokens/typography.css"
@@ -197,6 +202,18 @@ function CatalogBody({
     }
   }
 
+  // "Where does my access come from?" — the role on this app, the role that
+  // bundles it (an admin's "Admin (Duro)"), or a direct entitlement, and the
+  // group that holds it when it is not the user's own grant.
+  const describeSource = (source: AccessSource) => {
+    const base = source.role
+      ? source.roleApp
+        ? t("apps.via.roleOnApp", { role: source.role, app: source.roleApp })
+        : t("apps.via.role", { role: source.role })
+      : t("apps.via.entitlement", { entitlement: source.entitlement ?? "" })
+    return source.group ? t("apps.via.group", { source: base, group: source.group }) : base
+  }
+
   if (appsCatalog.length === 0) {
     return (
       <>
@@ -308,7 +325,14 @@ function CatalogBody({
                     </Inline>
                   </Table.Cell>
                   <Table.Cell>
-                    <Badge variant={stateBadgeVariant[entry.state]}>{stateLabel(entry.state)}</Badge>
+                    <Stack gap="xs" align="start">
+                      <Badge variant={stateBadgeVariant[entry.state]}>{stateLabel(entry.state)}</Badge>
+                      {entry.accessVia.map((source) => (
+                        <Text key={describeSource(source)} variant="bodySm" color="muted">
+                          {describeSource(source)}
+                        </Text>
+                      ))}
+                    </Stack>
                   </Table.Cell>
                   {/* Action cell: right-aligned by convention for BI/admin
                       tables. States with no clickable affordance (granted_full,

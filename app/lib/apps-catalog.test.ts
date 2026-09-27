@@ -54,4 +54,22 @@ describe("computeState", () => {
     // missing role definition the next time someone tries to ask.
     expect(computeState({ accessMode: "request" }, set(), set(), set(), 0)).toBe("requestable")
   })
+
+  describe("access that does not come from a role on the app", () => {
+    it("counts access granted another way (the admin role bundle, a group)", () => {
+      expect(computeState({ accessMode: "request" }, set(), set(), set(), 2, true)).toBe("granted_can_upgrade")
+    })
+
+    it("has nothing more to ask for on an invite-only app", () => {
+      expect(computeState({ accessMode: "invite_only" }, set(), set(), set(), 2, true)).toBe("granted_full")
+    })
+
+    it("has nothing more to ask for when the app defines no roles", () => {
+      expect(computeState({ accessMode: "request" }, set(), set(), set(), 0, true)).toBe("granted_full")
+    })
+
+    it("still reports a pending request first", () => {
+      expect(computeState({ accessMode: "request" }, set(), set("x"), set(), 2, true)).toBe("pending")
+    })
+  })
 })

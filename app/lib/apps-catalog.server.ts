@@ -3,6 +3,7 @@ import * as SqlClient from "@effect/sql/SqlClient"
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import { GrantRepo } from "~/lib/governance/GrantRepo.server"
 import { AccessRequestRepo } from "~/lib/governance/AccessRequestRepo.server"
+import { AuthzEngine } from "~/lib/governance/AuthzEngine.server"
 import { decodeRole, type Application, type Role } from "~/lib/governance/types"
 
 export type AppCatalogState =
@@ -24,6 +25,24 @@ export interface AppCatalogEntry {
   roles: ReadonlyArray<Pick<Role, "id" | "slug" | "displayName">>
   /** Roles the user could meaningfully request (no active grant + no pending request). */
   requestableRoleIds: ReadonlyArray<string>
+  /**
+   * Where the user's access to this app comes from, as the AuthzEngine resolved
+   * it: a role on this app, a role on another app that bundles this one's
+   * `access` (the duro admin role), a direct entitlement grant, or any of those
+   * held by a group the user belongs to. Empty when the user has no access.
+   */
+  accessVia: ReadonlyArray<AccessSource>
+}
+
+export interface AccessSource {
+  /** Role name, when the grant is a role grant. */
+  readonly role: string | null
+  /** The role's application, when it is not this app (e.g. "Duro" for the admin role). */
+  readonly roleApp: string | null
+  /** Entitlement name, when the grant is a direct entitlement grant. */
+  readonly entitlement: string | null
+  /** The group holding the grant, when it is not the user's own. */
+  readonly group: string | null
 }
 
 /**
@@ -36,13 +55,23 @@ export const computeState = (
   pendingRoleIds: ReadonlySet<string>,
   pendingEntitlementIds: ReadonlySet<string>,
   totalRoles: number,
+  /**
+   * Whether the AuthzEngine allows `access` on the app, whatever the route:
+   * an admin's access arrives through the duro admin role's bundle, not
+   * through a role on the app, and used to read as "Request access".
+   */
+  hasAccess = false,
 ): AppCatalogState => {
   if (app.accessMode === "open") return "open"
   if (pendingRoleIds.size > 0 || pendingEntitlementIds.size > 0) return "pending"
-  if (grantedRoleIds.size === 0) {
+  if (grantedRoleIds.size === 0 && !hasAccess) {
     return app.accessMode === "invite_only" ? "invite_only" : "requestable"
   }
-  return totalRoles > 0 && grantedRoleIds.size >= totalRoles ? "granted_full" : "granted_can_upgrade"
+  if (totalRoles > 0 && grantedRoleIds.size >= totalRoles) return "granted_full"
+  // Access without every role: more can be requested only where requests are
+  // accepted and there is something left to ask for.
+  if (app.accessMode === "invite_only" || totalRoles === 0) return "granted_full"
+  return "granted_can_upgrade"
 }
 
 export const loadAppsCatalogForPrincipal = (principalId: string) =>
@@ -50,6 +79,7 @@ export const loadAppsCatalogForPrincipal = (principalId: string) =>
     const appRepo = yield* ApplicationRepo
     const grantRepo = yield* GrantRepo
     const requestRepo = yield* AccessRequestRepo
+    const engine = yield* AuthzEngine
     const sql = yield* SqlClient.SqlClient
 
     const allApps = yield* appRepo.list()
@@ -76,7 +106,49 @@ export const loadAppsCatalogForPrincipal = (principalId: string) =>
       }
     }
 
-    return enabledApps.map<AppCatalogEntry>((app) => {
+    // The same question the home grid asks: may this principal `access` each
+    // app? One bulk call; the matched grants say *how*.
+    const subjectRows = yield* sql<{ externalId: string | null }>`
+      SELECT external_id FROM principals WHERE id = ${principalId}`
+    const subject = subjectRows[0]?.externalId ?? null
+    const decisions = subject
+      ? yield* engine.checkBulk(enabledApps.map((a) => ({ subject, application: a.slug, action: "access" })))
+      : enabledApps.map(() => ({ allow: false, matchedGrantIds: [] as readonly string[] }))
+
+    const matchedIds = [...new Set(decisions.flatMap((d) => d.matchedGrantIds))]
+    const sourceByGrant = new Map<string, AccessSource & { roleAppId: string | null }>()
+    if (matchedIds.length > 0) {
+      const rows = yield* sql<{
+        id: string
+        principalId: string
+        principalName: string
+        roleName: string | null
+        roleAppId: string | null
+        roleAppName: string | null
+        entitlementName: string | null
+      }>`
+        SELECT g.id, g.principal_id, p.display_name AS principal_name,
+               r.display_name AS role_name, ra.id AS role_app_id, ra.display_name AS role_app_name,
+               e.display_name AS entitlement_name
+        FROM grants g
+        JOIN principals p ON p.id = g.principal_id
+        LEFT JOIN roles r ON r.id = g.role_id
+        LEFT JOIN applications ra ON ra.id = r.application_id
+        LEFT JOIN entitlements e ON e.id = g.entitlement_id
+        WHERE g.id IN ${sql.in(matchedIds)}`
+      for (const row of rows) {
+        sourceByGrant.set(row.id, {
+          role: row.roleName,
+          roleAppId: row.roleAppId,
+          roleApp: row.roleAppName,
+          entitlement: row.roleName ? null : row.entitlementName,
+          group: row.principalId === principalId ? null : row.principalName,
+        })
+      }
+    }
+
+    return enabledApps.map<AppCatalogEntry>((app, index) => {
+      const decision = decisions[index]!
       const roles = rolesByApp.get(app.id) ?? []
       const appRoleIds = new Set(roles.map((r) => r.id))
       const grantedRoleIds = new Set(
@@ -96,9 +168,24 @@ export const loadAppsCatalogForPrincipal = (principalId: string) =>
         else if (p.entitlementId) pendingTargets.push({ kind: "entitlement", id: p.entitlementId })
       }
 
+      const seen = new Set<string>()
+      const accessVia: AccessSource[] = []
+      for (const grantId of decision.matchedGrantIds) {
+        const src = sourceByGrant.get(grantId)
+        if (!src) continue
+        const roleApp = src.roleAppId && src.roleAppId !== app.id ? src.roleApp : null
+        const source: AccessSource = { role: src.role, roleApp, entitlement: src.entitlement, group: src.group }
+        const key = JSON.stringify(source)
+        if (!seen.has(key)) {
+          seen.add(key)
+          accessVia.push(source)
+        }
+      }
+
       return {
         app,
-        state: computeState(app, grantedRoleIds, pendingRoleIds, pendingEntIds, roles.length),
+        state: computeState(app, grantedRoleIds, pendingRoleIds, pendingEntIds, roles.length, decision.allow),
+        accessVia,
         grantedRoleIds: [...grantedRoleIds],
         pendingTargets,
         roles: roles.map((r) => ({ id: r.id, slug: r.slug, displayName: r.displayName })),

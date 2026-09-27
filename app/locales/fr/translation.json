@@ -132,6 +132,12 @@
       "availableOnHome": "Disponible sur l'Accueil",
       "askAdmin": "Demandez à un admin"
     },
+    "via": {
+      "role": "Rôle : {{role}}",
+      "roleOnApp": "Via {{role}} ({{app}})",
+      "entitlement": "{{entitlement}} accordé",
+      "group": "{{source}}, via le groupe {{group}}"
+    },
     "learnMore": "En savoir plus"
   },
   "search": {
