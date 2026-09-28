@@ -13,7 +13,8 @@ import { parseXfccCert, canonicalSerial } from "~/lib/client-cert.server"
 import { config, isOriginAllowed } from "~/lib/config.server"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
-import { Button, Field, Fieldset, Form, Heading, LinkButton, Input, Stack, StatusIcon, Text } from "@duro-app/ui"
+import { Button, Field, Fieldset, Heading, LinkButton, Input, Stack, StatusIcon, Text } from "@duro-app/ui"
+import { Form } from "@duro-app/ui/form"
 
 type SetupError = "no_cert" | "invalid" | "revoked" | "expired" | "too_many_attempts" | "unknown"
 
