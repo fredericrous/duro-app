@@ -376,7 +376,11 @@ describe("/admin/invites page", () => {
     const dialog = await screen.findByRole("dialog")
     // The QR itself, and the one instruction that makes it usable: the account
     // has to be created with the invited address.
-    expect(within(dialog).getByRole("img", { name: t("admin.invites.qr.alt") })).toBeInTheDocument()
+    // The code renders asynchronously after "Preparing the invitation…";
+    // under a loaded full-suite run that takes longer than a sync query allows.
+    expect(
+      await within(dialog).findByRole("img", { name: t("admin.invites.qr.alt") }, { timeout: 5000 }),
+    ).toBeInTheDocument()
     expect(
       within(dialog).getByText(t("admin.invites.qr.emailNote", undefined, { email: "alice@example.com" })),
     ).toBeInTheDocument()

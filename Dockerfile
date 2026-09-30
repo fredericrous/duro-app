@@ -24,7 +24,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./package.json
 RUN mkdir -p /db && chown appuser:appuser /db
-USER appuser
+# Numeric so a pod with runAsNonRoot can prove the user is non-root: the
+# kubelet refuses "image has non-numeric user" and never starts the container
+# (hit by the in-cluster migration check on 2026-09-21).
+USER 1001
 EXPOSE 3000
 # Direct node invocation against react-router-serve's bin entry —
 # no package manager at runtime.

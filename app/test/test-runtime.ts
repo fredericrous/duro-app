@@ -29,6 +29,7 @@ import { CertRevealRepoLive } from "~/lib/services/CertRevealRepo.server"
 import { RecoveryRepoLive } from "~/lib/services/RecoveryRepo.server"
 import { DiscordNotifierDev } from "~/lib/services/DiscordNotifier.server"
 import { CertManagerDev } from "~/lib/services/CertManager.server"
+import { ClientCaTrustDev } from "~/lib/services/ClientCaTrust.server"
 import { EmailServiceDev } from "~/lib/services/EmailService.server"
 import { OidcClientDev } from "~/lib/services/OidcClient.server"
 import { OperatorClientDev } from "~/lib/services/OperatorClient.server"
@@ -68,6 +69,9 @@ const AppSyncServiceWired = AppSyncServiceLive.pipe(
 export const TestAppLayer = Layer.mergeAll(
   UserManagerDev,
   CertManagerDev,
+  // Route tests present fixture certs no real CA signed; issuer rejection is
+  // covered by ClientCaTrust and resolvePendingCertInvite's own tests.
+  ClientCaTrustDev,
   EmailServiceDev,
   OidcClientDev,
   InviteRepoLive,

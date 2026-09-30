@@ -20,6 +20,7 @@ import { EmailService, EmailError } from "~/lib/services/EmailService.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
+import { ClientCaTrust } from "~/lib/services/ClientCaTrust.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 
 const mockAudit = Layer.succeed(AuditService, {
@@ -1084,6 +1085,12 @@ describe("acceptInviteById", () => {
 })
 
 describe("resolvePendingCertInvite", () => {
+  /** The issuer check, stubbed: `trusted` says whether the pki-client CA signed it. */
+  const trustLayer = (trusted: boolean) =>
+    Layer.succeed(ClientCaTrust, { isIssuedByClientCa: () => Effect.succeed(trusted) })
+  const trusted = trustLayer(true)
+
+  const lookups = { count: 0 }
   const certLayer = (cert: { inviteId: string | null; userId: string | null; revokedAt: string | null } | null) =>
     Layer.succeed(CertificateRepo, {
       store: () => Effect.void,
@@ -1095,7 +1102,11 @@ describe("resolvePendingCertInvite", () => {
       findLatestRenewalOf: () => Effect.succeed(null),
       listAllByUsernames: () => Effect.succeed({}),
       findBySerial: () => Effect.succeed(null),
-      findBySerialCanonical: () => Effect.succeed(cert ? ({ serialNumber: "0a:1b", ...cert } as never) : null),
+      findBySerialCanonical: () =>
+        Effect.sync(() => {
+          lookups.count++
+          return cert ? ({ serialNumber: "0a:1b", ...cert } as never) : null
+        }),
       markRevokePending: () => Effect.succeed(0),
       markRevokeCompleted: () => Effect.void,
       markRevokeFailed: () => Effect.void,
@@ -1113,7 +1124,11 @@ describe("resolvePendingCertInvite", () => {
   it.effect("classifies a cert with no account as pending", () => {
     const store = new Map<string, Invite>()
     store.set("inv-9", makeInvite({ id: "inv-9" }))
-    const layer = Layer.mergeAll(mockInviteRepo(store), certLayer({ inviteId: "inv-9", userId: null, revokedAt: null }))
+    const layer = Layer.mergeAll(
+      mockInviteRepo(store),
+      certLayer({ inviteId: "inv-9", userId: null, revokedAt: null }),
+      trusted,
+    )
     return resolvePendingCertInvite(xfccOf).pipe(
       Effect.tap((r) =>
         Effect.sync(() => expect(r).toEqual({ kind: "pending", inviteId: "inv-9", email: "alice@example.com" })),
@@ -1126,6 +1141,7 @@ describe("resolvePendingCertInvite", () => {
     const layer = Layer.mergeAll(
       mockInviteRepo(new Map()),
       certLayer({ inviteId: "inv-9", userId: "alice", revokedAt: null }),
+      trusted,
     )
     return resolvePendingCertInvite(xfccOf).pipe(
       Effect.tap((r) => Effect.sync(() => expect(r.kind).toBe("has_account"))),
@@ -1136,7 +1152,41 @@ describe("resolvePendingCertInvite", () => {
   it.effect("returns no_cert when the header is absent", () =>
     resolvePendingCertInvite(null).pipe(
       Effect.tap((r) => Effect.sync(() => expect(r.kind).toBe("no_cert"))),
-      Effect.provide(Layer.mergeAll(mockInviteRepo(new Map()), certLayer(null))),
+      Effect.provide(Layer.mergeAll(mockInviteRepo(new Map()), certLayer(null), trusted)),
     ),
   )
+
+  it.effect("refuses a certificate the pki-client CA did not sign, before any serial lookup", () => {
+    // The break-glass CA (or any other root in the listener's bundle) must never
+    // resolve as an invite, even when its serial collides with a pending one.
+    const store = new Map<string, Invite>()
+    store.set("inv-9", makeInvite({ id: "inv-9" }))
+    const layer = Layer.mergeAll(
+      mockInviteRepo(store),
+      certLayer({ inviteId: "inv-9", userId: null, revokedAt: null }),
+      trustLayer(false),
+    )
+    return Effect.gen(function* () {
+      lookups.count = 0
+      const r = yield* resolvePendingCertInvite(xfccOf)
+      expect(r.kind).toBe("invalid")
+      expect(lookups.count).toBe(0)
+    }).pipe(Effect.provide(layer))
+  })
+
+  it.effect("still resolves the same certificate once the issuer is proven", () => {
+    const store = new Map<string, Invite>()
+    store.set("inv-9", makeInvite({ id: "inv-9" }))
+    const layer = Layer.mergeAll(
+      mockInviteRepo(store),
+      certLayer({ inviteId: "inv-9", userId: null, revokedAt: null }),
+      trusted,
+    )
+    return Effect.gen(function* () {
+      lookups.count = 0
+      const r = yield* resolvePendingCertInvite(xfccOf)
+      expect(r.kind).toBe("pending")
+      expect(lookups.count).toBe(1)
+    }).pipe(Effect.provide(layer))
+  })
 })

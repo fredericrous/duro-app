@@ -95,7 +95,11 @@ worker:
   enabled: false
   port: 3001
   otelServiceName: "duro-worker"
-  env: {}
+  env:
+    # The worker syncs DashboardApps from the operator every minute (a
+    # conditional GET: a 304 when nothing changed). Unset = auto-sync off,
+    # and apps only arrive through the admin "Sync from cluster" button.
+    OPERATOR_API_URL: "http://duro-operator.duro.svc.cluster.local:9090"
   resources:
     requests:
       memory: "64Mi"

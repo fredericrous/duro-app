@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach, beforeAll, afterAll, afterEach } from "vitest"
+import { describe, expect, it, vi, beforeEach } from "vitest"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 
@@ -120,7 +120,7 @@ describe("/catalog loader — appsCatalogPromise (real DB)", () => {
 // setup handle the HTTP boundary; no per-file bootstrap.
 // ===========================================================================
 
-import { screen, waitFor } from "@testing-library/react"
+import { screen, waitFor, within } from "@testing-library/react"
 import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
 import CatalogPage from "./catalog"
 import { renderRoute } from "~/test/render-route"
@@ -132,6 +132,8 @@ const entry = (
     state: string
     description: string | null
     homepage: string | null
+    accessVia: AppCatalogEntry["accessVia"]
+    requestableRoleIds: string[]
   }>,
 ): AppCatalogEntry =>
   ({
@@ -152,13 +154,15 @@ const entry = (
     grantedRoleIds: [],
     pendingTargets: [],
     roles: [],
-    requestableRoleIds: [],
+    requestableRoleIds: overrides.requestableRoleIds ?? [],
+    accessVia: overrides.accessVia ?? [],
   }) as unknown as AppCatalogEntry
 
 const renderCatalog = (
   catalog: AppCatalogEntry[],
   url = "/catalog",
   dashboard: { user: string; isAdmin: boolean } = { user: "alice", isAdmin: false },
+  urlBySlug: Record<string, string> = {},
 ) => {
   // Pre-resolve the promise ONCE so router revalidations don't re-trip
   // Suspense in a loop (same pattern as home.test.tsx).
@@ -169,7 +173,7 @@ const renderCatalog = (
     route: {
       path: "/catalog",
       Component: CatalogPage as never,
-      loader: () => ({ appsCatalogPromise, iconBySlug: {} }),
+      loader: () => ({ appsCatalogPromise, iconBySlug: {}, urlBySlug }),
     },
     url,
   })
@@ -209,6 +213,89 @@ describe("CatalogPage component — populated", () => {
     expect(chipLabels.some((l) => l.includes("Open"))).toBe(true)
     expect(chipLabels.some((l) => l.includes("Request access"))).toBe(true)
     expect(chipLabels.some((l) => l.includes("Pending"))).toBe(true)
+  })
+
+  it("says where the user's access comes from, e.g. the duro admin role", async () => {
+    // An admin's access arrives through the duro admin role's bundle, not a
+    // role on the app: the row must say so instead of offering a request.
+    renderCatalog([
+      entry({
+        slug: "wiki",
+        displayName: "Wiki",
+        state: "granted_full",
+        accessVia: [{ role: "Administrator", roleApp: "Duro", entitlement: null, group: null }],
+      }),
+      entry({
+        slug: "photos",
+        displayName: "Photos",
+        state: "granted_full",
+        accessVia: [{ role: null, roleApp: null, entitlement: "Access", group: "Family" }],
+      }),
+    ])
+
+    await waitFor(() => {
+      expect(screen.getByText("Via Administrator (Duro)")).toBeInTheDocument()
+    })
+    expect(screen.getByText("Access granted, through Family")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Request access" })).not.toBeInTheDocument()
+  })
+
+  describe("rows the user can already open", () => {
+    const granted = entry({
+      slug: "photos",
+      displayName: "Photos",
+      state: "granted_full",
+      requestableRoleIds: ["role-editor"],
+      accessVia: [{ role: "Administrator", roleApp: "Duro", entitlement: null, group: null }],
+    })
+    const urls = { photos: "https://photos.example.test" }
+
+    it("leads with Open, and offers a role as the quiet secondary", async () => {
+      renderCatalog([granted], "/catalog", { user: "alice", isAdmin: false }, urls)
+
+      const open = await screen.findByRole("link", { name: "Open" })
+      expect(open).toHaveAttribute("href", "https://photos.example.test")
+      expect(screen.getByRole("button", { name: "Request a role" })).toBeInTheDocument()
+      expect(screen.queryByText("Partial access")).not.toBeInTheDocument()
+      expect(screen.queryByRole("button", { name: "Request more access" })).not.toBeInTheDocument()
+    })
+
+    it("gives an admin Manage instead of a request to themselves", async () => {
+      renderCatalog([granted], "/catalog", { user: "admin", isAdmin: true }, urls)
+
+      await screen.findByRole("link", { name: "Open" })
+      expect(screen.getByRole("button", { name: "Manage" }).closest("a")).toHaveAttribute(
+        "href",
+        "/admin/applications/app-photos",
+      )
+      expect(screen.queryByRole("button", { name: "Request a role" })).not.toBeInTheDocument()
+    })
+
+    it("never has an admin request from themselves, even without access yet", async () => {
+      renderCatalog([entry({ slug: "wiki", displayName: "Wiki", state: "requestable" })], "/catalog", {
+        user: "admin",
+        isAdmin: true,
+      })
+
+      await screen.findByRole("button", { name: "Manage" })
+      // Scoped to the row: the "Request access" state chip above the table stays.
+      const row = screen.getByRole("row", { name: /Wiki/ })
+      expect(within(row).queryByRole("button", { name: "Request access" })).not.toBeInTheDocument()
+    })
+
+    it("offers no role when none is left to ask for", async () => {
+      renderCatalog([{ ...granted, requestableRoleIds: [] }], "/catalog", { user: "alice", isAdmin: false }, urls)
+
+      await screen.findByRole("link", { name: "Open" })
+      expect(screen.queryByRole("button", { name: "Request a role" })).not.toBeInTheDocument()
+    })
+
+    it("falls back to 'Available on Home' when the app has no URL", async () => {
+      renderCatalog([granted])
+
+      await screen.findByText("Available on Home")
+      expect(screen.queryByRole("link", { name: "Open" })).not.toBeInTheDocument()
+    })
   })
 
   it("shows the description and a Learn more link when the app has a homepage", async () => {

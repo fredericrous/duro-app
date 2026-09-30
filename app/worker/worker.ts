@@ -24,6 +24,10 @@ import { ConnectedSystemRepoLive } from "~/lib/governance/ConnectedSystemRepo.se
 import { ConnectorMappingRepoLive } from "~/lib/governance/ConnectorMappingRepo.server"
 import { AuditServiceLive } from "~/lib/governance/AuditService.server"
 import { LldapClientLive } from "~/lib/services/LldapClient.server"
+import { OperatorClientLive } from "~/lib/services/OperatorClient.server"
+import { AppSyncServiceLive } from "~/lib/governance/AppSyncService.server"
+import { makeAppAutoSync } from "~/lib/governance/appAutoSync.server"
+import { config } from "~/lib/config.server"
 import { FetchHttpClient } from "@effect/platform"
 import { OtelLayer } from "~/lib/telemetry.server"
 import * as SqlClient from "@effect/sql/SqlClient"
@@ -46,6 +50,10 @@ const PluginHostWired = PluginHostLive.pipe(
   ),
 )
 
+const AppSyncWired = AppSyncServiceLive.pipe(
+  Layer.provide(Layer.mergeAll(OperatorClientLive, GovernanceRepos, ApplicationRepoLive, PluginRegistryLive)),
+)
+
 const WorkerLayer = Layer.mergeAll(
   GovernanceRepos,
   ApplicationRepoLive,
@@ -53,6 +61,7 @@ const WorkerLayer = Layer.mergeAll(
   ProvisioningServiceLive,
   PluginRegistryLive,
   PluginHostWired,
+  AppSyncWired,
 ).pipe(Layer.provideMerge(DbLive), Layer.provide(OtelLayer), Layer.provide(FetchHttpClient.layer))
 
 // ---------------------------------------------------------------------------
@@ -138,6 +147,28 @@ const pollLoop = pollOnce.pipe(
 )
 
 // ---------------------------------------------------------------------------
+// App sync loop — DashboardApps reach duro without an admin clicking "Sync from
+// cluster". Its own cadence (a conditional GET a minute, a forced full sync an
+// hour) and its own fiber, so a slow operator never delays provisioning.
+// ---------------------------------------------------------------------------
+
+const APP_SYNC_EVERY = "60 seconds"
+const APP_SYNC_FORCE_EVERY_TICKS = 60
+
+const appSyncLoop = config.operatorApiUrl
+  ? // The first tick waits one interval: at a cold start of the whole stack the
+    // operator's cache may not be filled yet, and the guards would only refuse it.
+    Effect.sleep(APP_SYNC_EVERY).pipe(
+      Effect.zipRight(
+        makeAppAutoSync({ forceEvery: APP_SYNC_FORCE_EVERY_TICKS }).pipe(
+          Effect.repeat(Schedule.spaced(APP_SYNC_EVERY)),
+        ),
+      ),
+      Effect.asVoid,
+    )
+  : Effect.log("worker: OPERATOR_API_URL unset, app auto-sync off")
+
+// ---------------------------------------------------------------------------
 // Health server (for k8s liveness/readiness probes)
 // ---------------------------------------------------------------------------
 
@@ -190,6 +221,9 @@ const startHealthServer = Effect.gen(function* () {
 const main = Effect.gen(function* () {
   yield* Effect.log("duro worker starting")
   yield* startHealthServer
+  // The sync loop never fails (each tick recovers), so the poll loop alone
+  // decides whether the worker lives: its crash still exits the process.
+  yield* Effect.forkScoped(appSyncLoop)
   yield* pollLoop
 }).pipe(Effect.scoped)
 

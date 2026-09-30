@@ -1,7 +1,7 @@
 import * as PgClient from "@effect/sql-pg/PgClient"
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as SqlError from "@effect/sql/SqlError"
-import { Context, Config, Duration, Effect, Layer } from "effect"
+import { Context, Config, Duration, Effect, Layer, Schedule } from "effect"
 import { statSync } from "node:fs"
 
 import { seedDevFixtures } from "./seed-dev.server"
@@ -58,16 +58,52 @@ const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.t
 // idleTimeout: close idle connections quickly so we don't keep stale
 // sockets around between bursts.
 // applicationName: shows up in pg_stat_activity for triage.
+//
+// The layer build runs `SELECT 1` once (5 s timeout) and ManagedRuntime
+// memoizes the build fiber: a failure at that first attempt is the failure
+// every later runDbEffect sees, for the life of the process. Observed
+// 2026-09-21 in the migration-check lane: the app booted while the restored
+// CNPG clone was restarting, the first connect timed out, and /health/ready
+// answered 503 "Connection timed out" for 10 minutes against a database that
+// had been accepting connections since second 30. A pod restarted during a
+// primary failover would behave the same way in production. Retrying the
+// build with backoff keeps the failure transient: kubelet readiness sees
+// 503s only while the database is actually down, and the very first query
+// after it comes back succeeds.
+export const dbConnectRetry = Schedule.exponential(Duration.seconds(1), 2).pipe(
+  Schedule.union(Schedule.spaced(Duration.seconds(10))),
+  Schedule.upTo(Duration.minutes(5)),
+)
+
+/**
+ * Wrap a client layer so a failed build is retried on `dbConnectRetry`
+ * instead of being memoized as the process's permanent answer. Exported so
+ * the behaviour is testable with a fake layer that fails N times.
+ */
+export const withConnectRetry = <ROut, E, RIn>(
+  layer: Layer.Layer<ROut, E, RIn>,
+  schedule: Schedule.Schedule<unknown, E> = dbConnectRetry,
+) =>
+  layer.pipe(
+    Layer.retry(
+      schedule.pipe(
+        Schedule.tapInput((e: E) => Effect.sync(() => console.warn(`[db] connect failed, retrying: ${String(e)}`))),
+      ),
+    ),
+  )
+
 const PgClientLive = Layer.unwrapEffect(
   Config.redacted("DATABASE_URL").pipe(
     Effect.map((url) =>
-      PgClient.layer({
-        url,
-        transformResultNames: snakeToCamel,
-        applicationName: "duro-app",
-        connectionTTL: Duration.minutes(5),
-        idleTimeout: Duration.seconds(30),
-      }),
+      withConnectRetry(
+        PgClient.layer({
+          url,
+          transformResultNames: snakeToCamel,
+          applicationName: "duro-app",
+          connectionTTL: Duration.minutes(5),
+          idleTimeout: Duration.seconds(30),
+        }),
+      ),
     ),
   ),
 )
