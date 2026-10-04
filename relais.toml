@@ -37,6 +37,14 @@ aval = "required"
 amont = "required"
 amont_agent = "required"
 
+# A verification worktree is a bare checkout: the profile's commands need
+# node_modules installed there first. Executable authority like the
+# commands (hashed into the trust grant), run in every worktree the
+# commands run in.
+[[verification.profiles.default.setup]]
+argv = ["npm", "ci"]
+timeout_seconds = 900
+
 [[verification.profiles.default.commands]]
 argv = ["npm", "run", "typecheck"]
 timeout_seconds = 900
