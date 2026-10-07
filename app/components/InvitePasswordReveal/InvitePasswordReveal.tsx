@@ -84,9 +84,7 @@ export function InvitePasswordReveal({ hasPassword }: { hasPassword: boolean }) 
           </ScratchCard>
           <InputGroup.Addon
             disabled={!revealed || p12Password === null}
-            // holds-until: Duro 5.2 ships an InputGroup.Addon min-width size token;
-            // 4.5rem = 72px, the old value; rem equals the old px only while global.css pins html to 16px.
-            minWidth="4.5rem"
+            minWidth="fieldMinWSm"
             // `revealed` matters as much as the password being loaded: the
             // fetch fires at the START of the scratch, so between first contact
             // and the foil lifting there is a window where a stray touch landing
