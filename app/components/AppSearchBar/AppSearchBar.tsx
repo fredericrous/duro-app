@@ -6,17 +6,6 @@ import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { radii, spacing } from "@duro-app/tokens/tokens/spacing.css"
 
 const styles = css.create({
-  // Inline SVG wrapper for the leading magnifier — the DS Icon catalog only
-  // ships status icons (info, alert, x-circle, …), not glyphs like "search".
-  // We keep this local rather than expanding the DS for a single use site.
-  searchGlyph: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: sizes.iconSm,
-    height: sizes.iconSm,
-    color: "currentColor",
-  },
   chipCount: {
     // Muted suffix (e.g. "Media · 8") so the count never competes with the
     // label for the user's eye but is still readable at a glance.
@@ -73,9 +62,7 @@ export function AppSearchBar({
     <Stack gap="sm">
       <InputGroup.Root>
         <InputGroup.Addon position="start">
-          <html.span style={styles.searchGlyph}>
-            <SearchGlyph />
-          </html.span>
+          <Icon name="search" size="sm" />
         </InputGroup.Addon>
         <Input
           ref={inputRef}
@@ -110,26 +97,6 @@ export function AppSearchBar({
         </ToggleGroup>
       )}
     </Stack>
-  )
-}
-
-/** Lucide-style search icon, inlined to avoid expanding the DS icon catalog. */
-function SearchGlyph() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden={true}
-    >
-      <circle cx="11" cy="11" r="7" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
   )
 }
 
