@@ -42,7 +42,7 @@ describe("AppSearchBar", () => {
 
   it("does not render the clear button when query is empty", () => {
     renderBar({ query: "" })
-    expect(screen.queryByText("Clear search")).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Clear search" })).not.toBeInTheDocument()
   })
 
   it("renders the clear button when query is non-empty and clears on click", async () => {
