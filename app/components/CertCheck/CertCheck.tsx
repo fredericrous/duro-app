@@ -2,6 +2,7 @@ import { useParams } from "react-router"
 import { Trans, useTranslation } from "react-i18next"
 import { Alert, Button, LinkButton, Stack, Text } from "@duro-app/ui"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { borders } from "@duro-app/tokens/tokens/borders.css"
 import { radii, spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { typeScale, typography } from "@duro-app/tokens/tokens/typography.css"
 import { css, html } from "react-strict-dom"
@@ -23,7 +24,7 @@ const styles = css.create({
       ":hover": colors.warningBorder,
     },
     color: colors.warning,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderStyle: "solid",
     borderColor: colors.warningBorder,
     borderRadius: radii.sm,

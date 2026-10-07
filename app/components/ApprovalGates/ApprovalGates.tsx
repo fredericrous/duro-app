@@ -3,6 +3,7 @@ import { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
 import { css, html } from "react-strict-dom"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { borders } from "@duro-app/tokens/tokens/borders.css"
 import { spacing, radii } from "@duro-app/tokens/tokens/spacing.css"
 import { duration, easing } from "@duro-app/tokens/tokens/motion.css"
 import {
@@ -538,7 +539,7 @@ const styles = css.create({
     paddingLeft: spacing.md,
     paddingRight: spacing.md,
     borderRadius: radii.sm,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderStyle: "solid",
     borderColor: colors.border,
     backgroundColor: colors.bgCardHover,
@@ -572,7 +573,7 @@ const styles = css.create({
     transform: "scale(0.85)",
   },
   gateEmpty: {
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderStyle: "dashed",
     borderColor: colors.border,
     borderRadius: radii.sm,
@@ -590,7 +591,7 @@ const styles = css.create({
   },
   connectorLine: {
     width: "100%",
-    borderTopWidth: 1,
+    borderTopWidth: borders.hairline,
     borderTopStyle: "solid",
     borderTopColor: colors.border,
   },
@@ -600,7 +601,7 @@ const styles = css.create({
     gap: spacing.xs,
     padding: spacing.ms,
     borderRadius: radii.sm,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderStyle: "solid",
     borderColor: colors.border,
     backgroundColor: colors.bg,

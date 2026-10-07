@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { Card } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
+import { sizes } from "@duro-app/tokens/tokens/sizes.css"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 
 const styles = css.create({
@@ -12,7 +13,7 @@ const styles = css.create({
     padding: spacing.xl,
   },
   cardWrapper: {
-    maxWidth: 480,
+    maxWidth: sizes.panelMd,
     width: "100%",
   },
 })

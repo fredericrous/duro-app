@@ -11,6 +11,7 @@ import { handleAdminAccessRequestsMutation } from "~/lib/mutations/admin-access-
 import { enumLabel } from "~/lib/enum-labels"
 import { css, html } from "react-strict-dom"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { borders } from "@duro-app/tokens/tokens/borders.css"
 import {
   Alert,
   Badge,
@@ -276,7 +277,7 @@ const styles = css.create({
     flexDirection: "column",
     gap: spacing.xs,
     paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
+    borderBottomWidth: borders.hairline,
     borderBottomStyle: "solid",
     borderBottomColor: "var(--color-border)",
   },

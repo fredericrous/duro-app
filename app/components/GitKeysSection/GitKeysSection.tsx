@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import { useLinkTarget } from "~/hooks/useLinkTarget"
 import { useFetcher, useRevalidator } from "react-router"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { borders } from "@duro-app/tokens/tokens/borders.css"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
 import {
   Alert,
@@ -47,7 +48,7 @@ const styles = css.create({
     gap: spacing.md,
     paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
-    borderTopWidth: 1,
+    borderTopWidth: borders.hairline,
     borderTopStyle: "solid",
     borderTopColor: colors.border,
   },
@@ -58,7 +59,7 @@ const styles = css.create({
   // carry the meaning); persists until the next mutation, so no timer to clean.
   rowJustAdded: {
     backgroundColor: colors.successBg,
-    borderLeftWidth: 3,
+    borderLeftWidth: borders.accent,
     borderLeftStyle: "solid",
     borderLeftColor: colors.successBorder,
     paddingLeft: spacing.sm,

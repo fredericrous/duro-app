@@ -3,12 +3,13 @@ import type { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
 import { Alert, Button, Combobox, Field, Inline, Stack, Text, Textarea } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
+import { sizes } from "@duro-app/tokens/tokens/sizes.css"
 import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
 
 const styles = css.create({
   formWrap: {
     width: "100%",
-    maxWidth: 360,
+    maxWidth: sizes.panelSm,
     textAlign: "left",
   },
 })

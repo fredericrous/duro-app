@@ -13,19 +13,33 @@
 cache=".claude/.duro-session.cache"
 notes=".claude/duro-hook.local.md"
 doctor=".claude/.duro-session.cache.doctor"
+pin="#duro-hook-pin 5.0.0"
 
 # npx resolution dominates session start; the catalog only changes on upgrade.
-if [ ! -s "$cache" ] || [ -n "$(find "$cache" -mtime +7 2>/dev/null)" ]; then
-  if npx -y @duro-app/cli@^3.4.0 hook session-start >"$cache.tmp" 2>/dev/null; then
+# Refetch when it is missing, a week old, fetched with another floor (its
+# first line), or older than this script (a regenerate).
+if [ ! -s "$cache" ] || [ "$(head -n 1 "$cache" 2>/dev/null)" != "$pin" ] ||
+  [ -n "$(find "$cache" -mtime +7 2>/dev/null)" ] || [ ".claude/hooks/duro-catalog.sh" -nt "$cache" ]; then
+  # The pin is written with the payload, so a failed fetch (or one that
+  # printed nothing) leaves the old cache as it was and never a pin-only file.
+  if { echo "$pin"; npx -y @duro-app/cli@^5.0.0 hook session-start; } >"$cache.tmp" 2>/dev/null &&
+    [ -n "$(tail -n +2 "$cache.tmp")" ]; then
     mv "$cache.tmp" "$cache"
   else
     rm -f "$cache.tmp"
+    if [ -s "$cache" ] && [ "$(head -n 1 "$cache")" != "$pin" ]; then
+      echo "duro: the catalog below is from an older CLI and could not be refreshed; run: npx -y @duro-app/cli@^5.0.0 hook install" >&2
+    fi
   fi
 fi
 
 # Offline with no cache yet: stay silent rather than fail the session.
 if [ -s "$cache" ]; then
-  cat "$cache"
+  # The pin line is bookkeeping, not catalog: skip it, and only it.
+  case "$(head -n 1 "$cache")" in
+    '#duro-hook-pin '*) tail -n +2 "$cache" ;;
+    *) cat "$cache" ;;
+  esac
   if [ -s "$notes" ]; then
     echo
     cat "$notes"
@@ -40,8 +54,10 @@ key=$(find . -maxdepth 4 \( -name node_modules -o -name .git -o -name dist -o -n
   -o -name 'babel*' -o -name '.babelrc*' -o -name '*.babel.*' -o -name 'postcss*' \
   -o -name 'root.tsx' -o -name 'main.tsx' -o -name 'index.tsx' \) -exec cksum {} + 2>/dev/null |
   sort | cksum)
+# The floor is part of the key: a new floor reruns the doctor.
+key="5.0.0 $key"
 if [ "$key" != "$(cat "$doctor.key" 2>/dev/null)" ]; then
-  if npx -y @duro-app/cli@^3.4.0 doctor --session >"$doctor.tmp" 2>/dev/null; then
+  if npx -y @duro-app/cli@^5.0.0 doctor --session >"$doctor.tmp" 2>/dev/null; then
     mv "$doctor.tmp" "$doctor"
     echo "$key" >"$doctor.key"
   else

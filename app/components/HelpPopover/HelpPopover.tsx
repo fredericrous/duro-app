@@ -2,6 +2,7 @@ import type { CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
 import { css, html } from "react-strict-dom"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { borders } from "@duro-app/tokens/tokens/borders.css"
 import { shadows } from "@duro-app/tokens/tokens/shadows.css"
 import { spacing, radii } from "@duro-app/tokens/tokens/spacing.css"
 import { typography } from "@duro-app/tokens/tokens/typography.css"
@@ -38,12 +39,14 @@ const styles = css.create({
     zIndex: 50,
     top: "calc(100% + 4px)",
     left: 0,
-    minWidth: 240,
-    maxWidth: 320,
+    // holds-until: Duro 5.2 ships popover min/max width size tokens;
+    // 15rem/20rem = the old 240/320px; rem equals the old px only while global.css pins html to 16px.
+    minWidth: "15rem",
+    maxWidth: "20rem",
     padding: spacing.ms,
     backgroundColor: colors.bgCard,
     color: colors.text,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderStyle: "solid",
     borderColor: colors.border,
     borderRadius: radii.sm,

@@ -4,6 +4,7 @@ import { useLinkTarget } from "~/hooks/useLinkTarget"
 import { Card, Stack, Text } from "@duro-app/ui"
 import { Icon } from "../Icon"
 import { css, html } from "react-strict-dom"
+import { sizes } from "@duro-app/tokens/tokens/sizes.css"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 
 const styles = css.create({
@@ -15,8 +16,8 @@ const styles = css.create({
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    width: 48,
-    height: 48,
+    width: sizes.iconXxl,
+    height: sizes.iconXxl,
     color: colors.accent,
   },
 })

@@ -17,6 +17,16 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .claude/hooks/duro-plan.sh"
+          }
+        ]
+      }
     ]
   }
 }

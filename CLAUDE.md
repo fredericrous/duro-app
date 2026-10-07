@@ -46,11 +46,12 @@ Fleet decision `ui.mockup-handoff` (ADR-0016) is what this enforces; the
 session hook prints its constraints.
 
 Lint: the shared duro-stack flat config (`react` + `effect` + `tests`
-presets, v3) enforces the critical rules (html.\* elements, deep token
+presets, v5) enforces the critical rules (html.\* elements, deep token
 imports, form kit over bare `html.input`, no deprecated Table parts, raw
-design values in `css.create` — colours, off-scale spacing/radius, `@media`
-breakpoints, type, shadows, motion — and raw breakpoints in media-query
-strings, which autofix to `breakpoints.<key>`; warns on `flexGrow` in
+design values in `css.create` — colours, off-scale spacing/radius, sizes,
+border widths, `@media` breakpoints, type, shadows, motion; every measure
+is a `sizes.*`/`borders.*`/`spacing.*` token, ADR-0027 — and raw
+breakpoints in media-query strings, which autofix to `breakpoints.<key>`; warns on `flexGrow` in
 `css.create`), the UI-library and SQL-layer policies,
 `@effect/opentelemetry` via subpath, and accessibility-first test selectors
 (no `getByTestId`). Errors gate, warnings inform — severity is the gate,

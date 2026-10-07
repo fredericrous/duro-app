@@ -6,6 +6,7 @@ import { css, html } from "react-strict-dom"
 import { RequestAccessForm } from "~/components/RequestAccessForm/RequestAccessForm"
 import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
 import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { sizes } from "@duro-app/tokens/tokens/sizes.css"
 
 const styles = css.create({
   container: {
@@ -20,7 +21,7 @@ const styles = css.create({
   },
   ctaWrap: {
     width: "100%",
-    maxWidth: 360,
+    maxWidth: sizes.panelSm,
   },
 })
 
