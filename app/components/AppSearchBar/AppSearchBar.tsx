@@ -13,21 +13,6 @@ const styles = css.create({
     marginLeft: spacing.xs,
     fontVariantNumeric: "tabular-nums",
   },
-  // CSS visually-hidden — content readable by screen readers, invisible on
-  // screen. DS doesn't ship a primitive for this, so inline it here.
-  visuallyHidden: {
-    position: "absolute",
-    // holds-until: Duro 5.2 exports its visually-hidden style (or an
-    // accessible name on InputGroup.Addon); divider is the 1px the technique needs.
-    width: sizes.divider,
-    height: sizes.divider,
-    padding: 0,
-    margin: -1,
-    overflow: "hidden",
-    clip: "rect(0, 0, 0, 0)",
-    whiteSpace: "nowrap",
-    borderWidth: 0,
-  },
 })
 
 interface SearchChip {
@@ -77,13 +62,13 @@ export function AppSearchBar({
         {hasQuery && (
           <InputGroup.Addon
             position="end"
+            aria-label={clearLabel}
             onClick={() => {
               onQueryChange("")
               inputRef.current?.focus()
             }}
           >
             <Icon name="x-circle" size="sm" />
-            <html.span style={styles.visuallyHidden}>{clearLabel}</html.span>
           </InputGroup.Addon>
         )}
       </InputGroup.Root>
@@ -115,9 +100,7 @@ const skeletonStyles = css.create({
   },
   chip: {
     height: sizes.controlSm,
-    // holds-until: Duro 5.2 ships a skeleton chip width size token;
-    // 5.75rem = the old 92px; rem equals the old px only while global.css pins html to 16px.
-    width: "5.75rem",
+    width: sizes.skeletonChipW,
     borderRadius: radii.full,
     backgroundColor: colors.bgCard,
   },

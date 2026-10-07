@@ -143,9 +143,7 @@ function PasswordCard() {
         </ScratchCard>
         <InputGroup.Addon
           disabled={!revealed || password === null}
-          // holds-until: Duro 5.2 ships an InputGroup.Addon min-width size token;
-          // 4.5rem = 72px, the old value; rem equals the old px only while global.css pins html to 16px.
-          minWidth="4.5rem"
+          minWidth="fieldMinWSm"
           // See InvitePasswordReveal: the password arrives at the start of the
           // scratch, so without the `revealed` check a touch that lands here
           // mid-scratch copies a still-hidden password.
@@ -210,9 +208,7 @@ function DeviceNameCard() {
           />
           <InputGroup.Addon
             disabled={submitting || value.trim() === ""}
-            // holds-until: Duro 5.2 ships an InputGroup.Addon min-width size token;
-            // 4.5rem = 72px, the old value; rem equals the old px only while global.css pins html to 16px.
-            minWidth="4.5rem"
+            minWidth="fieldMinWSm"
             onClick={() => {
               fetcher.submit({ intent: "name", label: value }, { method: "post" })
             }}

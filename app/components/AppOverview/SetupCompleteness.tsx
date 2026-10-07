@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import { css, html } from "react-strict-dom"
 import { Button, Heading, Icon, Inline, Panel, Stack, Text } from "@duro-app/ui"
 import { radii, spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { sizes } from "@duro-app/tokens/tokens/sizes.css"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { duration, easing } from "@duro-app/tokens/tokens/motion.css"
 import { useReducedMotion } from "~/lib/useReducedMotion"
@@ -138,9 +139,7 @@ const styles = css.create({
     gridTemplateColumns: `repeat(${cols}, 1fr)`,
   }),
   segment: {
-    // holds-until: Duro 5.2 ships a progress-segment height size token;
-    // 0.375rem = the old 6px; rem equals the old px only while global.css pins html to 16px.
-    height: "0.375rem",
+    height: sizes.meterH,
     borderRadius: radii.full,
     backgroundColor: colors.border,
     transitionProperty: "background-color",
