@@ -145,7 +145,6 @@ function buildIdentityColumns(t: (key: string, opts?: Record<string, unknown>) =
   return [
     columnHelper.display({
       id: "select",
-      size: 40,
       enableSorting: false,
       header: ({ table }) => (
         <Checkbox
@@ -352,7 +351,6 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
 
-  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: identities,
     columns,
@@ -492,7 +490,7 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
                     <Table.HeaderCell
                       key={header.id}
                       label={typeof header.column.columnDef.header === "string" ? header.column.columnDef.header : ""}
-                      width={isActions ? "max-content" : header.getSize() !== 150 ? `${header.getSize()}px` : undefined}
+                      width={isActions ? "max-content" : header.column.id === "select" ? "controlLg" : undefined}
                     >
                       {header.isPlaceholder ? null : header.column.getCanSort() ? (
                         <html.span style={styles.sortHeader} onClick={header.column.getToggleSortingHandler()}>

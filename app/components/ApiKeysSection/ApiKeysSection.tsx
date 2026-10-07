@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import { useDisplayFormat } from "~/hooks/useDisplayFormat"
 import { useCopyFeedback } from "~/hooks/useCopyFeedback"
 import { css, html } from "react-strict-dom"
+import { borders } from "@duro-app/tokens/tokens/borders.css"
 import { radii, spacing } from "@duro-app/tokens/tokens/spacing.css"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 import {
@@ -51,7 +52,7 @@ const styles = css.create({
     gap: spacing.md,
     paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
-    borderTopWidth: 1,
+    borderTopWidth: borders.hairline,
     borderTopStyle: "solid",
     borderTopColor: colors.border,
   },
@@ -69,20 +70,19 @@ const styles = css.create({
     borderRadius: radii.sm,
     backgroundColor: colors.bgCard,
     color: colors.text,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderStyle: "solid",
     borderColor: colors.border,
   },
   keyFallback: {
     width: "100%",
-    minHeight: 64,
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
     fontSize: typography.fontSizeXs,
     padding: spacing.sm,
     borderRadius: radii.sm,
     backgroundColor: colors.bgCard,
     color: colors.text,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderStyle: "solid",
     borderColor: colors.border,
   },

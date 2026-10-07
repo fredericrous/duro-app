@@ -1,6 +1,7 @@
 import { Link } from "react-router"
 import type { ComponentProps } from "react"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { borders } from "@duro-app/tokens/tokens/borders.css"
 import { radii } from "@duro-app/tokens/tokens/spacing.css"
 import { typeScale, typography } from "@duro-app/tokens/tokens/typography.css"
 import { css } from "react-strict-dom"
@@ -24,7 +25,7 @@ const styles = css.create({
     padding: "8px 20px",
     backgroundColor: "transparent",
     color: colors.textMuted,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderStyle: "solid",
     borderColor: colors.border,
   },

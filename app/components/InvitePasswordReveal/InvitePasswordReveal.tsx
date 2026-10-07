@@ -84,7 +84,7 @@ export function InvitePasswordReveal({ hasPassword }: { hasPassword: boolean }) 
           </ScratchCard>
           <InputGroup.Addon
             disabled={!revealed || p12Password === null}
-            minWidth={72}
+            minWidth="4.5rem"
             // `revealed` matters as much as the password being loaded: the
             // fetch fires at the START of the scratch, so between first contact
             // and the foil lifting there is a window where a stray touch landing

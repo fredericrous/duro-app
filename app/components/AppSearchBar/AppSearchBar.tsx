@@ -1,6 +1,7 @@
 import { useRef } from "react"
 import { Icon, Input, InputGroup, Stack, Toggle, ToggleGroup } from "@duro-app/ui"
 import { css, html } from "react-strict-dom"
+import { sizes } from "@duro-app/tokens/tokens/sizes.css"
 import { colors } from "@duro-app/tokens/tokens/colors.css"
 import { radii, spacing } from "@duro-app/tokens/tokens/spacing.css"
 
@@ -12,8 +13,8 @@ const styles = css.create({
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: 16,
-    height: 16,
+    width: sizes.iconSm,
+    height: sizes.iconSm,
     color: "currentColor",
   },
   chipCount: {
@@ -27,8 +28,8 @@ const styles = css.create({
   // screen. DS doesn't ship a primitive for this, so inline it here.
   visuallyHidden: {
     position: "absolute",
-    width: 1,
-    height: 1,
+    width: sizes.divider,
+    height: sizes.divider,
     padding: 0,
     margin: -1,
     overflow: "hidden",
@@ -139,13 +140,13 @@ function SearchGlyph() {
  */
 const skeletonStyles = css.create({
   input: {
-    height: 36,
+    height: sizes.controlMd,
     borderRadius: radii.sm,
     backgroundColor: colors.bgCard,
   },
   chip: {
-    height: 28,
-    width: 92,
+    height: sizes.controlSm,
+    width: "5.75rem",
     borderRadius: radii.full,
     backgroundColor: colors.bgCard,
   },

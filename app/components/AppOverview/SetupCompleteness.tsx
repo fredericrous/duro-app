@@ -138,7 +138,7 @@ const styles = css.create({
     gridTemplateColumns: `repeat(${cols}, 1fr)`,
   }),
   segment: {
-    height: 6,
+    height: "0.375rem",
     borderRadius: radii.full,
     backgroundColor: colors.border,
     transitionProperty: "background-color",

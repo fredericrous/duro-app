@@ -127,8 +127,6 @@ const styles = css.create({
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    width: 32,
-    height: 32,
     flexShrink: 0,
     color: colors.accent,
   },

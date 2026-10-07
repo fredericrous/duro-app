@@ -33,7 +33,7 @@ export function AppGrid({ apps, categoryOrder }: AppGridProps) {
               <Text variant="overline" color="muted" as="div">
                 {categoryLabel(category)}
               </Text>
-              <Grid gap="md" minColumnWidth="120px">
+              <Grid gap="md" minColumnWidth="labelMinW">
                 {categoryApps.map((app) => (
                   <AppCard key={app.id} app={app} />
                 ))}
