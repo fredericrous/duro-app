@@ -138,6 +138,8 @@ const styles = css.create({
     gridTemplateColumns: `repeat(${cols}, 1fr)`,
   }),
   segment: {
+    // holds-until: Duro 5.2 ships a progress-segment height size token;
+    // 0.375rem = the old 6px; rem equals the old px only while global.css pins html to 16px.
     height: "0.375rem",
     borderRadius: radii.full,
     backgroundColor: colors.border,

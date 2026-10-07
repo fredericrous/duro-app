@@ -17,6 +17,8 @@ const styles = css.create({
   // screen. DS doesn't ship a primitive for this, so inline it here.
   visuallyHidden: {
     position: "absolute",
+    // holds-until: Duro 5.2 exports its visually-hidden style (or an
+    // accessible name on InputGroup.Addon); divider is the 1px the technique needs.
     width: sizes.divider,
     height: sizes.divider,
     padding: 0,
@@ -113,6 +115,8 @@ const skeletonStyles = css.create({
   },
   chip: {
     height: sizes.controlSm,
+    // holds-until: Duro 5.2 ships a skeleton chip width size token;
+    // 5.75rem = the old 92px; rem equals the old px only while global.css pins html to 16px.
     width: "5.75rem",
     borderRadius: radii.full,
     backgroundColor: colors.bgCard,
