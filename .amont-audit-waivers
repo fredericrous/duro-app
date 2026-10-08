@@ -1,0 +1,23 @@
+# Advisories a v* release may ship while nobody can fix them (amont >= 1.47).
+# One line each: <advisory id> <expires YYYY-MM-DD> <reason>. A waiver is void
+# once expired or when dated more than 90 days ahead: revisit, then re-date
+# or remove it.
+#
+# braces <= 3.0.3 (stack exhaustion on deeply nested patterns) has no patched
+# version. It ships through react-strict-dom > postcss-react-strict-dom >
+# fast-glob > micromatch, a build-time PostCSS plugin (postcss.config.js) fed
+# the app's own config patterns, never user input. npm audit also flags
+# micromatch, fast-glob, postcss-react-strict-dom and react-strict-dom, only
+# because of this one advisory. Remove when braces publishes a fix.
+GHSA-vfj7-8cjw-p6xm 2026-12-31 braces via react-strict-dom > postcss-react-strict-dom > fast-glob > micromatch (build-time PostCSS globs only); no patched version exists
+
+# node-forge <= 1.4.0 (RSA PKCS#1 v1.5 signature verification accepts extra
+# nested DigestAlgorithm elements) has no patched version; 1.4.0 is the latest
+# release. It is a direct dependency used only in
+# app/lib/services/VaultPki.server.ts to parse the certificate and key that
+# the token-authenticated NAS Vault PKI issue endpoint returns, and to bundle
+# them into a PKCS#12. duro-app never verifies an RSA signature with
+# node-forge, never terminates TLS with it, and never parses a certificate a
+# user supplies. Remove when node-forge publishes a fix, or replace it with
+# node:crypto.
+GHSA-86w9-cpqp-85rv 2026-12-31 node-forge in VaultPki only (PKCS#12 bundling of Vault-issued certs, no signature verification, no user input); no patched version exists
