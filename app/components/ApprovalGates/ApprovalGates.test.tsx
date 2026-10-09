@@ -226,7 +226,8 @@ describe("ApprovalGates drag and drop", () => {
       .spyOn(document, "elementsFromPoint")
       .mockReturnValue([trackGroup, trackGroup.parentElement as Element])
     // The index comes from where the pointer is against each gate's midpoint.
-    // Put the owner gate at x 80–120, so a release left of it slots Marie first.
+    // Put the owner gate (the elements around its Tag, inside the track) at
+    // x 80–120, so a release left of it slots Marie first.
     const owner = screen.getByText(`${t("admin.applications.gates.owner")} · daddy`)
     const zero = Element.prototype.getBoundingClientRect
     const rect = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {

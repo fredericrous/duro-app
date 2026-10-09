@@ -52,9 +52,10 @@ if (typeof window !== "undefined" && typeof window.matchMedia === "undefined") {
 // jsdom doesn't ship pointer capture or hit testing. @duro-app/ui's DragDrop
 // (5.7+) captures the pointer on its source and finds the zone under the
 // release point with document.elementsFromPoint; without these a drag throws.
-// jsdom lays nothing out (every rect is 0×0 at the origin), so the hit test
-// returns the elements whose rect holds the point, deepest first — the same
-// answer a browser gives, for a layout where everything sits at (0, 0).
+// jsdom lays nothing out (every rect is 0×0 at the origin), so this only keeps
+// a drag from throwing: it returns the elements whose rect holds the point, in
+// reverse document order (an approximation of a browser's topmost-first).
+// A test that cares which zone is hit spies on it, as ApprovalGates does.
 if (typeof Element !== "undefined" && typeof Element.prototype.setPointerCapture !== "function") {
   Element.prototype.setPointerCapture = function () {}
   Element.prototype.releasePointerCapture = function () {}
