@@ -218,9 +218,29 @@ describe("ApprovalGates drag and drop", () => {
     // still be holding when findByRole resolves on a cold run. Flush them.
     await act(async () => {})
 
+    // DragDrop finds the zone under the release point with
+    // document.elementsFromPoint. jsdom has no layout, so say what a browser
+    // would report there: the track (its labelled group, then the zone).
+    const trackGroup = screen.getByRole("group", { name: t("admin.applications.gates.tryIt") })
+    const hit = vi
+      .spyOn(document, "elementsFromPoint")
+      .mockReturnValue([trackGroup, trackGroup.parentElement as Element])
+    // The index comes from where the pointer is against each gate's midpoint.
+    // Put the owner gate (the elements around its Tag, inside the track) at
+    // x 80–120, so a release left of it slots Marie first.
+    const owner = screen.getByText(`${t("admin.applications.gates.owner")} · daddy`)
+    const zero = Element.prototype.getBoundingClientRect
+    const rect = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      return this.contains(owner) && !this.contains(trackGroup)
+        ? ({ left: 80, right: 120, top: 0, bottom: 20, width: 40, height: 20, x: 80, y: 0 } as DOMRect)
+        : zero.call(this)
+    })
+
     pointer("pointerdown", item, 0, 0)
-    pointer("pointermove", document, 40, 40) // past the threshold: the drag starts
-    pointer("pointerup", document, 0, 0) // released over the (zero-rect) track
+    pointer("pointermove", document, 40, 40) // past the threshold: the drag starts, left of the owner
+    pointer("pointerup", document, 40, 40) // released over the track, ahead of the owner
+    hit.mockRestore()
+    rect.mockRestore()
 
     await waitFor(() => {
       expect(
