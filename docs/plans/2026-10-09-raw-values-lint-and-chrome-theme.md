@@ -9,11 +9,13 @@ This repository carries Phase 3: delete the unused `ButtonLink` (its shorthand p
 
 ## Phase 3 record (observed before push)
 
-| Input                                 | Expected | Actual                                                                                                                   |
-| ------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `npm run lint` on `@duro-app/*` 5.9.0 | 0 errors | 0 errors, 8 warnings (as on main); ButtonLink deleted; the inline `fontWeight: 500` is now `typography.fontWeightMedium` |
-| typecheck, build                      | pass     | pass                                                                                                                     |
-| `npx vitest run`                      | pass     | 168 files, 1550 tests pass                                                                                               |
+| Input                                                                          | Expected                         | Actual                                                                                                                   |
+| ------------------------------------------------------------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `npm run lint` on `@duro-app/*` 5.9.0                                          | 0 errors                         | 0 errors, 8 warnings (as on main); ButtonLink deleted; the inline `fontWeight: 500` is now `typography.fontWeightMedium` |
+| typecheck, build                                                               | pass                             | pass                                                                                                                     |
+| `npx vitest run`                                                               | pass                             | 168 files, 1550 tests pass                                                                                               |
+| ApprovalGates drop test, with and without the owner gate's rect stub           | passes with it, fails without it | 3 of 3 pass with it; without it, the outcome sentence lists the owner first and the test fails                           |
+| ApprovalGates drop test on Duro 5.6.0 / 5.7.0 / 5.8.x / 5.9.0 (before the fix) | find the release that changed it | passes on 5.6.0, fails from 5.7.0 on (DragDrop #89); filed as duro-design-system#98                                      |
 
 Decision (2026-10-09): the bump surfaced one failing test, `ApprovalGates › dropping a roster person on the track slots them at the dropped index`. Bisected to Duro **5.7.0** (#89, DragDrop rework): passes on 5.6.0, fails on 5.7.0, 5.8.x and 5.9.0. 5.7 captures the pointer and finds the drop zone with `document.elementsFromPoint`, which jsdom lacks, so the test threw and then dropped into the wrong zone on jsdom's 0×0 layout. This is not a product regression: DS's own browser story drags onto a gates zone. Fixed test-side:
 
