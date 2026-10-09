@@ -49,6 +49,29 @@ if (typeof window !== "undefined" && typeof window.matchMedia === "undefined") {
   })) as unknown as typeof window.matchMedia
 }
 
+// jsdom doesn't ship pointer capture or hit testing. @duro-app/ui's DragDrop
+// (5.7+) captures the pointer on its source and finds the zone under the
+// release point with document.elementsFromPoint; without these a drag throws.
+// jsdom lays nothing out (every rect is 0×0 at the origin), so the hit test
+// returns the elements whose rect holds the point, deepest first — the same
+// answer a browser gives, for a layout where everything sits at (0, 0).
+if (typeof Element !== "undefined" && typeof Element.prototype.setPointerCapture !== "function") {
+  Element.prototype.setPointerCapture = function () {}
+  Element.prototype.releasePointerCapture = function () {}
+  Element.prototype.hasPointerCapture = function () {
+    return false
+  }
+}
+if (typeof document !== "undefined" && typeof document.elementsFromPoint !== "function") {
+  document.elementsFromPoint = (x: number, y: number) =>
+    [...document.body.querySelectorAll("*")]
+      .filter((el) => {
+        const r = el.getBoundingClientRect()
+        return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
+      })
+      .reverse()
+}
+
 // Central MSW server: defaults live in msw-server.ts, tests override per
 // case via `server.use(...)`. Listening here (not per file) means individual
 // test files don't have to bootstrap MSW. `onUnhandledRequest: "error"`
