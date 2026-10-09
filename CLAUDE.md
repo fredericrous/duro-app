@@ -2,7 +2,7 @@
 
 React Router (framework mode, SSR) + Effect + react-strict-dom
 access-governance app.
-Package manager: npm. Scripts: `dev`, `build`, `typecheck`, `test`, `lint`,
+Package manager: pnpm. Scripts: `dev`, `build`, `typecheck`, `test`, `lint`,
 `format`.
 
 ## Architecture decisions

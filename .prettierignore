@@ -12,3 +12,6 @@ chart/
 
 # Mockup artboards: authored in the design-canvas shape and checked by `duro mockup check`
 docs/mockups/
+
+# pnpm rewrites it on every install; prettier would churn with it
+pnpm-lock.yaml

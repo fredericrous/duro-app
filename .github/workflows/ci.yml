@@ -54,25 +54,27 @@ jobs:
         with:
           platform: any
 
+      # Reads package.json `packageManager` (no `version:`)
+      - uses: pnpm/action-setup@v4
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
-      # `npm run build` can compile green while react-router-serve (SSR) still
+      # `pnpm run build` can compile green while react-router-serve (SSR) still
       # dies at boot (bad server bundle, missing runtime export, etc.). This
       # boots the production bundle and curls /health, which is dependency-free
       # (returns {"status":"ok"} with no DB), so no Postgres is needed.
       - name: Smoke — server boots & serves
         run: |
-          npm run start & SERVER_PID=$!
+          pnpm run start & SERVER_PID=$!
           for i in $(seq 1 30); do
             curl -fsS http://localhost:3000/health && break
             sleep 1
@@ -83,13 +85,13 @@ jobs:
 
       - name: Type check
         if: ${{ !contains(fromJSON(steps.attest.outputs.gates), 'pre-push-run-tests-js') }}
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       - name: Format check
-        run: npm run format:check
+        run: pnpm run format:check
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
   # The suite is sharded across two runners: each keeps the same per-worker
   # budget (maxWorkers: 2, see vitest.config.ts), so wall time roughly halves
@@ -117,21 +119,23 @@ jobs:
         with:
           platform: any
 
+      # Reads package.json `packageManager` (no `version:`)
+      - uses: pnpm/action-setup@v4
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       # Always runs, attested or not. The pre-push attestation proves the tests
       # passed; it says nothing about coverage, which only the merged shard
       # blobs below can gate. Skipping here left coverage-gate with no reports
       # and failed every attested push ("ENOENT .vitest-reports").
       - name: Run tests (shard, coverage blob)
-        run: npx vitest run --coverage --reporter=blob --shard=${{ matrix.shard }}/2
+        run: pnpm exec vitest run --coverage --reporter=blob --shard=${{ matrix.shard }}/2
 
       - name: Upload shard report
         uses: actions/upload-artifact@v4
@@ -176,14 +180,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      # Reads package.json `packageManager` (no `version:`)
+      - uses: pnpm/action-setup@v4
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Start LLDAP
         env:
@@ -212,7 +218,7 @@ jobs:
             || { echo "::error::LLDAP did not serve /health within 90s"; docker logs lldap; exit 1; }
 
       - name: Integration tests
-        run: npm run test:integration
+        run: pnpm run test:integration
 
       - name: LLDAP log (on failure)
         if: failure()
@@ -229,14 +235,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      # Reads package.json `packageManager` (no `version:`)
+      - uses: pnpm/action-setup@v4
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Download shard reports
         uses: actions/download-artifact@v4
@@ -250,7 +258,7 @@ jobs:
         # the merged coverage report; vitest.config.ts thresholds gate here,
         # locking in the current floor and forcing future PRs to maintain or
         # raise it.
-        run: npx vitest run --merge-reports --coverage
+        run: pnpm exec vitest run --merge-reports --coverage
 
   # Pull-based migration check (phase 2, 2026-09-21). The cluster does the
   # work: this job only publishes the artifact and hands the check over. It
