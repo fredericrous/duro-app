@@ -1,21 +1,23 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
-COPY package.json package-lock.json .npmrc ./
+COPY package.json pnpm-lock.yaml .npmrc ./
 # Base registry → in-cluster Verdaccio mirror in CI (all deps are public npm,
 # incl. @duro-app). Public default keeps local builds working.
 ARG NPM_REGISTRY=https://registry.npmjs.org/
-RUN npm_config_registry="$NPM_REGISTRY" npm ci
+RUN npm_config_registry="$NPM_REGISTRY" npm install -g "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
+RUN npm_config_registry="$NPM_REGISTRY" pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
 # Prod-only deps in their own stage so the runtime image is just
 # node + node_modules + build artifacts — no package manager.
 FROM node:24-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json .npmrc ./
+COPY package.json pnpm-lock.yaml .npmrc ./
 ARG NPM_REGISTRY=https://registry.npmjs.org/
-RUN npm_config_registry="$NPM_REGISTRY" npm ci --omit=dev
+RUN npm_config_registry="$NPM_REGISTRY" npm install -g "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
+RUN npm_config_registry="$NPM_REGISTRY" pnpm install --frozen-lockfile --prod
 
 FROM node:24-alpine
 RUN adduser -u 1001 -D appuser

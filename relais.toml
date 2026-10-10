@@ -42,19 +42,19 @@ amont_agent = "required"
 # commands (hashed into the trust grant), run in every worktree the
 # commands run in.
 [[verification.profiles.default.setup]]
-argv = ["npm", "ci"]
+argv = ["pnpm", "install", "--frozen-lockfile"]
 timeout_seconds = 900
 
 [[verification.profiles.default.commands]]
-argv = ["npm", "run", "typecheck"]
+argv = ["pnpm", "run", "typecheck"]
 timeout_seconds = 900
 
 [[verification.profiles.default.commands]]
-argv = ["npm", "run", "lint"]
+argv = ["pnpm", "run", "lint"]
 timeout_seconds = 900
 
 [[verification.profiles.default.commands]]
-argv = ["npm", "run", "test"]
+argv = ["pnpm", "run", "test"]
 timeout_seconds = 900
 
 # A candidate that touches what the profile's verdict depends on — build
