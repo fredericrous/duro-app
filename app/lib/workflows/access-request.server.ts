@@ -375,7 +375,9 @@ export const decideApproval = (input: DecideInput) =>
             : `Your request for access to ${appName} was not approved.`,
           { text: "View your requests", url: `${config.homeUrl}/requests` },
         )
-      }).pipe(Effect.catchAll(() => Effect.void))
+      }).pipe(
+        Effect.catchAll((e) => Effect.logWarning("access request: decision notification failed", { error: String(e) })),
+      )
     }
 
     // Fire-and-forget provisioning outside the transaction. activateGrant

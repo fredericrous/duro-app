@@ -118,7 +118,9 @@ export async function action({ request }: Route.ActionArgs) {
 
         // Best-effort: email the invitee so they know an invitation awaits.
         // An email failure must not fail the create.
-        yield* notifyInviteeOfInvitation({ invitedPrincipalId, applicationId }).pipe(Effect.catchAll(() => Effect.void))
+        yield* notifyInviteeOfInvitation({ invitedPrincipalId, applicationId }).pipe(
+          Effect.catchAll((e) => Effect.logWarning("invitation: notifying the invitee failed", { error: String(e) })),
+        )
 
         return { ok: true as const }
       }).pipe(

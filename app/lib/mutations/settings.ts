@@ -202,7 +202,14 @@ function handleRevokeCert(serialNumber: string, auth: AuthInfo) {
     yield* cert.revokeCert(serialNumber).pipe(
       Effect.tap(() => certRepo.markRevokeCompleted(serialNumber)),
       Effect.tapError((e) =>
-        certRepo.markRevokeFailed(serialNumber, String(e)).pipe(Effect.catchAll(() => Effect.void)),
+        certRepo.markRevokeFailed(serialNumber, String(e)).pipe(
+          Effect.catchAll((markError) =>
+            Effect.logWarning("cert revocation: marking failed failed", {
+              serial: serialNumber,
+              error: String(markError),
+            }),
+          ),
+        ),
       ),
     )
     // No budget bookkeeping to undo: the revoked cert simply stops counting

@@ -89,5 +89,7 @@ export default Effect.gen(function* () {
       ALTER TABLE group_mappings ADD CONSTRAINT fk_group_mappings_role FOREIGN KEY (role_id) REFERENCES roles(id);
     EXCEPTION WHEN duplicate_object THEN NULL;
     END $$
-  `.pipe(Effect.catchAll(() => Effect.void))
+  `.pipe(
+    Effect.catchAll((e) => Effect.logWarning("migration 0008: fk_group_mappings_role not added", { error: String(e) })),
+  )
 })

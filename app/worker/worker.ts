@@ -79,7 +79,7 @@ const pollOnce = Effect.gen(function* () {
     Effect.tapErrorCause((cause) =>
       Effect.logError("worker: processNextPending failed").pipe(Effect.annotateLogs({ cause: String(cause) })),
     ),
-    Effect.catchAll(() => Effect.void),
+    Effect.catchAll(() => Effect.void), // logged by the tapErrorCause above; one failed step must not stop the worker loop
   )
 
   // 2. Retry failed jobs older than 5 minutes
@@ -104,7 +104,7 @@ const pollOnce = Effect.gen(function* () {
       Effect.tapErrorCause((cause) =>
         Effect.logError("worker: retry-requeue failed").pipe(Effect.annotateLogs({ cause: String(cause) })),
       ),
-      Effect.catchAll(() => Effect.void),
+      Effect.catchAll(() => Effect.void), // logged by the tapErrorCause above; one failed step must not stop the worker loop
     )
   }
 
@@ -122,7 +122,7 @@ const pollOnce = Effect.gen(function* () {
     Effect.tapErrorCause((cause) =>
       Effect.logError("worker: stale-running recovery failed").pipe(Effect.annotateLogs({ cause: String(cause) })),
     ),
-    Effect.catchAll(() => Effect.void),
+    Effect.catchAll(() => Effect.void), // logged by the tapErrorCause above; one failed step must not stop the worker loop
   )
 
   // 4. Expire + deprovision grants whose expires_at has passed, so an expired
@@ -131,7 +131,7 @@ const pollOnce = Effect.gen(function* () {
     Effect.tapErrorCause((cause) =>
       Effect.logError("worker: expireGrants failed").pipe(Effect.annotateLogs({ cause: String(cause) })),
     ),
-    Effect.catchAll(() => Effect.void),
+    Effect.catchAll(() => Effect.void), // logged by the tapErrorCause above; one failed step must not stop the worker loop
   )
 })
 

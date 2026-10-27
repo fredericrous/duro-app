@@ -226,11 +226,15 @@ const processJobInternal = (sql: SqlClient.SqlClient, job: ProvisioningJob) =>
     //    Both cleanup branches swallow their own errors: onExit callbacks
     //    MUST return Effect<_, never, _> so cleanup failures never override
     //    the original exit cause. Failures inside the cleanup are logged
-    //    (via withErr) and discarded.
+    //    as warnings and discarded.
     yield* dispatchEffect.pipe(
       Effect.onExit((exit) =>
         Exit.isSuccess(exit)
-          ? markCompleted(sql, job.id).pipe(Effect.catchAll(() => Effect.void))
+          ? markCompleted(sql, job.id).pipe(
+              Effect.catchAll((e) =>
+                Effect.logWarning("provisioning job: marking completed failed", { error: String(e) }),
+              ),
+            )
           : markFailed(sql, job.id, Cause.pretty(exit.cause)).pipe(
               Effect.tap(() =>
                 Effect.logError("provisioning job failed").pipe(
@@ -242,7 +246,9 @@ const processJobInternal = (sql: SqlClient.SqlClient, job: ProvisioningJob) =>
                   }),
                 ),
               ),
-              Effect.catchAll(() => Effect.void),
+              Effect.catchAll((e) =>
+                Effect.logWarning("provisioning job: marking failed failed", { error: String(e) }),
+              ),
             ),
       ),
     )

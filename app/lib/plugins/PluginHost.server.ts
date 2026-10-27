@@ -170,7 +170,11 @@ export const PluginHostLive = Layer.effect(
                 principalId: ctx.principal.id,
               },
             })
-            .pipe(Effect.catchAll(() => Effect.void))
+            .pipe(
+              Effect.catchAll((e) =>
+                Effect.logWarning("plugin.action.invoked audit emit failed", { error: String(e) }),
+              ),
+            )
 
           // Dispatch: declarative or imperative
           const work =
@@ -203,7 +207,9 @@ export const PluginHostLive = Layer.effect(
                     ...(Exit.isFailure(exit) ? { cause: Cause.pretty(exit.cause) } : {}),
                   },
                 })
-                .pipe(Effect.catchAll(() => Effect.void)),
+                .pipe(
+                  Effect.catchAll((e) => Effect.logWarning("plugin.action audit emit failed", { error: String(e) })),
+                ),
             ),
           )
         }),
@@ -264,7 +270,11 @@ export const PluginHostLive = Layer.effect(
                     reason: "other_active_grant_maps_to_same_target",
                   },
                 })
-                .pipe(Effect.catchAll(() => Effect.void))
+                .pipe(
+                  Effect.catchAll((e) =>
+                    Effect.logWarning("plugin.action.skipped audit emit failed", { error: String(e) }),
+                  ),
+                )
               return
             }
           }
@@ -284,7 +294,11 @@ export const PluginHostLive = Layer.effect(
                 principalId: ctx.principal.id,
               },
             })
-            .pipe(Effect.catchAll(() => Effect.void))
+            .pipe(
+              Effect.catchAll((e) =>
+                Effect.logWarning("plugin.action.invoked audit emit failed", { error: String(e) }),
+              ),
+            )
 
           const work =
             manifest.imperative && plugin.deprovision
@@ -315,7 +329,9 @@ export const PluginHostLive = Layer.effect(
                     ...(Exit.isFailure(exit) ? { cause: Cause.pretty(exit.cause) } : {}),
                   },
                 })
-                .pipe(Effect.catchAll(() => Effect.void)),
+                .pipe(
+                  Effect.catchAll((e) => Effect.logWarning("plugin.action audit emit failed", { error: String(e) })),
+                ),
             ),
           )
         }),

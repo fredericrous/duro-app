@@ -75,7 +75,7 @@ export async function action({ request }: Route.ActionArgs) {
             targetId: canonicalSerial(parseXfccCert(xfcc)?.serial ?? ""),
             metadata: { username, inviteId: resolved.inviteId },
           })
-          .pipe(Effect.catchAll(() => Effect.void))
+          .pipe(Effect.catchAll((e) => Effect.logWarning("invite.resumed audit emit failed", { error: String(e) })))
         return { success: true as const }
       }).pipe(
         Effect.catchAll((e) =>
