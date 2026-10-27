@@ -132,7 +132,7 @@ export async function action({ request }: Route.ActionArgs) {
             targetType: "grant",
             targetId: grantId,
           })
-          .pipe(Effect.catchAll(() => Effect.void))
+          .pipe(Effect.catchAll((e) => Effect.logWarning("grant.revoked audit emit failed", { error: String(e) })))
         yield* deactivateGrant(grantId)
       }).pipe(Effect.orDie),
     )

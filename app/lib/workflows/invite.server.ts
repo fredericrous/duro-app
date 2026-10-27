@@ -82,7 +82,7 @@ export const queueInvite = (input: InviteInput) =>
         targetId: certResult.serialNumber,
         metadata: { email: input.email, username: certUsername, inviteId: invite.id },
       })
-      .pipe(Effect.catchAll(() => Effect.void))
+      .pipe(Effect.catchAll((e) => Effect.logWarning("cert.issued audit emit failed", { error: String(e) })))
 
     // Track the certificate
     yield* certRepo
@@ -354,7 +354,7 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
         targetId: username,
         metadata: { email, reason, revokedBy },
       })
-      .pipe(Effect.catchAll(() => Effect.void))
+      .pipe(Effect.catchAll((e) => Effect.logWarning("user.revoked audit emit failed", { error: String(e) })))
 
     const certUsername = certUsernameFromEmail(email)
 
@@ -424,7 +424,7 @@ export const resendCert = (email: string, username: string, opts: ResendCertOpti
         targetId: certResult.serialNumber,
         metadata: { email, username, renewedFrom: opts.renewedFromSerial ?? null },
       })
-      .pipe(Effect.catchAll(() => Effect.void))
+      .pipe(Effect.catchAll((e) => Effect.logWarning("cert.issued audit emit failed", { error: String(e) })))
 
     // Track the certificate
     yield* certRepo

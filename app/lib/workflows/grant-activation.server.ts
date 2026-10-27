@@ -86,7 +86,7 @@ export const expireGrants = Effect.gen(function* () {
       )
     yield* audit
       .emit({ eventType: "grant.expired", targetType: "grant", targetId: grant.id })
-      .pipe(Effect.catchAll(() => Effect.void))
+      .pipe(Effect.catchAll((e) => Effect.logWarning("grant.expired audit emit failed", { error: String(e) })))
     // Deprovision downstream so the external access is actually removed.
     yield* deactivateGrant(grant.id).pipe(
       Effect.catchAll((e) =>

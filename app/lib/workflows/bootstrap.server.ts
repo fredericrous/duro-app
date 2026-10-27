@@ -170,7 +170,9 @@ export const createAdminInvite = (email: string) =>
     const stale = pending.find((i) => i.email === cleanEmail)
     if (stale) {
       yield* Effect.logWarning(`bootstrap: revoking existing pending invite for ${cleanEmail}`)
-      yield* revokeInvite(stale.id).pipe(Effect.catchAll(() => Effect.void))
+      yield* revokeInvite(stale.id).pipe(
+        Effect.catchAll((e) => Effect.logWarning("bootstrap: revoking the stale invite failed", { error: String(e) })),
+      )
     }
 
     const result = yield* queueInvite({

@@ -195,7 +195,7 @@ export const VaultPkiLive = Layer.effect(
               Effect.tapError((e) =>
                 Effect.logWarning("Failed to remove password from Vault after consume", { inviteId, error: String(e) }),
               ),
-              Effect.catchAll(() => Effect.void),
+              Effect.catchAll(() => Effect.void), // logged by the tapError above; the secret may already be gone
             )
 
           return password
@@ -207,7 +207,7 @@ export const VaultPkiLive = Layer.effect(
           Effect.tapError((e) =>
             Effect.logDebug("Failed to delete P12 secret from Vault", { inviteId, error: String(e) }),
           ),
-          Effect.catchAll(() => Effect.void),
+          Effect.catchAll(() => Effect.void), // logged by the tapError above; the secret may already be gone
         ),
 
       checkCertProcessed: (username: string) =>
@@ -224,7 +224,7 @@ export const VaultPkiLive = Layer.effect(
           Effect.tapError((e) =>
             Effect.logDebug("Failed to delete cert secret by username", { username, error: String(e) }),
           ),
-          Effect.catchAll(() => Effect.void),
+          Effect.catchAll(() => Effect.void), // logged by the tapError above; the secret may already be gone
         ),
 
       revokeCert: (serialNumber: string) =>

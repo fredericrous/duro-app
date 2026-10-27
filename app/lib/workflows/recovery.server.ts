@@ -76,7 +76,7 @@ export const requestRecovery = (input: RecoveryRequestInput) =>
         metadata: { email, requestId: created.right.id, note },
         ipAddress: ip ?? undefined,
       })
-      .pipe(Effect.catchAll(() => Effect.void))
+      .pipe(Effect.catchAll((e) => Effect.logWarning("recovery.requested audit emit failed", { error: String(e) })))
 
     // Best-effort admin notifications; the admin panel is the authoritative
     // list. Discord is the reliable channel (homelab email tends to land in
@@ -153,7 +153,13 @@ export const approveRecovery = (requestId: string, adminUser: string, revokeOthe
     })
 
     const revokedCount = yield* issue.pipe(
-      Effect.tapError(() => repo.reopen(requestId).pipe(Effect.catchAll(() => Effect.void))),
+      Effect.tapError(() =>
+        repo
+          .reopen(requestId)
+          .pipe(
+            Effect.catchAll((e) => Effect.logWarning("recovery: reopening the request failed", { error: String(e) })),
+          ),
+      ),
     )
 
     const audit = yield* AuditService
@@ -165,7 +171,7 @@ export const approveRecovery = (requestId: string, adminUser: string, revokeOthe
         targetId: req.username,
         metadata: { email: req.email, requestId, revokedOthers: revokeOthers, revokedCount },
       })
-      .pipe(Effect.catchAll(() => Effect.void))
+      .pipe(Effect.catchAll((e) => Effect.logWarning("recovery.approved audit emit failed", { error: String(e) })))
 
     return { email: req.email, revokedCount }
   }).pipe(Effect.withSpan("approveRecovery", { attributes: { requestId } }))
@@ -182,5 +188,5 @@ export const denyRecovery = (requestId: string, adminUser: string) =>
     const audit = yield* AuditService
     yield* audit
       .emit({ eventType: "recovery.denied", actorId: adminUser, targetType: "recovery_request", targetId: requestId })
-      .pipe(Effect.catchAll(() => Effect.void))
+      .pipe(Effect.catchAll((e) => Effect.logWarning("recovery.denied audit emit failed", { error: String(e) })))
   }).pipe(Effect.withSpan("denyRecovery", { attributes: { requestId } }))

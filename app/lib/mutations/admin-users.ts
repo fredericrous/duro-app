@@ -52,7 +52,13 @@ export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
         yield* cert.revokeCert(mutation.serialNumber).pipe(
           Effect.tap(() => certRepo.markRevokeCompleted(mutation.serialNumber)),
           Effect.tapError((e) =>
-            certRepo.markRevokeFailed(mutation.serialNumber, String(e)).pipe(Effect.catchAll(() => Effect.void)),
+            certRepo
+              .markRevokeFailed(mutation.serialNumber, String(e))
+              .pipe(
+                Effect.catchAll((e) =>
+                  Effect.logWarning("cert revocation: marking failed failed", { error: String(e) }),
+                ),
+              ),
           ),
         )
         return { certRevoked: true as const, serialNumber: mutation.serialNumber }

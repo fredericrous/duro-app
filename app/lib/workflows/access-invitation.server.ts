@@ -130,7 +130,11 @@ export const acceptInvitation = (input: { invitationId: string; principalId: str
             applicationId: inv.applicationId,
             metadata: { grantId: grant.id },
           })
-          .pipe(Effect.catchAll(() => Effect.void))
+          .pipe(
+            Effect.catchAll((e) =>
+              Effect.logWarning("access_invitation.accepted audit emit failed", { error: String(e) }),
+            ),
+          )
 
         return { grantId: grant.id, applicationId: inv.applicationId }
       }),
@@ -170,7 +174,9 @@ export const declineInvitation = (input: { invitationId: string; principalId: st
         targetId: input.invitationId,
         applicationId: inv.applicationId,
       })
-      .pipe(Effect.catchAll(() => Effect.void))
+      .pipe(
+        Effect.catchAll((e) => Effect.logWarning("access_invitation.declined audit emit failed", { error: String(e) })),
+      )
   }).pipe(Effect.withSpan("declineInvitation", { attributes: { invitationId: input.invitationId } }))
 
 /**
@@ -200,5 +206,9 @@ export const cancelInvitation = (input: { invitationId: string; adminPrincipalId
         targetId: input.invitationId,
         applicationId: inv.applicationId,
       })
-      .pipe(Effect.catchAll(() => Effect.void))
+      .pipe(
+        Effect.catchAll((e) =>
+          Effect.logWarning("access_invitation.cancelled audit emit failed", { error: String(e) }),
+        ),
+      )
   }).pipe(Effect.withSpan("cancelInvitation", { attributes: { invitationId: input.invitationId } }))

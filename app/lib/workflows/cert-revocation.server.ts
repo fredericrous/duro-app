@@ -30,9 +30,15 @@ export const revokeSerialForUser = (serial: string, opts: { auditUsername?: stri
                 targetId: serial,
                 metadata: { username: opts.auditUsername },
               })
-              .pipe(Effect.catchAll(() => Effect.void)),
+              .pipe(Effect.catchAll((e) => Effect.logWarning("cert.revoked audit emit failed", { error: String(e) }))),
       ),
-      Effect.catchAll((e) => certRepo.markRevokeFailed(serial, String(e)).pipe(Effect.catchAll(() => Effect.void))),
+      Effect.catchAll((e) =>
+        certRepo
+          .markRevokeFailed(serial, String(e))
+          .pipe(
+            Effect.catchAll((e) => Effect.logWarning("cert revocation: marking failed failed", { error: String(e) })),
+          ),
+      ),
     )
   })
 

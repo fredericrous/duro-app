@@ -106,7 +106,11 @@ export async function action({ params }: Route.ActionArgs) {
         return { success: false as const, error: "already_used" as ReinviteErrorCode }
       }
 
-      yield* repo.revoke(invite.id).pipe(Effect.catchAll(() => Effect.void))
+      yield* repo
+        .revoke(invite.id)
+        .pipe(
+          Effect.catchAll((e) => Effect.logWarning("reinvite: revoking the old invite failed", { error: String(e) })),
+        )
       yield* cert.deleteP12Secret(invite.id)
 
       // Effect.try, not bare JSON.parse: a corrupted row must fail the typed

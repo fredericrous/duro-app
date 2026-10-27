@@ -30,6 +30,10 @@ export function makeScopedAuditService(real: RealAuditService, manifest: PluginM
             source: `plugin:${manifest.slug}`,
           },
         })
-        .pipe(Effect.catchAll(() => Effect.void)),
+        .pipe(
+          Effect.catchAll((e) =>
+            Effect.logWarning(`plugin audit emit failed: ${event.eventType}`, { error: String(e) }),
+          ),
+        ),
   }
 }
