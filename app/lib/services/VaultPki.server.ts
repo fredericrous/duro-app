@@ -195,7 +195,7 @@ export const VaultPkiLive = Layer.effect(
               Effect.tapError((e) =>
                 Effect.logWarning("Failed to remove password from Vault after consume", { inviteId, error: String(e) }),
               ),
-              Effect.catchAll(() => Effect.void), // logged by the tapError above; deletion is best-effort
+              Effect.catchAll(() => Effect.void), // logged by the tapError above; removing the password is best-effort
             )
 
           return password
