@@ -36,7 +36,9 @@ export const revokeSerialForUser = (serial: string, opts: { auditUsername?: stri
         certRepo
           .markRevokeFailed(serial, String(e))
           .pipe(
-            Effect.catchAll((e) => Effect.logWarning("cert revocation: marking failed failed", { error: String(e) })),
+            Effect.catchAll((markError) =>
+              Effect.logWarning("cert revocation: marking failed failed", { serial: serial, error: String(markError) }),
+            ),
           ),
       ),
     )
