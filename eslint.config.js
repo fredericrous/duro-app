@@ -1,4 +1,4 @@
-import { react, effect, tests } from "@duro-app/eslint-config"
+import { react, effect, tests, adrLint } from "@duro-app/eslint-config"
 
 export default [
   { ignores: ["build/**", ".react-router/**"] },
@@ -49,4 +49,5 @@ export default [
       "duro/no-tokens-barrel-import": "off",
     },
   },
+  ...adrLint({ stack: ["react", "effect"] }),
 ]
