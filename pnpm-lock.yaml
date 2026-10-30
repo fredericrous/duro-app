@@ -138,8 +138,8 @@ importers:
         specifier: ^7.28.5
         version: 7.28.5(@babel/core@7.29.7)
       '@duro-app/eslint-config':
-        specifier: ^5.9.0
-        version: 5.9.0(eslint@10.3.0)(typescript@5.9.3)
+        specifier: ^5.37.0
+        version: 5.37.0(eslint@10.3.0)(typescript@5.9.3)
       '@duro-app/eslint-plugin':
         specifier: ^5.9.0
         version: 5.9.0(eslint@10.3.0)
@@ -292,6 +292,12 @@ packages:
 
   '@asamuzakjp/nwsapi@2.3.9':
     resolution: {integrity: sha512-n8GuYSrI9bF7FFZ/SjhwevlHc8xaVlb/7HmHelnc/PZXBD2ZR49NnN9sMMuDdEGPeeRQ5d0hqlSlEpgCX3Wl0Q==}
+
+  '@aval-adr/eslint-config@0.6.0':
+    resolution: {integrity: sha512-EMT9YtiJqz2AS/iKj8JDWB/QWUdcvEiw+s6Sir/mzajH9I8TnaerOiF6UJyWzvGH//+sr4/BXtKwhPxt4Qefzg==}
+    peerDependencies:
+      eslint: ^9.0.0 || ^10.0.0
+      typescript-eslint: ^8.0.0
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -479,8 +485,14 @@ packages:
   '@dual-bundle/import-meta-resolve@4.2.1':
     resolution: {integrity: sha512-id+7YRUgoUX6CgV0DtuhirQWodeeA7Lf4i2x71JS/vtA5pRb/hIGWlw+G6MeXvsM+MXrz0VAydTGElX1rAfgPg==}
 
-  '@duro-app/eslint-config@5.9.0':
-    resolution: {integrity: sha512-oolhmKR0GSU9RiWM0EQsBHlGr1uLejp6umVOgVqzSCyXm/7DM7Kfv5SvtzxPbPxXeJxEB30vadIe1TcGgA+w9g==}
+  '@duro-app/eslint-config@5.37.0':
+    resolution: {integrity: sha512-k6zAEyLOLxaCAdB+5Lw2JzUhiiyMel9WY0fImlSU/Ip4P9RuIZyKVNg4v6giT1B7CzrADh3LZRFPql8Fax/auA==}
+    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    peerDependencies:
+      eslint: ^9.0.0 || ^10.0.0
+
+  '@duro-app/eslint-plugin@5.37.0':
+    resolution: {integrity: sha512-Th+kWi5PW0QAIo8AA+WkZruzEbnCCYwpR21n++ztJ3Fq88xFNJdgXTMQEV4PFdhdulwng9lG3d7x1T1IbPHQsw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       eslint: ^9.0.0 || ^10.0.0
@@ -889,6 +901,12 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@eslint-community/eslint-plugin-eslint-comments@4.8.1':
+    resolution: {integrity: sha512-vafrdi15JHBFh1qWOAucyJwlEEuhdoMof28jOdKdgnwZ7bXwd6v4wzHYSmAVLwnx0yc7bqAtfJ0EZQV1WAzV/Q==}
+    engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+    peerDependencies:
+      eslint: ^6.0.0 || ^7.0.0 || ^8.0.0 || ^9.0.0 || ^10.0.0
 
   '@eslint-community/eslint-utils@4.9.1':
     resolution: {integrity: sha512-phrYmNiYppR7znFEdqgfWHXR6NCkZEK7hwWDHZUjit/2/U0r6XvkDl0SYnoM51Hq7FhCGdLDT6zxCCOY1hexsQ==}
@@ -3814,6 +3832,12 @@ snapshots:
 
   '@asamuzakjp/nwsapi@2.3.9': {}
 
+  '@aval-adr/eslint-config@0.6.0(eslint@10.3.0)(typescript-eslint@8.59.2(eslint@10.3.0)(typescript@5.9.3))':
+    dependencies:
+      '@eslint-community/eslint-plugin-eslint-comments': 4.8.1(eslint@10.3.0)
+      eslint: 10.3.0
+      typescript-eslint: 8.59.2(eslint@10.3.0)(typescript@5.9.3)
+
   '@babel/code-frame@7.29.7':
     dependencies:
       '@babel/helper-validator-identifier': 7.29.7
@@ -4038,9 +4062,10 @@ snapshots:
 
   '@dual-bundle/import-meta-resolve@4.2.1': {}
 
-  '@duro-app/eslint-config@5.9.0(eslint@10.3.0)(typescript@5.9.3)':
+  '@duro-app/eslint-config@5.37.0(eslint@10.3.0)(typescript@5.9.3)':
     dependencies:
-      '@duro-app/eslint-plugin': 5.9.0(eslint@10.3.0)
+      '@aval-adr/eslint-config': 0.6.0(eslint@10.3.0)(typescript-eslint@8.59.2(eslint@10.3.0)(typescript@5.9.3))
+      '@duro-app/eslint-plugin': 5.37.0(eslint@10.3.0)
       '@effect/eslint-plugin': 0.3.2
       '@eslint/js': 10.0.1(eslint@10.3.0)
       eslint: 10.3.0
@@ -4050,6 +4075,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
       - typescript
+
+  '@duro-app/eslint-plugin@5.37.0(eslint@10.3.0)':
+    dependencies:
+      eslint: 10.3.0
 
   '@duro-app/eslint-plugin@5.9.0(eslint@10.3.0)':
     dependencies:
@@ -4296,6 +4325,12 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
+
+  '@eslint-community/eslint-plugin-eslint-comments@4.8.1(eslint@10.3.0)':
+    dependencies:
+      escape-string-regexp: 4.0.0
+      eslint: 10.3.0
+      ignore: 7.0.5
 
   '@eslint-community/eslint-utils@4.9.1(eslint@10.3.0)':
     dependencies:

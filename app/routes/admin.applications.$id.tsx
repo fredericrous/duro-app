@@ -247,7 +247,7 @@ export default function AdminApplicationDetailPage({ loaderData }: Route.Compone
       next.delete("tab")
       setSearchParams(next, { replace: true })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on mount to consume the grant/tab params; re-running on dep changes would clear them again
   }, [])
 
   // Surface action results (create role/entitlement/resource, settings save) as

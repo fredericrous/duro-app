@@ -178,7 +178,7 @@ export function ScratchCard({
     // overflow a phone screen once the neighbouring copy button was laid out
     // beside it, which pushed that button under the scratch area — a scratch
     // then landed on "copy" instead. Letting it shrink keeps the two apart.
-    // eslint-disable-next-line duro/no-raw-html-element
+    // eslint-disable-next-line duro/no-raw-html-element -- needs a shrinkable flex container that the design-system Box cannot express
     <div
       className={`${styles.container}${className ? ` ${className}` : ""}`}
       style={{ width: "100%", maxWidth: width, height }}
