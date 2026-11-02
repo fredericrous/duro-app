@@ -1,11 +1,8 @@
 {
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".react-router/types/**/*"
-  ],
+  "include": ["**/*.ts", "**/*.tsx", ".react-router/types/**/*"],
   "exclude": ["node_modules", "dist", "build"],
   "compilerOptions": {
+    "plugins": [{ "name": "@effect/language-service" }],
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "types": ["node", "vite/client"],
     "isolatedModules": true,

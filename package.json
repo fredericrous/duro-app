@@ -65,6 +65,7 @@
     "@duro-app/eslint-config": "^5.37.0",
     "@duro-app/eslint-plugin": "^5.9.0",
     "@effect/eslint-plugin": "^0.3.2",
+    "@effect/language-service": "0.87.5",
     "@effect/vitest": "^0.27.0",
     "@eslint/js": "^10.0.1",
     "@react-router/dev": "^7.1.0",
