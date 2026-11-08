@@ -1,10 +1,11 @@
-import { react, effect, tests, adrLint } from "@duro-app/eslint-config"
+import { react } from "@duro-app/eslint-config"
+import { effect, tests, adrLint } from "@aval-adr/eslint-config"
 
 export default [
   { ignores: ["build/**", ".react-router/**"] },
-  // Shared duro-stack presets: base TS conventions + react-hooks + the duro
-  // plugin + UI-library policy (react), Effect server policy (effect), and
-  // accessibility-first test selectors (tests, self-scoped to test files).
+  // react (Duro): base TS conventions + react-hooks + the duro plugin +
+  // UI-library policy. effect and tests (@aval-adr/eslint-config): Effect
+  // server policy and accessibility-first test selectors (self-scoped).
   ...react,
   ...effect,
   ...tests,
@@ -49,5 +50,5 @@ export default [
       "duro/no-tokens-barrel-import": "off",
     },
   },
-  ...adrLint({ stack: ["react", "effect"] }),
+  ...adrLint(),
 ]
