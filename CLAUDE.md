@@ -45,8 +45,9 @@ beside a live screenshot — the `UI handoff` workflow refuses a PR that touches
 Fleet decision `ui.mockup-handoff` (ADR-0016) is what this enforces; the
 session hook prints its constraints.
 
-Lint: the shared duro-stack flat config (`react` + `effect` + `tests`
-presets, v5) enforces the critical rules (html.\* elements, deep token
+Lint: `react` from `@duro-app/eslint-config` v6 plus `effect`, `tests`
+and `adrLint` from `@aval-adr/eslint-config` (ADR-0048 moved the general
+presets there) enforce the critical rules (html.\* elements, deep token
 imports, form kit over bare `html.input`, no deprecated Table parts, raw
 design values in `css.create` — colours, off-scale spacing/radius, sizes,
 border widths, `@media` breakpoints, type, shadows, motion; every measure
