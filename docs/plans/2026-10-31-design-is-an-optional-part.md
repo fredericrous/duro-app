@@ -26,3 +26,22 @@ This repository's slice of the ADR-0048 plan is section 8, the pilot:
   lockfile holds ui and tokens at 5.9.0, so a bump to 6 would carry 36
   releases of 5.x changes, which is the Duro 5.x migration programme's work,
   not this pilot's. The lint split is what the pilot proves.
+- The new dependency `@aval-adr/eslint-config` `^0.16.0` is the required peer of `@duro-app/eslint-config` 6. adr-lint owns it, with the same owner as Duro, and it now supplies `effect`, `tests` and `adrLint` (`change.a-new-dependency-is-owned`).
+
+## Verification
+
+| Check                                                                                  | Expected           | Actual                                                                                                                           |
+| -------------------------------------------------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `eslint . -f json`, before vs after                                                    | the same error set | 5 errors both times, the same file/rule/line, none new and none gone                                                             |
+| stdin probe `app/probe-design-part.ts` importing `@radix-ui/react-dialog` and `kysely` | both refused       | `duro/no-restricted-imports` and `@typescript-eslint/no-restricted-imports` both reported (in 5.x, `effect` overrode the UI ban) |
+| `pnpm-lock.yaml` `@aval-adr/eslint-config` entries                                     | one version        | `0.16.0` only                                                                                                                    |
+| `npx @duro-app/cli@6.0.0 hook install --check` / `skill install --check`               | exit 0             | 0 / 0; the hooks now pin `^6.0.0`, and the grh pointer is printed on stderr                                                      |
+| `pnpm typecheck`, `pnpm test`                                                          | pass               | pass                                                                                                                             |
+
+## Implementation review
+
+- Round 1: approve-with-changes (55k, 25 s). Fixed outside the tree: the Verification table and the dependency ownership above. The pack refresh is a generated vendored file.
+
+## Interface review
+
+- No interface change (34k, 22 s). Deliberate: the CLI floor is `^6` while ui stays on 5.9. The old `^5.0.0` floor already resolved to 5.45 against the same ui 5.9, so the catalog-versus-installed drift is not new; the ui catch-up rides the Duro 5.x programme. Already measured: the v6 lint rules give the same error set on the 5.9 styles.
