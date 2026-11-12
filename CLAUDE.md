@@ -82,7 +82,7 @@ Dialog/Drawer/DetailPanel `closeAnimationDuration` is a motion token
   DOM fixtures) and `app/lib/emails/**` (react-email, where rsd never runs),
   and allows the document-shell tags plus `details`/`summary`/`canvas`.
 
-<!-- amont:start -->
+<!-- greengate:start -->
 
 ## Git hooks (amont)
 
@@ -92,4 +92,4 @@ and `git push` both need a long timeout — or a background run — are in
 [AGENTS.md](AGENTS.md) — read it before committing. Both files are
 generated: run `amont agents-md` after changing either.
 
-<!-- amont:end -->
+<!-- greengate:end -->
