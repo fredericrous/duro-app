@@ -50,7 +50,7 @@ jobs:
 
       - name: Attestation check
         id: attest
-        uses: fredericrous/attest@v1
+        uses: greenharness/greensummit@v2
         with:
           platform: any
 
@@ -115,7 +115,7 @@ jobs:
 
       - name: Attestation check
         id: attest
-        uses: fredericrous/attest@v1
+        uses: greenharness/greensummit@v2
         with:
           platform: any
 
