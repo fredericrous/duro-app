@@ -16,7 +16,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "prepare": "amont init || true"
+    "prepare": "greengate init || true"
   },
   "dependencies": {
     "@duro-app/tokens": "^5.9.0",
@@ -69,6 +69,7 @@
     "@effect/language-service": "0.87.5",
     "@effect/vitest": "^0.27.0",
     "@eslint/js": "^10.0.1",
+    "@greenharness/greengate": "^4.11.0",
     "@react-router/dev": "^7.18.5",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
@@ -81,7 +82,6 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "~19.1.7",
     "@vitest/coverage-v8": "^4.1.0",
-    "amont": "^1.47.1",
     "babel-plugin-react-compiler": "1.0.0",
     "esbuild": "^0.28.0",
     "eslint": "^10.0.3",
