@@ -38,14 +38,13 @@ Open `/admin`: the dev user is in `lldap_admin`, so admin is allowed.
 - No admin page opens a side detail panel today: `admin.tsx` offers
   `showDetail` (a panel when wide, a route when narrow), and no route
   calls it. A row click on identities does nothing, by design for now.
-- The first visit to each new route after Launch, not only the first
-  page, can crash once with "Invalid hook call" or "reading
-  'useContext'": vite finds a client dependency late and re-optimises.
-  `/admin/applications/<id>` does it. Reload once, ignoring the cache;
-  the same error after that reload is a defect.
+- "Invalid hook call", "Cannot read properties of null (reading
+  'useContext')" or "Application Error!" is a defect on any visit, the
+  first after Launch included: vite pre-bundles every client dependency
+  at startup (t01, 2026-11-20). Report it; never reload it away.
 - Raw translation keys (`ADMIN.COLS.NAME`) were seen once on
-  2026-11-19, on a page that had just hit the "Invalid hook call"
-  crash, and not on a clean load. `admin.cols.name` exists in `en`:
+  2026-11-19, on a page that had just hit the first-visit "Invalid hook
+  call" crash (fixed since), and not on a clean load. `admin.cols.name` exists in `en`:
   report any you see, never treat them as expected.
 - `/admin/users` and `/admin/principals` answer 301 to identities on
   purpose.

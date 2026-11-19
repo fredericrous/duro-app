@@ -29,9 +29,10 @@ Open `/`. No sign-in: the dev server is the user `dev`.
 
 ## Gotchas
 
-- The first visit to each route after Launch can fail once with "Invalid hook
-  call" (vite optimises client dependencies): reload once, ignoring the
-  cache. A second failure is a defect.
+- "Invalid hook call", "Cannot read properties of null (reading
+  'useContext')" or "Application Error!" is a defect on any visit, the
+  first after Launch included: vite pre-bundles every client dependency
+  at startup (t01, 2026-11-20). Report it; never reload it away.
 - "No launch URL configured" is expected locally, not a defect: the
   seed gives most apps no URL.
 - The badge count comes from the seed's pending requests; a request

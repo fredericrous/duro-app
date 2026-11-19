@@ -7,8 +7,17 @@ export default defineConfig({
   plugins: [
     reactRouter(),
     // App code: react-compiler + react-strict-dom/babel-preset (which includes @stylexjs/babel-plugin)
+    //
+    // `loader: "jsx"`: vite-plugin-babel also hooks this rule into the esbuild
+    // run of vite's dependency scan. Babel strips the types but keeps the
+    // JSX, and esbuild reads an onLoad result with no loader as plain `js`,
+    // so without it the scan fails on every component ("The JSX syntax
+    // extension is not currently enabled") and finds their dependencies
+    // only when a browser first loads them. See `unstable_optimizeDeps` in
+    // react-router.config.ts, which gives the scan its entries.
     babel({
       filter: /\/app\/.*\.[jt]sx?$/,
+      loader: "jsx",
       babelConfig: {
         presets: [
           "@babel/preset-typescript",
