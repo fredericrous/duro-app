@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 canonical: greenharness-skills/docs/plans/2026-11-19-create-verify-skill.md
 phases: [3]
 branch: feat/verify-duro-app-skill
@@ -22,7 +22,8 @@ once; its Drive hands the browser work to the `browser-check` agent.
 
 F2 of this PR ran through `verify-duro-app` (the skill it adds), from
 the worktree, Launch, Drive and Cleanup as separate tool calls.
-Evidence: `attestations/c88449a/` (final tree), `attestations/433aea9/`
+Evidence: `attestations/final-tree/` (`3f49a4d`, after review),
+`attestations/c88449a/` (before review), `attestations/433aea9/`
 (fresh run 2), `attestations/dc0644b/` (fresh run 1),
 `attestations/3b03265/` (the generator's own run).
 
@@ -65,3 +66,32 @@ route can crash once with "Invalid hook call" until a reload (vite
 re-optimises a late dependency); raw translation keys seen once after
 that crash; `showDetail` in `admin.tsx` has no caller; four
 accessibility findings on settings and admin.
+
+After the review fixes, re-checked on `3f49a4d` as separate calls:
+Launch ready in 21 s, Doctor `ok`, the 4 journeys pass, a second Launch
+refused, HUP / INT / TERM mid-launch exit 129 / 130 / 143 with no group,
+state directory or pidfile left, a SIGKILLed Launch cleaned up by the
+stderr `pidfile:` path, and Cleanup beside a `node` decoy clean. Two
+Launches timed out right after a SIGKILL test with vite listening and no
+request served; not reproduced on retry. The timeout line now names the
+last failed readiness check, and SKILL.md says to retry once and count
+it.
+
+## Implementation review
+
+- implementation-review: round 1 approve-with-changes (1 blocking: a
+  swallowed state-dir removal; 1 medium: holds-until; 2 low), Delta
+  approve, then 2 narrow passes approve. About 75k, 32k, 35k, 37k tokens.
+- unix: round 1 approve-with-changes (2 medium: SIGHUP, a SIGKILLed
+  Launch's pidfile; 5 low), Delta approve-with-changes (4 low), narrow
+  pass approve-with-changes (1 medium: `ps -g` is not a group selector),
+  final approve. All fixed.
+- deliberate: the fleet-pack refresh rides this branch in its own commit
+  (`5d9ce81`): worktree-task requires it on the task branch.
+- deliberate: `--help` anywhere in argv also catches a `-h` journey name
+  (none exists); a signal in the bind-failed retry gap and an empty
+  `mkdtemp` dir before the attempt is recorded stay unhandled (cosmetic).
+- deliberate: no unit test beside the helper, unlike sre-agent's 9: CI
+  here runs vitest over `app/` only; the generator's run is the check.
+  Interface review (2b) skipped: no interface code in the diff, the
+  `**` ui trait matches `.claude/` markdown and a Python helper.
