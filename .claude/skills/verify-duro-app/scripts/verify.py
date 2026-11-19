@@ -606,8 +606,27 @@ def run_attempt(root: Path, pidfile: Path, attempt: Attempt) -> Outcome:
 
 
 def cmd_launch() -> int:
+    """Launch, with one outer catch for a signal inside an except clause.
+
+    A signal landing between an inner except line and its mask raises
+    Interrupted out of that clause, past its siblings. The handler has
+    blocked HUP, INT and TERM before raising, and raises only once, so
+    this outer catch cannot itself be interrupted.
+    """
+    current: list[Attempt] = []
+    pidfile_box: list[Path] = []
+    try:
+        return _launch(current, pidfile_box)
+    except Interrupted as exc:
+        if pidfile_box:
+            teardown(current[0] if current else None, pidfile_box[0])
+        return exc.code
+
+
+def _launch(current: list[Attempt], pidfile_box: list[Path]) -> int:
     root = repo_root()
     pidfile = pidfile_for(root)
+    pidfile_box.append(pidfile)
     record = read_record(pidfile)
     if record is not None and members(record.pgid):
         fail(f"already running, pgid {record.pgid} — run cleanup {pidfile}")
@@ -627,6 +646,7 @@ def cmd_launch() -> int:
             signal.signal(sig, _on_signal)
         for try_number in (1, 2):
             attempt = Attempt(Path(tempfile.mkdtemp(prefix=f"{APP}-")))
+            current[:] = [attempt]
             outcome = run_attempt(root, pidfile, attempt)
             if outcome is Outcome.READY:
                 for sig in HELD_SIGNALS:
@@ -635,6 +655,7 @@ def cmd_launch() -> int:
                 return 0
             torn_down = teardown(attempt, pidfile)
             attempt = None
+            current.clear()
             if not torn_down:
                 return 1  # a group may still run: never start a second one
             if outcome is Outcome.EXITED or try_number == 2:
@@ -861,12 +882,11 @@ def cmd_cleanup(pidfile: Path) -> int:
         return 1
     now_start = lstart(record.leader_pid)
     if now_start is not None and record.leader_start is None:
-        # No start time was recorded: ours and a reuse look alike.
         # A Launch killed between the start and `ps`: ours and a reuse look
         # alike, so nothing is signalled.
         fail(
-            f"{record.pgid} has no recorded start time — if ps -o command= -g {record.pgid} "
-            f"shows react-router dev, run kill -TERM -{record.pgid}, then cleanup again"
+            f"{record.pgid} has no recorded start time — if pgrep -lg {record.pgid} "
+            f"lists node and esbuild, run kill -TERM -{record.pgid}, then cleanup again"
         )
         return 1
     if now_start is not None and now_start != record.leader_start:
