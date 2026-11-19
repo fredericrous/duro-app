@@ -668,7 +668,7 @@ class Page:
 JOURNEYS: dict[str, tuple[Page, ...]] = {
     "home": (Page("/", ("Welcome, dev", "Grafana")),),
     "catalog": (Page("/catalog", ("KB Vision", "Grafana")),),
-    "settings": (Page("/settings", ("dev@localhost",)), Page("/settings/api-keys", ("API",))),
+    "settings": (Page("/settings", ("General", "Git access")), Page("/settings/api-keys", ("API keys",))),
     "admin": (Page("/admin/identities", ("Alice", "Bob")), Page("/admin/applications", ("Jellyfin",))),
 }
 
@@ -743,15 +743,16 @@ Check {feature} of duro-app, a local dev server started for this check.
   No sign-in: the dev server signs every request in as user `dev`
   (admin). A login page or a redirect to another host is a failure.
 - Viewport {viewport}, theme {theme}.
-- The first load after Launch can show "Application Error!" with
-  "Invalid hook call" or "reading 'useContext'": vite optimises client
-  dependencies on first use. Reload once, ignoring the cache, and
-  report that it happened. The same error after that reload is a
-  failure.
+- The first visit to each route after Launch can show "Application
+  Error!" with "Invalid hook call" or "reading 'useContext'": vite
+  re-optimises a client dependency it found late. Reload once,
+  ignoring the cache, and report that it happened. The same error
+  after that reload is a failure.
 - Steps and questions:{steps}
 - Read the console and the network list: report every error and every
   request to a host other than 127.0.0.1.
-- Save screenshots as {evidence}/{app}-{feature}-<step>.png; report
+- Save screenshots as {evidence}/{app}-{feature}-<n>-<width>.png,
+  where <n> is the step number and <width> the viewport width; report
   each path, and the final URL.
 - Report measured facts only; no verdict on design quality.
 """

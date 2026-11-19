@@ -29,7 +29,7 @@ Open `/`. No sign-in: the dev server is the user `dev`.
 
 ## Gotchas
 
-- The first browser load after Launch can fail once with "Invalid hook
+- The first visit to each route after Launch can fail once with "Invalid hook
   call" (vite optimises client dependencies): reload once, ignoring the
   cache. A second failure is a defect.
 - "No launch URL configured" is expected locally, not a defect: the

@@ -4,10 +4,15 @@ Route: `/settings`
 
 ## Sub-features
 
-- Profile (`/settings`): name and email of the signed-in user.
-- Tabs: Activity, Certificate, API keys, Git, Security
-  (`/settings/<tab>`), in the side navigation of the page shell.
-- API keys (`/settings/api-keys`): list and create a key.
+- General (`/settings`): the signed-in user's settings. It does not
+  show the email.
+- Side navigation: General, Activity, API keys, Git access, Security
+  (`/settings`, `/settings/activity`, `/settings/api-keys`,
+  `/settings/git`, `/settings/security`). Git access and Security are
+  shown only when their feature is configured; both are locally.
+- API keys (`/settings/api-keys`): a card list of keys, and creating a
+  key.
+- On a narrow screen the navigation moves into a Menu drawer.
 
 ## How to get to it
 
@@ -15,18 +20,20 @@ Open `/settings`, or the "Welcome, dev" menu in the header.
 
 ## Driving it
 
-1. At 1280x800, read the profile: does it show `dev@localhost`? List
-   the side navigation entries in order.
-2. Click each side navigation entry. For each, the final URL and the
-   page heading. Does any of them show an error card?
-3. On API keys, list the buttons and the table columns.
-4. At 390x844, is the side navigation replaced by a "Menu" button that
-   opens a drawer? Open it and close it with Escape.
+1. At 1280x800, list the side navigation entries in order and the
+   General page's headings.
+2. Click each side navigation entry. For each, report the final URL,
+   the page heading, and whether an error card shows.
+3. On API keys, list the buttons and the key cards.
+4. At 390x844, open the Menu drawer, then close it with Escape. Does
+   focus return to the Menu button?
 
 ## Gotchas
 
-- Certificate and Git talk to Vault and Forgejo in production; locally
-  those point at a dead port, so an "unavailable" or empty state there
-  is expected. A blank page or an unhandled error is not.
+- Git access shows an error card locally: the git server is a dead
+  port. That is expected. A blank page or an unhandled error is not.
+- `/settings/certificate` is a route but has no navigation entry.
 - `AppShell` collapses on its container, not on the viewport: measure
   at 390 px, not by shrinking a wide window by a few pixels.
+- The first visit to each new route can crash once with "Invalid hook
+  call": reload once (see `admin.md`).

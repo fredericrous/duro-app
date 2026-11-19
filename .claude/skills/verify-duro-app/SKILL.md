@@ -19,6 +19,9 @@ hash moved may have made a step below stale):
 - app/lib/db/seed-dev.server.ts 4af244e97643
 - app/routes/health.ready.ts b777e34c790d
 - app/routes/api.catalog.ts f05f7072b9ff
+- app/routes/catalog.tsx 48f25f9ef368
+- app/routes/admin.tsx eddda186c74f
+- app/routes/settings.tsx 9c08cea75db5
 - app/locales/en/translation.json 55459f9795fe
 - .env.example aef606f08663
 
@@ -62,11 +65,13 @@ the script is stdlib only. `verify.py --help` prints the usage.
   started (a foreign server on the port never counts), `/health/ready`
   is 200 (the database answers), and `/` renders HTML (the first render
   compiles the routes). Deadline 120 s; a warm start took about 20 s.
-  On a miss it prints the last 20 log lines to stderr and keeps the log
-  at `<pidfile>.last.log`, then exits 1.
+  On a miss it prints the last 20 log lines to stderr and keeps a copy
+  of the log at `${TMPDIR:-/tmp}/verify-duro-app-<h>.last.log` (the
+  state directory is removed), then exits 1.
 - Empty data: a fresh `mktemp -d` state directory holds the log, `HOME`
   and `TMPDIR`; the store is in memory and seeded at boot (12 apps,
-  16 roles, 8 grants, 2 pending requests, users Alice and Bob).
+  16 roles, 8 grants, 2 pending requests, users Alice and Bob). The dev user's catalog
+  lists 11 of the 12 apps, which is the count Doctor prints.
 - Isolation:
   - the server's environment is built from nothing; `PATH` holds only
     node's directory, `/usr/bin` and `/bin`;
