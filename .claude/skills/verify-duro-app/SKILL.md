@@ -202,7 +202,8 @@ python3 "$v" cleanup <pidfile>
 4. Survivors: `fail: <pgid> still has <pids>`, the state directory is
    kept, exit 1. A state directory that cannot be removed:
    `fail: could not remove <dir> (…)`, exit 1. No recorded start time
-   with a live leader: `fail: … check pgrep -g <pgid> by hand`, exit 1.
+   with a live leader (a Launch killed before `ps` ran): a `fail:` line
+   naming the `kill -TERM -<pgid>` to run by hand, exit 1.
    Otherwise `ok: stopped <pgid>, removed <dir>`, exit 0.
 
 Every write a journey made (a request, an API key) was in memory and is

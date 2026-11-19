@@ -141,7 +141,7 @@ class NotLive(Exception):
 
 
 class Interrupted(Exception):
-    """SIGINT or SIGTERM during Launch: exit 130 or 143 after teardown."""
+    """SIGHUP, SIGINT or SIGTERM during Launch: 129, 130 or 143 after teardown."""
 
     def __init__(self, code: int) -> None:
         super().__init__(code)
@@ -355,7 +355,7 @@ HELD_SIGNALS = {signal.SIGHUP, signal.SIGINT, signal.SIGTERM}
 
 @contextlib.contextmanager
 def signals_held() -> Iterator[None]:
-    """Hold INT and TERM: they are delivered when the block ends."""
+    """Hold HUP, INT and TERM: they are delivered when the block ends."""
     signal.pthread_sigmask(signal.SIG_BLOCK, HELD_SIGNALS)
     try:
         yield
@@ -463,7 +463,7 @@ def teardown(attempt: Attempt | None, pidfile: Path) -> bool:
     run: it says so with a fail: line and keeps the state dir, and the
     caller must not start another server.
 
-    INT and TERM are held while it runs (about 10 s at most), so a second
+    HUP, INT and TERM are held while it runs (about 10 s at most), so a second
     Ctrl-C cannot leave it half done; the process exits right after.
     """
     if attempt is None:
@@ -501,6 +501,11 @@ def teardown(attempt: Attempt | None, pidfile: Path) -> bool:
     return True
 
 
+def one_line(text: str, limit: int = 120) -> str:
+    """A body excerpt that keeps a fail: line on one line."""
+    return " ".join(text[:limit].split())
+
+
 def not_ready(pgid: int, port: int) -> str:
     """Why the server is not usable yet; "" once it is.
 
@@ -512,11 +517,11 @@ def not_ready(pgid: int, port: int) -> str:
         return f"no listener on :{port} in group {pgid} (listeners' groups: {sorted(groups)})"
     status, body, _ = http(f"http://127.0.0.1:{port}/health/ready", timeout=5)
     if status != 200:
-        return f"/health/ready answered {status}: {body[:120]}"
+        return f"/health/ready answered {status}: {one_line(body)}"
     # The first SSR render compiles the routes: ready means usable.
     status, body, _ = http(f"http://127.0.0.1:{port}/", timeout=FIRST_PAGE_TIMEOUT_S)
     if status != 200 or "<html" not in body:
-        return f"/ answered {status} without a page: {body[:120]}"
+        return f"/ answered {status} without a page: {one_line(body)}"
     return ""
 
 
@@ -552,7 +557,7 @@ def run_attempt(root: Path, pidfile: Path, attempt: Attempt) -> Outcome:
     log_path = attempt.state / "server.log"
     cmd = server_cmd(root, port)
     # A signal between Popen and the pgid write would orphan the server:
-    # hold INT and TERM until the group id is on disk.
+    # hold HUP, INT and TERM until the group id and pidfile are on disk.
     with signals_held():
         with open(log_path, "a") as log:
             attempt.child = subprocess.Popen(
@@ -564,24 +569,26 @@ def run_attempt(root: Path, pidfile: Path, attempt: Attempt) -> Outcome:
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
                 # A blocked mask survives exec: the server must get its
-                # INT and TERM back, or Cleanup's TERM would be ignored.
+                # signals back, or Cleanup's TERM would be ignored.
                 preexec_fn=unblock_held_signals,
             )
         (attempt.state / "pgid").write_text(str(attempt.child.pid))
-    child = attempt.child
-    write_json_atomic(
-        pidfile,
-        {
+        child = attempt.child
+        payload: dict[str, Any] = {
             "pgid": child.pid,
             "leader_pid": child.pid,
-            "leader_start": lstart(child.pid),
+            "leader_start": None,
             "cmd": cmd,
             "state_dir": str(attempt.state),
             "port": port,
             "log": str(log_path),
             "started_at": utc_now(),
-        },
-    )
+        }
+        # On disk before `ps` runs (up to 10 s): a SIGKILL in between
+        # still leaves Cleanup a group to name.
+        write_json_atomic(pidfile, payload)
+    payload["leader_start"] = lstart(child.pid)
+    write_json_atomic(pidfile, payload)
     deadline = time.monotonic() + DEADLINE_S
     reason = "not checked yet"
     while time.monotonic() < deadline:
@@ -633,17 +640,22 @@ def cmd_launch() -> int:
             if outcome is Outcome.EXITED or try_number == 2:
                 fail(f"server exited during launch ({outcome.value})")
                 return 1
-            # The bind-failed retry: the teardown held INT and TERM.
+            # The bind-failed retry: the teardown held HUP, INT and TERM.
             unblock_held_signals()
         return 1
+    # Each clause masks first: a second signal landing before teardown
+    # blocks would raise past its sibling clauses.
     except Interrupted as exc:
+        signal.pthread_sigmask(signal.SIG_BLOCK, HELD_SIGNALS)
         teardown(attempt, pidfile)
         return exc.code
     except LaunchFailed as exc:
+        signal.pthread_sigmask(signal.SIG_BLOCK, HELD_SIGNALS)
         teardown(attempt, pidfile)
         fail(str(exc))
         return exc.code
     except BaseException:
+        signal.pthread_sigmask(signal.SIG_BLOCK, HELD_SIGNALS)
         teardown(attempt, pidfile)
         raise
 
@@ -850,7 +862,12 @@ def cmd_cleanup(pidfile: Path) -> int:
     now_start = lstart(record.leader_pid)
     if now_start is not None and record.leader_start is None:
         # No start time was recorded: ours and a reuse look alike.
-        fail(f"{record.pgid} has no recorded start time — check pgrep -g {record.pgid} by hand")
+        # A Launch killed between the start and `ps`: ours and a reuse look
+        # alike, so nothing is signalled.
+        fail(
+            f"{record.pgid} has no recorded start time — if ps -o command= -g {record.pgid} "
+            f"shows react-router dev, run kill -TERM -{record.pgid}, then cleanup again"
+        )
         return 1
     if now_start is not None and now_start != record.leader_start:
         # The id was reused by someone else's process: never signal it.
@@ -902,6 +919,8 @@ def main(argv: list[str]) -> int:
     except ToolFailure as exc:
         fail(str(exc))
         return 1
+    except Interrupted as exc:
+        return exc.code
     except KeyboardInterrupt:
         fail("interrupted — run the step again (cleanup is safe to repeat)")
         return 130
