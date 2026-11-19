@@ -162,7 +162,8 @@ Chrome DevTools protocol by hand, using the same brief.
 
 - `drive` writes `verify-duro-app-<journey>.json` (each GET, its status,
   the markers found and missing) and copies the server log; the
-  `browser-check` brief saves `verify-duro-app-<feature>-<step>.png`.
+  `browser-check` brief saves `verify-duro-app-<feature>-<n>-<width>.png` (step
+  number, viewport width).
   Both go to the directory worktree-task F3 names, outside the worktree.
   `drive` and `brief` refuse a directory inside it.
 - Without Green Harness (no `~/.claude/greenbelay`), pass any directory

@@ -9,8 +9,12 @@ Route: `/admin/identities`
   `/admin/users` and `/admin/principals` redirect here.
 - Applications (`/admin/applications`): a row opens the full detail
   route `/admin/applications/<id>`.
-- Access requests, grants, group mappings, invitations, audit, plugins,
-  recovery: the other entries of the admin side navigation.
+- The other entries of the admin side navigation, among them Dashboard
+  (`/admin`), User Invites, access requests, grants, invitations,
+  audit, Authz Playground, plugins and recovery. Group mappings
+  (`/admin/group-mappings`) is a route, but it was not in the
+  navigation on 2026-11-19 (`admin.tsx` maps it, likely behind a
+  condition).
 
 ## How to get to it
 
@@ -39,9 +43,10 @@ Open `/admin`: the dev user is in `lldap_admin`, so admin is allowed.
   'useContext'": vite finds a client dependency late and re-optimises.
   `/admin/applications/<id>` does it. Reload once, ignoring the cache;
   the same error after that reload is a defect.
-- Raw translation keys (`ADMIN.COLS.NAME`) were seen on 2026-11-19 on
-  admin tables although `admin.cols.name` exists in `en`: report them,
-  never treat them as expected.
+- Raw translation keys (`ADMIN.COLS.NAME`) were seen once on
+  2026-11-19, on a page that had just hit the "Invalid hook call"
+  crash, and not on a clean load. `admin.cols.name` exists in `en`:
+  report any you see, never treat them as expected.
 - `/admin/users` and `/admin/principals` answer 301 to identities on
   purpose.
 - Plugins and group sync call LLDAP and the operator in production;
