@@ -35,5 +35,7 @@ Open `/settings`, or the "Welcome, dev" menu in the header.
 - `/settings/certificate` is a route but has no navigation entry.
 - `AppShell` collapses on its container, not on the viewport: measure
   at 390 px, not by shrinking a wide window by a few pixels.
-- The first visit to each new route can crash once with "Invalid hook
-  call": reload once (see `admin.md`).
+- "Invalid hook call", "Cannot read properties of null (reading
+  'useContext')" or "Application Error!" is a defect on any visit, the
+  first after Launch included: vite pre-bundles every client dependency
+  at startup (t01, 2026-11-20). Report it; never reload it away.

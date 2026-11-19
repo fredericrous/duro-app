@@ -37,7 +37,7 @@ Open `/catalog`, or "Request access" in the header from any page.
   non-admin dev sign-in; a change to the request flow is proven by the
   route's vitest tests and, in the browser, through the header's
   "Request access" dialog (see `home.md`), if it opens for an admin.
-- The first visit to each route after Launch can fail once with "Application
-  Error!" and "Invalid hook call" / "Cannot read properties of null
-  (reading 'useContext')": vite optimises client dependencies on first
-  use. Reload once, ignoring the cache. A second failure is a defect.
+- "Invalid hook call", "Cannot read properties of null (reading
+  'useContext')" or "Application Error!" is a defect on any visit, the
+  first after Launch included: vite pre-bundles every client dependency
+  at startup (t01, 2026-11-20). Report it; never reload it away.

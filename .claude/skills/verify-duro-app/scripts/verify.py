@@ -827,11 +827,9 @@ Check {feature} of duro-app, a local dev server started for this check.
   No sign-in: the dev server signs every request in as user `dev`
   (admin). A login page or a redirect to another host is a failure.
 - Viewport {viewport}, theme {theme}.
-- The first visit to each route after Launch can show "Application
-  Error!" with "Invalid hook call" or "reading 'useContext'": vite
-  re-optimises a client dependency it found late. Reload once,
-  ignoring the cache, and report that it happened. The same error
-  after that reload is a failure.
+- "Application Error!", "Invalid hook call" or "reading 'useContext'"
+  is a failure on any visit, the first included. Report it; do not
+  reload it away.
 - Steps and questions:{steps}
 - Read the console and the network list: report every error and every
   request to a host other than 127.0.0.1.

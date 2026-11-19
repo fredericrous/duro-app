@@ -9,8 +9,8 @@ generated-from (first 12 hex of `git hash-object <file>`; a file whose
 hash moved may have made a step below stale):
 
 - package.json fbf2d1cf7229
-- vite.config.ts 4ce6dd1611eb
-- react-router.config.ts 15afbe4a0480
+- vite.config.ts cea04809f5f8
+- react-router.config.ts f8525650e242
 - app/routes.ts 8b54497526bd
 - app/lib/auth.server.ts b58a57c38566
 - app/lib/services/AppLayer.server.ts 14c25077dd15
