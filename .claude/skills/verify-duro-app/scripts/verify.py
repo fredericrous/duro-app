@@ -101,6 +101,10 @@ DEFAULTED = (
 )
 SET_BY_LAUNCH = ("NODE_ENV", "SESSION_SECRET", "OIDC_REDIRECT_URI")
 CLASSIFIED = frozenset((*DEAD_URLS, *DUMMIES, *UNSET, *DEFAULTED, *SET_BY_LAUNCH))
+# holds-until: these patterns see `process.env.X`, `process.env["X"]`,
+# `Config.<kind>("X")` and `require(Config|Secret)("X")` only, not
+# `import.meta.env`, a computed name or another helper. Ends when the app
+# reads its environment through one typed config module to import from.
 ENV_PATTERN = re.compile(
     r"process\.env\.([A-Z_][A-Z0-9_]*)"
     r"|process\.env\[\"([A-Z_][A-Z0-9_]*)\"\]"
@@ -118,6 +122,10 @@ USAGE = (
 
 class Precondition(Exception):
     """A missing tool, repository or file: exit 2 with a fail: line."""
+
+
+class ToolFailure(Exception):
+    """A system tool hung or a signal was refused at run time: exit 1."""
 
 
 class LaunchFailed(Exception):
@@ -197,7 +205,7 @@ def run_tool(args: list[str], ok_codes: frozenset[int] = frozenset({0})) -> str:
             timeout=TOOL_TIMEOUT_S,
         )
     except subprocess.TimeoutExpired as exc:
-        raise Precondition(f"{args[0]} hung for {TOOL_TIMEOUT_S:.0f}s") from exc
+        raise ToolFailure(f"{args[0]} hung for {TOOL_TIMEOUT_S:.0f}s") from exc
     if done.returncode not in ok_codes:
         raise Precondition(f"{args[0]} exited {done.returncode}: {done.stderr.strip()[:200]}")
     return done.stdout.strip()
@@ -313,7 +321,7 @@ def stop_group(pgid: int, child: subprocess.Popen[bytes] | None = None, grace_s:
             # macOS answers EPERM for a group whose members are exiting.
             if not members(pgid):
                 return []
-            raise Precondition(f"not allowed to signal group {pgid}") from None
+            raise ToolFailure(f"not allowed to signal group {pgid}") from None
         deadline = time.monotonic() + grace_s
         while time.monotonic() < deadline:
             if child is not None:
@@ -337,10 +345,12 @@ def _on_signal(signum: int, _frame: FrameType | None) -> None:
     if _interrupted:
         return
     _interrupted.append(signum)
-    raise Interrupted(130 if signum == signal.SIGINT else 143)
+    raise Interrupted(128 + signum)  # 129 HUP, 130 INT, 143 TERM
 
 
-HELD_SIGNALS = {signal.SIGINT, signal.SIGTERM}
+# HUP too: a closed tool-call shell must tear the attempt down, since the
+# server runs in its own session and would outlive the launcher.
+HELD_SIGNALS = {signal.SIGHUP, signal.SIGINT, signal.SIGTERM}
 
 
 @contextlib.contextmanager
@@ -435,6 +445,17 @@ def child_env(state: Path, port: int) -> dict[str, str]:
     return env
 
 
+def remove_dir(path: Path) -> str | None:
+    """Remove a state directory; the error text when it could not be."""
+    try:
+        shutil.rmtree(path)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        return f"could not remove {path} ({exc})"
+    return None
+
+
 def teardown(attempt: Attempt | None, pidfile: Path) -> bool:
     """Undo a failed or interrupted attempt: group, state dir, pidfile.
 
@@ -460,7 +481,7 @@ def teardown(attempt: Attempt | None, pidfile: Path) -> bool:
     if pgid is not None:
         try:
             survivors = stop_group(pgid, attempt.child)
-        except Precondition as exc:
+        except (Precondition, ToolFailure) as exc:
             fail(f"teardown could not stop group {pgid} ({exc}) — kill it by hand; {kept}")
             return False
         if survivors:
@@ -473,20 +494,30 @@ def teardown(attempt: Attempt | None, pidfile: Path) -> bool:
     else:
         if record is not None and record.state_dir == attempt.state:
             pidfile.unlink(missing_ok=True)
-    shutil.rmtree(attempt.state, ignore_errors=True)
+    problem = remove_dir(attempt.state)
+    if problem:
+        fail(f"teardown {problem}")
+        return False
     return True
 
 
-def is_ready(pgid: int, port: int) -> bool:
-    """Our group serves the port, the DB answers, and a page renders."""
-    if pgid not in listener_groups(port):
-        return False  # a foreign server on our port never counts
-    status, _, _ = http(f"http://127.0.0.1:{port}/health/ready", timeout=5)
+def not_ready(pgid: int, port: int) -> str:
+    """Why the server is not usable yet; "" once it is.
+
+    Ready: our group serves the port, the DB answers, and a page renders.
+    """
+    groups = listener_groups(port)
+    if pgid not in groups:
+        # A foreign server on our port never counts.
+        return f"no listener on :{port} in group {pgid} (listeners' groups: {sorted(groups)})"
+    status, body, _ = http(f"http://127.0.0.1:{port}/health/ready", timeout=5)
     if status != 200:
-        return False
+        return f"/health/ready answered {status}: {body[:120]}"
     # The first SSR render compiles the routes: ready means usable.
     status, body, _ = http(f"http://127.0.0.1:{port}/", timeout=FIRST_PAGE_TIMEOUT_S)
-    return status == 200 and "<html" in body
+    if status != 200 or "<html" not in body:
+        return f"/ answered {status} without a page: {body[:120]}"
+    return ""
 
 
 def print_tail(log: Path, pidfile: Path) -> Path:
@@ -552,17 +583,19 @@ def run_attempt(root: Path, pidfile: Path, attempt: Attempt) -> Outcome:
         },
     )
     deadline = time.monotonic() + DEADLINE_S
+    reason = "not checked yet"
     while time.monotonic() < deadline:
         if child.poll() is not None:
             if "already in use" in log_path.read_text(errors="replace"):
                 return Outcome.BIND_FAILED
             print_tail(log_path, pidfile)
             return Outcome.EXITED
-        if is_ready(child.pid, port):
+        reason = not_ready(child.pid, port)
+        if not reason:
             return Outcome.READY
         time.sleep(0.5)
     kept = print_tail(log_path, pidfile)
-    raise LaunchFailed(f"not ready in {DEADLINE_S:.0f}s — log {kept}")
+    raise LaunchFailed(f"not ready in {DEADLINE_S:.0f}s, last: {reason} — log {kept}")
 
 
 def cmd_launch() -> int:
@@ -573,16 +606,24 @@ def cmd_launch() -> int:
         fail(f"already running, pgid {record.pgid} — run cleanup {pidfile}")
         return 1
     server_cmd(root, 0)  # the node_modules precondition, before any state
-    signal.signal(signal.SIGINT, _on_signal)
-    signal.signal(signal.SIGTERM, _on_signal)
+    # On stderr before anything starts: a Launch killed by a tool timeout
+    # (SIGKILL, uncatchable) never reaches the stdout line, and Cleanup
+    # needs this path.
+    sys.stderr.write(f"pidfile: {pidfile}\n")
     attempt: Attempt | None = None
     try:
+        # holds-until: two Launches in the same worktree at the same
+        # instant both pass the already-running check above; the skill
+        # says so. Ends when a lock with a release is added (the O_EXCL
+        # lock was dropped for having none).
+        for sig in HELD_SIGNALS:
+            signal.signal(sig, _on_signal)
         for try_number in (1, 2):
             attempt = Attempt(Path(tempfile.mkdtemp(prefix=f"{APP}-")))
             outcome = run_attempt(root, pidfile, attempt)
             if outcome is Outcome.READY:
-                signal.signal(signal.SIGINT, signal.SIG_DFL)
-                signal.signal(signal.SIGTERM, signal.SIG_DFL)
+                for sig in HELD_SIGNALS:
+                    signal.signal(sig, signal.SIG_DFL)
                 sys.stdout.write(f"{pidfile}\n")
                 return 0
             torn_down = teardown(attempt, pidfile)
@@ -619,16 +660,19 @@ def live_record(pidfile: Path) -> Record:
     return record
 
 
-def seeded_apps(record: Record) -> list[str]:
-    """The dev user's catalog: empty means no seed (a file-backed store)."""
+def seeded_apps(record: Record) -> tuple[list[str], str]:
+    """The dev user's catalog, and why it could not be read ("" if read).
+
+    An empty list read without error means no seed (a file-backed store).
+    """
     status, body, _ = http(f"{record.base}/api/catalog")
     if status != 200:
-        return []
+        return [], f"/api/catalog answered {status}"
     try:
         apps = json.loads(body).get("apps", [])
-    except ValueError:
-        return []
-    return [str(app.get("name") or app.get("slug") or "?") for app in apps]
+    except (ValueError, AttributeError) as exc:
+        return [], f"/api/catalog is not the expected JSON ({exc})"
+    return [str(app.get("name") or app.get("slug") or "?") for app in apps], ""
 
 
 def cmd_doctor(pidfile: Path) -> int:
@@ -646,7 +690,10 @@ def cmd_doctor(pidfile: Path) -> int:
     if status != 200:
         fail(f"/admin {status} {location} — no dev sign-in; read {record.log}")
         return 1
-    apps = seeded_apps(record)
+    apps, problem = seeded_apps(record)
+    if problem:
+        fail(f"{problem} on :{record.port} — read {record.log}")
+        return 1
     if not apps:
         fail(f"catalog empty on :{record.port} — no dev seed; read {record.log}")
         return 1
@@ -732,7 +779,11 @@ def cmd_drive(pidfile: Path, evidence: Path, journeys: list[str]) -> int:
                 fail(f"{name} failed — read {out}")
                 rc = 1
     finally:
-        shutil.copy(record.log, evidence_dir / f"{APP}-server.log")
+        try:
+            shutil.copy(record.log, evidence_dir / f"{APP}-server.log")
+        except OSError as exc:
+            fail(f"could not copy the server log ({exc}) — run launch again")
+            rc = 1
     return rc
 
 
@@ -797,9 +848,16 @@ def cmd_cleanup(pidfile: Path) -> int:
         fail(f"no pidfile at {pidfile} — nothing to stop")
         return 1
     now_start = lstart(record.leader_pid)
+    if now_start is not None and record.leader_start is None:
+        # No start time was recorded: ours and a reuse look alike.
+        fail(f"{record.pgid} has no recorded start time — check pgrep -g {record.pgid} by hand")
+        return 1
     if now_start is not None and now_start != record.leader_start:
         # The id was reused by someone else's process: never signal it.
-        shutil.rmtree(record.state_dir, ignore_errors=True)
+        problem = remove_dir(record.state_dir)
+        if problem:
+            fail(problem)
+            return 1
         pidfile.unlink(missing_ok=True)
         ok(f"{record.pgid} reused, nothing signalled")
         return 0
@@ -807,14 +865,17 @@ def cmd_cleanup(pidfile: Path) -> int:
     if survivors:
         fail(f"{record.pgid} still has {' '.join(map(str, survivors))}")
         return 1
-    shutil.rmtree(record.state_dir, ignore_errors=True)
+    problem = remove_dir(record.state_dir)
+    if problem:
+        fail(problem)
+        return 1
     pidfile.unlink(missing_ok=True)
     ok(f"stopped {record.pgid}, removed {record.state_dir}")
     return 0
 
 
 def dispatch(argv: list[str]) -> int:
-    if argv[:1] in (["-h"], ["--help"]):
+    if "-h" in argv or "--help" in argv:
         sys.stdout.write(f"{USAGE}\n")
         return 0
     command, rest = (argv[0], argv[1:]) if argv else ("", [])
@@ -838,6 +899,9 @@ def main(argv: list[str]) -> int:
     except Precondition as exc:
         fail(str(exc))
         return 2
+    except ToolFailure as exc:
+        fail(str(exc))
+        return 1
     except KeyboardInterrupt:
         fail("interrupted — run the step again (cleanup is safe to repeat)")
         return 130
