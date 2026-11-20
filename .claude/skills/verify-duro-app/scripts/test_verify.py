@@ -1,6 +1,9 @@
 """Launch's readiness wait: python3 -m unittest discover -s <this dir>."""
 
+import tempfile
 import unittest
+import urllib.parse
+from pathlib import Path
 
 import verify
 
@@ -83,6 +86,19 @@ class Cap(unittest.TestCase):
         last_pass_ends = verify.CAP_S + verify.PASS_WORST_S + verify.SETTLE_WORST_S + verify.TEARDOWN_WORST_S
         self.assertLess(last_pass_ends, verify.TOOL_CEILING_S)
         self.assertGreaterEqual(verify.CAP_S, 2 * 170)  # the slowest start measured
+
+
+class OriginCheck(unittest.TestCase):
+    """t12: a mutation's Origin is the served host, so the suffix must match it."""
+
+    def test_launch_allows_the_origin_the_brief_opens(self) -> None:
+        with tempfile.TemporaryDirectory() as state:
+            env = verify.child_env(Path(state), 4321)
+            record = verify.Record(0, 0, None, Path(state), 4321, Path(state) / "log")
+        host = urllib.parse.urlsplit(record.base).hostname or ""
+        # the app's isOriginAllowed: new URL(origin).hostname.endsWith(suffix)
+        self.assertEqual(env["ALLOWED_ORIGIN_SUFFIX"], "127.0.0.1")
+        self.assertTrue(host.endswith(env["ALLOWED_ORIGIN_SUFFIX"]))
 
 
 if __name__ == "__main__":

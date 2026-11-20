@@ -68,6 +68,10 @@ the script is stdlib only. `verify.py --help` prints the usage.
   `node …/bin.js`: the shim's `NODE_PATH` is what resolves
   `@stylexjs/babel-plugin`, which `vite.config.ts` names; without
   it every page is a 500.
+- Sets `ALLOWED_ORIGIN_SUFFIX=127.0.0.1`, the host it serves: admin
+  mutations check the request's Origin against it, and the dev default
+  `localhost` answered every one from the brief's URL with 403 "Invalid
+  origin" (t12, 2026-11-20).
 - Ready means all three: the listener on the port is in the group Launch
   started (a foreign server on the port never counts), `/health/ready`
   is 200 (the database answers), and `/` renders HTML (the first render

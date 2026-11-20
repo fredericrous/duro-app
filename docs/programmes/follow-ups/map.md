@@ -54,25 +54,23 @@ or closed as not worth doing. Reached when no ticket here is open.
   to the Menu button while the 480 px cert panel is open, below a
   viewport of about 1296 px, is intended: a 360 px panel keeps the rail
   but squeezes the identities table into 279 px rows.
+- [t12](t12-verify-origin-403.md): verify-duro-app's Launch sets
+  `ALLOWED_ORIGIN_SUFFIX=127.0.0.1`, the host it serves, so admin
+  mutations from the brief's URL pass the origin check; the brief stays
+  on 127.0.0.1.
 
 ## Handoff
 
-2026-11-20, boundary: t08 closed (`fix/cert-panel-narrow`), after t09,
-t10, t11 and t13 (another session).
+2026-11-20, boundary: t12 closed (`fix/verify-origin-suffix`).
 
-- Done: [t08](t08-cert-panel-narrow-screens.md): below `md` the cert
-  panel opens as a right Drawer (`AdminDetailSurface`); a row's Revoke
-  now posts to `/admin/identities`, and a checkbox ticks once per click.
-  Revoke was broken at every width before. [t13](t13-rail-collapses-with-cert-panel.md):
-  the rail giving way while the wide panel is open is intended.
+- Done: [t12](t12-verify-origin-403.md): a verify run's admin
+  mutations answer 200 from `127.0.0.1`; `features/admin.md` step 5
+  drives a cert Revoke.
 - Live state: nothing in flight.
-- Next, in order: t12.
-- Lessons: a node a child route hands the layout (`setContent`) renders
-  under the layout's route, so `useFetcher` forms in it need an explicit
-  `action`. A verify run serves 127.0.0.1 while the dev origin check
-  wants `localhost`: drive admin mutations through `localhost` until
-  [t12](t12-verify-origin-403.md). A layout trade-off check needs the
-  panel's real rows and the page's own height, not only the rail's width.
+- Next, in order: nothing open in this programme.
+- Lessons: drive admin mutations through the brief's URL; `localhost`
+  is no longer needed. A feature file's mutation step is what catches
+  an origin or CSRF regression: GET journeys never send an Origin.
 
 ## Not yet specified
 
