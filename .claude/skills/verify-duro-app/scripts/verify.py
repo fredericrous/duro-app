@@ -116,7 +116,6 @@ UNSET = (
 DEFAULTED = (
     "ADMIN_EMAIL",
     "ADMIN_GROUP_NAME",
-    "ALLOWED_ORIGIN_SUFFIX",
     "APP_DESCRIPTION",
     "APP_NAME",
     "CATEGORY_ORDER",
@@ -125,7 +124,10 @@ DEFAULTED = (
     "SMTP_FROM",
     "WORKER_HEALTH_PORT",  # the worker is not started here
 )
-SET_BY_LAUNCH = ("NODE_ENV", "SESSION_SECRET", "OIDC_REDIRECT_URI")
+# ALLOWED_ORIGIN_SUFFIX: the dev default is `localhost`, but the server is
+# served on 127.0.0.1, so every admin mutation would answer 403 (t12).
+SET_BY_LAUNCH = ("NODE_ENV", "SESSION_SECRET", "OIDC_REDIRECT_URI", "ALLOWED_ORIGIN_SUFFIX")
+HOST = "127.0.0.1"
 CLASSIFIED = frozenset((*DEAD_URLS, *DUMMIES, *UNSET, *DEFAULTED, *SET_BY_LAUNCH))
 # holds-until: these patterns see `process.env.X`, `process.env["X"]`,
 # `Config.<kind>("X")` and `require(Config|Secret)("X")` only, not
@@ -193,7 +195,7 @@ class Record:
 
     @property
     def base(self) -> str:
-        return f"http://127.0.0.1:{self.port}"
+        return f"http://{HOST}:{self.port}"
 
 
 def utc_now() -> str:
@@ -503,7 +505,9 @@ def child_env(state: Path, port: int) -> dict[str, str]:
         # the in-memory PGlite with its seed, and every *Dev service layer.
         "NODE_ENV": "development",
         "SESSION_SECRET": secrets.token_hex(32),
-        "OIDC_REDIRECT_URI": f"http://127.0.0.1:{port}/auth/callback",
+        "OIDC_REDIRECT_URI": f"http://{HOST}:{port}/auth/callback",
+        # the Origin a browser sends on a mutation is the page's own host
+        "ALLOWED_ORIGIN_SUFFIX": HOST,
         **DUMMIES,
     }
     for name in DEAD_URLS:
@@ -646,7 +650,7 @@ def server_cmd(root: Path, port: int) -> list[str]:
     if not shim.exists():
         raise Precondition("no node_modules — run pnpm install --frozen-lockfile")
     # --strictPort: without it vite moves to the next free port silently.
-    return [str(shim), "dev", "--host", "127.0.0.1", "--port", str(port), "--strictPort"]
+    return [str(shim), "dev", "--host", HOST, "--port", str(port), "--strictPort"]
 
 
 def run_attempt(root: Path, pidfile: Path, attempt: Attempt) -> Outcome:

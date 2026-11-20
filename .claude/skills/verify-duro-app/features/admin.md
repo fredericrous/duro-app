@@ -34,6 +34,11 @@ Open `/admin`: the dev user is in `lldap_admin`, so admin is allowed.
    horizontal page scroll? Click Alice's Certificates button: does a
    dialog (a Drawer from the right) open with her certificates, and does
    its Close button close it?
+5. At 1280x800 on `/admin/identities`, open Alice's Certificates and
+   click Revoke on one active certificate (confirm it if asked). Report
+   the POST's URL and status from the network list, and whether the
+   page shows "Something went wrong" or the certificate as revoked.
+   A 403 is a defect (t12).
 
 ## Gotchas
 
@@ -49,6 +54,10 @@ Open `/admin`: the dev user is in `lldap_admin`, so admin is allowed.
   2026-11-19, on a page that had just hit the first-visit "Invalid hook
   call" crash (fixed since), and not on a clean load. `admin.cols.name` exists in `en`:
   report any you see, never treat them as expected.
+- Admin mutations check the request's Origin against
+  `ALLOWED_ORIGIN_SUFFIX`; Launch sets it to `127.0.0.1`, the host the
+  brief opens (the dev default `localhost` answered 403 "Invalid
+  origin" before t12). Open the brief's URL, never `localhost`.
 - `/admin/users` and `/admin/principals` answer 301 to identities on
   purpose.
 - Plugins and group sync call LLDAP and the operator in production;

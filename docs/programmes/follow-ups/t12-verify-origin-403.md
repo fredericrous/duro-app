@@ -1,7 +1,7 @@
 +++
 type = "task"
 mode = "afk"
-status = "open"
+status = "closed"
 blocked_by = []
 repos = ["duro-app"]
 +++
@@ -28,3 +28,21 @@ answered 200). Should Launch set the suffix, or the brief open
 
 One PR where a verify run's admin mutation answers 200, with the
 script's test covering it, and `features/admin.md` naming a mutation step.
+
+## Resolution
+
+2026-11-20: Launch sets the suffix, so a verify run stays on one host.
+
+- `verify.py` moves `ALLOWED_ORIGIN_SUFFIX` from `DEFAULTED` to
+  `SET_BY_LAUNCH` and sets it to `HOST` (`127.0.0.1`), the one constant
+  behind `--host`, the pidfile's `base` and `OIDC_REDIRECT_URI`. The
+  brief keeps opening `127.0.0.1`: switching it to `localhost` would
+  break the loopback-only checks (`http()`, `check_isolation`, the
+  brief's "a host other than 127.0.0.1" rule).
+- `test_verify.py` `OriginCheck`: the env Launch builds allows the
+  hostname of the URL the brief opens (a KeyError before the change).
+- `features/admin.md` step 5 revokes one of Alice's certificates. Run
+  on this branch: `POST /admin/identities.data` with Origin
+  `http://127.0.0.1:55707` answered 200 (`certRevoked: true`), the row
+  reads Revoked, no "Something went wrong"; `drive` home, catalog,
+  settings and admin passed.
