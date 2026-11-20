@@ -1,6 +1,7 @@
 import { useFetcher } from "react-router"
 import { html } from "react-strict-dom"
-import { Badge, Button, Checkbox, DetailPanel, List } from "@duro-app/ui"
+import { Badge, Button, Checkbox, List } from "@duro-app/ui"
+import { DetailSurface } from "~/components/admin/AdminDetailSurface"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 import { certStatus } from "~/lib/cert-status"
 
@@ -9,7 +10,10 @@ function CertRevokeButton({ serialNumber, t }: { serialNumber: string; t: (key: 
   const isRevoking = fetcher.state !== "idle"
 
   return (
-    <fetcher.Form method="post">
+    // The panel renders under the admin layout (DetailPanel or Drawer), not
+    // under the identities route that built it: name the action, or the
+    // fetcher posts to /admin, which has none ("Method Not Allowed").
+    <fetcher.Form method="post" action="/admin/identities">
       <html.input type="hidden" name="intent" value="revokeCert" />
       <html.input type="hidden" name="serialNumber" value={serialNumber} />
       <Button type="submit" variant="danger" size="small" disabled={isRevoking}>
@@ -42,24 +46,21 @@ export function CertPanelContent({
 }) {
   return (
     <>
-      <DetailPanel.Header>
-        <DetailPanel.Title>
+      <DetailSurface.Header>
+        <DetailSurface.Title>
           {t("admin.users.actions.viewCerts")} — {certPanelUser?.displayName || certPanelUserId}
-        </DetailPanel.Title>
-        <DetailPanel.Close aria-label={t("admin.detailPanel.close")} />
-      </DetailPanel.Header>
-      <DetailPanel.Body padded={false}>
+        </DetailSurface.Title>
+        <DetailSurface.Close aria-label={t("admin.detailPanel.close")} />
+      </DetailSurface.Header>
+      <DetailSurface.Body padded={false}>
         <List.Root selectionMode="multiple" aria-label={t("admin.users.actions.viewCerts")}>
           {certPanelCerts.map((cert) => {
             const status = certStatus(cert)
             const isActive = status === "active"
             return (
-              <List.Item
-                key={cert.id}
-                selected={selectedCerts.has(cert.serialNumber)}
-                disabled={!isActive}
-                onClick={isActive ? () => toggleCert(cert.serialNumber) : undefined}
-              >
+              // The Checkbox alone toggles: a row onClick too would receive the
+              // checkbox's bubbled click and undo its change.
+              <List.Item key={cert.id} selected={selectedCerts.has(cert.serialNumber)} disabled={!isActive}>
                 {isActive && (
                   <Checkbox
                     checked={selectedCerts.has(cert.serialNumber)}
@@ -85,13 +86,13 @@ export function CertPanelContent({
           })}
           {certPanelCerts.length === 0 && <List.Empty>{t("admin.users.certs.empty")}</List.Empty>}
         </List.Root>
-      </DetailPanel.Body>
+      </DetailSurface.Body>
       {onRevokeSelected && selectedCerts.size > 0 && (
-        <DetailPanel.Footer>
+        <DetailSurface.Footer>
           <Button variant="danger" size="small" onClick={onRevokeSelected}>
             {t("admin.users.certs.revokeSelected", { count: selectedCerts.size })}
           </Button>
-        </DetailPanel.Footer>
+        </DetailSurface.Footer>
       )}
     </>
   )

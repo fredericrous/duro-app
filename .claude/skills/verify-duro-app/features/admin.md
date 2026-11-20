@@ -31,12 +31,15 @@ Open `/admin`: the dev user is in `lldap_admin`, so admin is allowed.
    Jellyfin: report the final URL and the detail page's heading.
 4. At 390x844, open `/admin/identities`: is the side navigation
    replaced by a Menu button, and is the table readable without
-   horizontal page scroll?
+   horizontal page scroll? Click Alice's Certificates button: does a
+   dialog (a Drawer from the right) open with her certificates, and does
+   its Close button close it?
 
 ## Gotchas
 
-- The only side panel is the identities cert panel (wide screens only,
-  through `useAdminSidePanel`'s `setContent`/`onOpenChange`). A record's
+- The only side panel is the identities cert panel, through
+  `useAdminSidePanel`'s `setContent`/`onOpenChange`: a complementary
+  panel on wide screens, a modal Drawer (role dialog) below `md`. A record's
   detail is its own route; a row click on identities does nothing.
 - "Invalid hook call", "Cannot read properties of null (reading
   'useContext')" or "Application Error!" is a defect on any visit, the
