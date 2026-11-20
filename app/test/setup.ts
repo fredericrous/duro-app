@@ -30,8 +30,8 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   } as unknown as typeof ResizeObserver
 }
 
-// jsdom doesn't ship matchMedia. `useMediaQuery` (admin.tsx: DetailPanel vs
-// navigate on narrow screens; theme and link-target hooks) calls
+// jsdom doesn't ship matchMedia. `useMediaQuery` (admin.tsx: DetailPanel on
+// wide screens only; theme and link-target hooks) calls
 // window.matchMedia synchronously during render; without this stub it
 // throws. The stub always reports a match so admin renders its wide variant
 // in tests — the narrow variant is exercised via overrides where it matters.

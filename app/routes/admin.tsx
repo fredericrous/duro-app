@@ -35,8 +35,6 @@ export interface AdminSidePanelContext {
   setContent: (content: ReactNode | null) => void
   /** Register a callback that fires when panel is closed externally (ESC, close button) */
   onCloseRef: React.MutableRefObject<(() => void) | null>
-  showDetail: (content: ReactNode, detailPath: string) => void
-  isWide: boolean
 }
 
 export function useAdminSidePanel() {
@@ -165,26 +163,12 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
 
   const activeValue = deriveActiveValue(location.pathname)
 
-  const showDetail = useCallback(
-    (content: ReactNode, detailPath: string) => {
-      if (isWide) {
-        setSidePanelContent(content)
-        setSidePanelOpen(true)
-      } else {
-        navigate(detailPath)
-      }
-    },
-    [isWide, navigate],
-  )
-
   const outletContext: AdminSidePanelContext = {
     open: sidePanelOpen,
     onOpenChange: setSidePanelOpen,
     content: sidePanelContent,
     setContent: setSidePanelContent,
     onCloseRef,
-    showDetail,
-    isWide,
   }
 
   const nav = ({ onSelect }: AppShellNavProps) => (
@@ -256,7 +240,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
       closeLabel={t("admin.detailPanel.close")}
       aside={
         // DetailPanel at layout level — pushes the entire page left. Wide only:
-        // on narrow screens showDetail navigates to the detail route instead.
+        // detail views on narrow screens are their own routes.
         isWide && (
           <DetailPanel.Root open={sidePanelOpen} onOpenChange={handlePanelOpenChange}>
             <DetailPanel.Content size="md" label={t("admin.detailPanel.label")}>

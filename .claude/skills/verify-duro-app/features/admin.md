@@ -35,9 +35,9 @@ Open `/admin`: the dev user is in `lldap_admin`, so admin is allowed.
 
 ## Gotchas
 
-- No admin page opens a side detail panel today: `admin.tsx` offers
-  `showDetail` (a panel when wide, a route when narrow), and no route
-  calls it. A row click on identities does nothing, by design for now.
+- The only side panel is the identities cert panel (wide screens only,
+  through `useAdminSidePanel`'s `setContent`/`onOpenChange`). A record's
+  detail is its own route; a row click on identities does nothing.
 - "Invalid hook call", "Cannot read properties of null (reading
   'useContext')" or "Application Error!" is a defect on any visit, the
   first after Launch included: vite pre-bundles every client dependency
