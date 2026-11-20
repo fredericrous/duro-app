@@ -1217,6 +1217,7 @@
       "title": "Utilisateurs",
       "revokedTitle": "Utilisateurs révoqués",
       "cols": {
+        "select": "Sélection",
         "username": "Nom d'utilisateur",
         "displayName": "Nom d'affichage",
         "email": "E-mail",

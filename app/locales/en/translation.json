@@ -1217,6 +1217,7 @@
       "title": "Users",
       "revokedTitle": "Revoked Users",
       "cols": {
+        "select": "Select",
         "username": "Username",
         "displayName": "Display Name",
         "email": "Email",

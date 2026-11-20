@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/settings"
 import { requireAuth } from "~/lib/auth.server"
 import { config } from "~/lib/config.server"
-import { Icon, SideNav } from "@duro-app/ui"
+import { Heading, Icon, SideNav, VisuallyHidden } from "@duro-app/ui"
 import { Header } from "~/components/Header/Header"
 import { AppShell, type AppShellNavProps } from "~/components/AppShell/AppShell"
 
@@ -41,6 +41,17 @@ export default function SettingsLayout({ loaderData }: Route.ComponentProps) {
   const dashboardData = useRouteLoaderData("routes/dashboard") as { user: string; isAdmin: boolean } | undefined
 
   const activeValue = deriveActiveValue(location.pathname)
+
+  // Every settings page's sections are h3 cards; the page itself needs one h1.
+  // The rail already shows where you are, so it is for assistive tech only.
+  const pageTitles: Record<string, string> = {
+    general: t("settings.nav.general", "General"),
+    activity: t("settings.nav.activity", "Activity"),
+    "api-keys": t("settings.nav.apiKeys", "API keys"),
+    git: t("settings.nav.git", "Git access"),
+    security: t("settings.nav.security", "Security"),
+  }
+  const pageTitle = pageTitles[activeValue] ?? t("settings.nav.title", "Settings")
 
   const nav = useCallback(
     ({ onSelect }: AppShellNavProps) => (
@@ -86,6 +97,9 @@ export default function SettingsLayout({ loaderData }: Route.ComponentProps) {
       menuLabel={t("settings.nav.menu", "Menu")}
       closeLabel={t("common.close", "Close")}
     >
+      <VisuallyHidden>
+        <Heading level={1}>{pageTitle}</Heading>
+      </VisuallyHidden>
       <Outlet />
     </AppShell>
   )
