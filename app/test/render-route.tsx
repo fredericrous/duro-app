@@ -37,6 +37,10 @@ export interface RenderRouteOptions {
    *  `useOutletContext()`. Use for admin routes that consume
    *  `useAdminSidePanel()`. */
   parentContext?: unknown
+  /** Replaces the parent route's component. Use when the parent must hold
+   *  real state (e.g. a layout whose setters the child calls), so React can
+   *  see a cross-component update. It must render `<Outlet />` itself. */
+  parentComponent?: React.ComponentType
   /** Optional child routes (e.g. `/api/catalog` for fetcher.load). */
   children?: Array<{ path: string; loader?: () => unknown; action?: (args: { request: Request }) => unknown }>
   /** Initial URL the router opens at. Defaults to the route's path. */
@@ -44,7 +48,7 @@ export interface RenderRouteOptions {
 }
 
 export function renderRoute(options: RenderRouteOptions) {
-  const { route, parentLoaderId, parentLoader, parentContext, children = [], url } = options
+  const { route, parentLoaderId, parentLoader, parentContext, parentComponent, children = [], url } = options
 
   // Component wrapper: read loaderData via the hook and forward as a prop.
   // Mirrors React Router v7's framework-mode contract — generated route
@@ -82,7 +86,7 @@ export function renderRoute(options: RenderRouteOptions) {
       // test) actually paints. Pass `parentContext` through so the child can
       // read it via `useOutletContext()` (admin routes consume the
       // AdminSidePanel context this way).
-      Component: () => <Outlet context={parentContext} />,
+      Component: parentComponent ?? (() => <Outlet context={parentContext} />),
       children: [
         childRouteUnderTest,
         ...children.map((c) =>

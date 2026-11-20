@@ -85,8 +85,10 @@ vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
   originalWarn(...args)
 })
 
-import { screen, waitFor } from "@testing-library/react"
-import { ActionBarProvider } from "@duro-app/ui"
+import { fireEvent, screen, waitFor } from "@testing-library/react"
+import { StrictMode, useRef, useState, type ReactNode } from "react"
+import { Outlet } from "react-router"
+import { ActionBarProvider, DetailPanel } from "@duro-app/ui"
 import AdminIdentitiesPage from "./admin.identities"
 import { renderRoute } from "~/test/render-route"
 import { t } from "~/test/test-utils"
@@ -268,5 +270,67 @@ describe("AdminIdentitiesPage table headers", () => {
     await screen.findByRole("checkbox", { name: t("admin.users.selectAll") })
     const headerWarnings = dsWarnings.filter((w) => w.includes("Table.HeaderCell"))
     expect(headerWarnings).toEqual([])
+  })
+})
+
+describe("AdminIdentitiesPage cert panel toggle", () => {
+  // A layout holding real state, as /admin does: the warning this guards
+  // against ("Cannot update a component (X) while rendering a different
+  // component") only fires when the page's setters belong to another component.
+  // StrictMode as in entry.client.tsx: it replays state updaters during render.
+  const StatefulLayout = () => {
+    const [open, setOpen] = useState(false)
+    const [content, setContent] = useState<ReactNode | null>(null)
+    const onCloseRef = useRef<(() => void) | null>(null)
+    return (
+      <>
+        <StrictMode>
+          <Outlet context={{ open, onOpenChange: setOpen, content, setContent, onCloseRef }} />
+        </StrictMode>
+        <DetailPanel.Root open={open} onOpenChange={setOpen}>
+          <DetailPanel.Content size="md" label="cert panel">
+            {content}
+          </DetailPanel.Content>
+        </DetailPanel.Root>
+        <p>{open ? "layout panel open" : "layout panel closed"}</p>
+      </>
+    )
+  }
+
+  it("opens and closes the panel on two clicks without a cross-component render update", async () => {
+    const errorSpy = vi.spyOn(console, "error")
+    const cert = {
+      id: "c1",
+      inviteId: null,
+      userId: null,
+      username: "alice",
+      email: "alice@corp.com",
+      label: "laptop",
+      serialNumber: "AA:BB:CC",
+      issuedAt: "2024-01-01T00:00:00Z",
+      expiresAt: "2999-01-01T00:00:00Z",
+      revokedAt: null,
+      revokeState: null,
+      revokeError: null,
+    }
+    renderRoute({
+      route: {
+        path: "/admin/identities",
+        Component: PageWithProviders as never,
+        loader: () => ({ ...fixture, certsByUser: { alice: [cert] } }),
+      },
+      parentComponent: StatefulLayout,
+    })
+    const button = await screen.findByRole("button", { name: t("admin.users.actions.viewCerts") })
+
+    fireEvent.click(button)
+    await screen.findByText("layout panel open")
+
+    fireEvent.click(button)
+    await screen.findByText("layout panel closed")
+
+    const renderUpdates = errorSpy.mock.calls.filter((c) => String(c[0]).includes("Cannot update a component"))
+    expect(renderUpdates).toEqual([])
+    errorSpy.mockRestore()
   })
 })
