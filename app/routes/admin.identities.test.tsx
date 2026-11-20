@@ -321,16 +321,19 @@ describe("AdminIdentitiesPage cert panel toggle", () => {
       },
       parentComponent: StatefulLayout,
     })
-    const button = await screen.findByRole("button", { name: t("admin.users.actions.viewCerts") })
+    try {
+      const button = await screen.findByRole("button", { name: t("admin.users.actions.viewCerts") })
 
-    fireEvent.click(button)
-    await screen.findByText("layout panel open")
+      fireEvent.click(button)
+      await screen.findByText("layout panel open")
 
-    fireEvent.click(button)
-    await screen.findByText("layout panel closed")
+      fireEvent.click(button)
+      await screen.findByText("layout panel closed")
 
-    const renderUpdates = errorSpy.mock.calls.filter((c) => String(c[0]).includes("Cannot update a component"))
-    expect(renderUpdates).toEqual([])
-    errorSpy.mockRestore()
+      const renderUpdates = errorSpy.mock.calls.filter((c) => String(c[0]).includes("Cannot update a component"))
+      expect(renderUpdates).toEqual([])
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 })
