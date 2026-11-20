@@ -36,6 +36,9 @@ or closed as not worth doing. Reached when no ticket here is open.
 - [t07](t07-duplicate-family-group.md): the dev seed's Family is
   `grp-family`, the principal migration 0026 creates; production never
   had a second one.
+- [t08](t08-cert-panel-narrow-screens.md): admin's side content opens
+  as a right Drawer below `md` and as a DetailPanel above it; content
+  built for it uses `DetailSurface.*` parts and names its route's action.
 - [t09](t09-cert-toggle-setstate-in-render.md): the cert toggle calls
   the layout's setters from its click handler, never inside a state
   updater, because StrictMode replays updaters during render.
@@ -54,19 +57,22 @@ or closed as not worth doing. Reached when no ticket here is open.
 
 ## Handoff
 
-2026-11-20, boundary: t13 closed (`fix/rail-with-cert-panel`, docs only).
+2026-11-20, boundary: t08 closed (`fix/cert-panel-narrow`), after t09,
+t10, t11 and t13 (another session).
 
-- Done: [t13](t13-rail-collapses-with-cert-panel.md): the rail giving way
-  to the Menu button while the cert panel is open at 1280 is intended,
-  measured at 1280, 1440 and 1920 with the 480 px and 360 px panels; no
-  code change, no greenrack issue.
-- Live state: t08 is PR #177 (`fix/cert-panel-narrow`, another session,
-  no checks reported on it at 08:55). It edits this map too, so whichever
-  lands second merges the Decisions and Handoff sections.
-- Next, in order: t08 (if still open).
-- Lesson: a layout trade-off check needs the panel's real rows (Alice
-  has 3 seeded certs) and the page's own height, not only the rail's
-  width: the 360 px panel kept the rail and tripled the page's height.
+- Done: [t08](t08-cert-panel-narrow-screens.md): below `md` the cert
+  panel opens as a right Drawer (`AdminDetailSurface`); a row's Revoke
+  now posts to `/admin/identities`, and a checkbox ticks once per click.
+  Revoke was broken at every width before. [t13](t13-rail-collapses-with-cert-panel.md):
+  the rail giving way while the wide panel is open is intended.
+- Live state: nothing in flight.
+- Next, in order: t12.
+- Lessons: a node a child route hands the layout (`setContent`) renders
+  under the layout's route, so `useFetcher` forms in it need an explicit
+  `action`. A verify run serves 127.0.0.1 while the dev origin check
+  wants `localhost`: drive admin mutations through `localhost` until
+  [t12](t12-verify-origin-403.md). A layout trade-off check needs the
+  panel's real rows and the page's own height, not only the rail's width.
 
 ## Not yet specified
 

@@ -1,7 +1,7 @@
 +++
 type = "task"
 mode = "afk"
-status = "open"
+status = "closed"
 blocked_by = []
 repos = ["duro-app"]
 +++
@@ -31,3 +31,15 @@ A browser check at 390x844 that says what the toggle does. If it does
 nothing, one PR where the panel content opens on narrow screens too (a
 Drawer, or the panel in a narrow size), with a test, or the toggle is
 hidden there with the reason written down.
+
+## Resolution
+
+2026-11-20: at 390x844 the toggle did nothing (browser check on b927add:
+no dialog, no complementary, the URL unchanged). Below `md` the cert panel
+now opens as a right Drawer: `AdminDetailSurface` picks DetailPanel or
+Drawer, and the content takes its parts from `DetailSurface.*` at render
+time, so a node built at one width renders at the other. The check also
+found two bugs, on wide screens as well: a row's Revoke posted to `/admin`
+("Method Not Allowed"), because the panel renders under the layout, and a
+certificate's checkbox never ticked, because the row's `onClick` undid the
+Checkbox's change. Both are fixed, with tests.

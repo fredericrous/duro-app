@@ -8,7 +8,8 @@ import type { Route } from "./+types/admin"
 import { getAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"
 import { runEffect } from "~/lib/runtime.server"
-import { Badge, DetailPanel, Heading, Icon, Inline, SideNav, Stack, VisuallyHidden } from "@duro-app/ui"
+import { Badge, Heading, Icon, Inline, SideNav, Stack, VisuallyHidden } from "@duro-app/ui"
+import { AdminDetailSurface } from "~/components/admin/AdminDetailSurface"
 import { Header } from "~/components/Header/Header"
 import { AppShell, type AppShellNavProps } from "~/components/AppShell/AppShell"
 import { useMediaQuery } from "~/hooks/useMediaQuery"
@@ -259,15 +260,17 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
       menuLabel={t("admin.nav.menu", "Menu")}
       closeLabel={t("admin.detailPanel.close")}
       aside={
-        // DetailPanel at layout level — pushes the entire page left. Wide only:
-        // detail views on narrow screens are their own routes.
-        isWide && (
-          <DetailPanel.Root open={sidePanelOpen} onOpenChange={handlePanelOpenChange}>
-            <DetailPanel.Content size="md" label={t("admin.detailPanel.label")}>
-              {sidePanelContent}
-            </DetailPanel.Content>
-          </DetailPanel.Root>
-        )
+        // At layout level: on wide screens a DetailPanel that pushes the page
+        // left, on narrow ones a Drawer from the right. Every close (button,
+        // backdrop, Escape, swipe) goes through handlePanelOpenChange.
+        <AdminDetailSurface
+          isWide={isWide}
+          open={sidePanelOpen}
+          onOpenChange={handlePanelOpenChange}
+          label={t("admin.detailPanel.label")}
+        >
+          {sidePanelContent}
+        </AdminDetailSurface>
       }
     >
       <VisuallyHidden>
