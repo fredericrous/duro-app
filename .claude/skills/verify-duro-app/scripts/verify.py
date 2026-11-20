@@ -58,8 +58,19 @@ FIRST_PAGE_TIMEOUT_S = 60.0
 TOOL_CEILING_S = 600.0
 PASS_WORST_S = 4 * TOOL_TIMEOUT_S + READY_PROBE_TIMEOUT_S + FIRST_PAGE_TIMEOUT_S
 TEARDOWN_WORST_S = 30.0
-CAP_S = TOOL_CEILING_S - PASS_WORST_S - TEARDOWN_WORST_S - 15.0
+# Ready is not the end of the start: on a cold worktree whose dep scan
+# missed an import, the ready probe's first render finds it and vite
+# re-bundles and reloads about 1 s after ready (3 of 3 cold runs, t11,
+# 2026-11-20). Launch reads the log once the group has been quiet for
+# QUIET_WINDOW_S (an idle server gains about 0.04 CPU-s a second), or
+# after SETTLE_MAX_S, whichever comes first.
+QUIET_WINDOW_S = 3.0
+QUIET_CPU_S = 0.3
+SETTLE_MAX_S = 30.0
+SETTLE_WORST_S = SETTLE_MAX_S + TOOL_TIMEOUT_S
+CAP_S = TOOL_CEILING_S - PASS_WORST_S - SETTLE_WORST_S - TEARDOWN_WORST_S - 15.0
 DEAD = "http://127.0.0.1:9"  # the discard port: nothing listens there
+DEP_RELOAD = "optimized dependencies changed. reloading"
 
 # Every environment variable the app reads, by what Launch does with it.
 # `env_names_in_app` scans app/ at each Launch; a name missing here stops
@@ -303,13 +314,19 @@ def stalled(samples: list[tuple[float, float]], now: float) -> bool:
     Only rises between samples count: a member exiting lowers the group's
     sum, and that drop is not a stall.
     """
-    if not samples or now - samples[0][0] < STALL_WINDOW_S:
+    return idle_for(samples, now, STALL_WINDOW_S, STALL_CPU_S)
+
+
+def idle_for(samples: list[tuple[float, float]], now: float, window_s: float, cpu_s: float) -> bool:
+    """True once the samples span `window_s` and its last `window_s` gained
+    under `cpu_s` CPU-s. Only rises between samples count."""
+    if not samples or now - samples[0][0] < window_s:
         return False
     gained = 0.0
     for (_, before), (t, after) in zip(samples, samples[1:]):
-        if t > now - STALL_WINDOW_S:
+        if t > now - window_s:
             gained += max(0.0, after - before)
-    return gained < STALL_CPU_S
+    return gained < cpu_s
 
 
 def lstart(pid: int) -> str | None:
@@ -574,6 +591,38 @@ def not_ready(pgid: int, port: int) -> str:
     return ""
 
 
+def dep_reload(log_text: str) -> str:
+    """Vite's line saying it re-bundled dependencies after the start; "" if none.
+
+    The dep scan missed an import and vite found it on a request: it
+    re-bundles and reloads every page. A page loaded before that mixes two
+    copies of React, t01's "Invalid hook call" crash. "new dependencies
+    optimized" alone is not this: it reloads nothing.
+    """
+    for line in log_text.splitlines():
+        if DEP_RELOAD in line:
+            return line.strip()
+    return ""
+
+
+def reload_failure(line: str, log: Path) -> str:
+    return (
+        f'vite re-bundled dependencies after the start ("{one_line(line, 200)}"): '
+        f"the dep scan missed an import, and a page loaded before it crashes — read {log}"
+    )
+
+
+def settle(pgid: int) -> None:
+    """Wait until the group is quiet for QUIET_WINDOW_S, at most SETTLE_MAX_S."""
+    started = time.monotonic()
+    samples: list[tuple[float, float]] = []
+    while (now := time.monotonic()) - started < SETTLE_MAX_S:
+        samples.append((now, group_cpu_s(pgid)))
+        if idle_for(samples, now, QUIET_WINDOW_S, QUIET_CPU_S):
+            return
+        time.sleep(0.5)
+
+
 def print_tail(log: Path, pidfile: Path) -> Path:
     """The last 20 lines to stderr; the log kept beside the pidfile.
 
@@ -656,6 +705,11 @@ def run_attempt(root: Path, pidfile: Path, attempt: Attempt) -> Outcome:
             )
         reason = not_ready(child.pid, port)
         if not reason:
+            settle(child.pid)
+            line = dep_reload(log_path.read_text(errors="replace"))
+            if line:
+                kept = print_tail(log_path, pidfile)
+                raise LaunchFailed(reload_failure(line, kept))
             return Outcome.READY
         time.sleep(0.5)
     kept = print_tail(log_path, pidfile)
@@ -765,6 +819,23 @@ def seeded_apps(record: Record) -> tuple[list[str], str]:
     return [str(app.get("name") or app.get("slug") or "?") for app in apps], ""
 
 
+def reloaded(log: Path) -> bool:
+    """Did vite re-bundle? Prints the fail: line naming `log`.
+
+    Any request can make vite find an import the scan missed: the caller
+    settles the group after its requests, then reads the log.
+    """
+    try:
+        line = dep_reload(log.read_text(errors="replace"))
+    except OSError as exc:
+        fail(f"could not read the server log ({exc}) — run launch again")
+        return True
+    if line:
+        fail(reload_failure(line, log))
+        return True
+    return False
+
+
 def cmd_doctor(pidfile: Path) -> int:
     try:
         record = live_record(pidfile)
@@ -786,6 +857,9 @@ def cmd_doctor(pidfile: Path) -> int:
         return 1
     if not apps:
         fail(f"catalog empty on :{record.port} — no dev seed; read {record.log}")
+        return 1
+    settle(record.pgid)
+    if reloaded(record.log):
         return 1
     ok(f"ready on :{record.port}, dev sign-in, {len(apps)} seeded apps")
     return 0
@@ -869,11 +943,16 @@ def cmd_drive(pidfile: Path, evidence: Path, journeys: list[str]) -> int:
                 fail(f"{name} failed — read {out}")
                 rc = 1
     finally:
+        settle(record.pgid)  # the copy then holds any re-bundle the GETs caused
+        kept = evidence_dir / f"{APP}-server.log"
         try:
-            shutil.copy(record.log, evidence_dir / f"{APP}-server.log")
+            shutil.copy(record.log, kept)
         except OSError as exc:
             fail(f"could not copy the server log ({exc}) — run launch again")
             rc = 1
+        else:
+            if reloaded(kept):
+                rc = 1
     return rc
 
 

@@ -82,6 +82,15 @@ the script is stdlib only. `verify.py --help` prints the usage.
   gains under 2 CPU-s in 30 s (an idle server gains 0-1.2), and at a
   450 s cap, which leaves one more wait pass and the teardown under
   the tool's 600 s.
+- Ready is not the end of the start. Launch then waits until the group
+  is quiet (under 0.3 CPU-s in 3 s, at most 30 s) and reads the log. A
+  line `optimized dependencies changed. reloading` means vite's dep scan
+  missed an import, found it on the ready probe's render and re-bundled:
+  a page loaded before that crashes with t01's "Invalid hook call".
+  Launch fails with the line quoted, as a miss below. On a cold worktree
+  that line came about 1 s after ready, 3 of 3 runs (t11, 2026-11-20); a
+  warm one (`node_modules/.vite` kept) has the deps cached and never
+  logs it, so only a cold Launch proves the scan.
 - On a miss it prints the last 20 log lines to stderr and keeps a copy
   of the log at `${TMPDIR:-/tmp}/verify-duro-app-<h>.last.log` (the
   state directory is removed), then exits 1. The `fail:` line names the
@@ -140,7 +149,8 @@ One line: `ok: ready on :<port>, dev sign-in, <n> seeded apps`, or a
 `fail: … — <next step>` line on stderr. Exit 0 ready; 1 not ready (group
 gone, the port no longer served by that group, `/health/ready` not 200,
 `/admin` not 200 — production auth redirects it to OIDC — `/api/catalog`
-unreadable, or an empty catalog, which means no seed); 2 no pidfile or
+unreadable, an empty catalog, which means no seed, or the vite re-bundle
+line in the log once the group is quiet again, quoted as in Launch); 2 no pidfile or
 an unreadable one. It
 checks what the app wired, not only that it answers. A failing Doctor
 is a blocker report, not a repair.
@@ -174,7 +184,11 @@ python3 "$v" drive <pidfile> "$ev" home catalog settings admin
 
 Each journey GETs its pages as `dev` and requires a 200 with seeded
 text on it. It prints `ok: <journey> passed — <file>` or
-`fail: … — read <file>`; exit 1 when any fails. It proves routing,
+`fail: … — read <file>`; exit 1 when any fails. After the journeys it
+waits for the group to go quiet and fails, with the line quoted, when
+the log holds vite's re-bundle line: any request can find an import the
+scan missed. Run it after the `browser-check` agents, so that its read
+of the log covers their visits too. It proves routing,
 loaders, sign-in and seed; clicks, client state and layout need a
 browser. Without `browser-check`, drive those with Playwright or the
 Chrome DevTools protocol by hand, using the same brief.

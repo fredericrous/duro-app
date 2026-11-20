@@ -43,23 +43,26 @@ or closed as not worth doing. Reached when no ticket here is open.
   page a visually hidden `h1` named after its rail item, as settings
   does. The unnamed field is greenrack's `Combobox.Input`
   (greenharness/greenrack#203).
+- [t11](t11-launch-ignores-dep-reload.md): verify-duro-app fails on
+  vite's `optimized dependencies changed. reloading` line in Launch,
+  Doctor and Drive, reading the log once the server group is quiet,
+  since the line comes about 1 s after ready.
 
 ## Handoff
 
-2026-11-20, boundary: t10 closed (`fix/admin-h1-unnamed-field`).
+2026-11-20, boundary: t11 closed (`fix/verify-dep-reload`).
 
-- Done: [t10](t10-admin-h1-and-unnamed-field.md): every admin page has
-  one `h1`. The unnamed field Chrome flags is greenrack's
-  `Combobox.Input`, filed as greenharness/greenrack#203.
-  `/admin/group-mappings` logs the same issue (count 4), not followed.
+- Done: [t11](t11-launch-ignores-dep-reload.md): verify-duro-app's
+  Launch, Doctor and Drive fail with vite's re-bundle line quoted, read
+  once the server group is quiet (the line comes about 1 s after ready
+  on a cold worktree).
 - Live state: t08 may still be in flight on `fix/cert-panel-narrow`
   (another session). It also edits this map, so whichever lands second
   merges the Decisions and Handoff sections.
-- Next, in order: t08 (if still open), t11, t13.
-- Lesson: Chrome's "form field should have an id or name" count seems
-  to leave out checkboxes and switches (on identities, 6 unnamed inputs
-  gave a count of 1). Compare the count with the text-like fields, not
-  with every input.
+- Next, in order: t08 (if still open), t13.
+- Lesson: a dep-scan repro must start cold (`rm -rf node_modules/.vite`
+  before each Launch): the first cold run caches the late deps and every
+  warm run after it logs no reload.
 
 ## Not yet specified
 
