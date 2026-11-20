@@ -41,15 +41,18 @@ const PRINCIPALS = [
   { id: "p-bob", type: "user", externalId: "bob", name: "Bob", email: "bob@example.com" },
 ] as const
 
+// Family is the principal migration 0026 creates (and maps from the OIDC
+// `family` group); the seed reuses its id so dev shows one Family, as
+// production does. Listed so a database without that migration still gets it.
 const GROUPS = [
-  { id: "g-family", name: "Family" },
+  { id: "grp-family", name: "Family" },
   { id: "g-media", name: "Media" },
 ] as const
 
 const MEMBERSHIPS = [
-  ["g-family", "p-dev"],
-  ["g-family", "p-alice"],
-  ["g-family", "p-bob"],
+  ["grp-family", "p-dev"],
+  ["grp-family", "p-alice"],
+  ["grp-family", "p-bob"],
   ["g-media", "p-dev"],
   ["g-media", "p-alice"],
 ] as const
@@ -184,7 +187,7 @@ const GRANTS: Array<{ id: string; principal: string; target: string; reason: str
   { id: "grant-dev-abs", principal: "p-dev", target: "audiobookshelf:listener", reason: "bootstrap" },
   { id: "grant-dev-kuma", principal: "p-dev", target: "uptime-kuma:viewer", reason: "bootstrap" },
   // Group grant: alice and bob inherit viewer on kb-vision through Family.
-  { id: "grant-family-kb", principal: "g-family", target: "kb-vision:viewer", reason: "group grant" },
+  { id: "grant-family-kb", principal: "grp-family", target: "kb-vision:viewer", reason: "group grant" },
   { id: "grant-bob-jf", principal: "p-bob", target: "jellyfin:viewer", reason: "direct grant" },
 ]
 
@@ -343,10 +346,8 @@ export const seedDevGovernance = (sql: SqlClient.SqlClient) =>
       ON CONFLICT DO NOTHING
     `
 
-    for (const [id, oidcGroup, principalGroup] of [
-      ["gm-family", "family", "g-family"],
-      ["gm-media", "media", "g-media"],
-    ] as const) {
+    // `family` → grp-family is mapped by migration 0026.
+    for (const [id, oidcGroup, principalGroup] of [["gm-media", "media", "g-media"]] as const) {
       yield* sql`
         INSERT INTO group_mappings (id, oidc_group_name, principal_group_id)
         VALUES (${id}, ${oidcGroup}, ${principalGroup})
