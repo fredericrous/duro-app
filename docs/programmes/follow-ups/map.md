@@ -29,20 +29,27 @@ or closed as not worth doing. Reached when no ticket here is open.
 - [t05](t05-launch-deadline-cold-start.md): verify-duro-app Launch waits
   while the server group gains CPU (2 CPU-s per 30 s, 450 s cap), not
   for a fixed 120 s; a start costs about 75 CPU-s cold, 50 warm.
+- [t06](t06-server-packages-in-client-graph.md): server packages in the
+  dev pre-bundle set are expected and stay. The browser never imports
+  them, the production client bundle has none, and filtering them out of
+  the scan brings back t01's late re-bundle.
 
 ## Handoff
 
-2026-11-20, boundary: t05 closed (`fix/launch-cpu-progress`).
+2026-11-20, boundary: t06 closed (`fix/server-deps-client-scan`).
 
-- Done: [t05](t05-launch-deadline-cold-start.md): Launch's fixed 120 s
-  deadline is gone. It now waits while the server group makes CPU
-  progress, fails as `stalled` after 30 s with under 2 CPU-s, and caps
-  at 450 s. Probes that time out were measured and do not slow the start.
+- Done: [t06](t06-server-packages-in-client-graph.md): the chain is
+  `root.tsx` loader → `session.server` / `runtime.server` →
+  `AppLayer.server` → each package. Keeping them out of the scan was
+  tried and dropped: react-router's dev CSS walk resolves the SSR graph
+  in the client environment and re-bundles late. Only a comment landed.
+- Filed: [t11](t11-launch-ignores-dep-reload.md), Launch passing while
+  vite re-bundles.
 - Live state: nothing in flight.
-- Next, in order: t06, t07, t08, t09, t10.
-- Lesson: run verify-duro-app Launch with the Bash tool timeout at
-  600000 ms; at the default 120 s a loaded start gets SIGKILLed before
-  it can tear down.
+- Next, in order: t07, t08, t09, t10, t11.
+- Lesson: this shell's `grep` skips gitignored paths (`build/`,
+  `node_modules/`) and can return nothing on a /tmp log; use
+  `command grep` for bundle and log checks.
 
 ## Not yet specified
 
