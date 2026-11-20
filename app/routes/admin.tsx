@@ -8,7 +8,7 @@ import type { Route } from "./+types/admin"
 import { getAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"
 import { runEffect } from "~/lib/runtime.server"
-import { Badge, DetailPanel, Icon, Inline, SideNav, Stack } from "@duro-app/ui"
+import { Badge, DetailPanel, Heading, Icon, Inline, SideNav, Stack, VisuallyHidden } from "@duro-app/ui"
 import { Header } from "~/components/Header/Header"
 import { AppShell, type AppShellNavProps } from "~/components/AppShell/AppShell"
 import { useMediaQuery } from "~/hooks/useMediaQuery"
@@ -163,6 +163,26 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
 
   const activeValue = deriveActiveValue(location.pathname)
 
+  // Admin pages open on h2 (or no) headings; the page itself needs one h1.
+  // The rail already shows where you are, so it is for assistive tech only,
+  // as in the settings layout. A record's detail route keeps its collection's
+  // name here and its own record name in its h2.
+  const pageTitles: Record<string, string> = {
+    dashboard: t("admin.nav.dashboard", "Dashboard"),
+    identities: t("admin.nav.identities", "Identities"),
+    grants: t("admin.nav.grants", "Grants"),
+    applications: t("admin.nav.applications", "Applications"),
+    "access-requests": t("admin.nav.accessRequests", "Access Requests"),
+    invitations: t("admin.nav.invitations", "Access Invitations"),
+    invites: t("admin.nav.invites", "User Invites"),
+    audit: t("admin.nav.auditLog", "Audit Log"),
+    recovery: t("admin.nav.recovery", "Device Recovery"),
+    "authz-playground": t("admin.nav.authzPlayground", "Authz Playground"),
+    plugins: t("admin.nav.plugins", "Plugins"),
+    "group-mappings": t("admin.nav.groupMappings", "Group Mappings"),
+  }
+  const pageTitle = pageTitles[activeValue] ?? t("common.admin", "Admin")
+
   const outletContext: AdminSidePanelContext = {
     open: sidePanelOpen,
     onOpenChange: setSidePanelOpen,
@@ -250,6 +270,9 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         )
       }
     >
+      <VisuallyHidden>
+        <Heading level={1}>{pageTitle}</Heading>
+      </VisuallyHidden>
       <Stack gap="lg">
         <Outlet context={outletContext} />
       </Stack>

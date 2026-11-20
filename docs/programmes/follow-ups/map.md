@@ -39,22 +39,27 @@ or closed as not worth doing. Reached when no ticket here is open.
 - [t09](t09-cert-toggle-setstate-in-render.md): the cert toggle calls
   the layout's setters from its click handler, never inside a state
   updater, because StrictMode replays updaters during render.
+- [t10](t10-admin-h1-and-unnamed-field.md): the admin layout gives each
+  page a visually hidden `h1` named after its rail item, as settings
+  does. The unnamed field is greenrack's `Combobox.Input`
+  (greenharness/greenrack#203).
 
 ## Handoff
 
-2026-11-20, boundary: t09 closed (`fix/cert-toggle-updater`).
+2026-11-20, boundary: t10 closed (`fix/admin-h1-unnamed-field`).
 
-- Done: [t09](t09-cert-toggle-setstate-in-render.md): the cert toggle
-  no longer updates AdminLayout during render, and the browser shows no
-  error. Filed [t13](t13-rail-collapses-with-cert-panel.md) (rail
-  collapses while the panel is open, same on main).
-- Live state: t08 is in flight on `fix/cert-panel-narrow` (another
-  session). It also edits this map, so whichever lands second merges
-  the Decisions and Handoff sections.
-- Next, in order: t08, t10, t11, t13.
-- Lesson: a "setState in render" warning that a test cannot reproduce
-  may need StrictMode. It replays updaters during render, while a plain
-  render runs them eagerly in the event handler.
+- Done: [t10](t10-admin-h1-and-unnamed-field.md): every admin page has
+  one `h1`. The unnamed field Chrome flags is greenrack's
+  `Combobox.Input`, filed as greenharness/greenrack#203.
+  `/admin/group-mappings` logs the same issue (count 4), not followed.
+- Live state: t08 may still be in flight on `fix/cert-panel-narrow`
+  (another session). It also edits this map, so whichever lands second
+  merges the Decisions and Handoff sections.
+- Next, in order: t08 (if still open), t11, t13.
+- Lesson: Chrome's "form field should have an id or name" count seems
+  to leave out checkboxes and switches (on identities, 6 unnamed inputs
+  gave a count of 1). Compare the count with the text-like fields, not
+  with every input.
 
 ## Not yet specified
 

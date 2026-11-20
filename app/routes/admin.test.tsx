@@ -97,3 +97,12 @@ describe("AdminLayout component", () => {
     })
   })
 })
+
+describe("AdminLayout page heading", () => {
+  it("gives the page one h1, named after the open admin page", async () => {
+    renderLayout()
+    const h1 = await screen.findByRole("heading", { level: 1 })
+    expect(h1).toHaveTextContent(t("admin.nav.dashboard", "Dashboard"))
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1)
+  })
+})
