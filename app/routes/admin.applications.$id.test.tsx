@@ -286,8 +286,6 @@ const stubSidePanel = {
   content: null,
   setContent: () => {},
   onCloseRef: { current: null as null | (() => void) },
-  showDetail: () => {},
-  isWide: false,
 }
 
 const baseLoaderData = () => ({

@@ -61,7 +61,8 @@ never `--max-warnings`.
 Page shell: `app/components/AppShell` (the `page-with-sidenav` recipe on
 `Grid layout="split-wide"`; narrow screens get a Menu button + Drawer). Both
 `/settings` and `/admin` render through it; admin keeps its own `isWide` only
-for the DetailPanel-vs-navigate choice. A split collapses on its container,
+to render its DetailPanel (the identities cert panel) on wide screens; a
+record's detail is its own route (`/admin/<collection>/:id`). A split collapses on its container,
 so nesting `Grid layout="split"` inside the shell needs no media query.
 
 v1 notes: Icon/StatusIcon `size` is a token (`sm|md|lg|xl|xxl` = 16/18/24/36/48px);

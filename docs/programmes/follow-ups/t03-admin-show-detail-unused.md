@@ -1,7 +1,7 @@
 +++
 type = "task"
 mode = "afk"
-status = "open"
+status = "closed"
 blocked_by = []
 repos = ["duro-app"]
 +++
@@ -27,3 +27,11 @@ does the panel go?
 
 One PR that either wires rows to `showDetail` (with a test) or removes
 it, and updates `CLAUDE.md` and `features/admin.md` to match.
+
+## Resolution
+
+2026-11-20: removed. `showDetail` and the context's `isWide` had no
+caller since the Identities merge (#13); every record already has its own
+detail route. The `DetailPanel` stays: the identities cert panel opens it
+through `setContent`/`onOpenChange`. `CLAUDE.md` and `features/admin.md`
+now say so. The panel's narrow-screen gap is [t08](t08-cert-panel-narrow-screens.md).

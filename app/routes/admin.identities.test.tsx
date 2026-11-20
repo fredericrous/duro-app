@@ -98,8 +98,6 @@ const sidePanelCtx = {
   content: null,
   setContent: vi.fn(),
   onCloseRef: { current: null },
-  showDetail: vi.fn(),
-  isWide: true,
 }
 
 const fixture = {
