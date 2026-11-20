@@ -14,6 +14,7 @@ import {
   Checkbox,
   Dialog,
   Field,
+  Fieldset,
   Heading,
   Inline,
   Input,
@@ -272,13 +273,17 @@ export function ApiKeysSection({ apiKeys }: Props) {
               value={name}
               onChange={(e) => setName((e.target as HTMLInputElement).value)}
               placeholder={t("settings.apiKeys.fields.namePlaceholder")}
+              // A label for this key, not anything the browser should fill.
+              autoComplete="off"
               required
             />
             <Field.Description>{t("settings.apiKeys.fields.nameHint")}</Field.Description>
           </Field.Root>
 
-          <Field.Root>
-            <Field.Label>{t("settings.apiKeys.fields.scopes")}</Field.Label>
+          {/* A set of checkboxes is a group, not one labelable control: a
+              Field.Label here would point its `for` at nothing. */}
+          <Fieldset.Root gap="xs">
+            <Fieldset.Legend>{t("settings.apiKeys.fields.scopes")}</Fieldset.Legend>
             <Stack gap="sm">
               {KNOWN_SCOPES.map((scope) => (
                 <Checkbox
@@ -309,7 +314,7 @@ export function ApiKeysSection({ apiKeys }: Props) {
               ))}
             </Stack>
             <Field.Description>{t("settings.apiKeys.fields.scopesHint")}</Field.Description>
-          </Field.Root>
+          </Fieldset.Root>
 
           <Field.Root>
             <Field.Label>{t("settings.apiKeys.fields.expiry")}</Field.Label>

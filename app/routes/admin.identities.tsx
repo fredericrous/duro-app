@@ -489,7 +489,15 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
                   return (
                     <Table.HeaderCell
                       key={header.id}
-                      label={typeof header.column.columnDef.header === "string" ? header.column.columnDef.header : ""}
+                      // The select column's header is a checkbox, so it has no
+                      // text: name it, or stack mode shows an unlabelled cell.
+                      label={
+                        typeof header.column.columnDef.header === "string"
+                          ? header.column.columnDef.header
+                          : header.column.id === "select"
+                            ? t("admin.users.cols.select")
+                            : ""
+                      }
                       width={isActions ? "max-content" : header.column.id === "select" ? "controlLg" : undefined}
                     >
                       {header.isPlaceholder ? null : header.column.getCanSort() ? (

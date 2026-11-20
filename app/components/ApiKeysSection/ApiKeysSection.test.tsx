@@ -71,4 +71,16 @@ describe("ApiKeysSection", () => {
       expect(screen.getByText(t("settings.apiKeys.revokeConfirm.title"))).toBeInTheDocument()
     })
   })
+
+  it("names the scopes checkboxes as a group and keeps autofill off the key name", async () => {
+    renderSection([])
+    // A Field.Label over the checkboxes pointed its `for` at no element; a
+    // named group is what assistive tech can announce.
+    const group = await screen.findByRole("group", { name: t("settings.apiKeys.fields.scopes") })
+    expect(group.querySelectorAll('input[type="checkbox"]').length).toBeGreaterThan(0)
+    for (const label of document.querySelectorAll("label[for]")) {
+      expect(document.getElementById(label.getAttribute("for")!)).not.toBeNull()
+    }
+    expect(screen.getByLabelText(t("settings.apiKeys.fields.name"))).toHaveAttribute("autocomplete", "off")
+  })
 })

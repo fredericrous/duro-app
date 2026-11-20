@@ -68,3 +68,12 @@ describe("SettingsLayout component", () => {
     expect(screen.queryByRole("button", { name: t("settings.nav.security", "Security") })).not.toBeInTheDocument()
   })
 })
+
+describe("SettingsLayout page heading", () => {
+  it("gives the page one h1, named after the open settings page", async () => {
+    renderLayout(true)
+    const h1 = await screen.findByRole("heading", { level: 1 })
+    expect(h1).toHaveTextContent(t("settings.nav.general", "General"))
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1)
+  })
+})

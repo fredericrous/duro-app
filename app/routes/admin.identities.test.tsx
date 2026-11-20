@@ -75,6 +75,16 @@ describe("/admin/identities action", () => {
 
 // --- component render ---
 
+// The DS warns once per process about a Table.HeaderCell without a label, so
+// the spy has to be in place before the first table renders in this file.
+// It records into its own array: beforeEach's clearAllMocks wipes mock.calls.
+const dsWarnings: string[] = []
+const originalWarn = console.warn.bind(console)
+vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+  dsWarnings.push(String(args[0]))
+  originalWarn(...args)
+})
+
 import { screen, waitFor } from "@testing-library/react"
 import { ActionBarProvider } from "@duro-app/ui"
 import AdminIdentitiesPage from "./admin.identities"
@@ -249,5 +259,14 @@ describe("AdminIdentitiesPage", () => {
   it("renders the empty state when there are no identities or revocations", async () => {
     renderIdentities({ users: [], principals: [], revocations: [], systemUserIds: [], certsByUser: {} })
     await waitFor(() => expect(screen.getByText(t("admin.identities.empty", "No identities yet."))).toBeInTheDocument())
+  })
+})
+
+describe("AdminIdentitiesPage table headers", () => {
+  it("labels every header cell, the select-all checkbox column included", async () => {
+    renderIdentities()
+    await screen.findByRole("checkbox", { name: t("admin.users.selectAll") })
+    const headerWarnings = dsWarnings.filter((w) => w.includes("Table.HeaderCell"))
+    expect(headerWarnings).toEqual([])
   })
 })

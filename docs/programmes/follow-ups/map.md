@@ -21,23 +21,30 @@ or closed as not worth doing. Reached when no ticket here is open.
 - [t03](t03-admin-show-detail-unused.md): admin's `showDetail` is gone. A
   record's detail is its own route, and the `DetailPanel` serves only the
   identities cert panel.
+- [t04](t04-settings-admin-a11y-findings.md): the modal Drawer's focus and
+  the HeaderCell `label=""` warning are the design system's
+  (greenharness/greenrack#200, reaching duro-app with the greenrack
+  sweep); the select column label, the scopes group, autocomplete and the
+  settings `h1` are fixed in duro-app.
 
 ## Handoff
 
-2026-11-20, boundary: t03 closed (`refactor/drop-show-detail`).
+2026-11-20, boundary: t04 closed (`fix/settings-admin-a11y`).
 
-- Done: [t03](t03-admin-show-detail-unused.md): `showDetail` and the
-  context's `isWide` removed from `admin.tsx` and its test stubs, and
-  `CLAUDE.md`, `features/admin.md` and the test setup comment updated.
-  Typecheck, lint and the 186 admin tests pass. Before/after screenshots
-  of `/admin/identities` at 1280x800 are byte-identical, and the cert
-  panel still opens and closes.
-- Filed from this session: [t08](t08-cert-panel-narrow-screens.md)
-  (confirmed in a browser at 390x844),
-  [t09](t09-cert-toggle-setstate-in-render.md).
-- Next, in order: t04, t06, t05, t07, t08, t09.
+- Done: [t04](t04-settings-admin-a11y-findings.md): the identities select
+  column is labelled, the API keys scopes are a named `Fieldset` group,
+  the key name has `autocomplete="off"`, and every settings page has one
+  visually hidden `h1`. Each fix has a test that failed on the old code;
+  the browser re-check at 1280 and 390 px shows no dangling `for`, no
+  missing `autocomplete` and no HeaderCell warning.
+- Upstream: greenharness/greenrack#200 (modal Drawer focus, and the
+  HeaderCell `label=""` warning). It reaches duro-app with the
+  greenrack-rename sweep (decisions `greenrack-rename/t08`).
+- Filed from this session: [t10](t10-admin-h1-and-unnamed-field.md).
+- Next, in order: t06, t05, t07, t08, t09, t10.
 - Lesson (from t01, still true): a cold dev start takes 30-100 s here
   under load, so the verify skill's Launch can miss its deadline (t05).
+  This session's warm Launch was ready well inside it.
 
 ## Not yet specified
 
