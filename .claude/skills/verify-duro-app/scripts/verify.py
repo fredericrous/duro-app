@@ -53,8 +53,9 @@ READY_PROBE_TIMEOUT_S = 5.0
 # The first SSR request compiles the route graph through babel: allow it.
 FIRST_PAGE_TIMEOUT_S = 60.0
 # The cap is checked once per wait pass, so it leaves room for one more
-# pass (ps, lsof, ps per listener pid, both probes) and the teardown
-# under the Bash tool's 600 s ceiling: a capped Launch still tears down.
+# pass (ps, lsof, ps per listener pid, both probes), the settle after
+# ready and the teardown under the Bash tool's 600 s ceiling: a capped
+# Launch still tears down.
 TOOL_CEILING_S = 600.0
 PASS_WORST_S = 4 * TOOL_TIMEOUT_S + READY_PROBE_TIMEOUT_S + FIRST_PAGE_TIMEOUT_S
 TEARDOWN_WORST_S = 30.0

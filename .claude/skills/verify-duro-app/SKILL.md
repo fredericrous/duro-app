@@ -80,8 +80,8 @@ the script is stdlib only. `verify.py --help` prints the usage.
   line is in the log and no request is served yet: that is a compile
   in progress, not a hang. Launch fails as `stalled` when the group
   gains under 2 CPU-s in 30 s (an idle server gains 0-1.2), and at a
-  450 s cap, which leaves one more wait pass and the teardown under
-  the tool's 600 s.
+  410 s cap, which leaves one more wait pass, the settle below and the
+  teardown under the tool's 600 s.
 - Ready is not the end of the start. Launch then waits until the group
   is quiet (under 0.3 CPU-s in 3 s, at most 30 s) and reads the log. A
   line `optimized dependencies changed. reloading` means vite's dep scan

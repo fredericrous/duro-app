@@ -50,9 +50,10 @@ read the log once the server group is quiet, not at a fixed point.
   A lone `new dependencies optimized` line reloads nothing and passes.
 
 Checks: on the repro config, a cold Launch failed at 38 s with the line
-quoted and left no pidfile. On HEAD's config, cold at load 11, Launch
-was ready in 35 s, then Doctor, Drive (four journeys) and Cleanup
-passed, and the copied log held 0 reload lines. With the line appended
+quoted and left no pidfile. On HEAD's config, cold at load 6, the
+committed tree's Launch was ready in 30 s, Doctor passed in 4 s, Drive
+(four journeys) in 5 s, Cleanup passed, and the copied log held 0
+reload lines: each settle costs about 3 s on an idle server. With the line appended
 to a live server's log by hand, Doctor (passing just before) and
 Drive failed, Drive naming its evidence copy of the log.
 `scripts/test_verify.py` (12 tests, python 3.9.6 and 3.15.2) covers the
