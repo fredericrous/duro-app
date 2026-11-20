@@ -36,18 +36,25 @@ or closed as not worth doing. Reached when no ticket here is open.
 - [t07](t07-duplicate-family-group.md): the dev seed's Family is
   `grp-family`, the principal migration 0026 creates; production never
   had a second one.
+- [t09](t09-cert-toggle-setstate-in-render.md): the cert toggle calls
+  the layout's setters from its click handler, never inside a state
+  updater, because StrictMode replays updaters during render.
 
 ## Handoff
 
-2026-11-20, boundary: t07 closed (`fix/dev-seed-one-family`).
+2026-11-20, boundary: t09 closed (`fix/cert-toggle-updater`).
 
-- Done: [t07](t07-duplicate-family-group.md): production has one Family
-  (`grp-family`); the dev seed's `g-family` came from a seed older than 0026. The seed now reuses `grp-family`.
-- Live state: nothing in flight.
-- Next, in order: t08, t09, t10, t11.
-- Lesson: an `ON CONFLICT DO NOTHING` seed can lose a row to a later
-  migration's unique key without a word; check the merged state, not
-  the seed's source.
+- Done: [t09](t09-cert-toggle-setstate-in-render.md): the cert toggle
+  no longer updates AdminLayout during render, and the browser shows no
+  error. Filed [t13](t13-rail-collapses-with-cert-panel.md) (rail
+  collapses while the panel is open, same on main).
+- Live state: t08 is in flight on `fix/cert-panel-narrow` (another
+  session). It also edits this map, so whichever lands second merges
+  the Decisions and Handoff sections.
+- Next, in order: t08, t10, t11, t13.
+- Lesson: a "setState in render" warning that a test cannot reproduce
+  may need StrictMode. It replays updaters during render, while a plain
+  render runs them eagerly in the event handler.
 
 ## Not yet specified
 

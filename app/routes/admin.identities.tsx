@@ -263,19 +263,17 @@ export default function AdminIdentitiesPage({ loaderData }: Route.ComponentProps
 
   onCloseRef.current = closeCertPanel
 
+  // The next id is computed here, not in a setCertPanelUserId updater: React
+  // may run an updater during render (StrictMode replays it), and the layout's
+  // setters called from there update AdminLayout while this page renders.
   const toggleCertPanel = useCallback(
     (userId: string) => {
-      setCertPanelUserId((prev) => {
-        if (prev === userId) {
-          onOpenChange(false)
-          setContent(null)
-          return null
-        }
-        onOpenChange(true)
-        return userId
-      })
+      const next = certPanelUserId === userId ? null : userId
+      setCertPanelUserId(next)
+      onOpenChange(next !== null)
+      if (next === null) setContent(null)
     },
-    [onOpenChange, setContent],
+    [certPanelUserId, onOpenChange, setContent],
   )
 
   const toggleCert = useCallback((serialNumber: string) => {
