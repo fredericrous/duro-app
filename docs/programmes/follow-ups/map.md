@@ -29,9 +29,13 @@ or closed as not worth doing. Reached when no ticket here is open.
 - Done: [t03](t03-admin-show-detail-unused.md): `showDetail` and the
   context's `isWide` removed from `admin.tsx` and its test stubs, and
   `CLAUDE.md`, `features/admin.md` and the test setup comment updated.
-  Typecheck, lint and the 186 admin tests pass.
-- Filed from this session: [t08](t08-cert-panel-narrow-screens.md).
-- Next, in order: t04, t06, t05, t07, t08.
+  Typecheck, lint and the 186 admin tests pass. Before/after screenshots
+  of `/admin/identities` at 1280x800 are byte-identical, and the cert
+  panel still opens and closes.
+- Filed from this session: [t08](t08-cert-panel-narrow-screens.md)
+  (confirmed in a browser at 390x844),
+  [t09](t09-cert-toggle-setstate-in-render.md).
+- Next, in order: t04, t06, t05, t07, t08, t09.
 - Lesson (from t01, still true): a cold dev start takes 30-100 s here
   under load, so the verify skill's Launch can miss its deadline (t05).
 

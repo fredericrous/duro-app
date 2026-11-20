@@ -12,9 +12,10 @@ repos = ["duro-app"]
 
 `app/routes/admin.tsx` renders its `DetailPanel` only when `isWide`. The
 identities screen's cert toggle calls `onOpenChange(true)` and
-`setContent(<CertPanelContent …/>)` whatever the width, so below `md` the
-toggle likely opens nothing (seen in code 2026-11-20, not yet in a
-browser). Does a phone-width admin have any way to see and revoke one
+`setContent(<CertPanelContent …/>)` whatever the width. Seen in a browser
+2026-11-20 at 390x844: a click on Alice's Certificates button opens no
+panel, drawer or dialog and the URL stays, only the button turns active.
+Does a phone-width admin have any way to see and revoke one
 user's certificates?
 
 ## Look at
