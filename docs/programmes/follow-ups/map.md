@@ -47,22 +47,26 @@ or closed as not worth doing. Reached when no ticket here is open.
   vite's `optimized dependencies changed. reloading` line in Launch,
   Doctor and Drive, reading the log once the server group is quiet,
   since the line comes about 1 s after ready.
+- [t13](t13-rail-collapses-with-cert-panel.md): the admin rail giving way
+  to the Menu button while the 480 px cert panel is open, below a
+  viewport of about 1296 px, is intended: a 360 px panel keeps the rail
+  but squeezes the identities table into 279 px rows.
 
 ## Handoff
 
-2026-11-20, boundary: t11 closed (`fix/verify-dep-reload`).
+2026-11-20, boundary: t13 closed (`fix/rail-with-cert-panel`, docs only).
 
-- Done: [t11](t11-launch-ignores-dep-reload.md): verify-duro-app's
-  Launch, Doctor and Drive fail with vite's re-bundle line quoted, read
-  once the server group is quiet (the line comes about 1 s after ready
-  on a cold worktree).
-- Live state: t08 may still be in flight on `fix/cert-panel-narrow`
-  (another session). It also edits this map, so whichever lands second
-  merges the Decisions and Handoff sections.
-- Next, in order: t08 (if still open), t13.
-- Lesson: a dep-scan repro must start cold (`rm -rf node_modules/.vite`
-  before each Launch): the first cold run caches the late deps and every
-  warm run after it logs no reload.
+- Done: [t13](t13-rail-collapses-with-cert-panel.md): the rail giving way
+  to the Menu button while the cert panel is open at 1280 is intended,
+  measured at 1280, 1440 and 1920 with the 480 px and 360 px panels; no
+  code change, no greenrack issue.
+- Live state: t08 is PR #177 (`fix/cert-panel-narrow`, another session,
+  no checks reported on it at 08:55). It edits this map too, so whichever
+  lands second merges the Decisions and Handoff sections.
+- Next, in order: t08 (if still open).
+- Lesson: a layout trade-off check needs the panel's real rows (Alice
+  has 3 seeded certs) and the page's own height, not only the rail's
+  width: the 360 px panel kept the rail and tripled the page's height.
 
 ## Not yet specified
 
