@@ -33,23 +33,21 @@ or closed as not worth doing. Reached when no ticket here is open.
   dev pre-bundle set are expected and stay. The browser never imports
   them, the production client bundle has none, and filtering them out of
   the scan brings back t01's late re-bundle.
+- [t07](t07-duplicate-family-group.md): the dev seed's Family is
+  `grp-family`, the principal migration 0026 creates; production never
+  had a second one.
 
 ## Handoff
 
-2026-11-20, boundary: t06 closed (`fix/server-deps-client-scan`).
+2026-11-20, boundary: t07 closed (`fix/dev-seed-one-family`).
 
-- Done: [t06](t06-server-packages-in-client-graph.md): the chain is
-  `root.tsx` loader → `session.server` / `runtime.server` →
-  `AppLayer.server` → each package. Keeping them out of the scan was
-  tried and dropped: react-router's dev CSS walk resolves the SSR graph
-  in the client environment and re-bundles late. Only a comment landed.
-- Filed: [t11](t11-launch-ignores-dep-reload.md), Launch passing while
-  vite re-bundles.
+- Done: [t07](t07-duplicate-family-group.md): production has one Family
+  (`grp-family`); the dev seed's `g-family` came from a seed older than 0026. The seed now reuses `grp-family`.
 - Live state: nothing in flight.
-- Next, in order: t07, t08, t09, t10, t11.
-- Lesson: this shell's `grep` skips gitignored paths (`build/`,
-  `node_modules/`) and can return nothing on a /tmp log; use
-  `command grep` for bundle and log checks.
+- Next, in order: t08, t09, t10, t11.
+- Lesson: an `ON CONFLICT DO NOTHING` seed can lose a row to a later
+  migration's unique key without a word; check the merged state, not
+  the seed's source.
 
 ## Not yet specified
 
