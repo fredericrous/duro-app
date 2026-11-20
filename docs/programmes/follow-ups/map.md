@@ -26,25 +26,23 @@ or closed as not worth doing. Reached when no ticket here is open.
   (greenharness/greenrack#200, reaching duro-app with the greenrack
   sweep); the select column label, the scopes group, autocomplete and the
   settings `h1` are fixed in duro-app.
+- [t05](t05-launch-deadline-cold-start.md): verify-duro-app Launch waits
+  while the server group gains CPU (2 CPU-s per 30 s, 450 s cap), not
+  for a fixed 120 s; a start costs about 75 CPU-s cold, 50 warm.
 
 ## Handoff
 
-2026-11-20, boundary: t04 closed (`fix/settings-admin-a11y`).
+2026-11-20, boundary: t05 closed (`fix/launch-cpu-progress`).
 
-- Done: [t04](t04-settings-admin-a11y-findings.md): the identities select
-  column is labelled, the API keys scopes are a named `Fieldset` group,
-  the key name has `autocomplete="off"`, and every settings page has one
-  visually hidden `h1`. Each fix has a test that failed on the old code;
-  the browser re-check at 1280 and 390 px shows no dangling `for`, no
-  missing `autocomplete` and no HeaderCell warning.
-- Upstream: greenharness/greenrack#200 (modal Drawer focus, and the
-  HeaderCell `label=""` warning). It reaches duro-app with the
-  greenrack-rename sweep (decisions `greenrack-rename/t08`).
-- Filed from this session: [t10](t10-admin-h1-and-unnamed-field.md).
-- Next, in order: t06, t05, t07, t08, t09, t10.
-- Lesson (from t01, still true): a cold dev start takes 30-100 s here
-  under load, so the verify skill's Launch can miss its deadline (t05).
-  This session's warm Launch was ready well inside it.
+- Done: [t05](t05-launch-deadline-cold-start.md): Launch's fixed 120 s
+  deadline is gone. It now waits while the server group makes CPU
+  progress, fails as `stalled` after 30 s with under 2 CPU-s, and caps
+  at 450 s. Probes that time out were measured and do not slow the start.
+- Live state: nothing in flight.
+- Next, in order: t06, t07, t08, t09, t10.
+- Lesson: run verify-duro-app Launch with the Bash tool timeout at
+  600000 ms; at the default 120 s a loaded start gets SIGKILLed before
+  it can tear down.
 
 ## Not yet specified
 
