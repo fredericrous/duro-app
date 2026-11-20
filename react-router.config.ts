@@ -10,6 +10,14 @@ export default {
     // the page already holds the old React, and it crashes once with
     // "Invalid hook call" until a reload. Needs the `loader: "jsx"` on the
     // babel rules in vite.config.ts, or the scan fails on every component.
+    //
+    // The scan also crawls loaders into `~/lib/*.server`, so jose, nodemailer,
+    // node-forge, openid-client, @effect/sql-pg and friends are pre-bundled
+    // for the client too. That is expected; do not filter them out. The
+    // browser never imports them, but react-router's dev CSS walk resolves
+    // the SSR graph in the client environment on the first SSR request, and
+    // a package the scan skipped is then "discovered" late and re-bundled:
+    // the same reload as above (docs/programmes/follow-ups/t06-…).
     unstable_optimizeDeps: true,
   },
   // react-router 7.18.3+ refuses an action whose Origin differs from
