@@ -51,6 +51,10 @@ v=.claude/skills/verify-duro-app/scripts/verify.py
 python3 "$v" launch
 ```
 
+Run it with the Bash tool's `timeout` at 600000 (or in the background):
+a start under load takes longer than the default 120 s, and a tool
+timeout SIGKILLs the launcher before it can tear down.
+
 `python3` may be any 3.9 or later (macOS's `/usr/bin/python3` is 3.9);
 the script is stdlib only. `verify.py --help` prints the usage.
 
@@ -67,15 +71,21 @@ the script is stdlib only. `verify.py --help` prints the usage.
 - Ready means all three: the listener on the port is in the group Launch
   started (a foreign server on the port never counts), `/health/ready`
   is 200 (the database answers), and `/` renders HTML (the first render
-  compiles the routes). Deadline 120 s; a warm start took about 20 s.
-  On a miss it prints the last 20 log lines to stderr and keeps a copy
+  compiles the routes).
+- No fixed deadline: Launch waits while the server group keeps using
+  CPU. Reaching ready costs about 75 CPU-s on a cold worktree (no
+  `node_modules/.vite`) and about 50 warm, whatever the load, so the
+  wall time follows the load: 30 s at load 9, 70-110 s at 30-100,
+  170 s at 220 (measured 2026-11-20, t05). Until then vite's `Local:`
+  line is in the log and no request is served yet: that is a compile
+  in progress, not a hang. Launch fails as `stalled` when the group
+  gains under 2 CPU-s in 30 s (an idle server gains 0-1.2), and at a
+  450 s cap, which leaves one more wait pass and the teardown under
+  the tool's 600 s.
+- On a miss it prints the last 20 log lines to stderr and keeps a copy
   of the log at `${TMPDIR:-/tmp}/verify-duro-app-<h>.last.log` (the
   state directory is removed), then exits 1. The `fail:` line names the
   last readiness check that failed.
-- Seen twice on 2026-11-19, right after a SIGKILLed Launch, and not
-  reproduced: a timeout with vite's `Local:` line in the log and no
-  request served. Run Cleanup and Launch once more, count it as a
-  repair, and record the `fail:` line's reason.
 - Empty data: a fresh `mktemp -d` state directory holds the log, `HOME`
   and `TMPDIR`; the store is in memory and seeded at boot (12 apps,
   16 roles, 8 grants, 2 pending requests, users Alice and Bob). The dev user's

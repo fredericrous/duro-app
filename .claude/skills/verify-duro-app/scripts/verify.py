@@ -41,10 +41,24 @@ from types import FrameType
 from typing import Any
 
 APP = "verify-duro-app"
-DEADLINE_S = 120.0
+# Launch waits while the server works, not for a fixed time. Reaching
+# ready costs about 75 CPU-s cold (no node_modules/.vite) and 46-53 warm,
+# whatever the load; the wall time is that work spread over the CPU the
+# machine leaves: 30 s at load 9, 70-110 s at 30-100, 170 s at 220 (t05,
+# 2026-11-20). An idle server gains 0-1.2 CPU-s in 30 s.
+STALL_WINDOW_S = 30.0
+STALL_CPU_S = 2.0
 TOOL_TIMEOUT_S = 10.0
+READY_PROBE_TIMEOUT_S = 5.0
 # The first SSR request compiles the route graph through babel: allow it.
 FIRST_PAGE_TIMEOUT_S = 60.0
+# The cap is checked once per wait pass, so it leaves room for one more
+# pass (ps, lsof, ps per listener pid, both probes) and the teardown
+# under the Bash tool's 600 s ceiling: a capped Launch still tears down.
+TOOL_CEILING_S = 600.0
+PASS_WORST_S = 4 * TOOL_TIMEOUT_S + READY_PROBE_TIMEOUT_S + FIRST_PAGE_TIMEOUT_S
+TEARDOWN_WORST_S = 30.0
+CAP_S = TOOL_CEILING_S - PASS_WORST_S - TEARDOWN_WORST_S - 15.0
 DEAD = "http://127.0.0.1:9"  # the discard port: nothing listens there
 
 # Every environment variable the app reads, by what Launch does with it.
@@ -261,6 +275,41 @@ def read_record(path: Path) -> Record | None:
 
 def members(pgid: int) -> list[int]:
     return [int(pid) for pid in run_tool(["pgrep", "-g", str(pgid)], NONE_MATCHED_OK).split()]
+
+
+def cpu_seconds(ps_times: str) -> float:
+    """The sum of `ps -o time=` values ([[dd-]hh:]mm:ss.cc), one per line."""
+    total = 0.0
+    for field in ps_times.split():
+        days, _, clock = field.rpartition("-")
+        parts = [float(part) for part in clock.split(":")]
+        seconds = 0.0
+        for part in parts:
+            seconds = seconds * 60 + part
+        total += seconds + (int(days) * 86400 if days else 0)
+    return total
+
+
+def group_cpu_s(pgid: int) -> float:
+    """CPU seconds a process group's live members, and the children they
+    reaped (-S), have used. A member that exits takes its share with it."""
+    return cpu_seconds(run_tool(["ps", "-S", "-g", str(pgid), "-o", "time="], NONE_MATCHED_OK))
+
+
+def stalled(samples: list[tuple[float, float]], now: float) -> bool:
+    """True once the last STALL_WINDOW_S of (time, cpu) samples gained
+    less than STALL_CPU_S: the server is idle or wedged, not compiling.
+
+    Only rises between samples count: a member exiting lowers the group's
+    sum, and that drop is not a stall.
+    """
+    if not samples or now - samples[0][0] < STALL_WINDOW_S:
+        return False
+    gained = 0.0
+    for (_, before), (t, after) in zip(samples, samples[1:]):
+        if t > now - STALL_WINDOW_S:
+            gained += max(0.0, after - before)
+    return gained < STALL_CPU_S
 
 
 def lstart(pid: int) -> str | None:
@@ -515,7 +564,7 @@ def not_ready(pgid: int, port: int) -> str:
     if pgid not in groups:
         # A foreign server on our port never counts.
         return f"no listener on :{port} in group {pgid} (listeners' groups: {sorted(groups)})"
-    status, body, _ = http(f"http://127.0.0.1:{port}/health/ready", timeout=5)
+    status, body, _ = http(f"http://127.0.0.1:{port}/health/ready", timeout=READY_PROBE_TIMEOUT_S)
     if status != 200:
         return f"/health/ready answered {status}: {one_line(body)}"
     # The first SSR render compiles the routes: ready means usable.
@@ -589,20 +638,28 @@ def run_attempt(root: Path, pidfile: Path, attempt: Attempt) -> Outcome:
         write_json_atomic(pidfile, payload)
     payload["leader_start"] = lstart(child.pid)
     write_json_atomic(pidfile, payload)
-    deadline = time.monotonic() + DEADLINE_S
+    started = time.monotonic()
+    samples: list[tuple[float, float]] = []
     reason = "not checked yet"
-    while time.monotonic() < deadline:
+    while (now := time.monotonic()) - started < CAP_S:
         if child.poll() is not None:
             if "already in use" in log_path.read_text(errors="replace"):
                 return Outcome.BIND_FAILED
             print_tail(log_path, pidfile)
             return Outcome.EXITED
+        samples.append((now, group_cpu_s(child.pid)))
+        if stalled(samples, now):
+            kept = print_tail(log_path, pidfile)
+            raise LaunchFailed(
+                f"stalled: under {STALL_CPU_S:.0f} CPU-s in the last {STALL_WINDOW_S:.0f}s, "
+                f"{samples[-1][1]:.0f} CPU-s in {now - started:.0f}s, last: {reason} — log {kept}"
+            )
         reason = not_ready(child.pid, port)
         if not reason:
             return Outcome.READY
         time.sleep(0.5)
     kept = print_tail(log_path, pidfile)
-    raise LaunchFailed(f"not ready in {DEADLINE_S:.0f}s, last: {reason} — log {kept}")
+    raise LaunchFailed(f"not ready in {CAP_S:.0f}s, last: {reason} — log {kept}")
 
 
 def cmd_launch() -> int:
