@@ -6,7 +6,7 @@ export default {
     // Hands vite's dependency scan the client entry and every route module
     // from routes.ts. Without it the scan has no entries, only React is
     // pre-bundled at startup, and the first browser visit to a route finds
-    // the rest (@duro-app/ui, react-i18next, effect, …): vite re-bundles,
+    // the rest (@greenharness/greenrack-ui, react-i18next, effect, …): vite re-bundles,
     // the page already holds the old React, and it crashes once with
     // "Invalid hook call" until a reload. Needs the `loader: "jsx"` on the
     // babel rules in vite.config.ts, or the scan fails on every component.

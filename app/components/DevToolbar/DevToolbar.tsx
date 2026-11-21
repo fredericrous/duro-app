@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from "react"
-import { ActionBar, Switch } from "@duro-app/ui"
+import { ActionBar, Switch } from "@greenharness/greenrack-ui"
 
 interface DevOverrides {
   certInstalled: boolean

@@ -2,10 +2,10 @@ import { Fragment, useEffect, useMemo, useState } from "react"
 import { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
 import { css, html } from "react-strict-dom"
-import { colors } from "@duro-app/tokens/tokens/colors.css"
-import { borders } from "@duro-app/tokens/tokens/borders.css"
-import { spacing, radii } from "@duro-app/tokens/tokens/spacing.css"
-import { duration, easing } from "@duro-app/tokens/tokens/motion.css"
+import { colors } from "@greenharness/greenrack-tokens/tokens/colors.css"
+import { borders } from "@greenharness/greenrack-tokens/tokens/borders.css"
+import { spacing, radii } from "@greenharness/greenrack-tokens/tokens/spacing.css"
+import { duration, easing } from "@greenharness/greenrack-tokens/tokens/motion.css"
 import {
   Badge,
   Button,
@@ -22,7 +22,7 @@ import {
   Text,
   Toggle,
   ToggleGroup,
-} from "@duro-app/ui"
+} from "@greenharness/greenrack-ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 import { useReducedMotion } from "~/lib/useReducedMotion"

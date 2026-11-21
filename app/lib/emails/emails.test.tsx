@@ -10,7 +10,7 @@ const fixedT = async () => {
   return i18n.getFixedT("en")
 }
 
-describe("email templates (@duro-app/ui-email)", () => {
+describe("email templates (@greenharness/greenrack-ui-email)", () => {
   it("InviteEmail: token-driven, dark/light-aware, attachment-free CTA", async () => {
     const t = await fixedT()
     const html = await render(

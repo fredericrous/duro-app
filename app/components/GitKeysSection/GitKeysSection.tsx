@@ -3,9 +3,9 @@ import { css, html } from "react-strict-dom"
 import { useTranslation } from "react-i18next"
 import { useLinkTarget } from "~/hooks/useLinkTarget"
 import { useFetcher, useRevalidator } from "react-router"
-import { colors } from "@duro-app/tokens/tokens/colors.css"
-import { borders } from "@duro-app/tokens/tokens/borders.css"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { colors } from "@greenharness/greenrack-tokens/tokens/colors.css"
+import { borders } from "@greenharness/greenrack-tokens/tokens/borders.css"
+import { spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
 import {
   Alert,
   Button,
@@ -21,7 +21,7 @@ import {
   Text,
   Textarea,
   type ToastOptions,
-} from "@duro-app/ui"
+} from "@greenharness/greenrack-ui"
 import type { GitSshKey } from "~/lib/services/ForgejoClient.server"
 import {
   looksLikePrivateKey,

@@ -2,7 +2,7 @@ import { useFetcher } from "react-router"
 import { html } from "react-strict-dom"
 import { useTranslation } from "react-i18next"
 import type { Revocation } from "~/lib/services/InviteRepo.server"
-import { Button, Table } from "@duro-app/ui"
+import { Button, Table } from "@greenharness/greenrack-ui"
 
 export function RevokedUserRow({ revocation }: { revocation: Revocation }) {
   const { t } = useTranslation()

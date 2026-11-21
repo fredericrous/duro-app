@@ -1,6 +1,6 @@
 /*
  * App-owned theme variables, flipped by html[data-theme] (set SSR-side and by
- * the pre-paint script in root.tsx). Values mirror the @duro-app/tokens dark
+ * the pre-paint script in root.tsx). Values mirror the @greenharness/greenrack-tokens dark
  * base / light theme so the body (overscroll gutters, error pages) matches
  * the DS subtree, whose own vars are scoped to the ThemeProvider div.
  */

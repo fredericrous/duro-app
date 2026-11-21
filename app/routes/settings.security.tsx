@@ -4,7 +4,7 @@ import { redirect } from "react-router"
 import type { Route } from "./+types/settings.security"
 import { requireAuth } from "~/lib/auth.server"
 import { config } from "~/lib/config.server"
-import { LinkButton, Stack, Text } from "@duro-app/ui"
+import { LinkButton, Stack, Text } from "@greenharness/greenrack-ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 export function meta() {

@@ -13,7 +13,7 @@ import {
   type ExpiringItem,
   type GlanceStats,
 } from "~/lib/governance/dashboard-stats.server"
-import { Heading, Inline, LinkButton, Panel, Stack, Text } from "@duro-app/ui"
+import { Heading, Inline, LinkButton, Panel, Stack, Text } from "@greenharness/greenrack-ui"
 import { SetupCompleteness, type SetupCriterion } from "~/components/AppOverview/SetupCompleteness"
 import { GovernanceHygiene, type HygieneFinding } from "~/components/GovernanceHygiene/GovernanceHygiene"
 import { StatGrid } from "~/components/AppOverview/StatGrid"

@@ -7,7 +7,7 @@ export default {
         // plugin has compiled the file that defines it. Without this entry
         // the query came out as `@media (min-width: var(--md-…))`, which no
         // browser matches, and the rail never appeared.
-        "node_modules/@duro-app/tokens/src/**/*.{ts,tsx}",
+        "node_modules/@greenharness/greenrack-tokens/src/**/*.{ts,tsx}",
         "app/components/**/*.{ts,tsx}",
         "app/hooks/**/*.{ts,tsx}",
         "app/lib/**/*.{ts,tsx}",
@@ -18,7 +18,7 @@ export default {
       // compiles `css.create` — without it Babel parses the file, finds no
       // StyleX metadata, and `@react-strict-dom` expands to nothing. The app
       // still rendered because the classnames it emits are content hashes:
-      // any value @duro-app/ui also uses resolves to a rule the DS stylesheet
+      // any value @greenharness/greenrack-ui also uses resolves to a rule the DS stylesheet
       // already ships. Only app-only values (`minHeight: 100vh`,
       // `padding: 32`) had no rule anywhere and silently did nothing.
       //

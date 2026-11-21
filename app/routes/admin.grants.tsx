@@ -26,12 +26,12 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Button, ConfirmDialog, EmptyState, LinkButton, Stack } from "@duro-app/ui"
-import { Table } from "@duro-app/ui/table"
+import { Button, ConfirmDialog, EmptyState, LinkButton, Stack } from "@greenharness/greenrack-ui"
+import { Table } from "@greenharness/greenrack-ui/table"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
 
 type GrantWithNames = Grant & {
   principalName: string

@@ -1,12 +1,12 @@
 import { useState } from "react"
 import type { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
-import { Button, Heading, Stack, StatusIcon, Text } from "@duro-app/ui"
+import { Button, Heading, Stack, StatusIcon, Text } from "@greenharness/greenrack-ui"
 import { css, html } from "react-strict-dom"
 import { RequestAccessForm } from "~/components/RequestAccessForm/RequestAccessForm"
 import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { sizes } from "@duro-app/tokens/tokens/sizes.css"
+import { spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
+import { sizes } from "@greenharness/greenrack-tokens/tokens/sizes.css"
 
 const styles = css.create({
   container: {

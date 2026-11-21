@@ -4,9 +4,9 @@ import { useTranslation } from "react-i18next"
 import { useScratchReveal } from "~/hooks/useScratchReveal"
 import { useCopyFeedback } from "~/hooks/useCopyFeedback"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
-import { Card, Heading, Icon, Input, InputGroup, Stack, Text } from "@duro-app/ui"
+import { Card, Heading, Icon, Input, InputGroup, Stack, Text } from "@greenharness/greenrack-ui"
 import { css, html } from "react-strict-dom"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
 
 const styles = css.create({
   oneTimeHidden: {

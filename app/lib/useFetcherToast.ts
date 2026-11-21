@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react"
 import type { Fetcher } from "react-router"
-import { useToast, type ToastOptions } from "@duro-app/ui"
+import { useToast, type ToastOptions } from "@greenharness/greenrack-ui"
 
 /**
  * Canonical mutation result shape across the app's route actions.

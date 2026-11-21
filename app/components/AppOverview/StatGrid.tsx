@@ -1,4 +1,4 @@
-import { Card, Grid, Heading, Stack, Text } from "@duro-app/ui"
+import { Card, Grid, Heading, Stack, Text } from "@greenharness/greenrack-ui"
 import { AnimatedNumber } from "~/components/motion/AnimatedNumber"
 
 export interface Stat {

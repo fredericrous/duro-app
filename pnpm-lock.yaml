@@ -13,15 +13,6 @@ importers:
 
   .:
     dependencies:
-      '@duro-app/tokens':
-        specifier: ^6.3.0
-        version: 6.3.0(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))
-      '@duro-app/ui':
-        specifier: ^6.3.0
-        version: 6.3.0(@hookform/resolvers@5.2.2(react-hook-form@7.75.0(react@19.2.4)))(@tanstack/react-table@8.21.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(effect@3.22.5)(react-dom@19.2.4(react@19.2.4))(react-hook-form@7.75.0(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)
-      '@duro-app/ui-email':
-        specifier: ^6.3.0
-        version: 6.3.0(react-dom@19.2.4(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)
       '@effect/experimental':
         specifier: ^0.58.0
         version: 0.58.0(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5)
@@ -40,6 +31,15 @@ importers:
       '@electric-sql/pglite':
         specifier: ^0.3.16
         version: 0.3.16
+      '@greenharness/greenrack-tokens':
+        specifier: ^7.2.1
+        version: 7.2.1(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))
+      '@greenharness/greenrack-ui':
+        specifier: ^7.2.1
+        version: 7.2.1(@hookform/resolvers@5.2.2(react-hook-form@7.75.0(react@19.2.4)))(@tanstack/react-table@8.21.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(effect@3.22.5)(react-dom@19.2.4(react@19.2.4))(react-hook-form@7.75.0(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)
+      '@greenharness/greenrack-ui-email':
+        specifier: ^7.2.1
+        version: 7.2.1(react-dom@19.2.4(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.75.0(react@19.2.4))
@@ -140,12 +140,6 @@ importers:
       '@babel/preset-typescript':
         specifier: ^7.28.5
         version: 7.28.5(@babel/core@7.29.7)
-      '@duro-app/eslint-config':
-        specifier: ^6.3.0
-        version: 6.3.0(@aval-adr/eslint-config@0.16.0(eslint@10.3.0)(typescript-eslint@8.59.2(eslint@10.3.0)(typescript@5.9.3)))(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
-      '@duro-app/eslint-plugin':
-        specifier: ^6.3.0
-        version: 6.3.0(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
       '@effect/eslint-plugin':
         specifier: ^0.3.2
         version: 0.3.2
@@ -161,6 +155,12 @@ importers:
       '@greenharness/greengate':
         specifier: ^4.11.0
         version: 4.11.0
+      '@greenharness/greenrack-eslint-config':
+        specifier: 7.2.1
+        version: 7.2.1(@aval-adr/eslint-config@0.16.0(eslint@10.3.0)(typescript-eslint@8.59.2(eslint@10.3.0)(typescript@5.9.3)))(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
+      '@greenharness/greenrack-eslint-plugin':
+        specifier: 7.2.1
+        version: 7.2.1(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
       '@react-router/dev':
         specifier: ^7.18.5
         version: 7.18.5(@react-router/serve@7.18.5(react-router@7.18.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(typescript@5.9.3))(@types/node@25.6.2)(react-router@7.18.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(terser@5.51.2)(tsx@4.23.15)(typescript@5.9.3)(vite@6.4.6(@types/node@25.6.2)(terser@5.51.2)(tsx@4.23.15))
@@ -482,68 +482,6 @@ packages:
 
   '@dual-bundle/import-meta-resolve@4.2.1':
     resolution: {integrity: sha512-id+7YRUgoUX6CgV0DtuhirQWodeeA7Lf4i2x71JS/vtA5pRb/hIGWlw+G6MeXvsM+MXrz0VAydTGElX1rAfgPg==}
-
-  '@duro-app/eslint-config@6.3.0':
-    resolution: {integrity: sha512-ITvGgaAbR9VHuc9+8nNPXFAzIWuEMZQVa4d0BlKaAX3pEs763mhD6BDpGqbCWmtZGctNa8n5V/cELGpWNHSeuQ==}
-    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
-    peerDependencies:
-      '@aval-adr/eslint-config': '>=0.16.0 <1'
-      eslint: ^9.0.0 || ^10.0.0
-
-  '@duro-app/eslint-plugin@6.3.0':
-    resolution: {integrity: sha512-NLHOwMAv3UALOEMcLEJKl6hctQygWqxYCRl86tWY0mj9KRR17xTrl9YWeiTT7c8cK+URstPJqp8a+xXt2c84OQ==}
-    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
-    peerDependencies:
-      eslint: ^9.0.0 || ^10.0.0
-
-  '@duro-app/tokens@6.3.0':
-    resolution: {integrity: sha512-7XegmzBUu4tP4jeRkklCeuvwygbA6TdEc+B7mDY2mgr5syyXE8XZiOOHtlyVCOi6I9ydsVegGhXmni94iM3w3A==}
-    peerDependencies:
-      react-strict-dom: ^0.0.55
-    peerDependenciesMeta:
-      react-strict-dom:
-        optional: true
-
-  '@duro-app/ui-email@6.3.0':
-    resolution: {integrity: sha512-S3lrwJvZiii+cqR4d9vItxVerZ21wxx5VuDDaq62sUlfVRdcrFNNiDmeCNv+7Vd+MGgn+PFxGrvOHxqCdVIHxQ==}
-    peerDependencies:
-      react: ^19.0.0
-
-  '@duro-app/ui@6.3.0':
-    resolution: {integrity: sha512-T09gI1T+aHn7GNyPrpFrPjCC+kKflX5KIIve9T0WpX/ZTICOg00dEf9X/hFpI3nz73iNkNJZPpictAxvDZLZ9A==}
-    peerDependencies:
-      '@hookform/resolvers': ^5.0.0
-      '@tanstack/react-table': '>=8.0.0'
-      effect: ^3.0.0
-      react: ^19.0.0
-      react-dom: ^19.0.0
-      react-hook-form: ^7.55.0
-      react-native: '>=0.81.0'
-      react-native-gesture-handler: ^2.28.0
-      react-native-reanimated: '>=4.1.0'
-      react-native-safe-area-context: ^5.6.0
-      react-native-svg: ^15.12.0
-      react-native-worklets: '>=0.5.0'
-      react-strict-dom: ^0.0.55
-    peerDependenciesMeta:
-      '@hookform/resolvers':
-        optional: true
-      '@tanstack/react-table':
-        optional: true
-      effect:
-        optional: true
-      react-native:
-        optional: true
-      react-native-gesture-handler:
-        optional: true
-      react-native-reanimated:
-        optional: true
-      react-native-safe-area-context:
-        optional: true
-      react-native-svg:
-        optional: true
-      react-native-worklets:
-        optional: true
 
   '@effect/eslint-plugin@0.3.2':
     resolution: {integrity: sha512-c4Vs9t3r54A4Zpl+wo8+PGzZz3JWYsip41H+UrebRLjQ2Hk/ap63IeCgN/HWcYtxtyhRopjp7gW9nOQ2Snbl+g==}
@@ -1011,6 +949,68 @@ packages:
     resolution: {integrity: sha512-FMmoCI5dot7C9s7EF9ki0yGnTAubnyIqjJpFEroeVwAQuIBvRH2k9LzQPpz7yZ6PACxV74IvjbhpBtYEkUpa/A==}
     engines: {node: '>=18'}
     hasBin: true
+
+  '@greenharness/greenrack-eslint-config@7.2.1':
+    resolution: {integrity: sha512-pp7t20MOMqgfnDXjDjIxg3+3Bt/V7OqSSeOqlQv/P9pOMxFQuMvQ+ymKmPJD3XR81u7YyDkNihFHd46C6WSz4g==}
+    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    peerDependencies:
+      '@aval-adr/eslint-config': '>=0.16.0 <1'
+      eslint: ^9.0.0 || ^10.0.0
+
+  '@greenharness/greenrack-eslint-plugin@7.2.1':
+    resolution: {integrity: sha512-Un5/qPtZnxwGvDXmSGJuQEGV2KHCt5IuDueErwQIL830SIBFyNsUOzACi/QnAAm5yixs+ld5+xhUHOPN9tHybg==}
+    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    peerDependencies:
+      eslint: ^9.0.0 || ^10.0.0
+
+  '@greenharness/greenrack-tokens@7.2.1':
+    resolution: {integrity: sha512-au0LHXTV7vZrB4sAyJJPp/QVMIh6t+G8lRF5oENTWgCUEBCYve8CmAB1l/K/Msp6dA4PFHKQNCH5J96pgWIr/g==}
+    peerDependencies:
+      react-strict-dom: ^0.0.55
+    peerDependenciesMeta:
+      react-strict-dom:
+        optional: true
+
+  '@greenharness/greenrack-ui-email@7.2.1':
+    resolution: {integrity: sha512-GVWidSFYYwbIcKOElxuz9CNKdVm0NoUUrRVL6hIjEJHfvhsH36Mi7yT9e2mBLqY5Lk46ltsx+RdhBk/80mlRKg==}
+    peerDependencies:
+      react: ^19.0.0
+
+  '@greenharness/greenrack-ui@7.2.1':
+    resolution: {integrity: sha512-QzVtKVDVhHb6UlMMXqb7HfhplXrDcbcY6O9f5IkHZnG0sRIT1Gd3IKPToFEXFvKRptCH74t8USpWopXjgXenPw==}
+    peerDependencies:
+      '@hookform/resolvers': ^5.0.0
+      '@tanstack/react-table': '>=8.0.0'
+      effect: ^3.0.0
+      react: ^19.0.0
+      react-dom: ^19.0.0
+      react-hook-form: ^7.55.0
+      react-native: '>=0.81.0'
+      react-native-gesture-handler: ^2.28.0
+      react-native-reanimated: '>=4.1.0'
+      react-native-safe-area-context: ^5.6.0
+      react-native-svg: ^15.12.0
+      react-native-worklets: '>=0.5.0'
+      react-strict-dom: ^0.0.55
+    peerDependenciesMeta:
+      '@hookform/resolvers':
+        optional: true
+      '@tanstack/react-table':
+        optional: true
+      effect:
+        optional: true
+      react-native:
+        optional: true
+      react-native-gesture-handler:
+        optional: true
+      react-native-reanimated:
+        optional: true
+      react-native-safe-area-context:
+        optional: true
+      react-native-svg:
+        optional: true
+      react-native-worklets:
+        optional: true
 
   '@hookform/resolvers@5.2.2':
     resolution: {integrity: sha512-A/IxlMLShx3KjV/HeTcTfaMxdwy690+L/ZADoeaTltLx+CVuzkeVIPuybK3jrRfw7YZnmdKsVVHAlEPIAEUNlA==}
@@ -1779,6 +1779,9 @@ packages:
 
   '@types/nodemailer@7.0.11':
     resolution: {integrity: sha512-E+U4RzR2dKrx+u3N4DlsmLaDC6mMZOM/TPROxA0UAPiTgI0y4CEFBmZE+coGWTjakDriRsXG368lNk1u9Q0a2g==}
+
+  '@types/qrcode@1.5.6':
+    resolution: {integrity: sha512-te7NQcV2BOvdj2b1hCAHzAoMNuj65kNBMz0KBaxM6c3VGBOhU0dURQKOtH8CFNI/dsKkwlv32p26qYQTWoB5bw==}
 
   '@types/react-dom@19.1.11':
     resolution: {integrity: sha512-3BKc/yGdNTYQVVw4idqHtSOcFsgGuBbMveKCOgF8wQ5QtrYOc3jDIlzg3jef04zcXFIHLelyGlj0T+BJ8+KN+w==}
@@ -4229,55 +4232,6 @@ snapshots:
 
   '@dual-bundle/import-meta-resolve@4.2.1': {}
 
-  '@duro-app/eslint-config@6.3.0(@aval-adr/eslint-config@0.16.0(eslint@10.3.0)(typescript-eslint@8.59.2(eslint@10.3.0)(typescript@5.9.3)))(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)':
-    dependencies:
-      '@aval-adr/eslint-config': 0.16.0(eslint@10.3.0)(typescript-eslint@8.59.2(eslint@10.3.0)(typescript@5.9.3))
-      '@duro-app/eslint-plugin': 6.3.0(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
-      eslint: 10.3.0
-      eslint-plugin-react-hooks: 7.1.1(eslint@10.3.0)
-      typescript-eslint: 8.59.2(eslint@10.3.0)(typescript@5.9.3)
-    transitivePeerDependencies:
-      - '@typescript-eslint/parser'
-      - supports-color
-      - typescript
-
-  '@duro-app/eslint-plugin@6.3.0(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)':
-    dependencies:
-      '@typescript-eslint/eslint-plugin': 8.59.2(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
-      eslint: 10.3.0
-    transitivePeerDependencies:
-      - '@typescript-eslint/parser'
-      - supports-color
-      - typescript
-
-  '@duro-app/tokens@6.3.0(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))':
-    optionalDependencies:
-      react-strict-dom: 0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)
-
-  '@duro-app/ui-email@6.3.0(react-dom@19.2.4(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)':
-    dependencies:
-      '@duro-app/tokens': 6.3.0(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))
-      '@react-email/components': 1.0.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      react: 19.2.4
-    transitivePeerDependencies:
-      - react-dom
-      - react-strict-dom
-
-  '@duro-app/ui@6.3.0(@hookform/resolvers@5.2.2(react-hook-form@7.75.0(react@19.2.4)))(@tanstack/react-table@8.21.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(effect@3.22.5)(react-dom@19.2.4(react@19.2.4))(react-hook-form@7.75.0(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)':
-    dependencies:
-      '@duro-app/tokens': 6.3.0(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))
-      '@tanstack/react-virtual': 3.14.26(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      qrcode: 1.5.4
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
-      react-hook-form: 7.75.0(react@19.2.4)
-      react-strict-dom: 0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)
-    optionalDependencies:
-      '@hookform/resolvers': 5.2.2(react-hook-form@7.75.0(react@19.2.4))
-      '@tanstack/react-table': 8.21.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      effect: 3.22.5
-      react-native: 0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4)
-
   '@effect/eslint-plugin@0.3.2':
     dependencies:
       '@dprint/formatter': 0.4.1
@@ -4564,6 +4518,56 @@ snapshots:
       '@greenharness/greengate-linux-x64-gnu': 4.11.0
       '@greenharness/greengate-linux-x64-musl': 4.11.0
       '@greenharness/greengate-win32-x64': 4.11.0
+
+  '@greenharness/greenrack-eslint-config@7.2.1(@aval-adr/eslint-config@0.16.0(eslint@10.3.0)(typescript-eslint@8.59.2(eslint@10.3.0)(typescript@5.9.3)))(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)':
+    dependencies:
+      '@aval-adr/eslint-config': 0.16.0(eslint@10.3.0)(typescript-eslint@8.59.2(eslint@10.3.0)(typescript@5.9.3))
+      '@greenharness/greenrack-eslint-plugin': 7.2.1(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
+      eslint: 10.3.0
+      eslint-plugin-react-hooks: 7.1.1(eslint@10.3.0)
+      typescript-eslint: 8.59.2(eslint@10.3.0)(typescript@5.9.3)
+    transitivePeerDependencies:
+      - '@typescript-eslint/parser'
+      - supports-color
+      - typescript
+
+  '@greenharness/greenrack-eslint-plugin@7.2.1(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)':
+    dependencies:
+      '@typescript-eslint/eslint-plugin': 8.59.2(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
+      eslint: 10.3.0
+    transitivePeerDependencies:
+      - '@typescript-eslint/parser'
+      - supports-color
+      - typescript
+
+  '@greenharness/greenrack-tokens@7.2.1(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))':
+    optionalDependencies:
+      react-strict-dom: 0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)
+
+  '@greenharness/greenrack-ui-email@7.2.1(react-dom@19.2.4(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)':
+    dependencies:
+      '@greenharness/greenrack-tokens': 7.2.1(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))
+      '@react-email/components': 1.0.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react: 19.2.4
+    transitivePeerDependencies:
+      - react-dom
+      - react-strict-dom
+
+  '@greenharness/greenrack-ui@7.2.1(@hookform/resolvers@5.2.2(react-hook-form@7.75.0(react@19.2.4)))(@tanstack/react-table@8.21.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(effect@3.22.5)(react-dom@19.2.4(react@19.2.4))(react-hook-form@7.75.0(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)':
+    dependencies:
+      '@greenharness/greenrack-tokens': 7.2.1(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))
+      '@tanstack/react-virtual': 3.14.26(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@types/qrcode': 1.5.6
+      qrcode: 1.5.4
+      react: 19.2.4
+      react-dom: 19.2.4(react@19.2.4)
+      react-hook-form: 7.75.0(react@19.2.4)
+      react-strict-dom: 0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)
+    optionalDependencies:
+      '@hookform/resolvers': 5.2.2(react-hook-form@7.75.0(react@19.2.4))
+      '@tanstack/react-table': 8.21.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      effect: 3.22.5
+      react-native: 0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4)
 
   '@hookform/resolvers@5.2.2(react-hook-form@7.75.0(react@19.2.4))':
     dependencies:
@@ -5251,6 +5255,10 @@ snapshots:
   '@types/nodemailer@7.0.11':
     dependencies:
       '@types/node': 25.6.2
+
+  '@types/qrcode@1.5.6':
+    dependencies:
+      '@types/node': 25.9.9
 
   '@types/react-dom@19.1.11(@types/react@19.2.14)':
     dependencies:

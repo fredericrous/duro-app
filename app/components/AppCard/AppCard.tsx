@@ -1,11 +1,11 @@
 import { useTranslation } from "react-i18next"
 import type { AppDefinition } from "~/lib/apps"
 import { useLinkTarget } from "~/hooks/useLinkTarget"
-import { Card, Stack, Text } from "@duro-app/ui"
+import { Card, Stack, Text } from "@greenharness/greenrack-ui"
 import { Icon } from "../Icon"
 import { css, html } from "react-strict-dom"
-import { sizes } from "@duro-app/tokens/tokens/sizes.css"
-import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { sizes } from "@greenharness/greenrack-tokens/tokens/sizes.css"
+import { colors } from "@greenharness/greenrack-tokens/tokens/colors.css"
 
 const styles = css.create({
   link: {

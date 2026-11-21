@@ -20,12 +20,22 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { Badge, Button, ConfirmDialog, Dialog, EmptyState, Field, Input, Select, Stack } from "@duro-app/ui"
-import { Table } from "@duro-app/ui/table"
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  Dialog,
+  EmptyState,
+  Field,
+  Input,
+  Select,
+  Stack,
+} from "@greenharness/greenrack-ui"
+import { Table } from "@greenharness/greenrack-ui/table"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
 
 type TFunc = (key: string, opts?: Record<string, unknown>) => string
 

@@ -10,7 +10,7 @@ import { deviceBudget } from "~/lib/workflows/device-budget.server"
 import { parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
 import { Header } from "~/components/Header/Header"
 import { DevicesSection } from "~/components/DevicesSection/DevicesSection"
-import { PageShell } from "@duro-app/ui"
+import { PageShell } from "@greenharness/greenrack-ui"
 
 export function meta() {
   return [{ title: "Devices - Duro" }]

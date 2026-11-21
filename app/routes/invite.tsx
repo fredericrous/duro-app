@@ -16,7 +16,7 @@ import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { InvitePasswordReveal } from "~/components/InvitePasswordReveal/InvitePasswordReveal"
 import { CertCheck } from "~/components/CertCheck/CertCheck"
 import { useDevOverrides } from "~/components/DevToolbar/DevToolbar"
-import { Heading, LinkButton, Stack, Text } from "@duro-app/ui"
+import { Heading, LinkButton, Stack, Text } from "@greenharness/greenrack-ui"
 
 type InviteErrorCode =
   | "missing_token"

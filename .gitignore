@@ -17,5 +17,5 @@ coverage/
 .mcp.json
 scripts/mcp/node_modules
 
-# Duro session-hook cache (duro hook install)
-.claude/.duro-session.cache*
+# greenrack session-hook cache (greenrack hook install)
+.claude/.greenrack-session.cache*

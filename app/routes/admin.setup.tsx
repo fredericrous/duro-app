@@ -8,7 +8,7 @@ import { config, isOriginAllowed } from "~/lib/config.server"
 import { runEffect } from "~/lib/runtime.server"
 import { isFirstRun } from "~/lib/governance/bootstrap.server"
 import { submitBootstrapInviteAuto, type BootstrapErrorCode } from "~/lib/workflows/bootstrap.server"
-import { Alert, Button, Field, Heading, Input, LinkButton, Stack, Text } from "@duro-app/ui"
+import { Alert, Button, Field, Heading, Input, LinkButton, Stack, Text } from "@greenharness/greenrack-ui"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 

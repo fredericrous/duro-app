@@ -1,8 +1,8 @@
 import type { ReactNode } from "react"
-import { Card } from "@duro-app/ui"
+import { Card } from "@greenharness/greenrack-ui"
 import { css, html } from "react-strict-dom"
-import { sizes } from "@duro-app/tokens/tokens/sizes.css"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { sizes } from "@greenharness/greenrack-tokens/tokens/sizes.css"
+import { spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
 
 const styles = css.create({
   page: {

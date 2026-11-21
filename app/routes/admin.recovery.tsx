@@ -9,7 +9,7 @@ import { requireAdmin, requireAdminAction } from "~/lib/admin-guard.server"
 import { RecoveryRepo, type RecoveryRequest } from "~/lib/services/RecoveryRepo.server"
 import { approveRecovery, denyRecovery } from "~/lib/workflows/recovery.server"
 import { CardSection } from "~/components/CardSection/CardSection"
-import { Button, Checkbox, ConfirmDialog, Inline, Stack, Table, Text } from "@duro-app/ui"
+import { Button, Checkbox, ConfirmDialog, Inline, Stack, Table, Text } from "@greenharness/greenrack-ui"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 
 export async function loader({ request }: Route.LoaderArgs) {

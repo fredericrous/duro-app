@@ -5,9 +5,9 @@ import { requireAdmin } from "~/lib/admin-guard.server"
 import { PluginRegistry } from "~/lib/plugins/PluginRegistry.server"
 import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server"
 import type { PluginManifest } from "~/lib/plugins/contracts"
-import { Badge, Heading, Stack, Table, Tag, Text } from "@duro-app/ui"
+import { Badge, Heading, Stack, Table, Tag, Text } from "@greenharness/greenrack-ui"
 import { css, html } from "react-strict-dom"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 const styles = css.create({

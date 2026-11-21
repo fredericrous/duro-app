@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react"
 import type { useFetcher } from "react-router"
 import { useTranslation } from "react-i18next"
-import { Alert, Button, Combobox, Field, Inline, Stack, Text, Textarea } from "@duro-app/ui"
+import { Alert, Button, Combobox, Field, Inline, Stack, Text, Textarea } from "@greenharness/greenrack-ui"
 import { css, html } from "react-strict-dom"
-import { sizes } from "@duro-app/tokens/tokens/sizes.css"
+import { sizes } from "@greenharness/greenrack-tokens/tokens/sizes.css"
 import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
 
 const styles = css.create({

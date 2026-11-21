@@ -1,6 +1,6 @@
 "use no memo"
 
-import { EmailShell, Heading, Text, Button, Hr, Section } from "@duro-app/ui-email"
+import { EmailShell, Heading, Text, Button, Hr, Section } from "@greenharness/greenrack-ui-email"
 import { Trans } from "react-i18next/TransWithoutContext"
 import type { TFunction } from "i18next"
 import { CertInstallSteps } from "./cert-install-steps"

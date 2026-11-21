@@ -88,7 +88,7 @@ vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
 import { fireEvent, screen, waitFor } from "@testing-library/react"
 import { StrictMode, useRef, useState, type ReactNode } from "react"
 import { Outlet } from "react-router"
-import { ActionBarProvider, DetailPanel } from "@duro-app/ui"
+import { ActionBarProvider, DetailPanel } from "@greenharness/greenrack-ui"
 import AdminIdentitiesPage from "./admin.identities"
 import { renderRoute } from "~/test/render-route"
 import { t } from "~/test/test-utils"

@@ -12,8 +12,8 @@ import { useTranslation } from "react-i18next"
 import type { TFunction } from "i18next"
 import { useReactTable, getCoreRowModel, createColumnHelper } from "@tanstack/react-table"
 import { html } from "react-strict-dom"
-import { Badge, EmptyState, Heading, Stack, Text } from "@duro-app/ui"
-import { Table } from "@duro-app/ui/table"
+import { Badge, EmptyState, Heading, Stack, Text } from "@greenharness/greenrack-ui"
+import { Table } from "@greenharness/greenrack-ui/table"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 export async function loader({ request, params }: Route.LoaderArgs) {

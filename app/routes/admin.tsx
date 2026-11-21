@@ -8,12 +8,12 @@ import type { Route } from "./+types/admin"
 import { getAuth } from "~/lib/auth.server"
 import { checkAuthDecision } from "~/lib/auth-decision.server"
 import { runEffect } from "~/lib/runtime.server"
-import { Badge, Heading, Icon, Inline, SideNav, Stack, VisuallyHidden } from "@duro-app/ui"
+import { Badge, Heading, Icon, Inline, SideNav, Stack, VisuallyHidden } from "@greenharness/greenrack-ui"
 import { AdminDetailSurface } from "~/components/admin/AdminDetailSurface"
 import { Header } from "~/components/Header/Header"
 import { AppShell, type AppShellNavProps } from "~/components/AppShell/AppShell"
 import { useMediaQuery } from "~/hooks/useMediaQuery"
-import { breakpoints } from "@duro-app/tokens/tokens/breakpoints.css"
+import { breakpoints } from "@greenharness/greenrack-tokens/tokens/breakpoints.css"
 
 // Side-nav label with optional pending count chip. Co-located here because
 // it's only used for admin navigation and depends on the loader's count shape.

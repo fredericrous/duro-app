@@ -4,7 +4,7 @@
       {
         "hooks": [
           {
-            "command": "sh .claude/hooks/duro-catalog.sh",
+            "command": "sh .claude/hooks/greenrack-catalog.sh",
             "type": "command"
           }
         ]
@@ -23,7 +23,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh .claude/hooks/duro-plan.sh"
+            "command": "sh .claude/hooks/greenrack-plan.sh"
           }
         ]
       }

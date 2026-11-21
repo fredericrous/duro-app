@@ -19,7 +19,7 @@ import { server } from "./msw-server"
 // starved past this ceiling — the two together are the generic starvation cure.
 configure({ asyncUtilTimeout: 8000 })
 
-// jsdom doesn't ship ResizeObserver. @duro-app/ui's ScrollArea (and any DS
+// jsdom doesn't ship ResizeObserver. @greenharness/greenrack-ui's ScrollArea (and any DS
 // component that observes element resizes) crashes without it. A no-op
 // polyfill is enough — tests don't assert on resize-driven behaviour.
 if (typeof globalThis.ResizeObserver === "undefined") {
@@ -49,7 +49,7 @@ if (typeof window !== "undefined" && typeof window.matchMedia === "undefined") {
   })) as unknown as typeof window.matchMedia
 }
 
-// jsdom doesn't ship pointer capture or hit testing. @duro-app/ui's DragDrop
+// jsdom doesn't ship pointer capture or hit testing. @greenharness/greenrack-ui's DragDrop
 // (5.7+) captures the pointer on its source and finds the zone under the
 // release point with document.elementsFromPoint; without these a drag throws.
 // jsdom lays nothing out (every rect is 0×0 at the origin), so this only keeps

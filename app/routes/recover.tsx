@@ -6,7 +6,7 @@ import { runEffect } from "~/lib/runtime.server"
 import { config, isOriginAllowed } from "~/lib/config.server"
 import { requestRecovery } from "~/lib/workflows/recovery.server"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
-import { Alert, Button, Field, Fieldset, Heading, Input, Stack, Text, Textarea } from "@duro-app/ui"
+import { Alert, Button, Field, Fieldset, Heading, Input, Stack, Text, Textarea } from "@greenharness/greenrack-ui"
 
 export function meta({ data }: Route.MetaArgs) {
   return [{ title: data?.appName ? `Recover access — ${data.appName}` : "Recover access" }]

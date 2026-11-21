@@ -32,9 +32,9 @@ import {
 } from "@tanstack/react-table"
 
 import { css, html } from "react-strict-dom"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { colors } from "@duro-app/tokens/tokens/colors.css"
-import { typography } from "@duro-app/tokens/tokens/typography.css"
+import { spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
+import { colors } from "@greenharness/greenrack-tokens/tokens/colors.css"
+import { typography } from "@greenharness/greenrack-tokens/tokens/typography.css"
 import {
   ActionBar,
   Badge,
@@ -50,8 +50,8 @@ import {
   Text,
   Toggle,
   ToggleGroup,
-} from "@duro-app/ui"
-import { Table } from "@duro-app/ui/table"
+} from "@greenharness/greenrack-ui"
+import { Table } from "@greenharness/greenrack-ui/table"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 import { useFetcherToast } from "~/lib/useFetcherToast"

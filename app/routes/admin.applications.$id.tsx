@@ -18,7 +18,7 @@ import { ApprovalPolicyRepo } from "~/lib/governance/ApprovalPolicyRepo.server"
 import type { Role, Entitlement, Resource, Grant, Principal, ApprovalPolicy } from "~/lib/governance/types"
 import { useReactTable, getCoreRowModel, createColumnHelper } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
 import {
   Badge,
   Button,
@@ -37,8 +37,8 @@ import {
   Text,
   Tooltip,
   useToast,
-} from "@duro-app/ui"
-import { Table } from "@duro-app/ui/table"
+} from "@greenharness/greenrack-ui"
+import { Table } from "@greenharness/greenrack-ui/table"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { AnimatedNumber } from "~/components/motion/AnimatedNumber"
 import { AppOverview } from "~/components/AppOverview/AppOverview"

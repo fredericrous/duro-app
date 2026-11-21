@@ -27,7 +27,7 @@ import {
   Table,
   Text,
   type ToastOptions,
-} from "@duro-app/ui"
+} from "@greenharness/greenrack-ui"
 import { useFetcherToast } from "~/lib/useFetcherToast"
 import { CardSection } from "~/components/CardSection/CardSection"
 

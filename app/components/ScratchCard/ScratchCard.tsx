@@ -178,7 +178,7 @@ export function ScratchCard({
     // overflow a phone screen once the neighbouring copy button was laid out
     // beside it, which pushed that button under the scratch area — a scratch
     // then landed on "copy" instead. Letting it shrink keeps the two apart.
-    // eslint-disable-next-line duro/no-raw-html-element -- needs a shrinkable flex container that the design-system Box cannot express
+    // eslint-disable-next-line greenrack/no-raw-html-element -- needs a shrinkable flex container that the design-system Box cannot express
     <div
       className={`${styles.container}${className ? ` ${className}` : ""}`}
       style={{ width: "100%", maxWidth: width, height }}
@@ -200,7 +200,7 @@ export function ScratchCard({
           {/* Accessible reveal control. `pointer-events: none` lets mouse
               scratches fall through to the canvas, while it stays keyboard-
               focusable and Enter/Space-activatable for keyboard/SR users. */}
-          {/* eslint-disable-next-line duro/no-raw-html-element -- see container above */}
+          {/* eslint-disable-next-line greenrack/no-raw-html-element -- see container above */}
           <button type="button" className={styles.cover} aria-label={label} onClick={reveal} />
         </>
       )}

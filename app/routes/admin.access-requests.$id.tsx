@@ -10,8 +10,8 @@ import { AccessRequestRepo } from "~/lib/governance/AccessRequestRepo.server"
 import { handleAdminAccessRequestsMutation } from "~/lib/mutations/admin-access-requests"
 import { enumLabel } from "~/lib/enum-labels"
 import { css, html } from "react-strict-dom"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { borders } from "@duro-app/tokens/tokens/borders.css"
+import { spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
+import { borders } from "@greenharness/greenrack-tokens/tokens/borders.css"
 import {
   Alert,
   Badge,
@@ -24,7 +24,7 @@ import {
   Stack,
   Text,
   Textarea,
-} from "@duro-app/ui"
+} from "@greenharness/greenrack-ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 export async function loader({ request, params }: Route.LoaderArgs) {

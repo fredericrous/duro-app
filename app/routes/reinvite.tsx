@@ -11,7 +11,7 @@ import { resolveLocale, localeCookieHeader } from "~/lib/i18n.server"
 import { Effect } from "effect"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
-import { Alert, Button, Heading, StatusIcon, Text } from "@duro-app/ui"
+import { Alert, Button, Heading, StatusIcon, Text } from "@greenharness/greenrack-ui"
 
 type ReinviteErrorCode = "missing_token" | "invalid" | "already_used" | "still_valid" | "send_failed" | "unknown"
 

@@ -26,16 +26,16 @@ export default defineConfig({
         plugins: [["babel-plugin-react-compiler"]],
       },
     }),
-    // @duro-app/tokens source: the package's `./tokens/*.css` subpath exports
+    // @greenharness/greenrack-tokens source: the package's `./tokens/*.css` subpath exports
     // resolve to raw `.css.ts` files that contain `css.defineVars(...)` calls.
-    // The duro-design-system CLAUDE.md mandates the deep-import pattern
-    // (e.g. `@duro-app/tokens/tokens/colors.css`) and explicitly forbids the
+    // The greenrack design system's CLAUDE.md mandates the deep-import pattern
+    // (e.g. `@greenharness/greenrack-tokens/tokens/colors.css`) and explicitly forbids the
     // barrel import — so the consuming app must compile this source itself
     // through `react-strict-dom/babel-preset`, exactly like /app/**.
     // Must run BEFORE the generic stylex rule below so the strict-dom preset
     // (which pre-processes `css.defineVars`) gets first crack.
     babel({
-      filter: /node_modules\/@duro-app\/tokens\/.*\.[jt]sx?$/,
+      filter: /node_modules\/@greenharness\/greenrack-tokens\/.*\.[jt]sx?$/,
       babelConfig: {
         presets: [
           "@babel/preset-typescript",
@@ -49,13 +49,13 @@ export default defineConfig({
     // `.cls:not(#\#){...}` — unlayered, with a specificity hack — and unlayered
     // rules beat every cascade layer. react-strict-dom's element reset includes
     // shorthands like `padding:0`, so those injected copies outranked the
-    // longhands in @duro-app/ui's `@layer priority5` and every DS component
+    // longhands in @greenharness/greenrack-ui's `@layer priority5` and every DS component
     // rendered with its padding, background and weight stripped. It only showed
     // up in dev: the production bundle has no runtime injection, so there the
     // same rules stay layered and win correctly.
     //
     // The classnames this generates are already defined — layered — in
-    // @duro-app/ui/dist/index.css, which root.tsx imports, so dropping the
+    // @greenharness/greenrack-ui/dist/index.css, which root.tsx imports, so dropping the
     // injection loses no styles.
     babel({
       filter: /node_modules\/react-strict-dom/,
@@ -81,6 +81,6 @@ export default defineConfig({
     // Force both through Vite's transform pipeline. Without this, SSR loads
     // these from node_modules as native ESM and bypasses the babel rules
     // above — `css.defineVars` then throws at runtime.
-    noExternal: ["react-strict-dom", "@duro-app/tokens"],
+    noExternal: ["react-strict-dom", "@greenharness/greenrack-tokens"],
   },
 })

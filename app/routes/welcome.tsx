@@ -3,10 +3,10 @@ import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/welcome"
 import { requireAuth } from "~/lib/auth.server"
 import { config } from "~/lib/config.server"
-import { Button, Heading, StatusIcon, Text } from "@duro-app/ui"
+import { Button, Heading, StatusIcon, Text } from "@greenharness/greenrack-ui"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { css, html } from "react-strict-dom"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
 
 const styles = css.create({
   centered: {

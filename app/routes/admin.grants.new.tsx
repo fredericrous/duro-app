@@ -17,7 +17,18 @@ import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { activateGrant } from "~/lib/workflows/grant-activation.server"
 import type { Role } from "~/lib/governance/types"
-import { Button, Checkbox, Combobox, Field, Inline, LinkButton, Select, Stack, Text, Input } from "@duro-app/ui"
+import {
+  Button,
+  Checkbox,
+  Combobox,
+  Field,
+  Inline,
+  LinkButton,
+  Select,
+  Stack,
+  Text,
+  Input,
+} from "@greenharness/greenrack-ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 
 // ---------------------------------------------------------------------------

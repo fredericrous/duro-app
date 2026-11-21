@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react"
-import { DetailPanel, Drawer } from "@duro-app/ui"
+import { DetailPanel, Drawer } from "@greenharness/greenrack-ui"
 
 /**
  * Where admin's side content renders: a non-modal DetailPanel beside the page
