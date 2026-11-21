@@ -352,4 +352,12 @@ designed`. Merge with a merge commit so commits 1–3 stay bisectable.
   `generated-from` hashes are refreshed for vite.config.ts and catalog.tsx
   only; six other rows were already stale on main (follow-up).
 
+## Implementation review
+
+- Round 1 (tree 28df68…, commit 0092a22): implementation-review approve-with-changes; platform approve-with-changes; language approve-with-changes; interface-review approve-with-changes (brief lacked step 2b inputs, rebuilt); backend, react, architect approve.
+- Fixed: two stale comments in eslint.config.js and one in vite.config.ts (commit 7f0190c); AGENTS.md checked current (`greengate agents-md --check` 0).
+- Deliberate: Dockerfile comment still says `@duro-app` (platform); hadolint DL3018 on `apk add` blocks any Dockerfile commit, so pin apk, then fix the comment (follow-up).
+- Delta (tree 366b83…): language, interface, platform approve; implementation approve-with-changes, its one finding the renamed-dependency ownership note, carried in the PR body.
+- Backend and architect findings (doctor row open range `@^7`; postcss/vite glob into `node_modules/.../src`) are follow-ups with the 7.4 move; react approve with none.
+
 <!-- panel: repos=duro-app,homelab,decisions adds= reviewers=backend,lang:typescript,platform,react,tui,ui-design,unix,codex body-sha=b7f3975f2eca -->
