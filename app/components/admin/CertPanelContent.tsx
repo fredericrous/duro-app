@@ -1,6 +1,6 @@
 import { useFetcher } from "react-router"
 import { html } from "react-strict-dom"
-import { Badge, Button, Checkbox, List } from "@duro-app/ui"
+import { Badge, Button, Checkbox, List } from "@greenharness/greenrack-ui"
 import { DetailSurface } from "~/components/admin/AdminDetailSurface"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 import { certStatus } from "~/lib/cert-status"

@@ -1,9 +1,9 @@
-import { react } from "@duro-app/eslint-config"
+import { react } from "@greenharness/greenrack-eslint-config"
 import { effect, tests, adrLint } from "@aval-adr/eslint-config"
 
 export default [
   { ignores: ["build/**", ".react-router/**"] },
-  // react (Duro): base TS conventions + react-hooks + the duro plugin +
+  // react (greenrack): base TS conventions + react-hooks + the greenrack plugin +
   // UI-library policy. effect and tests (@aval-adr/eslint-config): Effect
   // server policy and accessibility-first test selectors (self-scoped).
   ...react,
@@ -12,7 +12,7 @@ export default [
   {
     files: ["app/**/*.{ts,tsx}"],
     rules: {
-      "duro/no-raw-html-element": [
+      "greenrack/no-raw-html-element": [
         "error",
         {
           allow: [
@@ -37,17 +37,17 @@ export default [
   },
   {
     // Tests render throwaway DOM fixtures and route/component mocks; email
-    // templates are @react-email/@duro-app/ui-email, where react-strict-dom
-    // does not run at all. Neither ships design-system UI, so the duro
+    // templates are built with @react-email and @greenharness/greenrack-ui-email, where react-strict-dom
+    // does not run at all. Neither ships design-system UI, so the greenrack
     // rules don't apply (the import policy above still does).
     files: ["app/**/*.test.{ts,tsx}", "app/lib/emails/**"],
     rules: {
-      "duro/no-raw-html-element": "off",
-      "duro/prefer-ds-form-components": "off",
-      "duro/no-deprecated-table-parts": "off",
-      "duro/no-raw-design-values": "off",
-      "duro/no-flex-grow-web": "off",
-      "duro/no-tokens-barrel-import": "off",
+      "greenrack/no-raw-html-element": "off",
+      "greenrack/prefer-ds-form-components": "off",
+      "greenrack/no-deprecated-table-parts": "off",
+      "greenrack/no-raw-design-values": "off",
+      "greenrack/no-flex-grow-web": "off",
+      "greenrack/no-tokens-barrel-import": "off",
     },
   },
   ...adrLint(),

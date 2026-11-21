@@ -28,7 +28,7 @@ import {
   ToggleGroup,
   Tooltip,
   type ToastOptions,
-} from "@duro-app/ui"
+} from "@greenharness/greenrack-ui"
 
 /**
  * Toast copy for a settled cert mutation. The list can be long enough that a

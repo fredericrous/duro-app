@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
-import { Heading, Stack, StatusIcon, Text } from "@duro-app/ui"
+import { Heading, Stack, StatusIcon, Text } from "@greenharness/greenrack-ui"
 
 type ErrorCardTone = "error" | "warning" | "info" | "success"
 

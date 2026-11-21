@@ -1,6 +1,6 @@
 "use no memo"
 
-import { Text } from "@duro-app/ui-email"
+import { Text } from "@greenharness/greenrack-ui-email"
 import { Trans } from "react-i18next/TransWithoutContext"
 import type { TFunction } from "i18next"
 

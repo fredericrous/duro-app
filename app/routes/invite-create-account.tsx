@@ -16,7 +16,7 @@ import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { CertGate } from "~/components/CertGate/CertGate"
 import { useDevOverrides } from "~/components/DevToolbar/DevToolbar"
-import { Heading, LinkButton, Stack, StatusIcon, Text } from "@duro-app/ui"
+import { Heading, LinkButton, Stack, StatusIcon, Text } from "@greenharness/greenrack-ui"
 
 type InviteErrorCode =
   | "missing_token"

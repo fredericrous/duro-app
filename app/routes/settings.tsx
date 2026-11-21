@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import type { Route } from "./+types/settings"
 import { requireAuth } from "~/lib/auth.server"
 import { config } from "~/lib/config.server"
-import { Heading, Icon, SideNav, VisuallyHidden } from "@duro-app/ui"
+import { Heading, Icon, SideNav, VisuallyHidden } from "@greenharness/greenrack-ui"
 import { Header } from "~/components/Header/Header"
 import { AppShell, type AppShellNavProps } from "~/components/AppShell/AppShell"
 

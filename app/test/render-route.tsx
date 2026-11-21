@@ -1,6 +1,6 @@
 import { render } from "@testing-library/react"
 import { createRoutesStub, Outlet, useLoaderData } from "react-router"
-import { ToastProvider } from "@duro-app/ui"
+import { ToastProvider } from "@greenharness/greenrack-ui"
 
 /**
  * Component-render harness using React Router v7's `createRoutesStub`.

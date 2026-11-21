@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react"
 import { useFetcher, useRevalidator } from "react-router"
 import { useTranslation } from "react-i18next"
 import { useLinkTarget } from "~/hooks/useLinkTarget"
-import { Alert, Button, Dialog, Inline, LinkButton, Spinner, Stack, Text } from "@duro-app/ui"
+import { Alert, Button, Dialog, Inline, LinkButton, Spinner, Stack, Text } from "@greenharness/greenrack-ui"
 import { RequestAccessForm } from "~/components/RequestAccessForm/RequestAccessForm"
 import type { AppCatalogEntry } from "~/lib/apps-catalog.server"
 

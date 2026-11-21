@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { useLocation, useNavigate } from "react-router"
-import { SideNav } from "@duro-app/ui"
+import { SideNav } from "@greenharness/greenrack-ui"
 import { renderRoute } from "~/test/render-route"
 import { AppShell, type AppShellNavProps } from "./AppShell"
 

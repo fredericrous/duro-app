@@ -8,7 +8,7 @@ import { AppGrid } from "~/components/AppGrid/AppGrid"
 import { NoAccess } from "~/components/NoAccess/NoAccess"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { AppSearchBar, AppSearchBarSkeleton } from "~/components/AppSearchBar/AppSearchBar"
-import { EmptyState, Inline, LinkButton, PageShell, Stack, Button } from "@duro-app/ui"
+import { EmptyState, Inline, LinkButton, PageShell, Stack, Button } from "@greenharness/greenrack-ui"
 import { useFetcher, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
 import { runEffect } from "~/lib/runtime.server"
@@ -151,7 +151,6 @@ export async function action({ request }: Route.ActionArgs): Promise<SubmitOutco
   }
 
   const { getAuth } = await import("~/lib/auth.server")
-  const { PrincipalRepo } = await import("~/lib/governance/PrincipalRepo.server")
   const auth = await getAuth(request)
   if (!auth.user) {
     return { outcome: "error", error: "not_authenticated" }

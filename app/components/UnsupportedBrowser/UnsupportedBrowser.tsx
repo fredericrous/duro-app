@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next"
-import { Button, Callout, Heading, LinkButton, Stack, Text } from "@duro-app/ui"
+import { Button, Callout, Heading, LinkButton, Stack, Text } from "@greenharness/greenrack-ui"
 import { useCopyFeedback } from "~/hooks/useCopyFeedback"
 
 /**

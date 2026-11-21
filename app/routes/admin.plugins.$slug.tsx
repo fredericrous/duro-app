@@ -9,11 +9,23 @@ import { ConnectedSystemRepo } from "~/lib/governance/ConnectedSystemRepo.server
 import { ApplicationRepo } from "~/lib/governance/ApplicationRepo.server"
 import type { PluginAction, PluginManifest } from "~/lib/plugins/contracts"
 import type { AuditEvent, ConnectedSystem } from "~/lib/governance/types"
-import { Badge, Button, EmptyState, Heading, Inline, LinkButton, Panel, Stack, Table, Tag, Text } from "@duro-app/ui"
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Heading,
+  Inline,
+  LinkButton,
+  Panel,
+  Stack,
+  Table,
+  Tag,
+  Text,
+} from "@greenharness/greenrack-ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 import { css, html } from "react-strict-dom"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
 
 interface LoaderData {
   manifest: PluginManifest

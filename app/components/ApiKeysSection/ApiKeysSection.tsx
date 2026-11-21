@@ -4,9 +4,9 @@ import { useTranslation } from "react-i18next"
 import { useDisplayFormat } from "~/hooks/useDisplayFormat"
 import { useCopyFeedback } from "~/hooks/useCopyFeedback"
 import { css, html } from "react-strict-dom"
-import { borders } from "@duro-app/tokens/tokens/borders.css"
-import { radii, spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { borders } from "@greenharness/greenrack-tokens/tokens/borders.css"
+import { radii, spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
+import { colors } from "@greenharness/greenrack-tokens/tokens/colors.css"
 import {
   Alert,
   Badge,
@@ -22,7 +22,7 @@ import {
   Stack,
   Tag,
   Text,
-} from "@duro-app/ui"
+} from "@greenharness/greenrack-ui"
 import type { ApiKey } from "~/lib/governance/types"
 import {
   ALLOWED_EXPIRY_DAYS,
@@ -30,7 +30,7 @@ import {
   WILDCARD_SCOPE,
   type SettingsApiKeysResult,
 } from "~/lib/mutations/settings-api-keys"
-import { typography, typeScale } from "@duro-app/tokens/tokens/typography.css"
+import { typography, typeScale } from "@greenharness/greenrack-tokens/tokens/typography.css"
 
 interface RevealData {
   rawKey: string

@@ -30,7 +30,7 @@ import {
   Stack,
   Table,
   Text,
-} from "@duro-app/ui"
+} from "@greenharness/greenrack-ui"
 
 export function meta() {
   return [{ title: "My requests - Duro" }]

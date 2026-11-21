@@ -4,9 +4,20 @@ import type { Route } from "./+types/catalog"
 import { Link, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
 import { useLinkTarget } from "~/hooks/useLinkTarget"
-import { Badge, Button, Callout, EmptyState, Inline, LinkButton, PageShell, Stack, Table, Text } from "@duro-app/ui"
+import {
+  Badge,
+  Button,
+  Callout,
+  EmptyState,
+  Inline,
+  LinkButton,
+  PageShell,
+  Stack,
+  Table,
+  Text,
+} from "@greenharness/greenrack-ui"
 import { css, html } from "react-strict-dom"
-import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { colors } from "@greenharness/greenrack-tokens/tokens/colors.css"
 import { Header } from "~/components/Header/Header"
 import { Icon } from "~/components/Icon"
 import { CardSection } from "~/components/CardSection/CardSection"
@@ -24,7 +35,7 @@ import {
 } from "~/lib/apps-catalog.server"
 import { filterByQuery } from "~/lib/search"
 import { useAppSearchParams, shouldRevalidateAppSearch } from "~/hooks/useAppSearchParams"
-import { typography } from "@duro-app/tokens/tokens/typography.css"
+import { typography } from "@greenharness/greenrack-tokens/tokens/typography.css"
 
 export function meta() {
   return [{ title: "Catalog - Duro" }]

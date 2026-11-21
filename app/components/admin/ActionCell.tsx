@@ -1,6 +1,6 @@
 import { useFetcher } from "react-router"
 import { html } from "react-strict-dom"
-import { Button, ButtonGroup } from "@duro-app/ui"
+import { Button, ButtonGroup } from "@greenharness/greenrack-ui"
 import { useFetcherToast, type MutationResult } from "~/lib/useFetcherToast"
 import type { UserData, RevokeTarget } from "./UserColumns"
 

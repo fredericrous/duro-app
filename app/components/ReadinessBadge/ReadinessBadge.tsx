@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next"
-import { Badge, Tooltip } from "@duro-app/ui"
+import { Badge, Tooltip } from "@greenharness/greenrack-ui"
 import { applicationReadiness, READINESS_TONE, type ReadinessSignals } from "~/lib/app-readiness"
 
 /**

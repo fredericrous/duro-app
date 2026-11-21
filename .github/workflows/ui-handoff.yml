@@ -75,7 +75,7 @@ jobs:
           if [ "$fail" -ne 0 ]; then
             echo "This PR touches app/routes or app/components. Either fill in the ## Mockup"
             echo "section (canvas URL · direction · docs/mockups/<screen> · two images) or"
-            echo "write a line 'Mockup: none' if it ships no screen. See /duro-mockup."
+            echo "write a line 'Mockup: none' if it ships no screen. See /greenrack-mockup."
             exit 1
           fi
           echo "Mockup section complete."

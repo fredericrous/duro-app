@@ -300,7 +300,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # NPM_REGISTRY stays at the Dockerfile default (public npm); every
-      # dependency, @duro-app/* included, is public.
+      # dependency, @greenharness/* included, is public.
       - name: Build and push the PR image
         uses: docker/build-push-action@v6
         with:

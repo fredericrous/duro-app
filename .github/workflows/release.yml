@@ -116,7 +116,7 @@ jobs:
           MM=$(echo "$V" | awk -F. '{print $1"."$2}')
           # NPM_REGISTRY stays at the Dockerfile default (public npm): the
           # in-cluster Verdaccio mirror is unreachable from a hosted runner and
-          # every dependency, @duro-app/* included, is public. The old
+          # every dependency, @greenharness/* included, is public. The old
           # `--secret id=npm_token` was never consumed by the Dockerfile.
           buildah bud \
             -t "$IMG:$V" -t "$IMG:$MM" .

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { render, screen, waitFor } from "@testing-library/react"
 import type { Fetcher } from "react-router"
-import { ToastProvider } from "@duro-app/ui"
+import { ToastProvider } from "@greenharness/greenrack-ui"
 import { useFetcherToast } from "./useFetcherToast"
 
 function Harness({ fetcher }: { fetcher: Fetcher }) {

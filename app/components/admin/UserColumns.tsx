@@ -1,5 +1,5 @@
 import { createColumnHelper } from "@tanstack/react-table"
-import { Badge, Checkbox } from "@duro-app/ui"
+import { Badge, Checkbox } from "@greenharness/greenrack-ui"
 import type { UserCertificate } from "~/lib/services/CertificateRepo.server"
 
 export type UserData = {

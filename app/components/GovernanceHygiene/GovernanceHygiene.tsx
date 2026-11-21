@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next"
 import { css, html } from "react-strict-dom"
-import { Button, Heading, Icon, Inline, Panel, Stack, Text } from "@duro-app/ui"
-import { colors } from "@duro-app/tokens/tokens/colors.css"
+import { Button, Heading, Icon, Inline, Panel, Stack, Text } from "@greenharness/greenrack-ui"
+import { colors } from "@greenharness/greenrack-tokens/tokens/colors.css"
 
 export interface HygieneFinding {
   /** stable id → admin.hygiene.findings.<id> (pluralized, {{count}}) + fix.<id> */

@@ -18,9 +18,9 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { css, html } from "react-strict-dom"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
-import { Badge, Button, Combobox, EmptyState, Inline, Input, Stack, Text } from "@duro-app/ui"
-import { Table } from "@duro-app/ui/table"
+import { spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
+import { Badge, Button, Combobox, EmptyState, Inline, Input, Stack, Text } from "@greenharness/greenrack-ui"
+import { Table } from "@greenharness/greenrack-ui/table"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { HelpPopover } from "~/components/HelpPopover/HelpPopover"
 

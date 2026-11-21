@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { render, screen, waitFor, fireEvent } from "@testing-library/react"
 import { createRoutesStub } from "react-router"
-import { ToastProvider } from "@duro-app/ui"
+import { ToastProvider } from "@greenharness/greenrack-ui"
 import { ActionCell } from "./ActionCell"
 import type { UserData } from "./UserColumns"
 

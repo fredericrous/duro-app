@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next"
 import { html } from "react-strict-dom"
 import type { AppDefinition } from "~/lib/apps"
 import { getCategoryOrder, formatCategory, groupAppsByCategory } from "~/lib/apps"
-import { Grid, Stack, Text } from "@duro-app/ui"
+import { Grid, Stack, Text } from "@greenharness/greenrack-ui"
 import { AppCard } from "../AppCard/AppCard"
 
 interface AppGridProps {

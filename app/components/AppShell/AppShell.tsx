@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { useLocation } from "react-router"
 import { css, html } from "react-strict-dom"
-import { Button, Drawer, Grid, PageShell } from "@duro-app/ui"
-import { breakpoints } from "@duro-app/tokens/tokens/breakpoints.css"
+import { Button, Drawer, Grid, PageShell } from "@greenharness/greenrack-ui"
+import { breakpoints } from "@greenharness/greenrack-tokens/tokens/breakpoints.css"
 
 /**
  * The page shell shared by /settings and /admin: a navigation rail beside

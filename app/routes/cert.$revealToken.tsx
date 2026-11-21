@@ -13,7 +13,7 @@ import { useScratchReveal } from "~/hooks/useScratchReveal"
 import { defaultDeviceName } from "~/lib/device-name"
 import { useCopyFeedback } from "~/hooks/useCopyFeedback"
 import { ScratchCard } from "~/components/ScratchCard/ScratchCard"
-import { Heading, Input, InputGroup, LinkButton, Stack, Text } from "@duro-app/ui"
+import { Heading, Input, InputGroup, LinkButton, Stack, Text } from "@greenharness/greenrack-ui"
 
 type CertRevealError = "invalid" | "expired" | "consumed" | "unknown"
 

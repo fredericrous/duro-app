@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next"
-import { Badge, Heading, Inline, LinkButton, Panel, Stack, Text } from "@duro-app/ui"
+import { Badge, Heading, Inline, LinkButton, Panel, Stack, Text } from "@greenharness/greenrack-ui"
 import { enumLabel } from "~/lib/enum-labels"
 import { useDisplayFormat } from "~/hooks/useDisplayFormat"
 

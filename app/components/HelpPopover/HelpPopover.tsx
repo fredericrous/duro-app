@@ -1,12 +1,13 @@
 import type { CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
 import { css, html } from "react-strict-dom"
-import { colors } from "@duro-app/tokens/tokens/colors.css"
-import { borders } from "@duro-app/tokens/tokens/borders.css"
-import { sizes } from "@duro-app/tokens/tokens/sizes.css"
-import { shadows } from "@duro-app/tokens/tokens/shadows.css"
-import { spacing, radii } from "@duro-app/tokens/tokens/spacing.css"
-import { typography } from "@duro-app/tokens/tokens/typography.css"
+import { colors } from "@greenharness/greenrack-tokens/tokens/colors.css"
+import { borders } from "@greenharness/greenrack-tokens/tokens/borders.css"
+import { sizes } from "@greenharness/greenrack-tokens/tokens/sizes.css"
+import { shadows } from "@greenharness/greenrack-tokens/tokens/shadows.css"
+import { spacing, radii } from "@greenharness/greenrack-tokens/tokens/spacing.css"
+import { typography } from "@greenharness/greenrack-tokens/tokens/typography.css"
+import { layers } from "@greenharness/greenrack-tokens/tokens/layers.css"
 
 const detailsStyle: CSSProperties = {
   display: "inline-block",
@@ -37,7 +38,7 @@ const summaryStyle: CSSProperties = {
 const styles = css.create({
   popup: {
     position: "absolute",
-    zIndex: 50,
+    zIndex: layers.floating,
     top: "calc(100% + 4px)",
     left: 0,
     minWidth: sizes.popoverWSm,

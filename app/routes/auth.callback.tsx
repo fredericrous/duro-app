@@ -1,6 +1,6 @@
 import { redirect } from "react-router"
 import { useTranslation } from "react-i18next"
-import { LinkButton } from "@duro-app/ui"
+import { LinkButton } from "@greenharness/greenrack-ui"
 import type { Route } from "./+types/auth.callback"
 import { ErrorCard } from "~/components/ErrorCard/ErrorCard"
 import { runEffect } from "~/lib/runtime.server"

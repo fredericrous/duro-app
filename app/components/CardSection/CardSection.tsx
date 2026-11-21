@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
-import { Heading, Panel } from "@duro-app/ui"
+import { Heading, Panel } from "@greenharness/greenrack-ui"
 import { css, html } from "react-strict-dom"
-import { spacing } from "@duro-app/tokens/tokens/spacing.css"
+import { spacing } from "@greenharness/greenrack-tokens/tokens/spacing.css"
 
 const styles = css.create({
   wrapper: {

@@ -35,7 +35,7 @@ import {
   Tag,
   TagGroup,
   Text,
-} from "@duro-app/ui"
+} from "@greenharness/greenrack-ui"
 import { CardSection } from "~/components/CardSection/CardSection"
 import { QrCode } from "~/components/QrCode/QrCode"
 import { useCopyFeedback } from "~/hooks/useCopyFeedback"
@@ -407,7 +407,7 @@ export default function AdminInvitesPage({ loaderData }: Route.ComponentProps) {
                   component. Watching input events on the wrapper recovers it —
                   without that, typing an address and clicking Send does
                   nothing, which reads as a broken button. */}
-              {/* eslint-disable-next-line duro/no-raw-html-element -- html.div
+              {/* eslint-disable-next-line greenrack/no-raw-html-element -- html.div
                   exposes no onInput/onBlur, and those events are the only way
                   to observe TagGroup's uncommitted input text. */}
               <div
