@@ -21,3 +21,9 @@ GHSA-vfj7-8cjw-p6xm 2026-12-31 braces via react-strict-dom > postcss-react-stric
 # user supplies. Remove when node-forge publishes a fix, or replace it with
 # node:crypto.
 GHSA-86w9-cpqp-85rv 2026-12-31 node-forge in VaultPki only (PKCS#12 bundling of Vault-issued certs, no signature verification, no user input); no patched version exists
+
+# @effect/platform < 0.97.1 builds cookie attributes from unchecked domain,
+# path and name in makeCookie(). duro-app never calls makeCookie or the
+# Cookies setters. The fix needs six Effect packages moved together, tracked
+# fleet-wide as decisions greenrack-rename f36; same expiry as the other apps.
+GHSA-chp3-j5qr-2vfr 2026-12-19 @effect/platform (moderate), patched >=0.97.1; makeCookie unused here, Effect bump follows (f36)
