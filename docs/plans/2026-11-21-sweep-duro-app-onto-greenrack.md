@@ -174,7 +174,7 @@ previous server, remove `build/`, `pnpm run build`, the SSR smoke, then
 serve and run the crawl, served-CSS, email and print-config checks; the
 commit sha and lock hash are recorded with each phase's results.
 
-- [ ] Phase 0: Baseline, in `duro-app-wt-greenrack` (branch `chore/greenrack`)
+- [x] Phase 0: Baseline, in `duro-app-wt-greenrack` (branch `chore/greenrack`)
       on 3d7ab22, no commit.
   - Build and serve: `pnpm run build`, then
     `NODE_ENV=development ALLOWED_ORIGIN_SUFFIX=127.0.0.1 PORT=<p> pnpm start`
@@ -217,19 +217,19 @@ commit sha and lock hash are recorded with each phase's results.
     recorded, not a stop.
   - Counts: typecheck, lint warnings, test count, `pnpm why` of the DS and
     eslint packages.
-- [ ] Phase 1: ui, tokens, ui-email 5.9 → ^5.45.0 under `@duro-app`.
+- [x] Phase 1: ui, tokens, ui-email 5.9 → ^5.45.0 under `@duro-app`.
   - Files: `package.json`, `pnpm-lock.yaml`; fallout under `app/**` only where
     a 5.x change requires it, each fix citing the change.
   - The eslint pair stays 6.0; `pnpm why @duro-app/eslint-plugin` shows one
     copy.
   - Commit `chore(deps): Duro 5.45`.
-- [ ] Phase 2: ui, tokens, ui-email, eslint-config, eslint-plugin → ^6.3.0;
+- [x] Phase 2: ui, tokens, ui-email, eslint-config, eslint-plugin → ^6.3.0;
       `@aval-adr/eslint-config` to the version 6.3's peer asks; `pnpm install` prints no unmet-peer warning for it (pnpm 10 only warns, so no other gate catches a mismatch).
   - Files: `package.json`, `pnpm-lock.yaml`, `eslint.config.js` if
     print-config loses a rule, `greengate.conf` (doctor row
     `@duro-app/cli@^6` once `npm view @duro-app/cli@^6 version` returns a version, then `greengate trust` and one run of the row exiting 0), lint fallout under `app/**`.
   - Commit `chore(deps): Duro 6.3`.
-- [ ] Phase 3: the rename to greenrack 7.2.1.
+- [x] Phase 3: the rename to greenrack 7.2.1.
   - (a) Allowlist in a `mktemp` file outside the tree (the dry run's list).
     From decisions' `docs/programmes/greenrack-rename/`: `./sweep-app.sh
 --check --allow <f> <wt>`, then `./sweep-app.sh --allow <f> --expect
@@ -324,5 +324,33 @@ designed`. Merge with a merge commit so commits 1–3 stay bisectable.
   `[skip ci]` chart bump.
 - 2026-11-21 — The eslint pair moves at commit 2 only (already 6.0, split
   done); commit 1 moves the runtime packages.
+- 2026-11-21 — Phase 0 seed: invite tokens are stored hashed and the dev
+  email layer never logs them, so admin actions cannot seed the public pages.
+  A file-backed dev PGlite in the scratch dir holds `seedDevFixtures` plus one
+  invite, cert reveal and recovery request made through the repos' own
+  `create`; every run serves a fresh copy, so ids and tokens match across
+  commits. `RECOVERY_ENABLED=true` (else `/recover` is a 404).
+- 2026-11-21 — States taken where the app has them: EmptyState from the
+  collections empty as seeded (invitations, audit, a principal); the invalid
+  state from `/settings/api-keys`' required name input (typed, cleared), as
+  the only Field.Error forms sit behind the client-certificate check.
+- 2026-11-21 — The baseline crawl ran directly; c1–c3 through browser-check.
+  At c1 the DS Button lost `data-element-src`, so the crawl's selectors also
+  match `data-style-src`; the baseline was re-crawled from a detached
+  worktree with the same script (noise floor 163/163 AE 0).
+- 2026-11-21 — c1 difference accepted by the person: a List draws no divider
+  under its last row (DS #148, 5.34.3), seen in the admin cert panel/Drawer.
+- 2026-11-21 — c3 difference accepted by the person: at 390 touch, Button and
+  LinkButton no longer shrink below their label (DS #204, 7.1.2); the app
+  detail action row then runs 15 px into the page padding (follow-up).
+- 2026-11-21 — greenrack 7.3.0 and 7.4.0 shipped this morning (Field native
+  validation message, Combobox fixes). Ranges stay ^7.2.1 as planned; the lock
+  holds 7.2.1, the version the hash probe and token checks covered. Moving to
+  7.4 is a follow-up.
+- 2026-11-21 — The commit gate lints touched files with no warnings, so c3
+  fixes two pre-existing warnings in renamed files (HelpPopover zIndex 50 is
+  `layers.floating`; an unused import in home.tsx). The verify skill's
+  `generated-from` hashes are refreshed for vite.config.ts and catalog.tsx
+  only; six other rows were already stale on main (follow-up).
 
 <!-- panel: repos=duro-app,homelab,decisions adds= reviewers=backend,lang:typescript,platform,react,tui,ui-design,unix,codex body-sha=b7f3975f2eca -->
