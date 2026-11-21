@@ -28,8 +28,8 @@ export default defineConfig({
     }),
     // @greenharness/greenrack-tokens source: the package's `./tokens/*.css` subpath exports
     // resolve to raw `.css.ts` files that contain `css.defineVars(...)` calls.
-    // The greenrack design system's CLAUDE.md mandates the deep-import pattern
-    // (e.g. `@greenharness/greenrack-tokens/tokens/colors.css`) and explicitly forbids the
+    // greenrack/no-tokens-barrel-import enforces the deep-import pattern
+    // (e.g. `@greenharness/greenrack-tokens/tokens/colors.css`) and forbids the
     // barrel import — so the consuming app must compile this source itself
     // through `react-strict-dom/babel-preset`, exactly like /app/**.
     // Must run BEFORE the generic stylex rule below so the strict-dom preset

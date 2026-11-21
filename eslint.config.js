@@ -3,7 +3,7 @@ import { effect, tests, adrLint } from "@aval-adr/eslint-config"
 
 export default [
   { ignores: ["build/**", ".react-router/**"] },
-  // react (Duro): base TS conventions + react-hooks + the duro plugin +
+  // react (greenrack): base TS conventions + react-hooks + the greenrack plugin +
   // UI-library policy. effect and tests (@aval-adr/eslint-config): Effect
   // server policy and accessibility-first test selectors (self-scoped).
   ...react,
@@ -37,8 +37,8 @@ export default [
   },
   {
     // Tests render throwaway DOM fixtures and route/component mocks; email
-    // templates are @react-email/@greenharness/greenrack-ui-email, where react-strict-dom
-    // does not run at all. Neither ships design-system UI, so the duro
+    // templates are built with @react-email and @greenharness/greenrack-ui-email, where react-strict-dom
+    // does not run at all. Neither ships design-system UI, so the greenrack
     // rules don't apply (the import policy above still does).
     files: ["app/**/*.test.{ts,tsx}", "app/lib/emails/**"],
     rules: {
