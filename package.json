@@ -19,9 +19,9 @@
     "prepare": "greengate init || true"
   },
   "dependencies": {
-    "@duro-app/tokens": "^5.45.0",
-    "@duro-app/ui": "^5.45.0",
-    "@duro-app/ui-email": "^5.45.0",
+    "@duro-app/tokens": "^6.3.0",
+    "@duro-app/ui": "^6.3.0",
+    "@duro-app/ui-email": "^6.3.0",
     "@effect/experimental": "^0.58.0",
     "@effect/opentelemetry": "^0.61.0",
     "@effect/platform": "^0.94.5",
@@ -63,8 +63,8 @@
   "devDependencies": {
     "@aval-adr/eslint-config": "^0.16.0",
     "@babel/preset-typescript": "^7.28.5",
-    "@duro-app/eslint-config": "^6.0.0",
-    "@duro-app/eslint-plugin": "^6.0.0",
+    "@duro-app/eslint-config": "^6.3.0",
+    "@duro-app/eslint-plugin": "^6.3.0",
     "@effect/eslint-plugin": "^0.3.2",
     "@effect/language-service": "0.87.5",
     "@effect/vitest": "^0.27.0",

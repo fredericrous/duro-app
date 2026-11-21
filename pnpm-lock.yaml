@@ -14,14 +14,14 @@ importers:
   .:
     dependencies:
       '@duro-app/tokens':
-        specifier: ^5.45.0
-        version: 5.45.0(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))
+        specifier: ^6.3.0
+        version: 6.3.0(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))
       '@duro-app/ui':
-        specifier: ^5.45.0
-        version: 5.45.0(@hookform/resolvers@5.2.2(react-hook-form@7.75.0(react@19.2.4)))(@tanstack/react-table@8.21.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(effect@3.22.5)(react-dom@19.2.4(react@19.2.4))(react-hook-form@7.75.0(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)
+        specifier: ^6.3.0
+        version: 6.3.0(@hookform/resolvers@5.2.2(react-hook-form@7.75.0(react@19.2.4)))(@tanstack/react-table@8.21.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(effect@3.22.5)(react-dom@19.2.4(react@19.2.4))(react-hook-form@7.75.0(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)
       '@duro-app/ui-email':
-        specifier: ^5.45.0
-        version: 5.45.0(react-dom@19.2.4(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)
+        specifier: ^6.3.0
+        version: 6.3.0(react-dom@19.2.4(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)
       '@effect/experimental':
         specifier: ^0.58.0
         version: 0.58.0(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5)
@@ -141,11 +141,11 @@ importers:
         specifier: ^7.28.5
         version: 7.28.5(@babel/core@7.29.7)
       '@duro-app/eslint-config':
-        specifier: ^6.0.0
-        version: 6.0.0(@aval-adr/eslint-config@0.16.0(eslint@10.3.0)(typescript-eslint@8.59.2(eslint@10.3.0)(typescript@5.9.3)))(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
+        specifier: ^6.3.0
+        version: 6.3.0(@aval-adr/eslint-config@0.16.0(eslint@10.3.0)(typescript-eslint@8.59.2(eslint@10.3.0)(typescript@5.9.3)))(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
       '@duro-app/eslint-plugin':
-        specifier: ^6.0.0
-        version: 6.0.0(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
+        specifier: ^6.3.0
+        version: 6.3.0(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
       '@effect/eslint-plugin':
         specifier: ^0.3.2
         version: 0.3.2
@@ -483,34 +483,34 @@ packages:
   '@dual-bundle/import-meta-resolve@4.2.1':
     resolution: {integrity: sha512-id+7YRUgoUX6CgV0DtuhirQWodeeA7Lf4i2x71JS/vtA5pRb/hIGWlw+G6MeXvsM+MXrz0VAydTGElX1rAfgPg==}
 
-  '@duro-app/eslint-config@6.0.0':
-    resolution: {integrity: sha512-U74wzXLME8VBXdfW2WAjS47JvgIseOAdOfBJbJFo3nrfFrAkVQ+4uEbn0OUY2WsPhOF7d7eMiR7MSoQEC6tp1w==}
+  '@duro-app/eslint-config@6.3.0':
+    resolution: {integrity: sha512-ITvGgaAbR9VHuc9+8nNPXFAzIWuEMZQVa4d0BlKaAX3pEs763mhD6BDpGqbCWmtZGctNa8n5V/cELGpWNHSeuQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       '@aval-adr/eslint-config': '>=0.16.0 <1'
       eslint: ^9.0.0 || ^10.0.0
 
-  '@duro-app/eslint-plugin@6.0.0':
-    resolution: {integrity: sha512-sg4AQV0CFH5mgu7R0RBMgk25pw05d8OeosLpxMGr3bz1vgO0AOw0rThsjW5lDAc7dQ1yZI+hZ4A3kEUkFOb6VQ==}
+  '@duro-app/eslint-plugin@6.3.0':
+    resolution: {integrity: sha512-NLHOwMAv3UALOEMcLEJKl6hctQygWqxYCRl86tWY0mj9KRR17xTrl9YWeiTT7c8cK+URstPJqp8a+xXt2c84OQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       eslint: ^9.0.0 || ^10.0.0
 
-  '@duro-app/tokens@5.45.0':
-    resolution: {integrity: sha512-ke2Xb6Pe7/604bZRWX0AGhKJvqbHhi1lnsKs38FHTUUmge60swkZJGgriAI2ICnNGBPEEokRYVFYcbCjAykedA==}
+  '@duro-app/tokens@6.3.0':
+    resolution: {integrity: sha512-7XegmzBUu4tP4jeRkklCeuvwygbA6TdEc+B7mDY2mgr5syyXE8XZiOOHtlyVCOi6I9ydsVegGhXmni94iM3w3A==}
     peerDependencies:
       react-strict-dom: ^0.0.55
     peerDependenciesMeta:
       react-strict-dom:
         optional: true
 
-  '@duro-app/ui-email@5.45.0':
-    resolution: {integrity: sha512-1oFE9CIIQVyXSSMNQ7Tam8GEB7cm54W2txaj6eOYCIG0W6/AuysOEptNaEOMei0Mdm9QbKi1Snuk9uz0r1TeNw==}
+  '@duro-app/ui-email@6.3.0':
+    resolution: {integrity: sha512-S3lrwJvZiii+cqR4d9vItxVerZ21wxx5VuDDaq62sUlfVRdcrFNNiDmeCNv+7Vd+MGgn+PFxGrvOHxqCdVIHxQ==}
     peerDependencies:
       react: ^19.0.0
 
-  '@duro-app/ui@5.45.0':
-    resolution: {integrity: sha512-/g1IP4aNwuAp8vTLic4jnur/ZASjH8ypBrF1qo/mlUrjdoACaM8YrOafhaI8mhAISQj57HfXblG1nKk4yEB8wQ==}
+  '@duro-app/ui@6.3.0':
+    resolution: {integrity: sha512-T09gI1T+aHn7GNyPrpFrPjCC+kKflX5KIIve9T0WpX/ZTICOg00dEf9X/hFpI3nz73iNkNJZPpictAxvDZLZ9A==}
     peerDependencies:
       '@hookform/resolvers': ^5.0.0
       '@tanstack/react-table': '>=8.0.0'
@@ -4229,10 +4229,10 @@ snapshots:
 
   '@dual-bundle/import-meta-resolve@4.2.1': {}
 
-  '@duro-app/eslint-config@6.0.0(@aval-adr/eslint-config@0.16.0(eslint@10.3.0)(typescript-eslint@8.59.2(eslint@10.3.0)(typescript@5.9.3)))(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)':
+  '@duro-app/eslint-config@6.3.0(@aval-adr/eslint-config@0.16.0(eslint@10.3.0)(typescript-eslint@8.59.2(eslint@10.3.0)(typescript@5.9.3)))(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)':
     dependencies:
       '@aval-adr/eslint-config': 0.16.0(eslint@10.3.0)(typescript-eslint@8.59.2(eslint@10.3.0)(typescript@5.9.3))
-      '@duro-app/eslint-plugin': 6.0.0(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
+      '@duro-app/eslint-plugin': 6.3.0(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
       eslint: 10.3.0
       eslint-plugin-react-hooks: 7.1.1(eslint@10.3.0)
       typescript-eslint: 8.59.2(eslint@10.3.0)(typescript@5.9.3)
@@ -4241,7 +4241,7 @@ snapshots:
       - supports-color
       - typescript
 
-  '@duro-app/eslint-plugin@6.0.0(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)':
+  '@duro-app/eslint-plugin@6.3.0(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)':
     dependencies:
       '@typescript-eslint/eslint-plugin': 8.59.2(@typescript-eslint/parser@8.59.2(eslint@10.3.0)(typescript@5.9.3))(eslint@10.3.0)(typescript@5.9.3)
       eslint: 10.3.0
@@ -4250,22 +4250,22 @@ snapshots:
       - supports-color
       - typescript
 
-  '@duro-app/tokens@5.45.0(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))':
+  '@duro-app/tokens@6.3.0(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))':
     optionalDependencies:
       react-strict-dom: 0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)
 
-  '@duro-app/ui-email@5.45.0(react-dom@19.2.4(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)':
+  '@duro-app/ui-email@6.3.0(react-dom@19.2.4(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)':
     dependencies:
-      '@duro-app/tokens': 5.45.0(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))
+      '@duro-app/tokens': 6.3.0(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))
       '@react-email/components': 1.0.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react: 19.2.4
     transitivePeerDependencies:
       - react-dom
       - react-strict-dom
 
-  '@duro-app/ui@5.45.0(@hookform/resolvers@5.2.2(react-hook-form@7.75.0(react@19.2.4)))(@tanstack/react-table@8.21.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(effect@3.22.5)(react-dom@19.2.4(react@19.2.4))(react-hook-form@7.75.0(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)':
+  '@duro-app/ui@6.3.0(@hookform/resolvers@5.2.2(react-hook-form@7.75.0(react@19.2.4)))(@tanstack/react-table@8.21.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(effect@3.22.5)(react-dom@19.2.4(react@19.2.4))(react-hook-form@7.75.0(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))(react@19.2.4)':
     dependencies:
-      '@duro-app/tokens': 5.45.0(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))
+      '@duro-app/tokens': 6.3.0(react-strict-dom@0.0.55(postcss@8.5.28)(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4))
       '@tanstack/react-virtual': 3.14.26(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       qrcode: 1.5.4
       react: 19.2.4
