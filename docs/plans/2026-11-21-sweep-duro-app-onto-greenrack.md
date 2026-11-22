@@ -266,7 +266,7 @@ install`. `git ls-files .claude/hooks` lists only `aval-heads.sh`,
   - Commit `feat!: move onto greenrack 7`. The PR body carries
     `Mockup: none — design-system rename and version move, no screen
 designed`. Merge with a merge commit so commits 1–3 stay bisectable.
-- [ ] Phase 4: release v1.65.0 after the merge.
+- [x] Phase 4: release v1.65.0 after the merge.
   - `git log --oneline v1.64.0..origin/main` lists only the chart bump and
     the sweep; no migration in `app/lib/db/migrations` changed.
   - `pnpm audit --prod` and `scripts/mcp`'s `npm audit --omit=dev` before
@@ -320,7 +320,9 @@ designed`. Merge with a merge commit so commits 1–3 stay bisectable.
 - Released: tag v1.65.0 on 04ec4e3 (the sweep, #183, and the minimatch override, #184). Release run success. ghcr `duro-app:1.65.0`, config digest `sha256:e2df388200ce0bfb0c895a4c1d88dd79064a543d89efeb36896773961082e204`. charts#539 merged; zot serves chart 1.65.0.
 - Live: homelab #1273 merged (`7c3a39d`) after 34 checks read green. Flux reconciled; HelmRelease 1.65.0, `history[0]` 1.65.0 deployed, Ready. Both deployments run `duro-app:1.65.0`.
 - Observed: 31 min after rollout, 0 restarts and 0 ERROR lines (duro, duro-worker). `/health` 200 on home and join, with the client certificate. The person opened `https://home.daddyshome.fr/` in a browser and it loads.
-- Not verified, so Phase 4 stays open: (a) the served JS/CSS scan for `@duro-app` and `--duro-`. The public root of home is the Authelia login page, and the app's assets are behind a session, so it needs a signed-in check; (b) an invite page rendering: it needs a live invite token; (c) the 1.64.0 ERROR-line baseline, which the plan requires before the merge. Recovered from the centralized Loki on the monitor cluster for 01:26–01:56 UTC (the 30 minutes before homelab #1273 merged at 01:56 UTC): duro-app (the 1.64.0 web pod) logged 240 lines and none matched `ERROR` (case-insensitive). duro-worker has no lines in that window because Alloy scrapes only the web pod, so its baseline is not recoverable. After the rollout both deployments logged 0 ERROR lines.
+- Checks closed (person accepted the one gap, 2026-11-22): served assets on home (21 files) and join (29 files) hold no `@duro-app` and no `--duro-`, all 200, checked from the person's signed-in session and with the client certificate; the invite page renders the invite flow (invited address and group, certificate download, Continue to Create Account), 200, no error text.
+- Accepted gap: duro-worker's 1.64.0 ERROR baseline. Alloy scrapes only the web pod, so the worker's pre-merge logs were never stored and cannot be recovered. duro-app's baseline: 240 lines in 01:26–01:56 UTC, none `ERROR`. Post-rollout worker and app logs: 0 ERROR lines.
+- Audit before the tag: `pnpm audit --json` showed one moderate (GHSA-chp3, waived to 2026-12-19) after the minimatch override; amont's audit-js gate passed on the tagged commit.
 - Scope note: the release contains #184 (minimatch override), which the plan's Picture ("nothing else in it") and Phase 4 (only the chart bump and the sweep) do not allow. Decision log records why.
 
 ## Decision log
