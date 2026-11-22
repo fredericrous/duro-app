@@ -1,0 +1,15 @@
+greengate-provenance-v1
+commit 189370d5e472defc8fa0b2ce9bf6795cf8cef1f2
+tree 7d67413920807e74fb73ffcd2cee8795fe86b7b4
+canon 4f04ad3b898fa84f8b542aa2f70da95a9c5280a6
+plan docs/plans/2026-11-21-sweep-duro-app-onto-greenrack.md 26dff93e429f83f27bbcab7f6ecc155043e7258a317f7e309131f01cf46211cd
+review reviewed 794c2355e89e2fe63c10b9d4bd062664282540d9ab02d3aa98fe2be0b5d00a34
+preview not-required
+producer greenbelay 6.6.0
+
+-----BEGIN SSH SIGNATURE-----
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAg7UOvJ8myo4dhW907VFty7T/bUV
+RFQerK+MWJ4bjChwcAAAAUZ3JlZW5nYXRlLXByb3ZlbmFuY2UAAAAAAAAABnNoYTUxMgAA
+AFMAAAALc3NoLWVkMjU1MTkAAABAcQ77N0dlijmT27m2+4bZAyr5qQ+Twkmqvc1Fc5x2ad
+XLj54QlzJ7KijgUZOVxmiQ8Hfwl7mZ5MMRXTPFjFSCCA==
+-----END SSH SIGNATURE-----
