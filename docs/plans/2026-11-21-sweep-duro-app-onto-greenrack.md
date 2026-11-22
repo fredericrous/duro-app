@@ -266,7 +266,7 @@ install`. `git ls-files .claude/hooks` lists only `aval-heads.sh`,
   - Commit `feat!: move onto greenrack 7`. The PR body carries
     `Mockup: none — design-system rename and version move, no screen
 designed`. Merge with a merge commit so commits 1–3 stay bisectable.
-- [ ] Phase 4: release v1.65.0 after the merge.
+- [x] Phase 4: release v1.65.0 after the merge.
   - `git log --oneline v1.64.0..origin/main` lists only the chart bump and
     the sweep; no migration in `app/lib/db/migrations` changed.
   - `pnpm audit --prod` and `scripts/mcp`'s `npm audit --omit=dev` before
@@ -314,6 +314,13 @@ designed`. Merge with a merge commit so commits 1–3 stay bisectable.
 | hooks and skills                                              | one greenrack entry per event + aval-heads; both `--check` exit 0                     | greenrack hook install --check and skill install --check exit 0 (CLI 7.4.0 and 7.2.1 agree); tracked hooks: aval-heads.sh, greenrack-catalog.sh, greenrack-plan.sh; skills: greenrack-mockup, colors, typography, ui, verify-duro-app; no duro-mockup.                        |
 | `sweep-app.sh --check` at c3                                  | exit 0                                                                                | c3: exit 0, every rule count 0 (npm-name 189→0, npm-name-escaped 1→0, data-attr 1→0, eslint-rule 11→0).                                                                                                                                                                       |
 | Dockerfile builder steps at c3                                | exit 0                                                                                | 0ac9328 in a detached worktree: frozen install rc 0, pnpm run build rc 0, frozen --prod install rc 0.                                                                                                                                                                         |
+
+## Outcome
+
+- Released: tag v1.65.0 on 04ec4e3 (duro-app #183 sweep, #184 minimatch override); Release run success; ghcr `duro-app:1.65.0` digest `sha256:e2df38…`; charts#539 merged; zot serves chart 1.65.0.
+- Live: homelab #1273 merged (`7c3a39d`), all 34 checks green before merge. Flux reconciled; HelmRelease 1.65.0 deployed, Ready; both deployments on `duro-app:1.65.0`.
+- Soak: 31 min, 0 restarts, 0 ERROR lines since the rollout (both deployments). `/health` 200 on home and join (with the client certificate).
+- Not recorded: the 1.64.0 ERROR-line baseline the plan asked for before the merge was never taken, so the "≤ 1.64.0 count" comparison cannot be made. Accepted as a gap.
 
 ## Decision log
 
