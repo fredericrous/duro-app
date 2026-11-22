@@ -266,7 +266,7 @@ install`. `git ls-files .claude/hooks` lists only `aval-heads.sh`,
   - Commit `feat!: move onto greenrack 7`. The PR body carries
     `Mockup: none — design-system rename and version move, no screen
 designed`. Merge with a merge commit so commits 1–3 stay bisectable.
-- [x] Phase 4: release v1.65.0 after the merge.
+- [ ] Phase 4: release v1.65.0 after the merge.
   - `git log --oneline v1.64.0..origin/main` lists only the chart bump and
     the sweep; no migration in `app/lib/db/migrations` changed.
   - `pnpm audit --prod` and `scripts/mcp`'s `npm audit --omit=dev` before
@@ -317,12 +317,14 @@ designed`. Merge with a merge commit so commits 1–3 stay bisectable.
 
 ## Outcome
 
-- Released: tag v1.65.0 on 04ec4e3 (duro-app #183 sweep, #184 minimatch override); Release run success; ghcr `duro-app:1.65.0` digest `sha256:e2df38…`; charts#539 merged; zot serves chart 1.65.0.
-- Live: homelab #1273 merged (`7c3a39d`), all 34 checks green before merge. Flux reconciled; HelmRelease 1.65.0 deployed, Ready; both deployments on `duro-app:1.65.0`.
-- Soak: 31 min, 0 restarts, 0 ERROR lines since the rollout (both deployments). `/health` 200 on home and join (with the client certificate).
-- Not recorded: the 1.64.0 ERROR-line baseline the plan asked for before the merge was never taken, so the "≤ 1.64.0 count" comparison cannot be made. Accepted as a gap.
+- Released: tag v1.65.0 on 04ec4e3 (the sweep, #183, and the minimatch override, #184). Release run success. ghcr `duro-app:1.65.0`, config digest `sha256:e2df388200ce0bfb0c895a4c1d88dd79064a543d89efeb36896773961082e204`. charts#539 merged; zot serves chart 1.65.0.
+- Live: homelab #1273 merged (`7c3a39d`) after 34 checks read green. Flux reconciled; HelmRelease 1.65.0, `history[0]` 1.65.0 deployed, Ready. Both deployments run `duro-app:1.65.0`.
+- Observed: 31 min after rollout, 0 restarts and 0 ERROR lines (duro, duro-worker). `/health` 200 on home and join, with the client certificate. The person opened `https://home.daddyshome.fr/` in a browser and it loads.
+- Not verified, so Phase 4 stays open: (a) the served JS/CSS scan for `@duro-app` and `--duro-`. The public root of home is the Authelia login page, and the app's assets are behind a session, so it needs a signed-in check; (b) an invite page rendering: it needs a live invite token; (c) the 1.64.0 ERROR-line baseline the plan requires before the merge was never taken, so the "≤ 1.64.0" comparison cannot be made.
+- Scope note: the release contains #184 (minimatch override), which the plan's Picture ("nothing else in it") and Phase 4 (only the chart bump and the sweep) do not allow. Decision log records why.
 
 ## Decision log
+- 2026-11-22 — v1.65.0 carries #184 (minimatch override, dev-chain GHSA-g3hv): amont's audit-js gate blocks a v* tag on it, and the release needed the gate to pass. It is outside the plan's "nothing else in it"; accepted by the person before the tag.
 
 - 2026-11-21 — Target 7.2.1, not the Handoff's 7.1.2: f99 names no blocker
   for 7.2.x, and a sweep targets the current release.
