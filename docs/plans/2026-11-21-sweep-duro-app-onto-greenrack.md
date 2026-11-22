@@ -315,7 +315,16 @@ designed`. Merge with a merge commit so commits 1–3 stay bisectable.
 | `sweep-app.sh --check` at c3                                  | exit 0                                                                                | c3: exit 0, every rule count 0 (npm-name 189→0, npm-name-escaped 1→0, data-attr 1→0, eslint-rule 11→0).                                                                                                                                                                       |
 | Dockerfile builder steps at c3                                | exit 0                                                                                | 0ac9328 in a detached worktree: frozen install rc 0, pnpm run build rc 0, frozen --prod install rc 0.                                                                                                                                                                         |
 
+## Outcome
+
+- Released: tag v1.65.0 on 04ec4e3 (the sweep, #183, and the minimatch override, #184). Release run success. ghcr `duro-app:1.65.0`, config digest `sha256:e2df388200ce0bfb0c895a4c1d88dd79064a543d89efeb36896773961082e204`. charts#539 merged; zot serves chart 1.65.0.
+- Live: homelab #1273 merged (`7c3a39d`) after 34 checks read green. Flux reconciled; HelmRelease 1.65.0, `history[0]` 1.65.0 deployed, Ready. Both deployments run `duro-app:1.65.0`.
+- Observed: 31 min after rollout, 0 restarts and 0 ERROR lines (duro, duro-worker). `/health` 200 on home and join, with the client certificate. The person opened `https://home.daddyshome.fr/` in a browser and it loads.
+- Not verified, so Phase 4 stays open: (a) the served JS/CSS scan for `@duro-app` and `--duro-`. The public root of home is the Authelia login page, and the app's assets are behind a session, so it needs a signed-in check; (b) an invite page rendering: it needs a live invite token; (c) the 1.64.0 ERROR-line baseline the plan requires before the merge was never taken, so the "≤ 1.64.0" comparison cannot be made.
+- Scope note: the release contains #184 (minimatch override), which the plan's Picture ("nothing else in it") and Phase 4 (only the chart bump and the sweep) do not allow. Decision log records why.
+
 ## Decision log
+- 2026-11-22 — v1.65.0 carries #184 (minimatch override, dev-chain GHSA-g3hv): amont's audit-js gate blocks a v* tag on it, and the release needed the gate to pass. It is outside the plan's "nothing else in it"; accepted by the person before the tag.
 
 - 2026-11-21 — Target 7.2.1, not the Handoff's 7.1.2: f99 names no blocker
   for 7.2.x, and a sweep targets the current release.
