@@ -11,7 +11,7 @@ Not restated here. They are vendored from the fleet corpus and the session
 hook prints the current ones; ask for any of them by name:
 
 ```console
-$ aval resolve ui.design-system --scope duro-stack
+$ aval resolve ui.design-system --scope greenrack-stack
 $ aval heads
 ```
 
