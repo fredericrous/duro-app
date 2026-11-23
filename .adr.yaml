@@ -22,4 +22,4 @@ areas:
 
 # The fleet stack scopes this repository is in (decisions ADR-0046):
 # aval answers resolve/relevant at them by default.
-in_scopes: [effect-stack, duro-stack]
+in_scopes: [effect-stack, greenrack-stack]
