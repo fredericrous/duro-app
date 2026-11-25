@@ -92,13 +92,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  await requireAdminAction(request)
+  const auth = await requireAdminAction(request)
 
   const formData = await request.formData()
   const parsed = parseAdminUsersMutation(formData as any)
   if ("error" in parsed) return parsed
 
-  return await runEffect(handleAdminUsersMutation(parsed))
+  return await runEffect(handleAdminUsersMutation(parsed, auth.user ?? auth.sub ?? "admin"))
 }
 
 const styles = css.create({

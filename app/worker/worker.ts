@@ -27,6 +27,9 @@ import { LldapClientLive } from "~/lib/services/LldapClient.server"
 import { OperatorClientLive } from "~/lib/services/OperatorClient.server"
 import { AppSyncServiceLive } from "~/lib/governance/AppSyncService.server"
 import { makeAppAutoSync } from "~/lib/governance/appAutoSync.server"
+import { CertificateRepoLive } from "~/lib/services/CertificateRepo.server"
+import { VaultCertManagerLive, VaultPkiLive } from "~/lib/services/VaultPki.server"
+import { sweepRevocations } from "~/lib/services/CertificateSweeper.server"
 import { config } from "~/lib/config.server"
 import { FetchHttpClient } from "@effect/platform"
 import { OtelLayer } from "~/lib/telemetry.server"
@@ -54,7 +57,13 @@ const AppSyncWired = AppSyncServiceLive.pipe(
   Layer.provide(Layer.mergeAll(OperatorClientLive, GovernanceRepos, ApplicationRepoLive, PluginRegistryLive)),
 )
 
+// Vault credentials (NAS_VAULT_ADDR / NAS_VAULT_TOKEN) come from the same chart
+// env and envFrom as the web pods.
+const CertManagerWired = VaultCertManagerLive.pipe(Layer.provide(VaultPkiLive))
+
 const WorkerLayer = Layer.mergeAll(
+  CertificateRepoLive,
+  CertManagerWired,
   GovernanceRepos,
   ApplicationRepoLive,
   AuditServiceLive,
@@ -169,6 +178,23 @@ const appSyncLoop = config.operatorApiUrl
   : Effect.log("worker: OPERATOR_API_URL unset, app auto-sync off")
 
 // ---------------------------------------------------------------------------
+// Revocation sweeper — retries cert revocations left pending or failed, on its
+// own fiber so a slow Vault never delays provisioning.
+// ---------------------------------------------------------------------------
+
+const REVOCATION_SWEEP_EVERY = "10 minutes"
+
+const revocationSweepLoop = sweepRevocations.pipe(
+  Effect.tap((attempted) => (attempted > 0 ? Effect.log("worker: revocation sweep", { attempted }) : Effect.void)),
+  Effect.tapErrorCause((cause) =>
+    Effect.logError("worker: revocation sweep failed").pipe(Effect.annotateLogs({ cause: String(cause) })),
+  ),
+  Effect.catchAll(() => Effect.void), // logged by the tapErrorCause above; the next tick retries
+  Effect.repeat(Schedule.spaced(REVOCATION_SWEEP_EVERY)),
+  Effect.asVoid,
+)
+
+// ---------------------------------------------------------------------------
 // Health server (for k8s liveness/readiness probes)
 // ---------------------------------------------------------------------------
 
@@ -224,6 +250,7 @@ const main = Effect.gen(function* () {
   // The sync loop never fails (each tick recovers), so the poll loop alone
   // decides whether the worker lives: its crash still exits the process.
   yield* Effect.forkScoped(appSyncLoop)
+  yield* Effect.forkScoped(revocationSweepLoop)
   yield* pollLoop
 }).pipe(Effect.scoped)
 

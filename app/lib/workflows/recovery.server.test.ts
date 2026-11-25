@@ -5,6 +5,7 @@ import { truncateAll, testRunEffect } from "~/test/test-runtime"
 import { requestRecovery, approveRecovery, denyRecovery } from "./recovery.server"
 import { RecoveryRepo } from "~/lib/services/RecoveryRepo.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
+import { CertManager, CertManagerDev } from "~/lib/services/CertManager.server"
 import { DiscordNotifier } from "~/lib/services/DiscordNotifier.server"
 
 beforeEach(async () => {
@@ -120,6 +121,48 @@ describe("approveRecovery / denyRecovery", () => {
     const req = await seedRequest()
     const result = await run(approveRecovery(req.id, "admin", true))
     expect(result.revokedCount).toBe(1) // the lost cert (the fresh one is issued after)
+  })
+
+  it("approve with revokeOthers revokes each serial in Vault and completes both rows", async () => {
+    await run(
+      Effect.gen(function* () {
+        const certRepo = yield* CertificateRepo
+        for (const serialNumber of ["LOST-1", "LOST-2"]) {
+          yield* certRepo.store({
+            username: "bob",
+            email: "bob@example.com",
+            serialNumber,
+            issuedAt: new Date(),
+            expiresAt: new Date(Date.now() + 1_000_000_000),
+          })
+        }
+      }),
+    )
+    const req = await seedRequest()
+    const vaultRevokes: string[] = []
+    await run(
+      approveRecovery(req.id, "admin", true).pipe(
+        Effect.provideServiceEffect(
+          CertManager,
+          Effect.map(CertManager, (real) => ({
+            ...real,
+            revokeCert: (serial: string) => Effect.sync(() => void vaultRevokes.push(serial)),
+          })),
+        ),
+        Effect.provide(CertManagerDev),
+      ),
+    )
+    expect(vaultRevokes.sort()).toEqual(["LOST-1", "LOST-2"])
+    const rows = await run(
+      Effect.gen(function* () {
+        const certRepo = yield* CertificateRepo
+        return yield* Effect.all([certRepo.findBySerial("LOST-1"), certRepo.findBySerial("LOST-2")])
+      }),
+    )
+    for (const row of rows) {
+      expect(row?.revokeState).toBe("completed")
+      expect(row?.revokedAt).not.toBeNull()
+    }
   })
 
   it("deny marks the request denied (no cert issued)", async () => {

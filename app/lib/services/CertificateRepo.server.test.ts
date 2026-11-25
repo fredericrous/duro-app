@@ -2,6 +2,7 @@
 import { describe, expect } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
+import * as SqlClient from "@effect/sql/SqlClient"
 import { makeTestDbLayer } from "~/lib/db/client.server"
 import { CertificateRepo, CertificateRepoLive, type StoreCertInput } from "./CertificateRepo.server"
 
@@ -182,6 +183,21 @@ describe("CertificateRepo — revokeAllForUser", () => {
 
         const v1 = yield* repo.findBySerial("SN-V1")
         expect(v1?.revokeState).toBe("pending")
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("leaves already-expired unrevoked rows untouched", (it) => {
+    it.effect("expired row is not marked pending", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        yield* repo.store(sample({ serialNumber: "SN-X1", username: "carol", expiresAt: inDays(-3) }))
+        yield* repo.store(sample({ serialNumber: "SN-X2", username: "carol", expiresAt: inDays(30) }))
+
+        yield* repo.revokeAllForUser("carol")
+
+        expect((yield* repo.findBySerial("SN-X1"))?.revokeState).toBeNull()
+        expect((yield* repo.findBySerial("SN-X2"))?.revokeState).toBe("pending")
       }),
     )
   })
@@ -395,6 +411,27 @@ describe("CertificateRepo — findBySerialCanonical", () => {
         const repo = yield* CertificateRepo
         const found = yield* repo.findBySerialCanonical("deadbeef")
         expect(found).toBeNull()
+      }),
+    )
+  })
+})
+
+describe("CertificateRepo — revoke retry bookkeeping", () => {
+  it.layer(TestLayer)("markRevokeFailed counts attempts and pushes revoke_next_at out", (it) => {
+    it.effect("backoff", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        const sql = yield* SqlClient.SqlClient
+        yield* repo.store(sample({ serialNumber: "SN-B", username: "dave" }))
+
+        yield* repo.markRevokeFailed("SN-B", "vault 503")
+        yield* repo.markRevokeFailed("SN-B", "vault 503")
+
+        const [row] = yield* sql<{ revokeAttempts: number; inFuture: boolean }>`
+          SELECT revoke_attempts, revoke_next_at > NOW() AS in_future FROM user_certificates WHERE serial_number = 'SN-B'`
+        expect(Number(row.revokeAttempts)).toBe(2)
+        expect(row.inFuture).toBe(true)
+        expect((yield* repo.listDueRevocations(10)).map((c) => c.serialNumber)).not.toContain("SN-B")
       }),
     )
   })

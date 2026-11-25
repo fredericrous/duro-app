@@ -1,6 +1,5 @@
 import { Effect } from "effect"
 import { errorMessage } from "~/lib/error-message"
-import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { revokeUser, resendCert } from "~/lib/workflows/invite.server"
@@ -29,7 +28,10 @@ export type AdminUsersResult =
 // Dispatcher
 // ---------------------------------------------------------------------------
 
-export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
+const revokeAdminSerial = (serial: string, username: string | undefined, actorId: string) =>
+  revokeSerialForUser(serial, { auditUsername: username, actorId, path: "admin" })
+
+export function handleAdminUsersMutation(mutation: AdminUsersMutation, actorId: string) {
   return Effect.gen(function* () {
     switch (mutation.intent) {
       case "revokeUser": {
@@ -43,32 +45,30 @@ export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
       }
 
       case "revokeCert": {
-        const cert = yield* CertManager
         const certRepo = yield* CertificateRepo
+        const existing = yield* certRepo.findBySerial(mutation.serialNumber)
         const affected = yield* certRepo.markRevokePending(mutation.serialNumber)
         if (affected === 0) {
           return { error: "Certificate not found or already revoked" }
         }
-        yield* cert.revokeCert(mutation.serialNumber).pipe(
-          Effect.tap(() => certRepo.markRevokeCompleted(mutation.serialNumber)),
-          Effect.tapError((e) =>
-            certRepo.markRevokeFailed(mutation.serialNumber, String(e)).pipe(
-              Effect.catchAll((markError) =>
-                Effect.logWarning("cert revocation: marking failed failed", {
-                  serial: mutation.serialNumber,
-                  error: String(markError),
-                }),
-              ),
-            ),
-          ),
-        )
+        yield* revokeSerialForUser(mutation.serialNumber, {
+          auditUsername: existing?.username,
+          actorId,
+          path: "admin",
+        })
+        const after = yield* certRepo.findBySerial(mutation.serialNumber)
+        if (after?.revokeState === "failed") {
+          return { error: `Revocation failed (${after.revokeError ?? "unknown error"}); it will be retried` }
+        }
         return { certRevoked: true as const, serialNumber: mutation.serialNumber }
       }
 
       case "revokeAllCerts": {
         const certRepo = yield* CertificateRepo
         const serials = yield* certRepo.revokeAllForUser(mutation.username)
-        yield* Effect.forEach(serials, (serial) => revokeSerialForUser(serial), { concurrency: 4 })
+        yield* Effect.forEach(serials, (serial) => revokeAdminSerial(serial, mutation.username, actorId), {
+          concurrency: 4,
+        })
         return { certsRevoked: true as const, count: serials.length }
       }
 
@@ -97,7 +97,8 @@ export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
               if (affected === 0) return false
               // Continue on failure (was Effect.tapError, which aborted the whole
               // batch on the first bad serial and reported total failure).
-              yield* revokeSerialForUser(serial)
+              const existing = yield* certRepo.findBySerial(serial)
+              yield* revokeAdminSerial(serial, existing?.username, actorId)
               return true
             }),
           { concurrency: 4 },
@@ -110,7 +111,9 @@ export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
         const counts = yield* Effect.forEach(mutation.usernames, (username) =>
           Effect.gen(function* () {
             const serials = yield* certRepo.revokeAllForUser(username)
-            yield* Effect.forEach(serials, (serial) => revokeSerialForUser(serial), { concurrency: 4 })
+            yield* Effect.forEach(serials, (serial) => revokeAdminSerial(serial, username, actorId), {
+              concurrency: 4,
+            })
             return serials.length
           }),
         )

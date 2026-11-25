@@ -229,6 +229,7 @@ const mockCertificateRepo = () =>
     store: () => Effect.void,
     setLabel: () => Effect.succeed(1),
     setClaimedPlatform: () => Effect.void,
+    listDueRevocations: () => Effect.succeed([]),
     listValid: () => Effect.succeed([]),
     listUnrevoked: () => Effect.succeed([]),
     listRecentNewDevices: () => Effect.succeed([]),

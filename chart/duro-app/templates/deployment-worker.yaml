@@ -64,6 +64,8 @@ spec:
             - name: health
               containerPort: {{ .Values.worker.port }}
               protocol: TCP
+          # The revocation sweeper revokes in NAS Vault: NAS_VAULT_ADDR arrives with
+          # .Values.env and NAS_VAULT_TOKEN through envFrom, exactly as for the web pods.
           env:
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}

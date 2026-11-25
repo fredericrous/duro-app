@@ -275,13 +275,13 @@ describe("handleAdminUsersMutation", () => {
     )
 
     const mutation: AdminUsersMutation = { intent: "revokeCert", serialNumber: "sn-1" }
-    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(layer)))
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation, "admin").pipe(Effect.provide(layer)))
     expect(result).toEqual({ certRevoked: true, serialNumber: "sn-1" })
   })
 
   it("revokeCert returns error for non-existent serial", async () => {
     const mutation: AdminUsersMutation = { intent: "revokeCert", serialNumber: "nonexistent" }
-    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(TestLayer)))
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation, "admin").pipe(Effect.provide(TestLayer)))
     expect(result).toEqual({ error: "Certificate not found or already revoked" })
   })
 
@@ -298,7 +298,7 @@ describe("handleAdminUsersMutation", () => {
     })
 
     const mutation: AdminUsersMutation = { intent: "reinviteRevoked", revocationId: "rev-1" }
-    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(TestLayer)))
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation, "admin").pipe(Effect.provide(TestLayer)))
     expect(result).toMatchObject({ success: true, reinviteEmail: "bob@example.com" })
     expect(revocations).toHaveLength(0)
   })
@@ -307,7 +307,7 @@ describe("handleAdminUsersMutation", () => {
     revocations.length = 0
 
     const mutation: AdminUsersMutation = { intent: "reinviteRevoked", revocationId: "doesnt-exist" }
-    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(TestLayer)))
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation, "admin").pipe(Effect.provide(TestLayer)))
     expect(result).toEqual({ error: "Revocation not found" })
   })
 
@@ -358,7 +358,7 @@ describe("handleAdminUsersMutation", () => {
     )
 
     const mutation: AdminUsersMutation = { intent: "revokeCertsBatch", serialNumbers: ["sn-1", "sn-2"] }
-    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(layer)))
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation, "admin").pipe(Effect.provide(layer)))
     expect(result).toEqual({ certsRevoked: true, count: 2 })
   })
 
@@ -409,7 +409,7 @@ describe("handleAdminUsersMutation", () => {
     )
 
     const mutation: AdminUsersMutation = { intent: "revokeCertsBatch", serialNumbers: ["sn-1", "sn-2"] }
-    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(layer)))
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation, "admin").pipe(Effect.provide(layer)))
     expect(result).toEqual({ certsRevoked: true, count: 1 })
   })
 
@@ -460,7 +460,7 @@ describe("handleAdminUsersMutation", () => {
     )
 
     const mutation: AdminUsersMutation = { intent: "revokeAllCertsBatch", usernames: ["alice", "bob"] }
-    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(layer)))
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation, "admin").pipe(Effect.provide(layer)))
     expect(result).toEqual({ certsRevoked: true, count: 2 })
   })
 
@@ -472,7 +472,7 @@ describe("handleAdminUsersMutation", () => {
   it("reinviteRevoked returns error when the revocation id is unknown", async () => {
     revocations.length = 0
     const mutation: AdminUsersMutation = { intent: "reinviteRevoked", revocationId: "no-such-rev" }
-    const result = await Effect.runPromise(handleAdminUsersMutation(mutation).pipe(Effect.provide(TestLayer)))
+    const result = await Effect.runPromise(handleAdminUsersMutation(mutation, "admin").pipe(Effect.provide(TestLayer)))
     expect(result).toEqual({ error: "Revocation not found" })
   })
 
@@ -522,7 +522,7 @@ describe("handleAdminUsersMutation", () => {
     )
 
     const result = await Effect.runPromise(
-      handleAdminUsersMutation({ intent: "revokeAllCerts", username: "alice" }).pipe(Effect.provide(layer)),
+      handleAdminUsersMutation({ intent: "revokeAllCerts", username: "alice" }, "admin").pipe(Effect.provide(layer)),
     )
     expect(result).toEqual({ certsRevoked: true, count: 2 })
     expect(certs.get("sn-a")?.revokeState).toBe("completed")
@@ -561,7 +561,7 @@ describe("handleAdminUsersMutation", () => {
     )
 
     const result = await Effect.runPromise(
-      handleAdminUsersMutation({ intent: "revokeCertsBatch", serialNumbers: ["sn-1", "sn-3"] }).pipe(
+      handleAdminUsersMutation({ intent: "revokeCertsBatch", serialNumbers: ["sn-1", "sn-3"] }, "admin").pipe(
         Effect.provide(layer),
       ),
     )
@@ -609,7 +609,7 @@ describe("handleAdminUsersMutation", () => {
     )
 
     const result = await Effect.runPromise(
-      handleAdminUsersMutation({ intent: "revokeCertsBatch", serialNumbers: ["sn-fail", "sn-good"] }).pipe(
+      handleAdminUsersMutation({ intent: "revokeCertsBatch", serialNumbers: ["sn-fail", "sn-good"] }, "admin").pipe(
         Effect.provide(layer),
       ),
     )
@@ -620,5 +620,75 @@ describe("handleAdminUsersMutation", () => {
     expect(certs.get("sn-good")?.revokeState).toBe("completed")
     expect(certs.get("sn-good")?.revokedAt).not.toBeNull()
     expect(certs.get("sn-fail")?.revokeState).toBe("failed")
+  })
+})
+
+describe("admin revoke mutations — audit", () => {
+  const mkCert = (sn: string, username = "alice"): UserCertificate => ({
+    id: sn,
+    inviteId: null,
+    userId: null,
+    username,
+    email: `${username}@x`,
+    label: null,
+    serialNumber: sn,
+    issuedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 86400000).toISOString(),
+    revokedAt: null,
+    revokeState: null,
+    revokeError: null,
+    renewedFromSerial: null,
+    claimedPlatform: null,
+  })
+
+  const runWithAudit = async (mutation: AdminUsersMutation, certs: Map<string, UserCertificate>) => {
+    const events: Array<{ eventType: string; actorId?: string; targetId?: string }> = []
+    const capturingAudit = Layer.succeed(AuditService, {
+      emit: (event: { eventType: string; actorId?: string; targetId?: string }) =>
+        Effect.sync(() => void events.push(event)),
+      query: () => Effect.succeed([]),
+    } as any)
+    const layer = Layer.mergeAll(
+      mockCertManager,
+      mockCertRepo(certs),
+      mockInviteRepo,
+      mockUserManager,
+      mockEmailService,
+      mockPreferencesRepo,
+      mockCertRevealRepo,
+      capturingAudit,
+    )
+    await Effect.runPromise(handleAdminUsersMutation(mutation, "root-admin").pipe(Effect.provide(layer)))
+    return events.filter((e) => e.eventType === "cert.revoked")
+  }
+
+  const seed = () =>
+    new Map<string, UserCertificate>([
+      ["sn-1", mkCert("sn-1")],
+      ["sn-2", mkCert("sn-2")],
+      ["sn-3", mkCert("sn-3", "bob")],
+    ])
+
+  it("revokeCert writes one cert.revoked naming the admin", async () => {
+    const events = await runWithAudit({ intent: "revokeCert", serialNumber: "sn-1" }, seed())
+    expect(events).toEqual([expect.objectContaining({ targetId: "sn-1", actorId: "root-admin" })])
+  })
+
+  it("revokeAllCerts writes one event per serial", async () => {
+    const events = await runWithAudit({ intent: "revokeAllCerts", username: "alice" }, seed())
+    expect(events.map((e) => e.targetId).sort()).toEqual(["sn-1", "sn-2"])
+    expect(events.every((e) => e.actorId === "root-admin")).toBe(true)
+  })
+
+  it("revokeCertsBatch writes one event per serial", async () => {
+    const events = await runWithAudit({ intent: "revokeCertsBatch", serialNumbers: ["sn-1", "sn-3"] }, seed())
+    expect(events.map((e) => e.targetId).sort()).toEqual(["sn-1", "sn-3"])
+    expect(events.every((e) => e.actorId === "root-admin")).toBe(true)
+  })
+
+  it("revokeAllCertsBatch writes one event per serial", async () => {
+    const events = await runWithAudit({ intent: "revokeAllCertsBatch", usernames: ["alice", "bob"] }, seed())
+    expect(events.map((e) => e.targetId).sort()).toEqual(["sn-1", "sn-2", "sn-3"])
+    expect(events.every((e) => e.actorId === "root-admin")).toBe(true)
   })
 })
