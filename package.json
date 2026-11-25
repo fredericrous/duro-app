@@ -19,9 +19,9 @@
     "prepare": "greengate init || true"
   },
   "dependencies": {
-    "@greenharness/greenrack-tokens": "^7.2.1",
-    "@greenharness/greenrack-ui": "^7.2.1",
-    "@greenharness/greenrack-ui-email": "^7.2.1",
+    "@greenharness/greenrack-tokens": "^7.11.0",
+    "@greenharness/greenrack-ui": "^7.11.0",
+    "@greenharness/greenrack-ui-email": "^7.11.0",
     "@effect/experimental": "^0.58.0",
     "@effect/opentelemetry": "^0.61.0",
     "@effect/platform": "^0.94.5",
