@@ -315,7 +315,7 @@ describe("/admin/invites page", () => {
     expect(send).toBeDisabled()
     expect(qr).toBeDisabled()
 
-    await userEvent.click(screen.getByRole("checkbox", { name: "family" }))
+    await userEvent.click(screen.getByRole("checkbox", { name: /family/ }))
     expect(send).toBeEnabled()
     expect(qr).toBeEnabled()
   })
@@ -325,7 +325,7 @@ describe("/admin/invites page", () => {
     // for the button; that used to leave both buttons dead with no explanation.
     renderPageWithAction()
     const send = await screen.findByRole("button", { name: t("admin.invites.submit") })
-    await userEvent.click(screen.getByRole("checkbox", { name: "family" }))
+    await userEvent.click(screen.getByRole("checkbox", { name: /family/ }))
     expect(send).toBeDisabled()
 
     await userEvent.type(screen.getByPlaceholderText(t("admin.invites.emailPlaceholder")), "alice@example.com")
@@ -339,7 +339,7 @@ describe("/admin/invites page", () => {
   it("does not submit the pending text twice once it becomes a tag", async () => {
     renderPageWithAction()
     await addEmail("alice@example.com")
-    await userEvent.click(screen.getByRole("checkbox", { name: "family" }))
+    await userEvent.click(screen.getByRole("checkbox", { name: /family/ }))
     await userEvent.click(screen.getByRole("button", { name: t("admin.invites.submit") }))
 
     await waitFor(() => expect(posted).toHaveLength(1))
@@ -350,7 +350,7 @@ describe("/admin/invites page", () => {
     renderPageWithAction()
     await addEmail("alice@example.com")
     await addEmail("bob@example.com")
-    await userEvent.click(screen.getByRole("checkbox", { name: "family" }))
+    await userEvent.click(screen.getByRole("checkbox", { name: /family/ }))
 
     expect(screen.getByRole("button", { name: t("admin.invites.submit") })).toBeEnabled()
     expect(screen.getByRole("button", { name: t("admin.invites.qr.button") })).toBeDisabled()
@@ -365,7 +365,7 @@ describe("/admin/invites page", () => {
       invite: { url: "https://join.example.com/invite/tok-1", email: "alice@example.com", expiresAt },
     })
     await addEmail("alice@example.com")
-    await userEvent.click(screen.getByRole("checkbox", { name: "family" }))
+    await userEvent.click(screen.getByRole("checkbox", { name: /family/ }))
     await userEvent.click(screen.getByRole("button", { name: t("admin.invites.qr.button") }))
 
     await waitFor(() => expect(posted).toHaveLength(1))
@@ -399,7 +399,7 @@ describe("/admin/invites page", () => {
       { hold: true },
     )
     await addEmail("alice@example.com")
-    await userEvent.click(screen.getByRole("checkbox", { name: "family" }))
+    await userEvent.click(screen.getByRole("checkbox", { name: /family/ }))
     await userEvent.click(screen.getByRole("button", { name: t("admin.invites.qr.button") }))
 
     // Before the server answers: the dialog is already up, saying it's working.
@@ -452,7 +452,7 @@ describe("/admin/invites page", () => {
   it("does not open the QR dialog for an ordinary emailed invite", async () => {
     renderPageWithAction({ success: true, message: "Invite sent to alice@example.com" })
     await addEmail("alice@example.com")
-    await userEvent.click(screen.getByRole("checkbox", { name: "family" }))
+    await userEvent.click(screen.getByRole("checkbox", { name: /family/ }))
     await userEvent.click(screen.getByRole("button", { name: t("admin.invites.submit") }))
 
     await waitFor(() => expect(posted).toHaveLength(1))
