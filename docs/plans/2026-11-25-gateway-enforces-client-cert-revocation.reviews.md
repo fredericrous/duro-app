@@ -1,0 +1,13 @@
+# Full reviews: Gateway enforces client-cert revocation
+
+- **backend** (opus): R1 rework — 3 blocking (adds=contract, phase order vs Vault policy, …), 2 high (no metrics source, Kyverno mechanism), 3 medium/low; 51k, 109 s. R2 approve-with-changes — high: broker copy unalerted (applied); medium: drop KV handoff (→ person), Files, Code review line, stale "debounce"/caption (carried); 75k, 52 s. Re-runs: approve-with-changes (Phase 3 split, applied; Files carried), then approve; 96k + 98k.
+- **lang:go** (opus): R1 a-w-c — blocking wrong Vault, high Go tests, high bootstrap apply step; 47k, 79 s. R2 a-w-c — blocking: broker needs grants on both Vaults (applied); 58k, 26 s.
+- **lang:typescript** (opus): R1 a-w-c — 3 high (worker trigger, worker layer/env, no metrics), 3 medium (@peculiar/x509, revoke_next_at, publisher tests); 48k, 58 s. R2 a-w-c — high: NULL revoke_next_at skips orphans (applied); medium: tick test (carried); 57k, 24 s.
+- **platform** (opus): R1 rework — blocking wrong Vault, high Phase 4 gate, medium rollback, low baseline; 38k, 79 s. R2 a-w-c — high grants (merged with go), medium Phase 5 all-CTP gate (carried), low duro-https exclusion no-op; 56k, 50 s.
+- **tui** (opus): R1 a-w-c — high runbook commands, 2 medium s_client/counter loop; 32k, 51 s. R2 a-w-c — 2 medium: rollback points at runbook fix 1, no-cert check must grep alert (carried); 41k, 23 s.
+- **unix** (opus): R1 a-w-c — 3 medium (s_client, vault -field, promtool on PrometheusRule); 30k, 43 s. R2 a-w-c — 2 medium: no-cert gate, explicit VAULT_ADDR (carried); 39k, 22 s.
+- **architect** (opus): a-w-c — 2 high (grants, broker failure unalerted; applied), medium contract home (carried); 49k, 44 s. Re-run approve, low: point broker alert runbook at CRL runbook (carried); 55k, 21 s.
+- **po** (opus): a-w-c — high rollback trigger (applied); medium phase-order heading, Contract section, iPhone precondition; low CTP count (carried); 37k, 37 s.
+- **codex** (gpt, high effort): rework — blocking: crl/rotate is GET/read; high: Phase 1 worker wiring, no worker Service, CRL config never applied on existing CA (all verified, applied); ~4 min.
+
+Carried into implementation (15): tick test not debounce; rollback → runbook fix 1; no-cert checks grep `alert certificate required`; VAULT_ADDR explicit for NAS reads; Phase 5 gate every `mtls-*` CTP Accepted + crl count; contract written in `nas-pki-and-mtls.md`; homelab Code review gains architect; picture caption names the broker; expired orphans excluded from backfill; Files lines (deployment-worker.yaml, service-worker.yaml); Phase 3 heading states order; iPhone reissue precondition wording; broker-alert runbook step; duro-https exclusion is a no-op in the main policy.
