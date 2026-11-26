@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach } from "vitest"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
-import { parseSettingsMutation, handleSettingsMutation } from "./settings"
+import { emailOnlyWhileRevoked, parseSettingsMutation, handleSettingsMutation } from "./settings"
 import { CertificateRepo, type UserCertificate } from "~/lib/services/CertificateRepo.server"
 import type { AuthInfo } from "~/lib/auth.server"
 import { truncateAll, testRunEffect } from "~/test/test-runtime"
@@ -51,7 +51,9 @@ describe("parseSettingsMutation", () => {
   it("parses showClaimLink (no fields — the server finds the waiting setup)", () => {
     const fd = new FormData()
     fd.append("intent", "showClaimLink")
-    expect(parseSettingsMutation(fd, auth)).toEqual({ intent: "showClaimLink", auth })
+    expect(parseSettingsMutation(fd, auth)).toEqual({ intent: "showClaimLink", delivery: "link", auth })
+    fd.append("delivery", "email")
+    expect(parseSettingsMutation(fd, auth)).toEqual({ intent: "showClaimLink", delivery: "email", auth })
   })
 
   it("parses revokeCert with serialNumber", () => {
@@ -302,6 +304,78 @@ describe("handleSettingsMutation — renewCert", () => {
         >,
       ),
     ).toMatchObject({ certLinkReady: true })
+  })
+
+  describe("a device presenting its revoked certificate: links by email only", () => {
+    const run = (m: Parameters<typeof handleSettingsMutation>[0]) =>
+      testRunEffect(handleSettingsMutation(m) as Effect.Effect<unknown, unknown, never>)
+
+    it("turns link delivery into email for issuing and for showing the link again", () => {
+      expect(emailOnlyWhileRevoked({ intent: "issueCert", delivery: "link", auth })).toEqual({
+        intent: "issueCert",
+        delivery: "email",
+        auth,
+      })
+      expect(emailOnlyWhileRevoked({ intent: "showClaimLink", delivery: "link", auth })).toEqual({
+        intent: "showClaimLink",
+        delivery: "email",
+        auth,
+      })
+      const rename = { intent: "renameCert" as const, serialNumber: "SN", label: "x", auth }
+      expect(emailOnlyWhileRevoked(rename)).toBe(rename)
+    })
+
+    it("issues by email: the answer carries no link", async () => {
+      const issued = await run(emailOnlyWhileRevoked({ intent: "issueCert", delivery: "link", auth }))
+      expect(issued).toEqual({ certSent: true })
+    })
+
+    it("re-sends a waiting setup by email: the answer carries no link", async () => {
+      expect(await run({ intent: "issueCert", delivery: "link", auth })).toMatchObject({ certLinkReady: true })
+      await ageRevealRows()
+      const shown = await run(emailOnlyWhileRevoked({ intent: "showClaimLink", delivery: "link", auth }))
+      expect(shown).toEqual({ certSent: true })
+    })
+
+    /** The link was minted a while ago: past the one-a-minute resend interval. */
+    const ageRevealRows = () =>
+      testRunEffect(
+        Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          yield* sql`UPDATE cert_reveal_tokens SET created_at = now() - interval '5 minutes'`
+        }) as Effect.Effect<void, never, never>,
+      )
+
+    it("mints and mails no other link within a minute: a repeat is told to wait, never that it was sent", async () => {
+      await run({ intent: "issueCert", delivery: "link", auth })
+      const tooSoon = await run({ intent: "showClaimLink", delivery: "email", auth })
+      expect(tooSoon).toMatchObject({ certError: expect.stringContaining("wait a minute") })
+      expect(tooSoon).not.toHaveProperty("certSent")
+      const count = () =>
+        testRunEffect(
+          Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient
+            const rows = yield* sql`SELECT count(*)::int AS n FROM cert_reveal_tokens`
+            return (rows[0] as { n: number }).n
+          }) as Effect.Effect<number, never, never>,
+        )
+      expect(await count()).toBe(1) // nothing was minted
+    })
+
+    it("checks the email address before it replaces the waiting link", async () => {
+      await run({ intent: "issueCert", delivery: "link", auth })
+      await ageRevealRows()
+      const noEmail = { ...auth, email: null }
+      const shown = await run({ intent: "showClaimLink", delivery: "email", auth: noEmail })
+      expect(shown).toMatchObject({ certError: expect.stringContaining("No email") })
+      const rows = await testRunEffect(
+        Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          return yield* sql`SELECT count(*)::int AS n FROM cert_reveal_tokens`
+        }) as Effect.Effect<ReadonlyArray<{ n: number }>, never, never>,
+      )
+      expect(rows[0]!.n).toBe(1) // the waiting link was not replaced
+    })
   })
 
   it("issueCert with link delivery returns the claim link instead of emailing", async () => {

@@ -12,6 +12,9 @@ import { isIssuedBy } from "~/lib/client-cert.server"
  * certificate must be proven to come from `pki-client` before its serial is
  * looked up. The check is cryptographic (`isIssuedBy`), never a name match.
  */
+/** What the client CA says about a certificate: `unknown` is "no CA to ask". */
+export type ClientCaVerdict = "issued" | "not-issued" | "unknown"
+
 export class ClientCaTrust extends Context.Tag("ClientCaTrust")<
   ClientCaTrust,
   {
@@ -22,11 +25,30 @@ export class ClientCaTrust extends Context.Tag("ClientCaTrust")<
      * OIDC login), which is the safe direction.
      */
     readonly isIssuedByClientCa: (certPem: string) => Effect.Effect<boolean>
+    /**
+     * The same check with the third answer kept apart: `unknown` means no CA
+     * could be obtained (Vault unreachable and nothing cached), which is NOT
+     * the same as another CA having signed it. A caller that must fail closed
+     * (a revoked device's confinement) needs the difference.
+     */
+    readonly clientCaVerdict: (certPem: string) => Effect.Effect<ClientCaVerdict>
   }
 >() {}
 
+/**
+ * Both checks from one verdict: for a stub or a Dev layer that has a single
+ * answer, so the two methods cannot disagree.
+ */
+export const clientCaTrustOf = (verdict: (certPem: string) => Effect.Effect<ClientCaVerdict>) => ({
+  clientCaVerdict: verdict,
+  isIssuedByClientCa: (certPem: string) => verdict(certPem).pipe(Effect.map((answer) => answer === "issued")),
+})
+
 /** How long a fetched CA is used before it is fetched again. */
 const CA_TTL = Duration.hours(1)
+
+/** How long one fetch of the CA from Vault may take. */
+export const CA_FETCH_TIMEOUT = Duration.seconds(5)
 
 /**
  * Reads the CA from NAS Vault's `pki-client/cert/ca`, an unauthenticated PKI
@@ -52,8 +74,21 @@ export const ClientCaTrustLive = Layer.effect(
         return yield* Effect.fail(new Error("pki-client/cert/ca returned no certificate"))
       }
       return pem
-    }).pipe(Effect.scoped)
+    }).pipe(
+      Effect.scoped,
+      // Bounded: a hung Vault must not hold a caller (or, for a caller that
+      // stopped waiting, a background refresh) forever. A timeout is a failed
+      // refresh: the last good CA keeps serving, and with none it fails closed.
+      Effect.timeoutFail({
+        duration: CA_FETCH_TIMEOUT,
+        onTimeout: () => new Error(`pki-client/cert/ca did not answer within ${Duration.format(CA_FETCH_TIMEOUT)}`),
+      }),
+    )
 
+    // Concurrent refreshes are not shared: each caller on a stale cache fetches
+    // (at most 5 s each). holds-until: one revoked device at a time reaches the
+    // presented-cert check, and invites are rare; past that, share the
+    // in-flight refresh (Effect.cachedWithTTL or a Deferred in the Ref).
     const currentCaPem: Effect.Effect<string | null> = Effect.gen(function* () {
       const cached = yield* Ref.get(cache)
       const now = yield* Clock.currentTimeMillis
@@ -69,9 +104,17 @@ export const ClientCaTrustLive = Layer.effect(
       )
     })
 
+    const clientCaVerdict = (certPem: string): Effect.Effect<ClientCaVerdict> =>
+      currentCaPem.pipe(
+        Effect.map(
+          (caPem): ClientCaVerdict =>
+            caPem === null ? "unknown" : isIssuedBy(certPem, caPem) ? "issued" : "not-issued",
+        ),
+      )
+
     return {
-      isIssuedByClientCa: (certPem) =>
-        currentCaPem.pipe(Effect.map((caPem) => (caPem === null ? false : isIssuedBy(certPem, caPem)))),
+      clientCaVerdict,
+      isIssuedByClientCa: (certPem) => clientCaVerdict(certPem).pipe(Effect.map((verdict) => verdict === "issued")),
     }
   }),
 )
@@ -81,6 +124,7 @@ export const ClientCaTrustLive = Layer.effect(
  * so every certificate is treated as client-CA issued — the same trust the
  * dev stack gives the rest of the cert flow.
  */
-export const ClientCaTrustDev = Layer.succeed(ClientCaTrust, {
-  isIssuedByClientCa: () => Effect.succeed(true),
-})
+export const ClientCaTrustDev = Layer.succeed(
+  ClientCaTrust,
+  clientCaTrustOf(() => Effect.succeed("issued")),
+)

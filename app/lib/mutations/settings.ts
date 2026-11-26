@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Clock, Effect } from "effect"
 import { errorMessage } from "~/lib/error-message"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
@@ -24,7 +24,7 @@ import type { AuthInfo } from "~/lib/auth.server"
 export type SettingsMutation =
   | { intent: "issueCert"; delivery: "email" | "link"; auth: AuthInfo }
   | { intent: "emailRevealLink"; revealToken: string; auth: AuthInfo }
-  | { intent: "showClaimLink"; auth: AuthInfo }
+  | { intent: "showClaimLink"; delivery: "email" | "link"; auth: AuthInfo }
   | { intent: "renewCert"; serialNumber: string; auth: AuthInfo }
   | { intent: "revokeCert"; serialNumber: string; auth: AuthInfo }
   | { intent: "renameCert"; serialNumber: string; label: string | null; auth: AuthInfo }
@@ -171,11 +171,38 @@ function handleRenewCert(serialNumber: string, auth: AuthInfo) {
  * certificate: nothing is issued and the daily budget is untouched, so being
  * interrupted mid-setup no longer costs a day.
  */
-function handleShowClaimLink(auth: AuthInfo) {
+/**
+ * A claim link is minted for an email re-send at most once a minute: earlier
+ * links stay live, so each re-send would add one. A repeat inside the minute is
+ * answered as a wait, never as "sent": the latest link may have been shown on
+ * screen, not mailed (the reveal row does not record how it was delivered).
+ */
+const EMAIL_RESEND_INTERVAL_MS = 60_000
+
+function handleShowClaimLink(auth: AuthInfo, delivery: "email" | "link") {
   return Effect.gen(function* () {
+    // Before minting anything: no address means nothing to send, and the
+    // waiting link must not be replaced for nothing.
+    const email = delivery === "email" ? auth.email : null
+    if (delivery === "email") {
+      if (!email) return { certError: "No email associated with your account." } as SettingsResult
+      const latest = yield* (yield* CertRevealRepo).findLatestLive(auth.user!)
+      const now = yield* Clock.currentTimeMillis
+      if (latest && now - new Date(latest.createdAt).getTime() < EMAIL_RESEND_INTERVAL_MS) {
+        return { certError: "Please wait a minute before sending the link again." } as SettingsResult
+      }
+    }
     const pending = yield* reissueClaimLink(auth.user!)
     if (!pending) {
       return { certError: "No device setup is waiting." } as SettingsResult
+    }
+    if (email) {
+      // The fresh link goes to the mailbox only: it never rides the response.
+      const emailService = yield* EmailService
+      const prefs = yield* PreferencesRepo
+      const locale = yield* prefs.getLocale(auth.user!)
+      yield* emailService.sendCertRenewalEmail(email, locale, pending.token)
+      return { certSent: true as const } as SettingsResult
     }
     return {
       certLinkReady: true as const,
@@ -300,7 +327,7 @@ export function handleSettingsMutation(mutation: SettingsMutation) {
     case "emailRevealLink":
       return handleEmailRevealLink(mutation.revealToken, mutation.auth)
     case "showClaimLink":
-      return handleShowClaimLink(mutation.auth)
+      return handleShowClaimLink(mutation.auth, mutation.delivery)
     case "renewCert":
       return handleRenewCert(mutation.serialNumber, mutation.auth)
     case "revokeCert":
@@ -329,6 +356,20 @@ function parseLabel(raw: FormDataEntryValue | null): string | null {
   return trimmed.length > 0 ? trimmed : null
 }
 
+/**
+ * A device presenting its user's revoked certificate may be the lost one,
+ * still holding a live session: a link shown on its screen would let it
+ * re-enroll itself and undo the revocation. So while it is restricted, every
+ * new-device link goes to the mailbox only (the person's decision, 2026-11-26,
+ * plan 2026-11-26-revoked-cert-notice). Applied by the /devices action.
+ */
+export function emailOnlyWhileRevoked(mutation: SettingsMutation): SettingsMutation {
+  if (mutation.intent === "issueCert" || mutation.intent === "showClaimLink") {
+    return { ...mutation, delivery: "email" }
+  }
+  return mutation
+}
+
 export function parseSettingsMutation(formData: FormData, auth: AuthInfo): SettingsMutation | { error: string } {
   const intent = formData.get("intent") as string | null
 
@@ -337,7 +378,8 @@ export function parseSettingsMutation(formData: FormData, auth: AuthInfo): Setti
     return { intent, delivery, auth }
   }
   if (intent === "showClaimLink") {
-    return { intent, auth }
+    const delivery = formData.get("delivery") === "email" ? ("email" as const) : ("link" as const)
+    return { intent, delivery, auth }
   }
   if (intent === "emailRevealLink") {
     const revealToken = formData.get("revealToken") as string

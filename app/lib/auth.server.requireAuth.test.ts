@@ -13,7 +13,7 @@ vi.mock("./runtime.server", async () => {
   return { runEffect: mod.testRunEffect, runDbEffect: mod.testRunEffect }
 })
 
-const { requireAuth } = await import("./auth.server")
+const { requireAuth, getAuth, refuseRevokedDevice } = await import("./auth.server")
 const { createSessionCookie } = await import("./session.server")
 const { seedTestDb, truncateAll } = await import("~/test/test-runtime")
 
@@ -77,5 +77,109 @@ describe("requireAuth — pending-cert redirect", () => {
     })
     const auth = await requireAuth(req)
     expect(auth.user).toBe("alice")
+  })
+})
+
+describe("requireAuth — a device presenting its user's revoked certificate", () => {
+  const seedRevokedCert = (username: string) =>
+    seedTestDb(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        const expires = new Date(Date.now() + 86400_000).toISOString()
+        yield* sql`INSERT INTO user_certificates (id, username, email, serial_number, issued_at, expires_at, revoked_at)
+                   VALUES ('cert-1', ${username}, 'x@example.com', '0a:1b:2c:3d:4e:5f', ${new Date().toISOString()},
+                           ${expires}, '2026-09-23T16:22:23Z')`
+      }) as Effect.Effect<void, never, never>,
+    )
+
+  /** A signed-in request from alice's device, which presents the fixture cert. */
+  const aliceRequest = async (path: string, init: RequestInit = {}) => {
+    const setCookie = await createSessionCookie({ sub: "abc", name: "alice", email: "alice@example.com", groups: [] })
+    return new Request(`http://home.example${path}`, {
+      ...init,
+      headers: { cookie: setCookie.split(";")[0], "x-forwarded-client-cert": XFCC },
+    })
+  }
+
+  it("sends any page but /devices to /devices", async () => {
+    await seedRevokedCert("alice")
+    for (const path of ["/", "/settings", "/admin", "/catalog.data"]) {
+      const res = await catchResponse(requireAuth(await aliceRequest(path)))
+      expect(res.status).toBe(302)
+      expect(res.headers.get("location")).toBe("/devices")
+    }
+  })
+
+  it("refuses any other write with 403", async () => {
+    await seedRevokedCert("alice")
+    const res = await catchResponse(requireAuth(await aliceRequest("/settings", { method: "POST" })))
+    expect(res.status).toBe(403)
+  })
+
+  it("lets /devices and its data and writes through", async () => {
+    await seedRevokedCert("alice")
+    expect((await requireAuth(await aliceRequest("/devices"))).user).toBe("alice")
+    expect((await requireAuth(await aliceRequest("/devices.data"))).user).toBe("alice")
+    expect((await requireAuth(await aliceRequest("/devices", { method: "POST" }))).user).toBe("alice")
+  })
+
+  it("getAuth refuses a write with 403: actions reach a route without its layout", async () => {
+    await seedRevokedCert("alice")
+    for (const path of ["/requests", "/", "/admin/grants"]) {
+      const res = await catchResponse(getAuth(await aliceRequest(path, { method: "POST" })))
+      expect(res.status).toBe(403)
+    }
+  })
+
+  it("getAuth shows a confined device as signed out on reads, including ?_routes= data requests", async () => {
+    await seedRevokedCert("alice")
+    for (const path of ["/catalog.data?_routes=routes/catalog", "/requests"]) {
+      expect(await getAuth(await aliceRequest(path))).toEqual({ sub: null, user: null, email: null, groups: [] })
+    }
+  })
+
+  it("getAuth lets /devices through, and a device whose certificate is not revoked", async () => {
+    await seedRevokedCert("alice")
+    expect((await getAuth(await aliceRequest("/devices", { method: "POST" }))).user).toBe("alice")
+    await truncateAll()
+    expect((await getAuth(await aliceRequest("/requests", { method: "POST" }))).user).toBe("alice")
+  })
+
+  it("looks the certificate up once per request, however many loaders ask", async () => {
+    await seedRevokedCert("alice")
+    const request = await aliceRequest("/settings.data")
+    const spy = vi.spyOn(await import("~/lib/workflows/presented-cert.server"), "presentedCertStatus")
+    const outcomes = await Promise.allSettled([requireAuth(request), getAuth(request), requireAuth(request)])
+    expect(outcomes.map((o) => o.status)).toEqual(["rejected", "fulfilled", "rejected"])
+    expect(spy).toHaveBeenCalledTimes(1)
+    spy.mockRestore()
+  })
+
+  it("a lookup that dies fails soft: the device is treated as unavailable, not a 500", async () => {
+    await seedRevokedCert("alice")
+    const spy = vi
+      .spyOn(await import("~/lib/workflows/presented-cert.server"), "presentedCertStatus")
+      .mockImplementation((() => Effect.die(new Error("boom"))) as never)
+    expect((await getAuth(await aliceRequest("/requests"))).user).toBe("alice") // fails soft
+    expect((await requireAuth(await aliceRequest("/settings"))).user).toBe("alice")
+    spy.mockRestore()
+  })
+
+  it("refuseRevokedDevice: 403 for the API whatever the method, nothing for a device that is fine", async () => {
+    await seedRevokedCert("alice")
+    for (const method of ["GET", "POST"]) {
+      const res = await catchResponse(
+        refuseRevokedDevice(await aliceRequest("/api/grants/export", { method }), "alice"),
+      )
+      expect(res.status).toBe(403)
+    }
+    await expect(refuseRevokedDevice(await aliceRequest("/api/x"), "bob")).resolves.toBeUndefined()
+    await truncateAll()
+    await expect(refuseRevokedDevice(await aliceRequest("/api/x"), "alice")).resolves.toBeUndefined()
+  })
+
+  it("leaves a device alone when the revoked certificate is another user's", async () => {
+    await seedRevokedCert("bob")
+    expect((await requireAuth(await aliceRequest("/settings"))).user).toBe("alice")
   })
 })

@@ -79,6 +79,9 @@ type ClaimState =
   | { kind: "ready"; revealToken: string; expiresAt: string; claimUrl: string }
   | { kind: "cooldown"; nextAvailable: string }
   | { kind: "error"; message: string }
+  /** The link went to the mailbox only (a device presenting a revoked
+   *  certificate never gets it on screen: see emailOnlyWhileRevoked). */
+  | { kind: "emailed" }
 
 /**
  * The QR handoff for a freshly issued device certificate. The link is the
@@ -89,10 +92,13 @@ type ClaimState =
  */
 function ClaimLinkDialog({
   state,
+  emailOnly,
   onClose,
   onRetry,
 }: {
   state: ClaimState | null
+  /** The link goes to the mailbox only: no QR, no copy, a sending state while it goes. */
+  emailOnly: boolean
   onClose: () => void
   onRetry: () => void
 }) {
@@ -112,8 +118,12 @@ function ClaimLinkDialog({
     state?.kind === "cooldown"
       ? t("devices.qr.cooldownTitle")
       : state?.kind === "error"
-        ? t("devices.qr.errorTitle")
-        : t("devices.qr.title")
+        ? t(emailOnly ? "devices.qr.sendErrorTitle" : "devices.qr.errorTitle")
+        : state?.kind === "emailed"
+          ? t("devices.qr.emailedTitle")
+          : emailOnly && state?.kind === "pending"
+            ? t("devices.qr.sendingTitle")
+            : t("devices.qr.title")
 
   return (
     <Dialog.Root
@@ -138,6 +148,19 @@ function ClaimLinkDialog({
             </Stack>
           )}
 
+          {/* One polite live region for the whole email path, so the swap from
+              "sending" to "emailed" is announced and the dialog keeps its shape.
+              The server may email even when the page did not ask (a status it
+              could not settle), so "emailed" always renders here. */}
+          {((emailOnly && state?.kind === "pending") || state?.kind === "emailed") && (
+            <Stack gap="md" align="center">
+              <html.div role="status">
+                <Text as="p">{state.kind === "emailed" ? t("devices.qr.emailedBody") : t("devices.qr.sending")}</Text>
+              </html.div>
+              {state.kind === "pending" && <Spinner size="lg" />}
+            </Stack>
+          )}
+
           {state?.kind === "error" && (
             <Stack gap="md">
               <Alert variant="error">{state.message}</Alert>
@@ -149,7 +172,7 @@ function ClaimLinkDialog({
             </Stack>
           )}
 
-          {(state?.kind === "pending" || state?.kind === "ready") && (
+          {!emailOnly && (state?.kind === "pending" || state?.kind === "ready") && (
             <Stack gap="md" align="center">
               <Text as="p" variant="bodySm" color="muted">
                 {state.kind === "ready" ? t("devices.qr.hint") : t("devices.qr.preparing")}
@@ -462,6 +485,7 @@ export function DevicesSection({
   budget,
   certificates,
   pendingClaim = null,
+  presentedRevoked = null,
 }: {
   /** Live new-device slots — see ~/lib/device-budget. */
   budget: DeviceBudget
@@ -469,6 +493,9 @@ export function DevicesSection({
   /** A device setup still waiting to be claimed — expiry only; the link
    *  itself is fetched by an explicit POST, never served in loader data. */
   pendingClaim?: { expiresAt: string } | null
+  /** The certificate this device presented, when it is one of the user's
+   *  own and revoked (see ~/lib/workflows/presented-cert.server). */
+  presentedRevoked?: { revokedAt: string; label: string | null } | null
 }) {
   const { t } = useTranslation()
   const { formatDateTime } = useDisplayFormat()
@@ -488,10 +515,17 @@ export function DevicesSection({
   const [session, setSession] = useState<{
     staleData: SettingsResult | undefined
     blockedUntil: string | null
+    /** What opened the dialog: "Try again" repeats THIS, never another action
+     *  (re-sending a waiting link must not issue a new certificate). */
+    intent: "issueCert" | "showClaimLink"
   } | null>(null)
 
-  const issue = () => {
-    fetcher.submit({ intent: "issueCert", delivery: "link" }, { method: "post", action: API_URL })
+  // A device presenting its revoked certificate gets the link by email only;
+  // the server enforces it, the page just asks for what it will get.
+  const delivery = presentedRevoked !== null ? "email" : "link"
+
+  const submitIntent = (intent: "issueCert" | "showClaimLink") => {
+    fetcher.submit({ intent, delivery }, { method: "post", action: API_URL })
   }
 
   // The button never swallows a click: the dialog opens first, and whatever
@@ -500,20 +534,21 @@ export function DevicesSection({
   // the click without re-rendering on a timer.
   const openClaimDialog = () => {
     const full = budget.used >= budget.limit && budget.nextAvailable !== null
-    setSession({ staleData: fetcher.data, blockedUntil: full ? budget.nextAvailable : null })
-    if (!full) issue()
+    setSession({ staleData: fetcher.data, blockedUntil: full ? budget.nextAvailable : null, intent: "issueCert" })
+    if (!full) submitIntent("issueCert")
   }
 
   const retry = () => {
-    setSession({ staleData: fetcher.data, blockedUntil: null })
-    issue()
+    const intent = session?.intent ?? "issueCert"
+    setSession({ staleData: fetcher.data, blockedUntil: null, intent })
+    submitIntent(intent)
   }
 
   // Resume an interrupted setup: same certificate, fresh link, no budget
   // spent. Opens the same dialog so there is one place a claim link lives.
   const resumeClaim = () => {
-    setSession({ staleData: fetcher.data, blockedUntil: null })
-    fetcher.submit({ intent: "showClaimLink" }, { method: "post", action: API_URL })
+    setSession({ staleData: fetcher.data, blockedUntil: null, intent: "showClaimLink" })
+    submitIntent("showClaimLink")
   }
 
   // Only THIS session's answer counts — `fetcher.data` outlives the dialog.
@@ -534,15 +569,29 @@ export function DevicesSection({
               }
             : "rateLimited" in sessionResult
               ? { kind: "cooldown", nextAvailable: sessionResult.nextAvailable }
-              : "certError" in sessionResult
-                ? { kind: "error", message: sessionResult.certError }
-                : "error" in sessionResult
-                  ? { kind: "error", message: sessionResult.error }
-                  : { kind: "pending" }
+              : "certSent" in sessionResult
+                ? { kind: "emailed" }
+                : "certError" in sessionResult
+                  ? { kind: "error", message: sessionResult.certError }
+                  : "error" in sessionResult
+                    ? { kind: "error", message: sessionResult.error }
+                    : { kind: "pending" }
 
   // Ambient hint so the limit is visible BEFORE the click too; the dialog is
   // what explains it after one.
   const atLimit = budget.used >= budget.limit && budget.nextAvailable !== null
+
+  // The warning for a revoked certificate this device presented: with a setup
+  // already waiting, resuming it is the one remedy (no second claim).
+  const revokedDate = presentedRevoked ? formatDateTime(presentedRevoked.revokedAt) : ""
+  const revokedMessage =
+    presentedRevoked === null
+      ? ""
+      : pendingClaim !== null
+        ? t("devices.presentedRevoked.bodyPending", { date: revokedDate })
+        : presentedRevoked.label
+          ? t("devices.presentedRevoked.bodyLabelled", { date: revokedDate, label: presentedRevoked.label })
+          : t("devices.presentedRevoked.body", { date: revokedDate })
 
   return (
     <CardSection
@@ -564,6 +613,27 @@ export function DevicesSection({
           {t("devices.description")}
         </Text>
 
+        {/* This device is still presenting a certificate duro revoked: say so,
+            and offer the way to a new one right here (on a phone the header
+            button can be off-screen). With a setup already waiting, resuming it
+            is the one remedy: a second claim would spend the budget. */}
+        {presentedRevoked !== null && (
+          <Alert variant="warning">
+            <Stack gap="sm">
+              <Text as="p">{revokedMessage}</Text>
+              {pendingClaim === null && (
+                <Inline gap="sm">
+                  {/* Default size, not small: this is the phone path, and a small
+                      button is under the 24 px target (WCAG 2.5.8). */}
+                  <Button variant="secondary" disabled={isSubmitting} onClick={openClaimDialog}>
+                    {t("devices.presentedRevoked.action")}
+                  </Button>
+                </Inline>
+              )}
+            </Stack>
+          </Alert>
+        )}
+
         {atLimit && budget.nextAvailable !== null && (
           <Text as="p" variant="bodySm" color="muted">
             {t("devices.nextAvailable", { time: formatDateTime(budget.nextAvailable) })}
@@ -578,15 +648,25 @@ export function DevicesSection({
             <Stack gap="sm">
               <Text as="p">{t("devices.pending.body", { time: formatDateTime(pendingClaim.expiresAt) })}</Text>
               <Inline gap="sm">
-                <Button variant="secondary" size="small" onClick={resumeClaim}>
-                  {t("devices.pending.action")}
+                <Button
+                  variant="secondary"
+                  size={presentedRevoked !== null ? undefined : "small"}
+                  disabled={isSubmitting}
+                  onClick={resumeClaim}
+                >
+                  {presentedRevoked !== null ? t("devices.pending.emailAction") : t("devices.pending.action")}
                 </Button>
               </Inline>
             </Stack>
           </Alert>
         )}
 
-        <ClaimLinkDialog state={claimState} onClose={() => setSession(null)} onRetry={retry} />
+        <ClaimLinkDialog
+          state={claimState}
+          emailOnly={presentedRevoked !== null}
+          onClose={() => setSession(null)}
+          onRetry={retry}
+        />
 
         {rows.length > 0 && (
           <>

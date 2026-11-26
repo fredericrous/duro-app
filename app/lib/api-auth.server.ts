@@ -3,6 +3,7 @@ import { getSession } from "./session.server"
 import { PrincipalRepo } from "./governance/PrincipalRepo.server"
 import { ApiKeyRepo } from "./governance/ApiKeyRepo.server"
 import { runEffect } from "./runtime.server"
+import { refuseRevokedDevice } from "./auth.server"
 
 export interface ApiAuthResult {
   readonly principalId: string
@@ -18,6 +19,9 @@ export async function requireApiAuth(request: Request): Promise<ApiAuthResult> {
   // 1. Try session cookie
   const session = await getSession(request)
   if (session) {
+    // A device presenting its user's revoked certificate is confined to the
+    // Devices page; the API, where a session is scope "*", is closed to it.
+    await refuseRevokedDevice(request, session.name)
     const principal = await runEffect(
       Effect.gen(function* () {
         const repo = yield* PrincipalRepo

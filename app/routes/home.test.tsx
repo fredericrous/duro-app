@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach, beforeAll, afterAll, afterEach } from "vitest"
+import { describe, expect, it, vi, beforeEach } from "vitest"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 

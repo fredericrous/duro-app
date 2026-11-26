@@ -1,5 +1,5 @@
 import { useRouteLoaderData } from "react-router"
-import { Effect } from "effect"
+import { Duration, Effect } from "effect"
 import type { Route } from "./+types/devices"
 import { requireAuth } from "~/lib/auth.server"
 import { runEffect } from "~/lib/runtime.server"
@@ -7,7 +7,8 @@ import { isOriginAllowed } from "~/lib/config.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { findPendingClaim } from "~/lib/workflows/cert-reveal.server"
 import { deviceBudget } from "~/lib/workflows/device-budget.server"
-import { parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
+import { emailOnly, presentedCertStatus, presentedRevokedNotice } from "~/lib/workflows/presented-cert.server"
+import { emailOnlyWhileRevoked, parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
 import { Header } from "~/components/Header/Header"
 import { DevicesSection } from "~/components/DevicesSection/DevicesSection"
 import { PageShell } from "@greenharness/greenrack-ui"
@@ -18,7 +19,11 @@ export function meta() {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const auth = await requireAuth(request)
-  const { budget, certificates, pendingClaim } = await runEffect(
+  const xfcc = request.headers.get("x-forwarded-client-cert")
+  // The certificate this device presented, when it is one of the user's own
+  // and revoked: the page then says so and offers a new one.
+  const presentedRevokedLookup = presentedRevokedNotice(xfcc, auth.user)
+  const { budget, certificates, pendingClaim, presentedRevoked } = await runEffect(
     Effect.gen(function* () {
       const certRepo = yield* CertificateRepo
       const budget = yield* deviceBudget(auth.user!)
@@ -28,10 +33,11 @@ export async function loader({ request }: Route.LoaderArgs) {
       // Existence and expiry ONLY. The claim link is a bearer secret, so it
       // never rides a GET — the showClaimLink POST hands it over.
       const pendingClaim = yield* findPendingClaim(auth.user!).pipe(Effect.catchAll(() => Effect.succeed(null)))
-      return { budget, certificates, pendingClaim }
+      const presentedRevoked = yield* presentedRevokedLookup
+      return { budget, certificates, pendingClaim, presentedRevoked }
     }),
   )
-  return { email: auth.email, budget, certificates, pendingClaim }
+  return { email: auth.email, budget, certificates, pendingClaim, presentedRevoked }
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -42,7 +48,16 @@ export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData()
   const parsed = parseSettingsMutation(formData as unknown as FormData, auth)
   if ("error" in parsed) return parsed
-  return await runEffect(handleSettingsMutation(parsed).pipe(Effect.orDie))
+  // A device presenting its user's revoked certificate gets new-device links
+  // by email only, whatever the form asked (emailOnlyWhileRevoked), and so does
+  // one whose certificate status could not be told: this is a security rule,
+  // so it fails closed. 6 s (above the CA fetch's own 5 s, so a dead Vault answers
+  // `unknown` rather than racing it), not the page-load 300 ms: only a few writes pay it.
+  const status = await runEffect(
+    presentedCertStatus(request.headers.get("x-forwarded-client-cert"), auth.user, { timeout: Duration.seconds(6) }),
+  )
+  const mutation = emailOnly(status) ? emailOnlyWhileRevoked(parsed) : parsed
+  return await runEffect(handleSettingsMutation(mutation).pipe(Effect.orDie))
 }
 
 export default function DevicesPage({ loaderData }: Route.ComponentProps) {
@@ -51,11 +66,15 @@ export default function DevicesPage({ loaderData }: Route.ComponentProps) {
   const isAdmin = dashboardData?.isAdmin ?? false
 
   return (
-    <PageShell maxWidth="lg" header={<Header user={user} isAdmin={isAdmin} />}>
+    <PageShell
+      maxWidth="lg"
+      header={<Header user={user} isAdmin={isAdmin} restricted={loaderData.presentedRevoked !== null} />}
+    >
       <DevicesSection
         budget={loaderData.budget}
         certificates={loaderData.certificates}
         pendingClaim={loaderData.pendingClaim}
+        presentedRevoked={loaderData.presentedRevoked}
       />
     </PageShell>
   )
