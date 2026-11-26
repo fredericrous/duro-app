@@ -261,6 +261,12 @@
     "pending": {
       "body": "Une configuration d’appareil est en attente — le lien est valide jusqu’au {{time}}.",
       "action": "Afficher le lien à nouveau"
+    },
+    "presentedRevoked": {
+      "body": "Le certificat présenté par cet appareil a été révoqué le {{date}}. Ajoutez un appareil pour en obtenir un nouveau, puis choisissez-le quand votre navigateur le demande. Vous devrez peut-être d’abord supprimer l’ancien certificat.",
+      "bodyLabelled": "Le certificat présenté par cet appareil, « {{label}} », a été révoqué le {{date}}. Ajoutez un appareil pour en obtenir un nouveau, puis choisissez-le quand votre navigateur le demande. Vous devrez peut-être d’abord supprimer l’ancien certificat.",
+      "bodyPending": "Le certificat présenté par cet appareil a été révoqué le {{date}}. Reprenez la configuration d’appareil en attente ci-dessous pour en obtenir un nouveau. Vous devrez peut-être d’abord supprimer l’ancien certificat.",
+      "action": "Ajouter un appareil"
     }
   },
   "categories": {

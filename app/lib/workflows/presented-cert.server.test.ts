@@ -1,0 +1,151 @@
+// @vitest-environment node
+import { afterAll, beforeEach, describe, expect, it } from "vitest"
+import { it as effectIt } from "@effect/vitest"
+import { Effect, Fiber, Layer, Option, TestClock } from "effect"
+import * as SqlClient from "@effect/sql/SqlClient"
+import { readFileSync } from "node:fs"
+import { fileURLToPath } from "node:url"
+import { disposeTestRuntime, seedTestDb, testRunEffect, truncateAll } from "~/test/test-runtime"
+import { ClientCaTrust } from "~/lib/services/ClientCaTrust.server"
+import { CertificateRepo, CertificateRepoError } from "~/lib/services/CertificateRepo.server"
+import {
+  presentedRevokedCert,
+  presentedRevokedNotice,
+  presentedSerial,
+  readCookie,
+  revokedNoticeCookie,
+} from "./presented-cert.server"
+
+// The fixture cert canonicalizes to serial "a1b2c3d4e5f"; Vault stores it in colon form.
+const FIXTURE_PEM = readFileSync(
+  fileURLToPath(new URL("../../test/fixtures/client-cert-fixture.pem", import.meta.url)),
+  "utf8",
+)
+const XFCC = `Cert="${encodeURIComponent(FIXTURE_PEM)}"`
+const STORED_SERIAL = "0a:1b:2c:3d:4e:5f"
+const REVOKED_AT = "2026-09-23T16:22:23.000Z"
+
+const seedCert = (opts: { username?: string; revokedAt?: string | null; label?: string | null } = {}) =>
+  seedTestDb(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      const expires = new Date(Date.now() + 30 * 86400_000).toISOString()
+      yield* sql`INSERT INTO user_certificates (id, username, email, serial_number, issued_at, expires_at, revoked_at, label)
+                 VALUES ('cert-1', ${opts.username ?? "daddy"}, 'daddy@example.com', ${STORED_SERIAL},
+                         ${new Date().toISOString()}, ${expires},
+                         ${opts.revokedAt === undefined ? REVOKED_AT : opts.revokedAt}, ${opts.label ?? null})`
+    }) as Effect.Effect<void, never, never>,
+  )
+
+const trustLayer = (trusted: boolean) =>
+  Layer.succeed(ClientCaTrust, { isIssuedByClientCa: () => Effect.succeed(trusted) })
+
+const run = <A>(effect: Effect.Effect<A, never, CertificateRepo | ClientCaTrust>) => testRunEffect(effect)
+
+beforeEach(async () => {
+  await truncateAll()
+})
+
+afterAll(async () => {
+  await disposeTestRuntime()
+})
+
+describe("presentedRevokedCert (PGlite)", () => {
+  it("is Some for the owner's revoked cert", async () => {
+    await seedCert({ label: "iPhone" })
+    const hit = await run(presentedRevokedCert(XFCC, "daddy"))
+    expect(hit).toEqual(Option.some({ serial: "a1b2c3d4e5f", revokedAt: expect.any(String), label: "iPhone" }))
+    expect(new Date(Option.getOrThrow(hit).revokedAt).toISOString()).toBe(REVOKED_AT)
+  })
+
+  it("is None with no header, an unparsable header, or no signed-in user", async () => {
+    await seedCert()
+    expect(await run(presentedRevokedCert(null, "daddy"))).toEqual(Option.none())
+    expect(await run(presentedRevokedCert('Cert="not-a-pem"', "daddy"))).toEqual(Option.none())
+    expect(await run(presentedRevokedCert(XFCC, null))).toEqual(Option.none())
+  })
+
+  it("is None for an unrevoked cert", async () => {
+    await seedCert({ revokedAt: null })
+    expect(await run(presentedRevokedCert(XFCC, "daddy"))).toEqual(Option.none())
+  })
+
+  it("is None for another user's revoked cert", async () => {
+    await seedCert({ username: "alice" })
+    expect(await run(presentedRevokedCert(XFCC, "daddy"))).toEqual(Option.none())
+  })
+
+  it("is None for a serial duro does not know", async () => {
+    expect(await run(presentedRevokedCert(XFCC, "daddy"))).toEqual(Option.none())
+  })
+
+  it("is None for a cert the pki-client CA did not sign", async () => {
+    await seedCert()
+    expect(await run(presentedRevokedCert(XFCC, "daddy").pipe(Effect.provide(trustLayer(false))))).toEqual(
+      Option.none(),
+    )
+  })
+
+  it("maps to the loader-data shape: an object on a hit, null otherwise", async () => {
+    await seedCert({ label: null })
+    const notice = await run(presentedRevokedNotice(XFCC, "daddy"))
+    expect(notice).toEqual({ revokedAt: expect.any(String), label: null })
+    expect(await run(presentedRevokedNotice(null, "daddy"))).toBeNull()
+  })
+})
+
+describe("presentedRevokedCert (stubbed services)", () => {
+  /** A repo that answers `findBySerialCanonical` with `answer`; nothing else is used. */
+  const repoLayer = (answer: Effect.Effect<unknown, CertificateRepoError>) =>
+    Layer.succeed(CertificateRepo, { findBySerialCanonical: () => answer } as never)
+  const ownedRevoked = Effect.succeed({
+    username: "daddy",
+    revokedAt: REVOKED_AT,
+    label: null,
+    serialNumber: STORED_SERIAL,
+  })
+
+  effectIt.effect("is None when the repo fails", () =>
+    presentedRevokedCert(XFCC, "daddy").pipe(
+      Effect.tap((hit) => Effect.sync(() => expect(hit).toEqual(Option.none()))),
+      Effect.provide(
+        Layer.mergeAll(repoLayer(Effect.fail(new CertificateRepoError({ message: "db down" }))), trustLayer(true)),
+      ),
+    ),
+  )
+
+  effectIt.effect("is None within its 300 ms budget when the CA check never returns", () =>
+    Effect.gen(function* () {
+      const fiber = yield* Effect.fork(presentedRevokedCert(XFCC, "daddy"))
+      yield* TestClock.adjust("1 second")
+      const hit = yield* Fiber.join(fiber)
+      expect(hit).toEqual(Option.none())
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          repoLayer(ownedRevoked),
+          Layer.succeed(ClientCaTrust, { isIssuedByClientCa: () => Effect.never }),
+        ),
+      ),
+    ),
+  )
+})
+
+describe("presented-cert helpers", () => {
+  it("reads the canonical serial of the presented cert", () => {
+    expect(presentedSerial(XFCC)).toBe("a1b2c3d4e5f")
+    expect(presentedSerial(null)).toBeNull()
+  })
+
+  it("reads one cookie from a raw Cookie header", () => {
+    expect(readCookie("a=1; duro_revoked_notice=a1b2c3d4e5f; b=2", "duro_revoked_notice")).toBe("a1b2c3d4e5f")
+    expect(readCookie("a=1", "duro_revoked_notice")).toBeNull()
+    expect(readCookie(null, "duro_revoked_notice")).toBeNull()
+  })
+
+  it("builds the suppression cookie for one day", () => {
+    expect(revokedNoticeCookie("a1b2c3d4e5f")).toBe(
+      "duro_revoked_notice=a1b2c3d4e5f; Path=/; Max-Age=86400; HttpOnly; Secure; SameSite=Lax",
+    )
+  })
+})

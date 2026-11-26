@@ -1,5 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
 import { Effect } from "effect"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
 vi.mock("~/lib/auth.server", () => ({
   requireAuth: vi.fn(),
@@ -14,11 +16,18 @@ vi.mock("~/lib/mutations/settings", () => ({
 vi.mock("~/lib/config.server", () => ({
   isOriginAllowed: vi.fn().mockReturnValue(true),
 }))
+// The lookup itself is tested in presented-cert.server.test.ts; here only
+// what the loader hands it and does with its answer.
+vi.mock("~/lib/workflows/presented-cert.server", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("~/lib/workflows/presented-cert.server")>()
+  return { ...mod, presentedRevokedNotice: vi.fn(() => Effect.succeed(null)) }
+})
 
 import { requireAuth } from "~/lib/auth.server"
 import { runEffect } from "~/lib/runtime.server"
 import { parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
 import { isOriginAllowed } from "~/lib/config.server"
+import { presentedRevokedNotice } from "~/lib/workflows/presented-cert.server"
 import { action, loader } from "./devices"
 import { callAction, callLoader, expectData } from "~/test/route-utils"
 
@@ -46,6 +55,61 @@ describe("/devices loader", () => {
     // The one-time password is never handed to this page — it is revealed from
     // the emailed link only.
     expect(data).not.toHaveProperty("p12Password")
+  })
+})
+
+describe("/devices loader: the certificate this device presented", () => {
+  const budget = { used: 0, limit: 3, nextAvailable: null }
+  const XFCC_HEADER = "x-forwarded-client-cert"
+  // client-cert-fixture.pem canonicalizes to serial "a1b2c3d4e5f". This file
+  // runs under jsdom, where import.meta.url is not a file URL.
+  const FIXTURE_XFCC = `Cert="${encodeURIComponent(
+    readFileSync(join(process.cwd(), "app/test/fixtures/client-cert-fixture.pem"), "utf8"),
+  )}"`
+  const notice = { revokedAt: "2026-09-23T16:22:23.000Z", label: null }
+
+  it("asks the lookup with the request's XFCC and the signed-in user", async () => {
+    mockRunEffect.mockResolvedValue({ budget, certificates: [], pendingClaim: null, presentedRevoked: null } as never)
+    await callLoader(loader, { headers: { [XFCC_HEADER]: 'Cert="x"' } })
+    expect(vi.mocked(presentedRevokedNotice)).toHaveBeenCalledWith('Cert="x"', "alice")
+  })
+
+  it("asks with no XFCC when the request has none, and passes null through", async () => {
+    mockRunEffect.mockResolvedValue({ budget, certificates: [], pendingClaim: null, presentedRevoked: null } as never)
+    const data = expectData<{ presentedRevoked: unknown }>(await callLoader(loader))
+    expect(vi.mocked(presentedRevokedNotice)).toHaveBeenCalledWith(null, "alice")
+    expect(data.presentedRevoked).toBeNull()
+  })
+
+  /** The loader's answer, unwrapped when it came back through data() with headers. */
+  const unwrap = (value: unknown) =>
+    value && typeof value === "object" && "init" in value && "data" in value
+      ? { payload: (value as { data: unknown }).data, init: (value as { init: ResponseInit }).init }
+      : { payload: value, init: null }
+
+  it("sets the once-a-day cookie when it shows the notice", async () => {
+    mockRunEffect.mockResolvedValue({ budget, certificates: [], pendingClaim: null, presentedRevoked: notice } as never)
+    const { payload, init } = unwrap(expectData(await callLoader(loader, { headers: { [XFCC_HEADER]: FIXTURE_XFCC } })))
+    expect((payload as { presentedRevoked: unknown }).presentedRevoked).toEqual(notice)
+    expect(new Headers(init?.headers).get("Set-Cookie")).toBe(
+      "duro_revoked_notice=a1b2c3d4e5f; Path=/; Max-Age=86400; HttpOnly; Secure; SameSite=Lax",
+    )
+  })
+
+  it("does not set it again when it already holds that serial, nor with no notice", async () => {
+    mockRunEffect.mockResolvedValue({ budget, certificates: [], pendingClaim: null, presentedRevoked: notice } as never)
+    const again = unwrap(
+      expectData(
+        await callLoader(loader, {
+          headers: { [XFCC_HEADER]: FIXTURE_XFCC, cookie: "duro_revoked_notice=a1b2c3d4e5f" },
+        }),
+      ),
+    )
+    expect(again.init).toBeNull()
+
+    mockRunEffect.mockResolvedValue({ budget, certificates: [], pendingClaim: null, presentedRevoked: null } as never)
+    const none = unwrap(expectData(await callLoader(loader, { headers: { [XFCC_HEADER]: FIXTURE_XFCC } })))
+    expect(none.init).toBeNull()
   })
 })
 
@@ -84,9 +148,86 @@ describe("/devices action", () => {
 // Component-render test — a certificate's device label renders in the list
 // ===========================================================================
 
-import { screen, waitFor } from "@testing-library/react"
+import { screen, waitFor, within } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import DevicesPage from "./devices"
 import { renderRoute } from "~/test/render-route"
+
+const pageData = (extra: Record<string, unknown>) => () => ({
+  email: "a@example.com",
+  budget: { used: 0, limit: 3, nextAvailable: null },
+  certificates: [],
+  pendingClaim: null,
+  ...extra,
+})
+
+describe("DevicesPage: the presented certificate is revoked", () => {
+  const revoked = { revokedAt: "2026-09-23T16:22:23.000Z", label: null }
+
+  it("warns, with the revoke date and its own Add a device button", async () => {
+    renderRoute({
+      route: { path: "/devices", Component: DevicesPage as never, loader: pageData({ presentedRevoked: revoked }) },
+      url: "/devices",
+    })
+    const alert = await screen.findByText(/The certificate this device presented was revoked on/)
+    const warning = alert.closest('[role="alert"], [role="status"]') as HTMLElement
+    expect(warning).not.toBeNull()
+    expect(within(warning).getByRole("button", { name: "Add a device" })).toBeEnabled()
+    // The header keeps its own: same name, two buttons page-wide.
+    expect(screen.getAllByRole("button", { name: "Add a device" })).toHaveLength(2)
+  })
+
+  it("disables its button while the device setup is being issued", async () => {
+    renderRoute({
+      route: {
+        path: "/devices",
+        Component: DevicesPage as never,
+        loader: pageData({ presentedRevoked: revoked }),
+        action: () => new Promise(() => {}), // the issue never answers: stays submitting
+      },
+      url: "/devices",
+    })
+    const alert = await screen.findByText(/The certificate this device presented was revoked on/)
+    const warning = alert.closest('[role="alert"], [role="status"]') as HTMLElement
+    await userEvent.click(within(warning).getByRole("button", { name: "Add a device" }))
+    await waitFor(() => {
+      expect(within(warning).getByRole("button", { name: "Add a device" })).toBeDisabled()
+    })
+  })
+
+  it("points to the waiting setup, with no button, when one is pending", async () => {
+    renderRoute({
+      route: {
+        path: "/devices",
+        Component: DevicesPage as never,
+        loader: pageData({
+          presentedRevoked: revoked,
+          pendingClaim: { expiresAt: new Date(Date.now() + 3600_000).toISOString() },
+        }),
+      },
+      url: "/devices",
+    })
+    const alert = await screen.findByText(/Resume the device setup waiting below/)
+    const warning = alert.closest('[role="alert"], [role="status"]') as HTMLElement
+    expect(within(warning).queryByRole("button")).toBeNull()
+  })
+
+  it("shows no warning when the presented certificate is not revoked", async () => {
+    renderRoute({
+      route: {
+        path: "/devices",
+        Component: DevicesPage as never,
+        loader: pageData({
+          presentedRevoked: null,
+          pendingClaim: { expiresAt: new Date(Date.now() + 3600_000).toISOString() },
+        }),
+      },
+      url: "/devices",
+    })
+    await screen.findByText(/A device setup is waiting/)
+    expect(screen.queryByText(/The certificate this device presented/)).toBeNull()
+  })
+})
 
 describe("DevicesPage component", () => {
   it("renders a certificate's device label", async () => {

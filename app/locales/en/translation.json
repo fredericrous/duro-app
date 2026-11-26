@@ -261,6 +261,12 @@
     "pending": {
       "body": "A device setup is waiting — the link is still valid until {{time}}.",
       "action": "Show the link again"
+    },
+    "presentedRevoked": {
+      "body": "The certificate this device presented was revoked on {{date}}. Add a device to get a new one, then choose it when your browser asks. You may need to remove the old certificate first.",
+      "bodyLabelled": "The certificate this device presented, “{{label}}”, was revoked on {{date}}. Add a device to get a new one, then choose it when your browser asks. You may need to remove the old certificate first.",
+      "bodyPending": "The certificate this device presented was revoked on {{date}}. Resume the device setup waiting below to get a new one. You may need to remove the old certificate first.",
+      "action": "Add a device"
     }
   },
   "categories": {

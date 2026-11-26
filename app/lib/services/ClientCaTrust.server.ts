@@ -28,6 +28,9 @@ export class ClientCaTrust extends Context.Tag("ClientCaTrust")<
 /** How long a fetched CA is used before it is fetched again. */
 const CA_TTL = Duration.hours(1)
 
+/** How long one fetch of the CA from Vault may take. */
+export const CA_FETCH_TIMEOUT = Duration.seconds(5)
+
 /**
  * Reads the CA from NAS Vault's `pki-client/cert/ca`, an unauthenticated PKI
  * endpoint, and caches it. A failed refresh keeps serving the last good CA —
@@ -52,7 +55,16 @@ export const ClientCaTrustLive = Layer.effect(
         return yield* Effect.fail(new Error("pki-client/cert/ca returned no certificate"))
       }
       return pem
-    }).pipe(Effect.scoped)
+    }).pipe(
+      Effect.scoped,
+      // Bounded: a hung Vault must not hold a caller (or, for a caller that
+      // stopped waiting, a background refresh) forever. A timeout is a failed
+      // refresh: the last good CA keeps serving, and with none it fails closed.
+      Effect.timeoutFail({
+        duration: CA_FETCH_TIMEOUT,
+        onTimeout: () => new Error(`pki-client/cert/ca did not answer within ${Duration.format(CA_FETCH_TIMEOUT)}`),
+      }),
+    )
 
     const currentCaPem: Effect.Effect<string | null> = Effect.gen(function* () {
       const cached = yield* Ref.get(cache)

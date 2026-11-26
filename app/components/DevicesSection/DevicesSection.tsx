@@ -462,6 +462,7 @@ export function DevicesSection({
   budget,
   certificates,
   pendingClaim = null,
+  presentedRevoked = null,
 }: {
   /** Live new-device slots — see ~/lib/device-budget. */
   budget: DeviceBudget
@@ -469,6 +470,9 @@ export function DevicesSection({
   /** A device setup still waiting to be claimed — expiry only; the link
    *  itself is fetched by an explicit POST, never served in loader data. */
   pendingClaim?: { expiresAt: string } | null
+  /** The certificate this device presented, when it is one of the user's
+   *  own and revoked (see ~/lib/workflows/presented-cert.server). */
+  presentedRevoked?: { revokedAt: string; label: string | null } | null
 }) {
   const { t } = useTranslation()
   const { formatDateTime } = useDisplayFormat()
@@ -563,6 +567,34 @@ export function DevicesSection({
         <Text as="p" color="muted">
           {t("devices.description")}
         </Text>
+
+        {/* This device is still presenting a certificate duro revoked: say so,
+            and offer the way to a new one right here (on a phone the header
+            button can be off-screen). With a setup already waiting, resuming it
+            is the one remedy: a second claim would spend the budget. */}
+        {presentedRevoked !== null && (
+          <Alert variant="warning">
+            <Stack gap="sm">
+              <Text as="p">
+                {pendingClaim !== null
+                  ? t("devices.presentedRevoked.bodyPending", { date: formatDateTime(presentedRevoked.revokedAt) })
+                  : presentedRevoked.label
+                    ? t("devices.presentedRevoked.bodyLabelled", {
+                        date: formatDateTime(presentedRevoked.revokedAt),
+                        label: presentedRevoked.label,
+                      })
+                    : t("devices.presentedRevoked.body", { date: formatDateTime(presentedRevoked.revokedAt) })}
+              </Text>
+              {pendingClaim === null && (
+                <Inline gap="sm">
+                  <Button variant="secondary" size="small" disabled={isSubmitting} onClick={openClaimDialog}>
+                    {t("devices.presentedRevoked.action")}
+                  </Button>
+                </Inline>
+              )}
+            </Stack>
+          </Alert>
+        )}
 
         {atLimit && budget.nextAvailable !== null && (
           <Text as="p" variant="bodySm" color="muted">
