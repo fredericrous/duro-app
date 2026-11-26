@@ -142,6 +142,7 @@ Files: `bootstrap/pkg/vault/nas_cluster_auth.go`, `bootstrap/pkg/vault/nas_clust
   failure, or a copied CRL with `nextUpdate` under 4 days, sets `success=1`
   (like `sync_service_ca`), failing the job so the existing broker-staleness
   alerts fire.
+  - Added after Phase 2 shipped: duro leaves the three `duro_crl_*` gauges out until the first good publish, so a threshold never fires on a publisher that has never succeeded. Also alert on `absent(duro_crl_published_timestamp_seconds)` for 1 h and on `up{service="duro-worker"} == 0`, each with a `promtool test rules` case.
 - Docs: `docs/operations/mtls-breakglass.md` and
   `docs/operations/nas-pki-and-mtls.md` rewritten to the new truth;
   a runbook "CRL stale → everyone refused" in the C4 style (numbered
@@ -249,6 +250,18 @@ Post-release (deliberate, Phase 2's own gate):
 - an UP `duro-worker` scrape target carrying all four metrics;
 - `crl: published` in the worker log, and no "CRL publisher disabled" warning;
 - `vault kv get -field=ca.crl secret/pki/client-crl | openssl crl -noout -text` on NAS Vault lists `6F:5C:7F:04:8F…`.
+
+Observed 2026-11-26, after v1.67.0 (duro-app `f7989f2`, chart 1.67.0 through homelab #1318 `7dcd874be`):
+
+| gate                     | input                                                                                                    | actual                                                                                                                                                                                      |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 3a, before release | the running 1.66.0 duro-worker's own token: GET `crl/rotate`, `cert/ca`, KV `client-crl`, KV `client-ca` | 200, 200, 404 (readable, not yet written), 403; a rotated CRL runs 7 d (05:57 → Dec 3) and lists 18 serials, the iPhone's among them. `auto_rebuild` is not readable with duro-pki's grants |
+| scrape target            | Prometheus `/api/v1/targets`, pool `serviceMonitor/duro/duro-worker/0`                                   | `up`, `http://10.244.3.114:3001/metrics`, no error                                                                                                                                          |
+| four metrics             | instant query of each                                                                                    | next_update 1796278776 (Dec 3 06:19), published 1795673978, missing_serials 0, revocations_pending 0                                                                                        |
+| worker log               | `kubectl logs duro-worker-54f446b5c8-6tzhg`                                                              | `crl: published revoked=18 nextUpdate=2026-12-03T06:19:36Z`; no "disabled", re-revoke or error line                                                                                         |
+| KV copy                  | NAS KV `secret/data/pki/client-crl`, read with duro-pki's token, `openssl crl -text`                     | version 1, a valid PEM CRL, Next Update Dec 3 06:19:36 2026 GMT, 18 serials incl. `6F5C7F048F771661B80CB77D68847D2845F3EB`                                                                  |
+
+Phase 3b's start condition holds: the first publish is in NAS KV `secret/pki/client-crl`.
 
 Before the release, check the Phase 3a gate against NAS Vault: `vault read pki-client/config/crl` shows 168h with auto_rebuild false, and the duro-pki token can GET `crl/rotate`.
 

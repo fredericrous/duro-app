@@ -71,6 +71,12 @@ or closed as not worth doing. Reached when no ticket here is open.
   sweep's inbox, all due 2026-12-05.
 - [t18](t18-audit-actor-on-sub.md): filed 2026-11-26 from the
   cert-revocation Phase 1 inbox: align audit `actorId` on `auth.sub`.
+- [t19](t19-tls-verification-off.md): filed 2026-11-26 from the
+  cert-revocation Phase 2 checks: the chart sets
+  `NODE_TLS_REJECT_UNAUTHORIZED=0` for every duro process.
+- [t20](t20-renew-expired-cert.md): filed 2026-11-26 from the
+  cert-revocation Phase 1 inbox: offer renewal for an expired, unrevoked
+  cert, after the plan's Phase 5.
 - Lessons: drive admin mutations through the brief's URL; `localhost`
   is no longer needed. A feature file's mutation step is what catches
   an origin or CSRF regression: GET journeys never send an Origin.
