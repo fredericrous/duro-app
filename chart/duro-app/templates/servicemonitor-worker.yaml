@@ -1,0 +1,20 @@
+{{- if and .Values.worker.enabled .Values.worker.serviceMonitor.enabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/ServiceMonitor") }}
+# Scrapes the worker's CRL publisher gauges (duro_crl_*, duro_revocations_pending);
+# the homelab client-crl alerts read them.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "duro-app.fullname" . }}-worker
+  labels:
+    {{- include "duro-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  selector:
+    matchLabels:
+      {{- include "duro-app.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  endpoints:
+    - port: health
+      path: /metrics
+      interval: {{ .Values.worker.serviceMonitor.interval }}
+{{- end }}

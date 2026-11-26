@@ -94,7 +94,7 @@ Files: `app/lib/mutations/admin-users.ts`, `app/lib/workflows/recovery.server.ts
   a sweeper test turns a `failed` row `completed`; repo test for the
   expired-row predicate.
 
-### Phase 2 — duro-app: the CRL publisher (PR 2, release)
+### Phase 2 — duro-app: the CRL publisher (PR 2, release) — done
 
 <!-- panel: repos=duro-app -->
 
@@ -215,12 +215,58 @@ Files: `kubernetes/homelab/security/configs/kyverno-policies/generate-mtls-clien
 
 Post-release (deliberate, accepted by implementation-review): the worker's first `worker: revocation sweep` log line in-cluster, and no "sweeper disabled" warning.
 
+### Phase 2 results (PR 2, observed before push)
+
+| check                        | input                                                                                                                                                                                                                                      | expected                                                              | actual                                                                                                                                                                                                         |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| unit suite                   | `pnpm run test` on 858b86f                                                                                                                                                                                                                 | all green                                                             | 173 files, 1610 tests passed                                                                                                                                                                                   |
+| typecheck, lint              | `pnpm run typecheck`, `eslint` on the changed files, `node scripts/build-worker.mjs`                                                                                                                                                       | 0 errors; the worker bundle builds                                    | 0 errors; bundle built                                                                                                                                                                                         |
+| publisher behaviour          | CrlPublisher.server.test (it.effect + TestClock, real ECDSA CA and CRLs from `@peculiar/x509`)                                                                                                                                             | the plan's four cases, plus deadlines and rotation                    | 19 tests pass: debounce, bad signature / nextUpdate < 3 d not written, re-revoke, hung rotate and hung re-revoke retried, offset rotates; removing the per-re-revoke timeout turns the hung re-revoke test red |
+| SQL on the real schema       | revocation-loop.test: `CrlDbLive` on PGlite with 4 certs (2 completed, 1 of them expired, 1 failed)                                                                                                                                        | watermark `0\|` → `2\|<ts>`; completed = the unexpired one; pending 1 | passes                                                                                                                                                                                                         |
+| dev-Vault pilot              | the bundled publisher (`VaultCrlLive` + `VaultCertManagerLive` over FetchHttpClient) against `vault server -dev` with `pki-client` (config/crl 168h, auto_rebuild=false): one revoked cert, one completed in duro but not revoked in Vault | re-revoke the missing one, publish a 7-day CRL listing both to KV     | "revoking again" for `04:bd:…`, "crl: published revoked=2"; `openssl crl -text` on KV `ca.crl`: Next Update +7 d, both serials; gauges render                                                                  |
+| KV write per rotate          | the same pilot run twice                                                                                                                                                                                                                   | —                                                                     | KV version 1 → 2: each `crl/rotate` re-signs (new thisUpdate/nextUpdate), so production writes every cycle                                                                                                     |
+| hung Vault                   | the pilot against a listener that accepts and never answers                                                                                                                                                                                | the cycle fails within the call timeout and the tick returns          | "crl: publish failed … timed out after 15 seconds", 17 s wall time                                                                                                                                             |
+| chart                        | `helm template` chart/duro-app with the homelab HelmRelease values, with and without `--api-versions monitoring.coreos.com/v1/ServiceMonitor`                                                                                              | ServiceMonitor only with the CRD; it selects the worker Service alone | 1 vs 0 ServiceMonitors; `duro-worker` Service selects the worker pod on port `health`; the web Service lacks the component label                                                                               |
+| scrape reachability (static) | homelab `origin/main`: Prometheus selectors, duro namespace policies                                                                                                                                                                       | nothing blocks a scrape of `duro-worker:3001`                         | `serviceMonitorSelector: {}` and namespace selector `{}`; ambient with a Kyverno PERMISSIVE PeerAuthentication; no AuthorizationPolicy or Cilium policy                                                        |
+
+Deviations from the plan text:
+
+- `reflect-metadata` 0.2.2 is a second new dependency: tsyringe, which `@peculiar/x509` loads, throws at import without it (reproduced).
+- "Only when content changed" holds, but every rotate re-signs the CRL, so the KV write happens every cycle. That is what Envoy needs: a fresh nextUpdate.
+- The publisher is single-writer only because duro-worker runs `replicas: 1` with `strategy: Recreate`. Each replica would rotate the CRL and write KV, and `published` is remembered per process. Scaling the worker needs a lease first.
+- `duro_crl_next_update_timestamp_seconds`, `duro_crl_published_timestamp_seconds` and `duro_crl_missing_serials` are absent until the first good publish, because a 0 would fire the staleness alerts. Phase 3b also needs an absent-series alert (filed in the homelab inbox).
+
+Dependency ownership: `@peculiar/x509` 3.1.0 (MIT, Peculiar Ventures, released 2026-10-27, no install scripts), pinned exact.
+
+- Why add it: node-forge cannot parse or verify a CRL, node:crypto has no CRL type, and a CRL is a specified format (RFC 5280).
+- What it pulls in: tsyringe 4.10 (MIT), plus `@peculiar/asn1-*` and `@peculiar/utils` from the same maintainer.
+- Where it loads: only in the worker. The `VaultCrl` adapter lives in `VaultCrl.server.ts`, not `VaultPki.server.ts`, so the web server never imports it.
+- `reflect-metadata` 0.2.2 (Apache-2.0, 0 dependencies, no install scripts) is pinned exact.
+- `pnpm audit --prod` reports no known vulnerabilities.
+
+Post-release (deliberate, Phase 2's own gate):
+
+- an UP `duro-worker` scrape target carrying all four metrics;
+- `crl: published` in the worker log, and no "CRL publisher disabled" warning;
+- `vault kv get -field=ca.crl secret/pki/client-crl | openssl crl -noout -text` on NAS Vault lists `6F:5C:7F:04:8F…`.
+
+Before the release, check the Phase 3a gate against NAS Vault: `vault read pki-client/config/crl` shows 168h with auto_rebuild false, and the duro-pki token can GET `crl/rotate`.
+
+Decision log: the CRL handover through NAS KV `secret/pki/client-crl` (key `ca.crl`) is taken. The person decided "duro-app publishes the CRL via Vault → ESO", and Phase 3a (homelab a47f7e777), which grants duro-pki write on that path, is live.
+
 ## Implementation review
 
 - implementation-review (opus): approve after round 1 (4 blocking) and delta (1 blocking naming); all fixed; ~314k tokens over 3 rounds.
 - backend, architect, platform (opus): approve after delta; idempotent marks, worker-owned Vault wiring, 401/403 transient all fixed.
 - lang:typescript (opus): approve; `deliberate: certBatchRevokeToast keeps a local cast (optional low), revisit with Phase 2's admin UI`.
 - Follow-up (inbox): older audit paths (recovery, settings) still record display names; align actors on `sub`.
+
+Phase 2 (all opus, 4 rounds):
+
+- implementation-review: approve-with-changes → approve. Fixed the deadlines, the plan record, dependency ownership and names. Kept the pack refresh deliberately (worktree-task Start). ~263k tokens.
+- backend, architect: approve after the deltas. Fixed the per-call and per-re-revoke deadlines, the count|max watermark, rotating re-revokes, the publisher-owned ports, the SQL adapter and the composition-root wiring. ~300k tokens.
+- lang:typescript: approve after 3 rounds. Fixed Option state, typed errors and operations, and the explicit test override. `deliberate: RerevokeTimeout stays exported beside the module's other error types`. ~186k tokens.
+- platform: approve in round 1. Its absent-series alert is filed for homelab 3b. 53k tokens.
 
 ## Rollback
 

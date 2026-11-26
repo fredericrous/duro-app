@@ -9,8 +9,16 @@
  * Runs a simple poll loop + a tiny HTTP health server for k8s probes.
  */
 
-import { Effect, Layer, Schedule } from "effect"
+import { Effect, Layer, Ref, Schedule } from "effect"
 import * as Http from "node:http"
+import {
+  type CrlDb,
+  type CrlPublisherState,
+  crlMetricsSnapshot,
+  initialCrlPublisherState,
+} from "~/lib/services/CrlPublisher.server"
+import { CrlDbLive } from "~/lib/services/CrlDb.server"
+import { formatCrlMetrics } from "~/worker/metrics"
 import { ProvisioningService, ProvisioningServiceLive } from "~/lib/governance/ProvisioningService.server"
 import { expireGrants } from "~/lib/workflows/grant-activation.server"
 import { PluginHostLive } from "~/lib/plugins/PluginHost.server"
@@ -28,7 +36,7 @@ import { OperatorClientLive } from "~/lib/services/OperatorClient.server"
 import { AppSyncServiceLive } from "~/lib/governance/AppSyncService.server"
 import { makeAppAutoSync } from "~/lib/governance/appAutoSync.server"
 import { CertificateRepoLive } from "~/lib/services/CertificateRepo.server"
-import { revocationSweepLoop } from "~/worker/revocation-loop"
+import { crlPublisherWorkerLoop, revocationSweepLoop } from "~/worker/revocation-loop"
 import { config } from "~/lib/config.server"
 import { FetchHttpClient } from "@effect/platform"
 import { OtelLayer } from "~/lib/telemetry.server"
@@ -56,6 +64,7 @@ const AppSyncWired = AppSyncServiceLive.pipe(
 
 const WorkerLayer = Layer.mergeAll(
   CertificateRepoLive,
+  CrlDbLive,
   GovernanceRepos,
   ApplicationRepoLive,
   AuditServiceLive,
@@ -172,48 +181,66 @@ const HEALTH_PORT = parseInt(process.env.WORKER_HEALTH_PORT ?? "3001", 10)
 // /health/ready hits the DB so kubelet can detect a wedged pool and
 // restart the worker. /health (and /) stay as cheap liveness checks
 // — the process being up does not imply the pool is healthy.
-const startHealthServer = Effect.gen(function* () {
-  const runtime = yield* Effect.runtime<SqlClient.SqlClient>()
-  const runProbe = (eff: Effect.Effect<unknown, unknown, SqlClient.SqlClient>) =>
-    Effect.runPromise(Effect.provide(eff, runtime))
-  return yield* Effect.acquireRelease(
-    Effect.sync(() => {
-      const server = Http.createServer((req, res) => {
-        if (req.url === "/health/ready") {
-          runProbe(
-            Effect.gen(function* () {
-              const sql = yield* SqlClient.SqlClient
-              yield* sql`SELECT 1`
-            }).pipe(Effect.timeout("3 seconds")),
-          ).then(
-            () => {
-              res.writeHead(200, { "Content-Type": "application/json" })
-              res.end(JSON.stringify({ status: "ready" }))
-            },
-            (err) => {
-              res.writeHead(503, { "Content-Type": "application/json" })
-              res.end(JSON.stringify({ status: "not_ready", error: String(err) }))
-            },
-          )
-          return
-        }
-        res.writeHead(200, { "Content-Type": "text/plain" })
-        res.end("ok")
-      })
-      server.listen(HEALTH_PORT, () => {
-        console.log(`worker health server on :${HEALTH_PORT}`)
-      })
-      return server
-    }),
-    (server) => Effect.sync(() => server.close()),
-  )
-})
+// /metrics serves the CRL publisher's gauges in Prometheus text format, on the
+// same port, scraped through the worker Service's ServiceMonitor.
+const startHealthServer = (crlState: Ref.Ref<CrlPublisherState>) =>
+  Effect.gen(function* () {
+    const runtime = yield* Effect.runtime<SqlClient.SqlClient | CrlDb>()
+    const runProbe = <A>(eff: Effect.Effect<A, unknown, SqlClient.SqlClient | CrlDb>) =>
+      Effect.runPromise(Effect.provide(eff, runtime))
+    const metrics = crlMetricsSnapshot(crlState).pipe(Effect.map(formatCrlMetrics), Effect.timeout("3 seconds"))
+    return yield* Effect.acquireRelease(
+      Effect.sync(() => {
+        const server = Http.createServer((req, res) => {
+          if (req.url === "/metrics") {
+            runProbe(metrics).then(
+              (body) => {
+                res.writeHead(200, { "Content-Type": "text/plain; version=0.0.4; charset=utf-8" })
+                res.end(body)
+              },
+              (err) => {
+                res.writeHead(503, { "Content-Type": "text/plain" })
+                res.end(`metrics unavailable: ${String(err)}`)
+              },
+            )
+            return
+          }
+          if (req.url === "/health/ready") {
+            runProbe(
+              Effect.gen(function* () {
+                const sql = yield* SqlClient.SqlClient
+                yield* sql`SELECT 1`
+              }).pipe(Effect.timeout("3 seconds")),
+            ).then(
+              () => {
+                res.writeHead(200, { "Content-Type": "application/json" })
+                res.end(JSON.stringify({ status: "ready" }))
+              },
+              (err) => {
+                res.writeHead(503, { "Content-Type": "application/json" })
+                res.end(JSON.stringify({ status: "not_ready", error: String(err) }))
+              },
+            )
+            return
+          }
+          res.writeHead(200, { "Content-Type": "text/plain" })
+          res.end("ok")
+        })
+        server.listen(HEALTH_PORT, () => {
+          console.log(`worker health server on :${HEALTH_PORT}`)
+        })
+        return server
+      }),
+      (server) => Effect.sync(() => server.close()),
+    )
+  })
 
 // Main
 
 const main = Effect.gen(function* () {
   yield* Effect.log("duro worker starting")
-  yield* startHealthServer
+  const crlState = yield* Ref.make(initialCrlPublisherState)
+  yield* startHealthServer(crlState)
   // The sync loop never fails (each tick recovers), so the poll loop alone
   // decides whether the worker lives: its crash still exits the process.
   yield* Effect.forkScoped(appSyncLoop)
@@ -221,6 +248,9 @@ const main = Effect.gen(function* () {
   // Vault never delays provisioning. Its Vault layer is built inside the loop:
   // unset NAS_VAULT_* disables the sweeper, never the worker.
   yield* Effect.forkScoped(revocationSweepLoop(FetchHttpClient.layer))
+  // Publishes the pki-client CRL for Envoy: at start, every 6 h, and after a
+  // revocation completes. Its own fiber; unset NAS_VAULT_* disables it only.
+  yield* Effect.forkScoped(crlPublisherWorkerLoop(FetchHttpClient.layer, crlState))
   yield* pollLoop
 }).pipe(Effect.scoped)
 

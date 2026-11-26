@@ -1,0 +1,22 @@
+{{- if .Values.worker.enabled }}
+# The worker serves no traffic; this Service exists so Prometheus can find its
+# /metrics (servicemonitor-worker.yaml). The component label on the Service
+# itself keeps the ServiceMonitor from also matching the web Service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "duro-app.fullname" . }}-worker
+  labels:
+    {{- include "duro-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.worker.port }}
+      targetPort: health
+      protocol: TCP
+      name: health
+  selector:
+    {{- include "duro-app.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+{{- end }}
