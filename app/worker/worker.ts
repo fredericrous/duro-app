@@ -28,16 +28,13 @@ import { OperatorClientLive } from "~/lib/services/OperatorClient.server"
 import { AppSyncServiceLive } from "~/lib/governance/AppSyncService.server"
 import { makeAppAutoSync } from "~/lib/governance/appAutoSync.server"
 import { CertificateRepoLive } from "~/lib/services/CertificateRepo.server"
-import { VaultCertManagerLive, VaultPkiLive } from "~/lib/services/VaultPki.server"
-import { sweepRevocations } from "~/lib/services/CertificateSweeper.server"
+import { revocationSweepLoop } from "~/lib/workflows/revocation-sweep.server"
 import { config } from "~/lib/config.server"
 import { FetchHttpClient } from "@effect/platform"
 import { OtelLayer } from "~/lib/telemetry.server"
 import * as SqlClient from "@effect/sql/SqlClient"
 
-// ---------------------------------------------------------------------------
 // Layer composition — same services as AppLayer but without web/oidc/email
-// ---------------------------------------------------------------------------
 
 const GovernanceRepos = Layer.mergeAll(
   PrincipalRepoLive,
@@ -57,13 +54,8 @@ const AppSyncWired = AppSyncServiceLive.pipe(
   Layer.provide(Layer.mergeAll(OperatorClientLive, GovernanceRepos, ApplicationRepoLive, PluginRegistryLive)),
 )
 
-// Vault credentials (NAS_VAULT_ADDR / NAS_VAULT_TOKEN) come from the same chart
-// env and envFrom as the web pods.
-const CertManagerWired = VaultCertManagerLive.pipe(Layer.provide(VaultPkiLive))
-
 const WorkerLayer = Layer.mergeAll(
   CertificateRepoLive,
-  CertManagerWired,
   GovernanceRepos,
   ApplicationRepoLive,
   AuditServiceLive,
@@ -73,9 +65,7 @@ const WorkerLayer = Layer.mergeAll(
   AppSyncWired,
 ).pipe(Layer.provideMerge(DbLive), Layer.provide(OtelLayer), Layer.provide(FetchHttpClient.layer))
 
-// ---------------------------------------------------------------------------
 // Poll loop
-// ---------------------------------------------------------------------------
 
 // Poll interval — Effect Schedule.spaced accepts DurationInput strings
 
@@ -155,11 +145,9 @@ const pollLoop = pollOnce.pipe(
   ),
 )
 
-// ---------------------------------------------------------------------------
 // App sync loop — DashboardApps reach duro without an admin clicking "Sync from
 // cluster". Its own cadence (a conditional GET a minute, a forced full sync an
 // hour) and its own fiber, so a slow operator never delays provisioning.
-// ---------------------------------------------------------------------------
 
 const APP_SYNC_EVERY = "60 seconds"
 const APP_SYNC_FORCE_EVERY_TICKS = 60
@@ -177,26 +165,7 @@ const appSyncLoop = config.operatorApiUrl
     )
   : Effect.log("worker: OPERATOR_API_URL unset, app auto-sync off")
 
-// ---------------------------------------------------------------------------
-// Revocation sweeper — retries cert revocations left pending or failed, on its
-// own fiber so a slow Vault never delays provisioning.
-// ---------------------------------------------------------------------------
-
-const REVOCATION_SWEEP_EVERY = "10 minutes"
-
-const revocationSweepLoop = sweepRevocations.pipe(
-  Effect.tap((attempted) => (attempted > 0 ? Effect.log("worker: revocation sweep", { attempted }) : Effect.void)),
-  Effect.tapErrorCause((cause) =>
-    Effect.logError("worker: revocation sweep failed").pipe(Effect.annotateLogs({ cause: String(cause) })),
-  ),
-  Effect.catchAll(() => Effect.void), // logged by the tapErrorCause above; the next tick retries
-  Effect.repeat(Schedule.spaced(REVOCATION_SWEEP_EVERY)),
-  Effect.asVoid,
-)
-
-// ---------------------------------------------------------------------------
 // Health server (for k8s liveness/readiness probes)
-// ---------------------------------------------------------------------------
 
 const HEALTH_PORT = parseInt(process.env.WORKER_HEALTH_PORT ?? "3001", 10)
 
@@ -240,9 +209,7 @@ const startHealthServer = Effect.gen(function* () {
   )
 })
 
-// ---------------------------------------------------------------------------
 // Main
-// ---------------------------------------------------------------------------
 
 const main = Effect.gen(function* () {
   yield* Effect.log("duro worker starting")
@@ -250,7 +217,10 @@ const main = Effect.gen(function* () {
   // The sync loop never fails (each tick recovers), so the poll loop alone
   // decides whether the worker lives: its crash still exits the process.
   yield* Effect.forkScoped(appSyncLoop)
-  yield* Effect.forkScoped(revocationSweepLoop)
+  // Retries cert revocations left pending or failed, on its own fiber so a slow
+  // Vault never delays provisioning. Its Vault layer is built inside the loop:
+  // unset NAS_VAULT_* disables the sweeper, never the worker.
+  yield* Effect.forkScoped(revocationSweepLoop(FetchHttpClient.layer))
   yield* pollLoop
 }).pipe(Effect.scoped)
 

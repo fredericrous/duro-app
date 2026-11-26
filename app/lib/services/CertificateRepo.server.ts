@@ -103,13 +103,28 @@ export class CertificateRepo extends Context.Tag("CertificateRepo")<
     readonly findBySerialCanonical: (canonical: string) => Effect.Effect<UserCertificate | null, CertificateRepoError>
     /** Marks cert as revoke-pending. Returns affected row count. Enforces ownership via username. */
     readonly markRevokePending: (serialNumber: string, username?: string) => Effect.Effect<number, CertificateRepoError>
-    readonly markRevokeCompleted: (serialNumber: string) => Effect.Effect<void, CertificateRepoError>
     /**
-     * Unrevoked certs whose revocation is `pending` or `failed` and whose
+     * Completes a revocation. Touches only a row not yet revoked; resolves
+     * `true` when this call changed a row, `false` when it was already
+     * completed (or does not exist), so a repeat never rewrites history.
+     */
+    readonly markRevokeCompleted: (serialNumber: string) => Effect.Effect<boolean, CertificateRepoError>
+    /**
+     * Unexpired, unrevoked certs whose revocation is `pending` or `failed` and whose
      * retry time has come (a NULL `revoke_next_at` is due now), oldest first.
      */
     readonly listDueRevocations: (limit: number) => Effect.Effect<UserCertificate[], CertificateRepoError>
-    readonly markRevokeFailed: (serialNumber: string, error: string) => Effect.Effect<void, CertificateRepoError>
+    /**
+     * Records a transient failure and schedules the retry. Touches only a row
+     * not yet revoked; resolves the new `revoke_attempts` (0 when no row changed).
+     */
+    readonly markRevokeFailed: (serialNumber: string, error: string) => Effect.Effect<number, CertificateRepoError>
+    /**
+     * Records a failure retrying cannot fix: the attempt count jumps to
+     * `MAX_REVOKE_ATTEMPTS`, so the sweeper stops offering the row. Resolves
+     * the new `revoke_attempts` (0 when no row changed).
+     */
+    readonly markRevokeAbandoned: (serialNumber: string, error: string) => Effect.Effect<number, CertificateRepoError>
     /** Marks all active certs as pending and returns their serial numbers. */
     readonly revokeAllForUser: (username: string) => Effect.Effect<string[], CertificateRepoError>
     readonly setUserId: (inviteId: string, userId: string) => Effect.Effect<void, CertificateRepoError>
@@ -122,7 +137,7 @@ export class CertificateRepo extends Context.Tag("CertificateRepo")<
 // ---------------------------------------------------------------------------
 
 /** After this many failures the sweeper stops; the device list's retry button remains. */
-const MAX_REVOKE_ATTEMPTS = 20
+export const MAX_REVOKE_ATTEMPTS = 20
 
 const withErr = <A>(effect: Effect.Effect<A, SqlError.SqlError>, message: string) =>
   effect.pipe(Effect.mapError((e) => new CertificateRepoError({ message, cause: e })))
@@ -283,7 +298,8 @@ export const CertificateRepoLive = Layer.effect(
       markRevokeCompleted: (serialNumber: string) =>
         withErr(
           sql`UPDATE user_certificates SET revoked_at = NOW(), revoke_state = 'completed', revoke_error = NULL
-              WHERE serial_number = ${serialNumber}`.pipe(Effect.asVoid),
+              WHERE serial_number = ${serialNumber} AND revoked_at IS NULL
+              RETURNING serial_number`.pipe(Effect.map((rows) => rows.length > 0)),
           "Failed to mark certificate as revoke-completed",
         ),
 
@@ -295,8 +311,19 @@ export const CertificateRepoLive = Layer.effect(
               SET revoke_state = 'failed', revoke_error = ${error},
                   revoke_next_at = NOW() + LEAST(POWER(2, revoke_attempts), 60) * INTERVAL '1 minute',
                   revoke_attempts = revoke_attempts + 1
-              WHERE serial_number = ${serialNumber}`.pipe(Effect.asVoid),
+              WHERE serial_number = ${serialNumber} AND revoked_at IS NULL
+              RETURNING revoke_attempts`.pipe(Effect.map((rows) => Number(rows[0]?.revokeAttempts ?? 0))),
           "Failed to mark certificate as revoke-failed",
+        ),
+
+      markRevokeAbandoned: (serialNumber: string, error: string) =>
+        withErr(
+          sql`UPDATE user_certificates
+              SET revoke_state = 'failed', revoke_error = ${error}, revoke_next_at = NULL,
+                  revoke_attempts = ${MAX_REVOKE_ATTEMPTS}
+              WHERE serial_number = ${serialNumber} AND revoked_at IS NULL
+              RETURNING revoke_attempts`.pipe(Effect.map((rows) => Number(rows[0]?.revokeAttempts ?? 0))),
+          "Failed to mark certificate as revoke-abandoned",
         ),
 
       listDueRevocations: (limit: number) =>
@@ -304,6 +331,7 @@ export const CertificateRepoLive = Layer.effect(
           sql`SELECT * FROM user_certificates
               WHERE revoke_state IN ('pending', 'failed')
                 AND revoked_at IS NULL
+                AND expires_at > NOW()
                 AND revoke_attempts < ${MAX_REVOKE_ATTEMPTS}
                 AND COALESCE(revoke_next_at, '-infinity') <= NOW()
               ORDER BY COALESCE(revoke_next_at, '-infinity') ASC
@@ -313,19 +341,12 @@ export const CertificateRepoLive = Layer.effect(
 
       revokeAllForUser: (username: string) =>
         withErr(
-          Effect.gen(function* () {
-            // One predicate for the SELECT and the UPDATE: an expired row is
-            // neither returned nor marked pending (it would stay pending forever).
-            const active = yield* sql`SELECT serial_number FROM user_certificates
-                            WHERE username = ${username} AND revoked_at IS NULL AND expires_at > NOW()`
-            const serials = active.map((r: any) => r.serialNumber as string)
-            if (serials.length > 0) {
-              yield* sql`UPDATE user_certificates
-                        SET revoke_state = 'pending', revoke_next_at = NOW() + INTERVAL '2 minutes'
-                        WHERE username = ${username} AND revoked_at IS NULL AND expires_at > NOW()`
-            }
-            return serials
-          }),
+          // One statement: an expired row is neither returned nor marked pending
+          // (it would stay pending forever), and no row can slip between a read and a write.
+          sql`UPDATE user_certificates
+              SET revoke_state = 'pending', revoke_next_at = NOW() + INTERVAL '2 minutes'
+              WHERE username = ${username} AND revoked_at IS NULL AND expires_at > NOW()
+              RETURNING serial_number`.pipe(Effect.map((rows) => rows.map((r: any) => r.serialNumber as string))),
           "Failed to revoke all certificates for user",
         ),
 

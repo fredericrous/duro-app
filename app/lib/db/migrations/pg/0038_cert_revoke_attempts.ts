@@ -14,5 +14,5 @@ export default Effect.gen(function* () {
   yield* sql`ALTER TABLE user_certificates ADD COLUMN IF NOT EXISTS revoke_attempts INTEGER NOT NULL DEFAULT 0`
   yield* sql`ALTER TABLE user_certificates ADD COLUMN IF NOT EXISTS revoke_next_at TIMESTAMPTZ`
   yield* sql`UPDATE user_certificates SET revoke_next_at = NOW()
-             WHERE revoke_state IN ('pending', 'failed') AND revoked_at IS NULL`
+             WHERE revoke_state IN ('pending', 'failed') AND revoked_at IS NULL AND expires_at > NOW()`
 })

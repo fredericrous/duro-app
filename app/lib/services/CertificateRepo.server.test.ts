@@ -4,7 +4,12 @@ import { it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { makeTestDbLayer } from "~/lib/db/client.server"
-import { CertificateRepo, CertificateRepoLive, type StoreCertInput } from "./CertificateRepo.server"
+import {
+  CertificateRepo,
+  CertificateRepoLive,
+  MAX_REVOKE_ATTEMPTS,
+  type StoreCertInput,
+} from "./CertificateRepo.server"
 
 const TestLayer = CertificateRepoLive.pipe(Layer.provideMerge(makeTestDbLayer()))
 
@@ -432,6 +437,55 @@ describe("CertificateRepo — revoke retry bookkeeping", () => {
         expect(Number(row.revokeAttempts)).toBe(2)
         expect(row.inFuture).toBe(true)
         expect((yield* repo.listDueRevocations(10)).map((c) => c.serialNumber)).not.toContain("SN-B")
+      }),
+    )
+  })
+})
+
+describe("CertificateRepo — revocation due list", () => {
+  it.layer(TestLayer)("listDueRevocations skips an expired unrevoked row", (it) => {
+    it.effect("expired row is not due", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        yield* repo.store(sample({ serialNumber: "SN-LIVE", username: "erin", expiresAt: inDays(30) }))
+        yield* repo.store(sample({ serialNumber: "SN-STALE", username: "erin", expiresAt: inDays(-1) }))
+        yield* repo.markRevokeFailed("SN-LIVE", "vault 503")
+        yield* repo.markRevokeFailed("SN-STALE", "vault 503")
+        const sql = yield* SqlClient.SqlClient
+        yield* sql`UPDATE user_certificates SET revoke_next_at = NOW() - INTERVAL '1 minute'`
+
+        expect((yield* repo.listDueRevocations(10)).map((c) => c.serialNumber)).toEqual(["SN-LIVE"])
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("markRevokeAbandoned takes the row out of the due list", (it) => {
+    it.effect("attempts jump to the cap", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        yield* repo.store(sample({ serialNumber: "SN-GONE", username: "frank" }))
+
+        const attempts = yield* repo.markRevokeAbandoned("SN-GONE", "403 denied")
+
+        expect(attempts).toBe(MAX_REVOKE_ATTEMPTS)
+        expect((yield* repo.listDueRevocations(10)).map((c) => c.serialNumber)).not.toContain("SN-GONE")
+      }),
+    )
+  })
+
+  it.layer(TestLayer)("a completed row stays completed", (it) => {
+    it.effect("completed and failed marks only touch unrevoked rows", () =>
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        yield* repo.store(sample({ serialNumber: "SN-FIN", username: "gina" }))
+
+        expect(yield* repo.markRevokeCompleted("SN-FIN")).toBe(true)
+        expect(yield* repo.markRevokeCompleted("SN-FIN")).toBe(false)
+        expect(yield* repo.markRevokeFailed("SN-FIN", "late failure")).toBe(0)
+
+        const row = yield* repo.findBySerial("SN-FIN")
+        expect(row?.revokeState).toBe("completed")
+        expect(row?.revokeError).toBeNull()
       }),
     )
   })

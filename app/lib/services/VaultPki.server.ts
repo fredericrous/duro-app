@@ -8,7 +8,18 @@ import { makeJsonApi } from "~/lib/http.server"
 export class VaultPkiError extends Data.TaggedError("VaultPkiError")<{
   readonly message: string
   readonly cause?: unknown
+  /** True when retrying the same call cannot succeed (a Vault 4xx other than the idempotent cases). */
+  readonly permanent?: boolean
 }> {}
+
+const VAULT_STATUS_PATTERN = /Vault request failed: (\d{3}) - /
+// 408 and 429 say "try again later", unlike the rest of 4xx.
+const TRANSIENT_CLIENT_STATUSES = new Set([408, 429])
+
+const isPermanentVaultFailure = (message: string): boolean => {
+  const status = Number(VAULT_STATUS_PATTERN.exec(message)?.[1])
+  return status >= 400 && status < 500 && !TRANSIENT_CLIENT_STATUSES.has(status)
+}
 
 // --- Vault response schemas ---
 
@@ -236,14 +247,17 @@ export const VaultPkiLive = Layer.effect(
             if (msg.includes("already revoked") || msg.includes("404")) {
               return Effect.void
             }
-            return Effect.fail(new VaultPkiError({ message: `Failed to revoke cert: ${msg}` }))
+            return Effect.fail(
+              new VaultPkiError({ message: `Failed to revoke cert: ${msg}`, permanent: isPermanentVaultFailure(msg) }),
+            )
           }),
         ),
     }
   }),
 )
 
-const mapVaultError = (e: VaultPkiError) => new CertManagerError({ message: e.message, cause: e.cause })
+const mapVaultError = (e: VaultPkiError) =>
+  new CertManagerError({ message: e.message, cause: e.cause, permanent: e.permanent })
 
 export const VaultCertManagerLive = Layer.effect(
   CertManager,

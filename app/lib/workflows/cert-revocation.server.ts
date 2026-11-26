@@ -1,55 +1,75 @@
 import { Effect } from "effect"
 import { CertManager } from "~/lib/services/CertManager.server"
-import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
+import { CertificateRepo, MAX_REVOKE_ATTEMPTS } from "~/lib/services/CertificateRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 
-/**
- * Revoke one cert serial, recording completion or failure. Never fails: within
- * a batch a single failure must NOT abort the rest — revoke as many as possible
- * and record which failed (a security operation should not be blocked by one
- * bad serial; the admin can retry those).
- *
- * When `auditUsername` or `actorId` is provided, a `cert.revoked` audit event is emitted on
- * successful revocation (audit failure swallowed). Shared by the admin batch
- * loops and the revokeInvite/revokeUser workflows.
- */
+/** Which route led to a revocation; recorded in the `cert.revoked` audit metadata. */
+export type RevokePath = "admin" | "self" | "recovery" | "reveal" | "user-revoke" | "sweeper"
+
 export interface RevokeSerialOptions {
-  /** Owner of the cert; recorded in the audit metadata. */
+  /** Owner of the cert, when known; recorded in the audit metadata. */
   readonly auditUsername?: string
-  /** Who acted (an admin's username, or a system actor); recorded as the audit actor. */
-  readonly actorId?: string
-  /** Which route led here: `admin`, `recovery`, `sweeper`, ... */
-  readonly path?: string
+  /** Who acted (a username, or a `system` actor); recorded as the audit actor. */
+  readonly actorId: string
+  readonly path: RevokePath
 }
 
-export const revokeSerialForUser = (serial: string, opts: RevokeSerialOptions = {}) =>
+export type RevokeOutcome = { readonly _tag: "Revoked" } | { readonly _tag: "RevokeFailed"; readonly error: string }
+
+const isPermanent = (error: unknown): boolean =>
+  typeof error === "object" && error !== null && "permanent" in error && error.permanent === true
+
+/**
+ * Revoke one cert serial in the CA and record the result on its row. Never
+ * fails: within a batch a single failure must not abort the rest, so the
+ * result is a tagged outcome the caller can count or report. A success marks
+ * the row completed and, only when that call is the one that completed it,
+ * emits a `cert.revoked` audit event (audit failure is logged, not raised). A
+ * failure records the attempt for the sweeper's backoff; a permanent CA
+ * refusal sets the attempt count to its cap at once.
+ *
+ * Called by the admin handlers (`revokeAdminSerial` in admin-users.ts), the
+ * revokeInvite and revokeUser workflows (invite.server.ts), recovery approval
+ * (recovery.server.ts), `revokeSupersededCert` below, the settings self-revoke
+ * and the duro-worker revocation sweep.
+ */
+export const revokeSerialForUser = (serial: string, opts: RevokeSerialOptions) =>
   Effect.gen(function* () {
     const cert = yield* CertManager
     const certRepo = yield* CertificateRepo
     const audit = yield* AuditService
-    yield* cert.revokeCert(serial).pipe(
-      Effect.tap(() => certRepo.markRevokeCompleted(serial)),
-      Effect.tap(() =>
-        opts.auditUsername === undefined && opts.actorId === undefined
-          ? Effect.void
-          : audit
-              .emit({
-                eventType: "cert.revoked",
-                actorId: opts.actorId,
-                targetType: "user_certificate",
-                targetId: serial,
-                metadata: { username: opts.auditUsername, path: opts.path },
-              })
-              .pipe(Effect.catchAll((e) => Effect.logWarning("cert.revoked audit emit failed", { error: String(e) }))),
-      ),
+
+    const recordFailure = (error: unknown) =>
+      Effect.gen(function* () {
+        const message = String(error)
+        const attempts = isPermanent(error)
+          ? yield* certRepo.markRevokeAbandoned(serial, message)
+          : yield* certRepo.markRevokeFailed(serial, message)
+        if (attempts >= MAX_REVOKE_ATTEMPTS) {
+          yield* Effect.logError("revocation abandoned", { serial, attempts, error: message })
+        }
+      }).pipe(
+        Effect.catchAll((markError) =>
+          Effect.logWarning("cert revocation: marking failed failed", { serial, error: String(markError) }),
+        ),
+      )
+
+    const emitAudit = audit
+      .emit({
+        eventType: "cert.revoked",
+        actorId: opts.actorId,
+        targetType: "user_certificate",
+        targetId: serial,
+        metadata: { username: opts.auditUsername, path: opts.path },
+      })
+      .pipe(Effect.catchAll((e) => Effect.logWarning("cert.revoked audit emit failed", { error: String(e) })))
+
+    return yield* cert.revokeCert(serial).pipe(
+      Effect.flatMap(() => certRepo.markRevokeCompleted(serial)),
+      Effect.flatMap((completedNow) => (completedNow ? emitAudit : Effect.void)),
+      Effect.as({ _tag: "Revoked" } as RevokeOutcome),
       Effect.catchAll((e) =>
-        certRepo
-          .markRevokeFailed(serial, String(e))
-          .pipe(
-            Effect.catchAll((markError) =>
-              Effect.logWarning("cert revocation: marking failed failed", { serial: serial, error: String(markError) }),
-            ),
-          ),
+        recordFailure(e).pipe(Effect.as({ _tag: "RevokeFailed", error: String(e) } as RevokeOutcome)),
       ),
     )
   })
@@ -58,9 +78,9 @@ export const revokeSerialForUser = (serial: string, opts: RevokeSerialOptions = 
  * Retire the cert a renewal replaced, once the replacement has actually been
  * revealed to its owner. Best-effort by construction: the user must still get
  * their new certificate even if revoking the old one fails, so every error is
- * swallowed here. A failure leaves revoke_state='failed' on the row, which the
- * device list surfaces with a retry button — the only recovery path, since
- * the sweeper in duro-worker retries stuck revocations in the background.
+ * swallowed here. A failure leaves revoke_state='failed' on the row: the
+ * duro-worker sweeper retries it in the background, and the device list
+ * surfaces it with a retry button for an immediate retry.
  *
  * Ownership is re-checked by reading the row rather than trusting an UPDATE's
  * affected-row count, which is driver-dependent here (see setLabel's note).
@@ -72,7 +92,7 @@ export const revokeSupersededCert = (serial: string, username: string) =>
     // Already gone, never existed, or not this user's to revoke.
     if (!existing || existing.revokedAt || existing.username !== username) return
     yield* certRepo.markRevokePending(serial, username)
-    yield* revokeSerialForUser(serial, { auditUsername: username })
+    yield* revokeSerialForUser(serial, { auditUsername: username, actorId: username, path: "reveal" })
   }).pipe(
     Effect.catchAll((e) =>
       Effect.logWarning("[cert-renewal] failed to revoke superseded cert", { serial, error: String(e) }),

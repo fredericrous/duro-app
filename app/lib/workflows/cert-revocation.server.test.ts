@@ -3,7 +3,9 @@ import { describe, expect, it, beforeEach } from "vitest"
 import { Effect } from "effect"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { CertManager } from "~/lib/services/CertManager.server"
-import { revokeSupersededCert } from "./cert-revocation.server"
+import { AuditService } from "~/lib/governance/AuditService.server"
+import { CertManagerError } from "~/lib/services/CertManager.server"
+import { revokeSerialForUser, revokeSupersededCert } from "./cert-revocation.server"
 import { testRunEffect, truncateAll } from "~/test/test-runtime"
 
 const seedCert = (serialNumber: string, username: string) =>
@@ -82,5 +84,94 @@ describe("revokeSupersededCert", () => {
     expect(cert?.revokeState).toBe("failed")
     expect(cert?.revokeError).toContain("vault down")
     expect(cert?.revokedAt).toBeNull()
+  })
+})
+
+const REVOKE_OPTIONS = { auditUsername: "alice", actorId: "admin-sub", path: "admin" } as const
+
+const recordingAudit = (events: Array<{ eventType: string; actorId?: string; metadata?: Record<string, unknown> }>) =>
+  AuditService.of({
+    emit: (event) => Effect.sync(() => void events.push(event)),
+    query: () => Effect.succeed([]),
+    subscribe: () => Effect.succeed(() => {}),
+  })
+
+const withVault = (
+  effect: ReturnType<typeof revokeSerialForUser>,
+  events: Array<{ eventType: string; actorId?: string; metadata?: Record<string, unknown> }>,
+  revokeCert: () => Effect.Effect<void, CertManagerError>,
+) =>
+  effect.pipe(
+    Effect.provideService(AuditService, recordingAudit(events)),
+    Effect.provideService(CertManager, { revokeCert } as never),
+  )
+
+describe("revokeSerialForUser", () => {
+  it("audits once with the actor and path, and a second revoke of the completed serial adds nothing", async () => {
+    await testRunEffect(seedCert("SN-TWICE", "alice"))
+    const events: Array<{ eventType: string; actorId?: string; metadata?: Record<string, unknown> }> = []
+
+    const first = await testRunEffect(
+      withVault(revokeSerialForUser("SN-TWICE", REVOKE_OPTIONS), events, () => Effect.void),
+    )
+    const second = await testRunEffect(
+      withVault(revokeSerialForUser("SN-TWICE", REVOKE_OPTIONS), events, () => Effect.void),
+    )
+    // A Vault outage on a repeat must not move a completed row back to failed either.
+    const third = await testRunEffect(
+      withVault(revokeSerialForUser("SN-TWICE", REVOKE_OPTIONS), events, () =>
+        Effect.fail(new CertManagerError({ message: "vault down" })),
+      ),
+    )
+
+    expect(first._tag).toBe("Revoked")
+    expect(second._tag).toBe("Revoked")
+    expect(third._tag).toBe("RevokeFailed")
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({
+      eventType: "cert.revoked",
+      actorId: "admin-sub",
+      metadata: { username: "alice", path: "admin" },
+    })
+    const row = await testRunEffect(readCert("SN-TWICE"))
+    expect(row?.revokeState).toBe("completed")
+    expect(row?.revokeError).toBeNull()
+    expect(row?.revokedAt).not.toBeNull()
+  })
+
+  it("returns RevokeFailed with the error and counts the attempt", async () => {
+    await testRunEffect(seedCert("SN-DOWN", "alice"))
+
+    const outcome = await testRunEffect(
+      withVault(revokeSerialForUser("SN-DOWN", REVOKE_OPTIONS), [], () =>
+        Effect.fail(new CertManagerError({ message: "vault 503" })),
+      ),
+    )
+
+    expect(outcome).toMatchObject({ _tag: "RevokeFailed" })
+    expect(outcome._tag === "RevokeFailed" && outcome.error).toContain("vault 503")
+    const row = await testRunEffect(readCert("SN-DOWN"))
+    expect(row?.revokeState).toBe("failed")
+  })
+
+  it("a permanent Vault refusal caps the attempts so the sweeper stops offering the row", async () => {
+    await testRunEffect(seedCert("SN-DENIED", "alice"))
+
+    await testRunEffect(
+      withVault(revokeSerialForUser("SN-DENIED", REVOKE_OPTIONS), [], () =>
+        Effect.fail(new CertManagerError({ message: "403 permission denied", permanent: true })),
+      ),
+    )
+
+    const due = await testRunEffect(
+      Effect.gen(function* () {
+        const repo = yield* CertificateRepo
+        return yield* repo.listDueRevocations(10)
+      }),
+    )
+    expect(due.map((cert) => cert.serialNumber)).not.toContain("SN-DENIED")
+    const row = await testRunEffect(readCert("SN-DENIED"))
+    expect(row?.revokeState).toBe("failed")
+    expect(row?.revokedAt).toBeNull()
   })
 })

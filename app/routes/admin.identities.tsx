@@ -98,7 +98,9 @@ export async function action({ request }: Route.ActionArgs) {
   const parsed = parseAdminUsersMutation(formData as any)
   if ("error" in parsed) return parsed
 
-  return await runEffect(handleAdminUsersMutation(parsed, auth.user ?? auth.sub ?? "admin"))
+  if (!auth.sub) return { error: "Cannot identify the acting admin" }
+
+  return await runEffect(handleAdminUsersMutation(parsed, auth.sub))
 }
 
 const styles = css.create({

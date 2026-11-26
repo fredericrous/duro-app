@@ -11,10 +11,14 @@ import { CertificateRepo, type UserCertificate } from "~/lib/services/Certificat
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 
-const mockAudit = Layer.succeed(AuditService, {
-  emit: () => Effect.void,
-  query: () => Effect.succeed([]),
-} as any)
+const mockAudit = Layer.succeed(
+  AuditService,
+  AuditService.of({
+    emit: () => Effect.void,
+    query: () => Effect.succeed([]),
+    subscribe: () => Effect.succeed(() => {}),
+  }),
+)
 
 // --- Minimal mock layers ---
 
@@ -41,13 +45,14 @@ const mockCertRepo = (certs: Map<string, UserCertificate> = new Map()) =>
     },
     markRevokeCompleted: (sn: string) => {
       const cert = certs.get(sn)
-      if (cert) certs.set(sn, { ...cert, revokedAt: new Date().toISOString(), revokeState: "completed" })
-      return Effect.void
+      if (!cert || cert.revokedAt) return Effect.succeed(false)
+      certs.set(sn, { ...cert, revokedAt: new Date().toISOString(), revokeState: "completed" })
+      return Effect.succeed(true)
     },
     markRevokeFailed: (sn: string, error: string) => {
       const cert = certs.get(sn)
       if (cert) certs.set(sn, { ...cert, revokeState: "failed", revokeError: error })
-      return Effect.void
+      return Effect.succeed(1)
     },
     revokeAllForUser: (username: string) => {
       const serials = [...certs.values()]
