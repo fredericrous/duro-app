@@ -79,3 +79,52 @@ describe("requireAuth — pending-cert redirect", () => {
     expect(auth.user).toBe("alice")
   })
 })
+
+describe("requireAuth — a device presenting its user's revoked certificate", () => {
+  const seedRevokedCert = (username: string) =>
+    seedTestDb(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        const expires = new Date(Date.now() + 86400_000).toISOString()
+        yield* sql`INSERT INTO user_certificates (id, username, email, serial_number, issued_at, expires_at, revoked_at)
+                   VALUES ('cert-1', ${username}, 'x@example.com', '0a:1b:2c:3d:4e:5f', ${new Date().toISOString()},
+                           ${expires}, '2026-09-23T16:22:23Z')`
+      }) as Effect.Effect<void, never, never>,
+    )
+
+  /** A signed-in request from alice's device, which presents the fixture cert. */
+  const aliceRequest = async (path: string, init: RequestInit = {}) => {
+    const setCookie = await createSessionCookie({ sub: "abc", name: "alice", email: "alice@example.com", groups: [] })
+    return new Request(`http://home.example${path}`, {
+      ...init,
+      headers: { cookie: setCookie.split(";")[0], "x-forwarded-client-cert": XFCC },
+    })
+  }
+
+  it("sends any page but /devices to /devices", async () => {
+    await seedRevokedCert("alice")
+    for (const path of ["/", "/settings", "/admin", "/catalog.data"]) {
+      const res = await catchResponse(requireAuth(await aliceRequest(path)))
+      expect(res.status).toBe(302)
+      expect(res.headers.get("location")).toBe("/devices")
+    }
+  })
+
+  it("refuses any other write with 403", async () => {
+    await seedRevokedCert("alice")
+    const res = await catchResponse(requireAuth(await aliceRequest("/settings", { method: "POST" })))
+    expect(res.status).toBe(403)
+  })
+
+  it("lets /devices and its data and writes through", async () => {
+    await seedRevokedCert("alice")
+    expect((await requireAuth(await aliceRequest("/devices"))).user).toBe("alice")
+    expect((await requireAuth(await aliceRequest("/devices.data"))).user).toBe("alice")
+    expect((await requireAuth(await aliceRequest("/devices", { method: "POST" }))).user).toBe("alice")
+  })
+
+  it("leaves a device alone when the revoked certificate is another user's", async () => {
+    await seedRevokedCert("bob")
+    expect((await requireAuth(await aliceRequest("/settings"))).user).toBe("alice")
+  })
+})

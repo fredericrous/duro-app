@@ -9,7 +9,7 @@ import { t } from "~/test/test-utils"
 // "My requests" badge reads openRequestItems from the "routes/dashboard"
 // layout loader, so pass one when a test needs the badge to render.
 const renderHeader = (
-  props: { user: string; isAdmin: boolean; showMenu?: boolean },
+  props: { user: string; isAdmin: boolean; showMenu?: boolean; restricted?: boolean },
   dashboard?: { openRequestItems?: number; certAlerts?: number },
 ) =>
   renderRoute({
@@ -56,6 +56,18 @@ describe("Header", () => {
     expect(screen.queryByText(t("header.welcome", undefined, { user: "alice" }))).not.toBeInTheDocument()
     expect(screen.queryByRole("link", { name: new RegExp(t("header.devices")) })).not.toBeInTheDocument()
     expect(screen.queryByRole("link", { name: new RegExp(t("header.myRequests")) })).not.toBeInTheDocument()
+  })
+
+  it("keeps only Devices and the account menu when the device is restricted", async () => {
+    // A device presenting its revoked certificate is confined to /devices
+    // (requireAuth); the menu's own items (only Log out) are checked in a
+    // browser, since the DS Menu popup does not open reliably under jsdom.
+    renderHeader({ user: "alice", isAdmin: true, restricted: true })
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: new RegExp(t("header.devices")) })).toBeInTheDocument()
+    })
+    expect(screen.queryByRole("link", { name: new RegExp(t("header.myRequests")) })).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /Welcome, alice/ })).toBeInTheDocument()
   })
 
   it("renders the account menu trigger with the welcome greeting for the user", async () => {

@@ -1,7 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
 import { Effect } from "effect"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 
 vi.mock("~/lib/auth.server", () => ({
   requireAuth: vi.fn(),
@@ -28,7 +26,6 @@ import { runEffect } from "~/lib/runtime.server"
 import { parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
 import { isOriginAllowed } from "~/lib/config.server"
 import { presentedRevokedNotice } from "~/lib/workflows/presented-cert.server"
-import { data } from "react-router"
 import { action, loader } from "./devices"
 import { callAction, callLoader, expectData } from "~/test/route-utils"
 
@@ -62,12 +59,6 @@ describe("/devices loader", () => {
 describe("/devices loader: the certificate this device presented", () => {
   const budget = { used: 0, limit: 3, nextAvailable: null }
   const XFCC_HEADER = "x-forwarded-client-cert"
-  // client-cert-fixture.pem canonicalizes to serial "a1b2c3d4e5f". This file
-  // runs under jsdom, where import.meta.url is not a file URL.
-  const FIXTURE_XFCC = `Cert="${encodeURIComponent(
-    readFileSync(join(process.cwd(), "app/test/fixtures/client-cert-fixture.pem"), "utf8"),
-  )}"`
-  const notice = { revokedAt: "2026-09-23T16:22:23.000Z", label: null }
 
   it("asks the lookup with the request's XFCC and the signed-in user", async () => {
     mockRunEffect.mockResolvedValue({ budget, certificates: [], pendingClaim: null, presentedRevoked: null } as never)
@@ -80,37 +71,6 @@ describe("/devices loader: the certificate this device presented", () => {
     const loaderData = expectData<{ presentedRevoked: unknown }>(await callLoader(loader))
     expect(vi.mocked(presentedRevokedNotice)).toHaveBeenCalledWith(null, "alice")
     expect(loaderData.presentedRevoked).toBeNull()
-  })
-
-  /** The class React Router's data() returns (its type export has no runtime value). */
-  const DataWithInit = data(null).constructor as new (...args: never[]) => { data: unknown; init: ResponseInit | null }
-  /** The loader's answer, unwrapped when it came back through data() with headers. */
-  const unwrap = (value: unknown) =>
-    value instanceof DataWithInit ? { payload: value.data, init: value.init } : { payload: value, init: null }
-
-  it("sets the once-a-day cookie when it shows the notice", async () => {
-    mockRunEffect.mockResolvedValue({ budget, certificates: [], pendingClaim: null, presentedRevoked: notice } as never)
-    const { payload, init } = unwrap(expectData(await callLoader(loader, { headers: { [XFCC_HEADER]: FIXTURE_XFCC } })))
-    expect((payload as { presentedRevoked: unknown }).presentedRevoked).toEqual(notice)
-    expect(new Headers(init?.headers).get("Set-Cookie")).toBe(
-      "duro_revoked_notice=a1b2c3d4e5f; Path=/; Max-Age=86400; HttpOnly; Secure; SameSite=Lax",
-    )
-  })
-
-  it("does not set it again when it already holds that serial, nor with no notice", async () => {
-    mockRunEffect.mockResolvedValue({ budget, certificates: [], pendingClaim: null, presentedRevoked: notice } as never)
-    const again = unwrap(
-      expectData(
-        await callLoader(loader, {
-          headers: { [XFCC_HEADER]: FIXTURE_XFCC, cookie: "duro_revoked_notice=a1b2c3d4e5f" },
-        }),
-      ),
-    )
-    expect(again.init).toBeNull()
-
-    mockRunEffect.mockResolvedValue({ budget, certificates: [], pendingClaim: null, presentedRevoked: null } as never)
-    const none = unwrap(expectData(await callLoader(loader, { headers: { [XFCC_HEADER]: FIXTURE_XFCC } })))
-    expect(none.init).toBeNull()
   })
 })
 
@@ -183,6 +143,8 @@ describe("DevicesPage: the presented certificate is revoked", () => {
     expect(within(warning).getByRole("button", { name: "Add a device" })).toBeEnabled()
     // The header keeps its own: same name, two buttons page-wide.
     expect(screen.getAllByRole("button", { name: "Add a device" })).toHaveLength(2)
+    // Confined to Devices (requireAuth): the header drops "My requests".
+    expect(screen.queryByRole("link", { name: /My requests/ })).toBeNull()
   })
 
   it("disables its button while the device setup is being issued", async () => {

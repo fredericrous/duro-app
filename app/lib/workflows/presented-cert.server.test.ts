@@ -8,13 +8,7 @@ import { fileURLToPath } from "node:url"
 import { disposeTestRuntime, seedTestDb, testRunEffect, truncateAll } from "~/test/test-runtime"
 import { ClientCaTrust } from "~/lib/services/ClientCaTrust.server"
 import { CertificateRepo, CertificateRepoError } from "~/lib/services/CertificateRepo.server"
-import {
-  presentedRevokedCert,
-  presentedRevokedNotice,
-  presentedSerial,
-  readCookie,
-  revokedNoticeCookie,
-} from "./presented-cert.server"
+import { presentedRevokedCert, presentedRevokedNotice } from "./presented-cert.server"
 
 // The fixture cert canonicalizes to serial "a1b2c3d4e5f"; Vault stores it in colon form.
 const FIXTURE_PEM = readFileSync(
@@ -162,23 +156,4 @@ describe("presentedRevokedCert (stubbed services)", () => {
       ),
     ),
   )
-})
-
-describe("presented-cert helpers", () => {
-  it("reads the canonical serial of the presented cert", () => {
-    expect(presentedSerial(XFCC)).toBe("a1b2c3d4e5f")
-    expect(presentedSerial(null)).toBeNull()
-  })
-
-  it("reads one cookie from a raw Cookie header", () => {
-    expect(readCookie("a=1; duro_revoked_notice=a1b2c3d4e5f; b=2", "duro_revoked_notice")).toBe("a1b2c3d4e5f")
-    expect(readCookie("a=1", "duro_revoked_notice")).toBeNull()
-    expect(readCookie(null, "duro_revoked_notice")).toBeNull()
-  })
-
-  it("builds the suppression cookie for one day", () => {
-    expect(revokedNoticeCookie("a1b2c3d4e5f")).toBe(
-      "duro_revoked_notice=a1b2c3d4e5f; Path=/; Max-Age=86400; HttpOnly; Secure; SameSite=Lax",
-    )
-  })
 })

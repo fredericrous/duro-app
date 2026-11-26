@@ -44,9 +44,12 @@ interface HeaderProps {
   user: string
   isAdmin: boolean
   showMenu?: boolean
+  /** This device presents its user's revoked certificate: duro confines it to
+   *  /devices (requireAuth), so the header offers only Devices and sign-out. */
+  restricted?: boolean
 }
 
-export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
+export function Header({ user, isAdmin, showMenu = true, restricted = false }: HeaderProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [logoutOpen, setLogoutOpen] = useState(false)
@@ -86,19 +89,21 @@ export function Header({ user, isAdmin, showMenu = true }: HeaderProps) {
               </Badge>
             )}
           </LinkButton>
-          <LinkButton href="/requests" variant="secondary">
-            {t("header.myRequests")}
-            {openItems > 0 && (
-              <Badge variant="info" size="sm">
-                {openItems}
-              </Badge>
-            )}
-          </LinkButton>
+          {!restricted && (
+            <LinkButton href="/requests" variant="secondary">
+              {t("header.myRequests")}
+              {openItems > 0 && (
+                <Badge variant="info" size="sm">
+                  {openItems}
+                </Badge>
+              )}
+            </LinkButton>
+          )}
           <Menu.Root>
             <Menu.Trigger>{t("header.welcome", { user })} &#9662;</Menu.Trigger>
             <Menu.Popup align="end">
-              {isAdmin && <Menu.LinkItem href="/admin">{t("common.admin")}</Menu.LinkItem>}
-              <Menu.LinkItem href="/settings">{t("common.settings")}</Menu.LinkItem>
+              {isAdmin && !restricted && <Menu.LinkItem href="/admin">{t("common.admin")}</Menu.LinkItem>}
+              {!restricted && <Menu.LinkItem href="/settings">{t("common.settings")}</Menu.LinkItem>}
               <Menu.Item onClick={() => setLogoutOpen(true)}>{t("common.logout")}</Menu.Item>
             </Menu.Popup>
           </Menu.Root>

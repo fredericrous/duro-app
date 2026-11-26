@@ -35,34 +35,6 @@ export interface PresentedRevokedNotice {
 /** Budget for the whole check: home waits for it before it starts streaming. */
 export const PRESENTED_CERT_TIMEOUT = Duration.millis(300)
 
-/** The cookie that holds the canonical serial already redirected today. */
-export const REVOKED_NOTICE_COOKIE = "duro_revoked_notice"
-
-/** The canonical serial of the presented certificate, or null. Synchronous. */
-export function presentedSerial(xfcc: string | null | undefined): string | null {
-  const parsed = parseXfccCert(xfcc)
-  return parsed ? canonicalSerial(parsed.serial) : null
-}
-
-/**
- * Read one cookie from a raw `Cookie` header. The value is the plain
- * canonical serial (hex), not React Router's `createCookie` encoding.
- */
-export function readCookie(cookieHeader: string | null | undefined, name: string): string | null {
-  if (!cookieHeader) return null
-  for (const part of cookieHeader.split(";")) {
-    const eq = part.indexOf("=")
-    if (eq === -1) continue
-    if (part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim()
-  }
-  return null
-}
-
-/** `Set-Cookie` value that suppresses the home redirect for this serial for a day. */
-export function revokedNoticeCookie(serial: string): string {
-  return `${REVOKED_NOTICE_COOKIE}=${serial}; Path=/; Max-Age=86400; HttpOnly; Secure; SameSite=Lax`
-}
-
 export const presentedRevokedCert = (
   xfcc: string | null | undefined,
   username: string | null | undefined,

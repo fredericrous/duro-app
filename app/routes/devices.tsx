@@ -1,4 +1,4 @@
-import { data, useRouteLoaderData } from "react-router"
+import { useRouteLoaderData } from "react-router"
 import { Effect } from "effect"
 import type { Route } from "./+types/devices"
 import { requireAuth } from "~/lib/auth.server"
@@ -7,13 +7,7 @@ import { isOriginAllowed } from "~/lib/config.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { findPendingClaim } from "~/lib/workflows/cert-reveal.server"
 import { deviceBudget } from "~/lib/workflows/device-budget.server"
-import {
-  presentedRevokedNotice,
-  presentedSerial,
-  readCookie,
-  REVOKED_NOTICE_COOKIE,
-  revokedNoticeCookie,
-} from "~/lib/workflows/presented-cert.server"
+import { presentedRevokedNotice } from "~/lib/workflows/presented-cert.server"
 import { parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
 import { Header } from "~/components/Header/Header"
 import { DevicesSection } from "~/components/DevicesSection/DevicesSection"
@@ -43,16 +37,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       return { budget, certificates, pendingClaim, presentedRevoked }
     }),
   )
-  const payload = { email: auth.email, budget, certificates, pendingClaim, presentedRevoked }
-
-  // Home redirects here once a day per revoked serial: the cookie that stops
-  // it is set only once the notice is shown, so a failed lookup here leaves
-  // the redirect to retry. A matching cookie is not refreshed (a fixed day).
-  const serial = presentedRevoked ? presentedSerial(xfcc) : null
-  if (serial !== null && readCookie(request.headers.get("cookie"), REVOKED_NOTICE_COOKIE) !== serial) {
-    return data(payload, { headers: { "Set-Cookie": revokedNoticeCookie(serial) } })
-  }
-  return payload
+  return { email: auth.email, budget, certificates, pendingClaim, presentedRevoked }
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -72,7 +57,10 @@ export default function DevicesPage({ loaderData }: Route.ComponentProps) {
   const isAdmin = dashboardData?.isAdmin ?? false
 
   return (
-    <PageShell maxWidth="lg" header={<Header user={user} isAdmin={isAdmin} />}>
+    <PageShell
+      maxWidth="lg"
+      header={<Header user={user} isAdmin={isAdmin} restricted={loaderData.presentedRevoked !== null} />}
+    >
       <DevicesSection
         budget={loaderData.budget}
         certificates={loaderData.certificates}

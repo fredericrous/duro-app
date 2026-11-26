@@ -1,8 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 
 // === Test-runtime swap ===
 // Replace runEffect with one bound to a real PGlite + real repos AppLayer.
@@ -21,11 +19,6 @@ vi.mock("~/lib/config.server", () => ({
   config: { categoryOrder: ["media", "tools"] },
   isOriginAllowed: vi.fn().mockReturnValue(true),
 }))
-// The real check, wrapped so a test can see whether it ran at all.
-vi.mock("~/lib/workflows/presented-cert.server", async (importOriginal) => {
-  const mod = await importOriginal<typeof import("~/lib/workflows/presented-cert.server")>()
-  return { ...mod, presentedRevokedCert: vi.fn(mod.presentedRevokedCert) }
-})
 vi.mock("~/lib/apps.server", () => ({
   getVisibleApps: vi.fn().mockReturnValue([]),
   loadApps: vi.fn().mockReturnValue([]),
@@ -34,7 +27,6 @@ vi.mock("~/lib/apps.server", () => ({
 import { getAuth } from "~/lib/auth.server"
 import { isOriginAllowed } from "~/lib/config.server"
 import { getVisibleApps, loadApps } from "~/lib/apps.server"
-import { presentedRevokedCert } from "~/lib/workflows/presented-cert.server"
 import { action, loader } from "./home"
 import { seedTestDb, truncateAll } from "~/test/test-runtime"
 import { callAction, callLoader, expectData } from "~/test/route-utils"
@@ -80,71 +72,6 @@ const seedAliceAndAppNoPolicy = Effect.gen(function* () {
              VALUES ('app-jelly', 'jellyfin', 'Jellyfin', 'request', 'p-alice')`
   yield* sql`INSERT INTO roles (id, application_id, slug, display_name)
              VALUES ('role-viewer', 'app-jelly', 'viewer', 'Viewer')`
-})
-
-// The fixture cert canonicalizes to serial "a1b2c3d4e5f"; Vault stores it in colon form.
-// This file runs under jsdom, where import.meta.url is not a file URL.
-const FIXTURE_PEM = readFileSync(join(process.cwd(), "app/test/fixtures/client-cert-fixture.pem"), "utf8")
-const XFCC = `Cert="${encodeURIComponent(FIXTURE_PEM)}"`
-
-const seedRevokedCert = (username: string) =>
-  seedTestDb(
-    Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient
-      const expires = new Date(Date.now() + 30 * 86400_000).toISOString()
-      yield* sql`INSERT INTO user_certificates (id, username, email, serial_number, issued_at, expires_at, revoked_at)
-                 VALUES ('cert-1', ${username}, 'x@example.com', '0a:1b:2c:3d:4e:5f',
-                         ${new Date().toISOString()}, ${expires}, '2026-09-23T16:22:23Z')`
-    }) as Effect.Effect<void, never, never>,
-  )
-
-describe("/home loader: a device presenting its user's revoked certificate", () => {
-  beforeEach(() => {
-    mockGetAuth.mockResolvedValue({ user: "daddy", sub: "daddy-sub", email: "d@x", groups: [] } as never)
-  })
-
-  it("is sent to /devices", async () => {
-    await seedRevokedCert("daddy")
-    const loaded = await callLoader(loader, { url: "http://localhost/", headers: { "x-forwarded-client-cert": XFCC } })
-    expect(loaded.kind).toBe("response")
-    if (loaded.kind !== "response") return
-    expect(loaded.response.status).toBe(302)
-    expect(loaded.response.headers.get("Location")).toBe("/devices")
-    // The suppression cookie is set by /devices once it has shown the notice.
-    expect(loaded.response.headers.get("Set-Cookie")).toBeNull()
-  })
-
-  it("stays on home, with no lookup, once the cookie holds that serial", async () => {
-    await seedRevokedCert("daddy")
-    const loaded = await callLoader(loader, {
-      url: "http://localhost/",
-      headers: { "x-forwarded-client-cert": XFCC, cookie: "duro_revoked_notice=a1b2c3d4e5f" },
-    })
-    expect(loaded.kind).toBe("data")
-    expect(vi.mocked(presentedRevokedCert)).not.toHaveBeenCalled()
-  })
-
-  it("is sent again when the cookie holds another serial", async () => {
-    await seedRevokedCert("daddy")
-    const loaded = await callLoader(loader, {
-      url: "http://localhost/",
-      headers: { "x-forwarded-client-cert": XFCC, cookie: "duro_revoked_notice=ffff" },
-    })
-    expect(loaded.kind).toBe("response")
-  })
-
-  it("stays on home with no client certificate", async () => {
-    await seedRevokedCert("daddy")
-    const loaded = await callLoader(loader, { url: "http://localhost/" })
-    expect(loaded.kind).toBe("data")
-    expect(vi.mocked(presentedRevokedCert)).not.toHaveBeenCalled()
-  })
-
-  it("stays on home when the revoked certificate is another user's", async () => {
-    await seedRevokedCert("alice")
-    const loaded = await callLoader(loader, { url: "http://localhost/", headers: { "x-forwarded-client-cert": XFCC } })
-    expect(loaded.kind).toBe("data")
-  })
 })
 
 describe("/home loader", () => {

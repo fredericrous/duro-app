@@ -1,5 +1,5 @@
 import { Suspense, use } from "react"
-import { Effect, Either, Option, Schema } from "effect"
+import { Effect, Either, Schema } from "effect"
 import type { Route } from "./+types/home"
 import { getVisibleApps, loadApps } from "~/lib/apps.server"
 import { config, isOriginAllowed } from "~/lib/config.server"
@@ -9,7 +9,7 @@ import { NoAccess } from "~/components/NoAccess/NoAccess"
 import { CenteredCardPage } from "~/components/CenteredCardPage/CenteredCardPage"
 import { AppSearchBar, AppSearchBarSkeleton } from "~/components/AppSearchBar/AppSearchBar"
 import { EmptyState, Inline, LinkButton, PageShell, Stack, Button } from "@greenharness/greenrack-ui"
-import { redirect, useFetcher, useRouteLoaderData } from "react-router"
+import { useFetcher, useRouteLoaderData } from "react-router"
 import { useTranslation } from "react-i18next"
 import { runEffect } from "~/lib/runtime.server"
 import { requirePrincipal } from "~/lib/governance/current-principal.server"
@@ -19,13 +19,6 @@ import { AuthzEngine } from "~/lib/governance/AuthzEngine.server"
 import { PrincipalRepo } from "~/lib/governance/PrincipalRepo.server"
 import { submitAccessRequest } from "~/lib/workflows/access-request.server"
 import { loadAppsCatalogForPrincipal, type AppCatalogEntry } from "~/lib/apps-catalog.server"
-import type { AuthInfo } from "~/lib/auth.server"
-import {
-  presentedRevokedCert,
-  presentedSerial,
-  readCookie,
-  REVOKED_NOTICE_COOKIE,
-} from "~/lib/workflows/presented-cert.server"
 import type { AppDefinition } from "~/lib/apps"
 import { formatCategory, getCategoryOrder } from "~/lib/apps"
 import { filterByQuery } from "~/lib/search"
@@ -47,7 +40,9 @@ interface HomeData {
  * Returned to the loader as an unawaited Promise so the route shell streams
  * before this finishes — see HomePage's <Suspense> below.
  */
-async function loadHomeData(auth: AuthInfo): Promise<HomeData> {
+async function loadHomeData(request: Request): Promise<HomeData> {
+  const { getAuth } = await import("~/lib/auth.server")
+  const auth = await getAuth(request)
   const staticApps = getVisibleApps(auth.groups)
 
   let visibleApps = staticApps
@@ -117,29 +112,11 @@ async function loadHomeData(auth: AuthInfo): Promise<HomeData> {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const { getAuth } = await import("~/lib/auth.server")
-  const auth = await getAuth(request)
-
-  // A device presenting one of this user's revoked certificates is sent to
-  // /devices to get a new one (duro-https has no CRL: it is the way back in).
-  // The sync parse and the cookie test come first, so a device already sent
-  // there today, or with no client cert, costs no lookup. The /devices loader
-  // sets the cookie once it has shown the notice, so a failed lookup there
-  // leaves this redirect retryable. Plan: 2026-11-26-revoked-cert-notice.
-  const xfcc = request.headers.get("x-forwarded-client-cert")
-  if (auth.user && xfcc) {
-    const serial = presentedSerial(xfcc)
-    if (serial !== null && readCookie(request.headers.get("cookie"), REVOKED_NOTICE_COOKIE) !== serial) {
-      const revoked = await runEffect(presentedRevokedCert(xfcc, auth.user))
-      if (Option.isSome(revoked)) throw redirect("/devices")
-    }
-  }
-
   // Defer the slow path so the page shell paints before checkBulk finishes.
   // React Router v7 streams unawaited promises in single-fetch responses; the
   // client consumes via Suspense + use() in HomeBody below.
   return {
-    homeDataPromise: loadHomeData(auth),
+    homeDataPromise: loadHomeData(request),
     categoryOrder: config.categoryOrder,
   }
 }
