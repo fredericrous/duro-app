@@ -12,6 +12,6 @@ if (!i18next.isInitialized) {
     defaultNS,
     resources: { en: { translation: en }, fr: { translation: fr } },
     interpolation: { escapeValue: false },
-    initImmediate: false,
+    initAsync: false,
   })
 }
