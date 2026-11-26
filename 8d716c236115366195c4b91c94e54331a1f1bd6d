@@ -1,0 +1,20 @@
+greengate-provenance-v1
+commit 915f8a687a9d01857846c517fc68962fa0e93a76
+tree 8d716c236115366195c4b91c94e54331a1f1bd6d
+canon ba7ad3f5f062814d0acdd76f7e3a2b3e8f494c77
+patch b141e86f7a4bbad65de73caa48578878644b761e
+plan docs/plans/2026-11-25-gateway-enforces-client-cert-revocation.md b4dfec45bc15bfbd9baec0ec3047703dc0a0b9899d93ec1f32282e6384f3df34
+review reviewed 016751b833a4d3d706893d034cd7448c3cb3ceab60ed99cd988500c0fb7ef186
+code-review backend reviewed 016751b833a4d3d706893d034cd7448c3cb3ceab60ed99cd988500c0fb7ef186
+code-review lang:typescript reviewed 016751b833a4d3d706893d034cd7448c3cb3ceab60ed99cd988500c0fb7ef186
+code-review architect reviewed 016751b833a4d3d706893d034cd7448c3cb3ceab60ed99cd988500c0fb7ef186
+code-review platform reviewed 016751b833a4d3d706893d034cd7448c3cb3ceab60ed99cd988500c0fb7ef186
+preview approved
+producer greenbelay 6.18.0
+
+-----BEGIN SSH SIGNATURE-----
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAg7UOvJ8myo4dhW907VFty7T/bUV
+RFQerK+MWJ4bjChwcAAAAUZ3JlZW5nYXRlLXByb3ZlbmFuY2UAAAAAAAAABnNoYTUxMgAA
+AFMAAAALc3NoLWVkMjU1MTkAAABArFBPdHyylUW4nvSeK5d9V/qUFsfPFxvPEeYgZaEwNA
+WnVZMyusIlaUJQlzAO+3g3089XoPbg/LQJSfJDjaX1Aw==
+-----END SSH SIGNATURE-----
