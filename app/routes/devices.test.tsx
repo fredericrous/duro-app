@@ -76,9 +76,9 @@ describe("/devices loader: the certificate this device presented", () => {
 
   it("asks with no XFCC when the request has none, and passes null through", async () => {
     mockRunEffect.mockResolvedValue({ budget, certificates: [], pendingClaim: null, presentedRevoked: null } as never)
-    const data = expectData<{ presentedRevoked: unknown }>(await callLoader(loader))
+    const loaderData = expectData<{ presentedRevoked: unknown }>(await callLoader(loader))
     expect(vi.mocked(presentedRevokedNotice)).toHaveBeenCalledWith(null, "alice")
-    expect(data.presentedRevoked).toBeNull()
+    expect(loaderData.presentedRevoked).toBeNull()
   })
 
   /** The loader's answer, unwrapped when it came back through data() with headers. */

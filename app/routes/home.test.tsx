@@ -105,45 +105,45 @@ describe("/home loader: a device presenting its user's revoked certificate", () 
 
   it("is sent to /devices", async () => {
     await seedRevokedCert("daddy")
-    const result = await callLoader(loader, { url: "http://localhost/", headers: { "x-forwarded-client-cert": XFCC } })
-    expect(result.kind).toBe("response")
-    if (result.kind !== "response") return
-    expect(result.response.status).toBe(302)
-    expect(result.response.headers.get("Location")).toBe("/devices")
+    const loaded = await callLoader(loader, { url: "http://localhost/", headers: { "x-forwarded-client-cert": XFCC } })
+    expect(loaded.kind).toBe("response")
+    if (loaded.kind !== "response") return
+    expect(loaded.response.status).toBe(302)
+    expect(loaded.response.headers.get("Location")).toBe("/devices")
     // The suppression cookie is set by /devices once it has shown the notice.
-    expect(result.response.headers.get("Set-Cookie")).toBeNull()
+    expect(loaded.response.headers.get("Set-Cookie")).toBeNull()
   })
 
   it("stays on home, with no lookup, once the cookie holds that serial", async () => {
     await seedRevokedCert("daddy")
-    const result = await callLoader(loader, {
+    const loaded = await callLoader(loader, {
       url: "http://localhost/",
       headers: { "x-forwarded-client-cert": XFCC, cookie: "duro_revoked_notice=a1b2c3d4e5f" },
     })
-    expect(result.kind).toBe("data")
+    expect(loaded.kind).toBe("data")
     expect(vi.mocked(presentedRevokedCert)).not.toHaveBeenCalled()
   })
 
   it("is sent again when the cookie holds another serial", async () => {
     await seedRevokedCert("daddy")
-    const result = await callLoader(loader, {
+    const loaded = await callLoader(loader, {
       url: "http://localhost/",
       headers: { "x-forwarded-client-cert": XFCC, cookie: "duro_revoked_notice=ffff" },
     })
-    expect(result.kind).toBe("response")
+    expect(loaded.kind).toBe("response")
   })
 
   it("stays on home with no client certificate", async () => {
     await seedRevokedCert("daddy")
-    const result = await callLoader(loader, { url: "http://localhost/" })
-    expect(result.kind).toBe("data")
+    const loaded = await callLoader(loader, { url: "http://localhost/" })
+    expect(loaded.kind).toBe("data")
     expect(vi.mocked(presentedRevokedCert)).not.toHaveBeenCalled()
   })
 
   it("stays on home when the revoked certificate is another user's", async () => {
     await seedRevokedCert("alice")
-    const result = await callLoader(loader, { url: "http://localhost/", headers: { "x-forwarded-client-cert": XFCC } })
-    expect(result.kind).toBe("data")
+    const loaded = await callLoader(loader, { url: "http://localhost/", headers: { "x-forwarded-client-cert": XFCC } })
+    expect(loaded.kind).toBe("data")
   })
 })
 

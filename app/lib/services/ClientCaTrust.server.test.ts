@@ -88,32 +88,34 @@ describe("ClientCaTrustLive", () => {
     }).pipe(Effect.provide(ClientCaTrustLive.pipe(Layer.provide(FetchHttpClient.layer)))),
   )
 
-  it("a caller that stops waiting does not cancel the CA refresh: it fills the cache", async () => {
+  effectIt.effect("a caller that stops waiting does not cancel the CA refresh: it fills the cache", () =>
     // The revoked-cert notice waits 300 ms at most for a CA check it runs in a
-    // daemon fiber (presented-cert.server.ts). Vault answering in 500 ms must
+    // daemon fiber (presented-cert.server.ts). A Vault slower than that must
     // still warm the cache for the next check, not be cancelled every time.
-    const calls = { count: 0 }
-    server.use(
-      http.get(CA_URL, async () => {
-        calls.count++
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        return HttpResponse.json({ data: { certificate: CLIENT_CA } })
-      }),
-    )
-    const rt = makeRuntime()
-    const first = await rt.runPromise(
-      Effect.gen(function* () {
-        const trust = yield* ClientCaTrust
-        const fiber = yield* Effect.forkDaemon(trust.isIssuedByClientCa(LEAF_CLIENT_CA))
-        return yield* Fiber.join(fiber).pipe(Effect.timeoutOption("300 millis"))
-      }),
-    )
-    expect(first).toEqual(Option.none())
-    await new Promise((resolve) => setTimeout(resolve, 700))
-    expect(await check(rt, LEAF_CLIENT_CA)).toBe(true)
-    expect(calls.count).toBe(1)
-    await rt.dispose()
-  })
+    // Vault answers only when the test opens the gate: no real wait.
+    Effect.gen(function* () {
+      let openGate!: () => void
+      const gate = new Promise<void>((resolve) => (openGate = resolve))
+      const calls = { count: 0 }
+      server.use(
+        http.get(CA_URL, async () => {
+          calls.count++
+          await gate
+          return HttpResponse.json({ data: { certificate: CLIENT_CA } })
+        }),
+      )
+      const trust = yield* ClientCaTrust
+      const refresh = yield* Effect.forkDaemon(trust.isIssuedByClientCa(LEAF_CLIENT_CA))
+      const waiter = yield* Effect.fork(Fiber.join(refresh).pipe(Effect.timeoutOption("300 millis")))
+      yield* TestClock.adjust("300 millis")
+      expect(yield* Fiber.join(waiter)).toEqual(Option.none()) // the caller gave up
+
+      openGate() // Vault answers after the caller left
+      expect(yield* Fiber.join(refresh)).toBe(true) // the refresh still finished
+      expect(yield* trust.isIssuedByClientCa(LEAF_CLIENT_CA)).toBe(true) // from the cache
+      expect(calls.count).toBe(1)
+    }).pipe(Effect.provide(ClientCaTrustLive.pipe(Layer.provide(FetchHttpClient.layer)))),
+  )
 
   effectIt.effect("gives up on a Vault fetch after 5 s and fails closed with nothing cached", () =>
     Effect.gen(function* () {

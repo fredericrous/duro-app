@@ -37,8 +37,9 @@ const seedCert = (opts: { username?: string; revokedAt?: string | null; label?: 
     }) as Effect.Effect<void, never, never>,
   )
 
-const trustLayer = (trusted: boolean) =>
-  Layer.succeed(ClientCaTrust, { isIssuedByClientCa: () => Effect.succeed(trusted) })
+/** The issuer check, stubbed: the pki-client CA signed every certificate, or none. */
+const signedByClientCa = Layer.succeed(ClientCaTrust, { isIssuedByClientCa: () => Effect.succeed(true) })
+const signedByAnotherCa = Layer.succeed(ClientCaTrust, { isIssuedByClientCa: () => Effect.succeed(false) })
 
 const run = <A>(effect: Effect.Effect<A, never, CertificateRepo | ClientCaTrust>) => testRunEffect(effect)
 
@@ -81,7 +82,7 @@ describe("presentedRevokedCert (PGlite)", () => {
 
   it("is None for a cert the pki-client CA did not sign", async () => {
     await seedCert()
-    expect(await run(presentedRevokedCert(XFCC, "daddy").pipe(Effect.provide(trustLayer(false))))).toEqual(
+    expect(await run(presentedRevokedCert(XFCC, "daddy").pipe(Effect.provide(signedByAnotherCa)))).toEqual(
       Option.none(),
     )
   })
@@ -109,7 +110,7 @@ describe("presentedRevokedCert (stubbed services)", () => {
     presentedRevokedCert(XFCC, "daddy").pipe(
       Effect.tap((hit) => Effect.sync(() => expect(hit).toEqual(Option.none()))),
       Effect.provide(
-        Layer.mergeAll(repoLayer(Effect.fail(new CertificateRepoError({ message: "db down" }))), trustLayer(true)),
+        Layer.mergeAll(repoLayer(Effect.fail(new CertificateRepoError({ message: "db down" }))), signedByClientCa),
       ),
     ),
   )
