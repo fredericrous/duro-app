@@ -13,7 +13,7 @@ vi.mock("./runtime.server", async () => {
   return { runEffect: mod.testRunEffect, runDbEffect: mod.testRunEffect }
 })
 
-const { requireAuth, getAuth } = await import("./auth.server")
+const { requireAuth, getAuth, refuseRevokedDevice } = await import("./auth.server")
 const { createSessionCookie } = await import("./session.server")
 const { seedTestDb, truncateAll } = await import("~/test/test-runtime")
 
@@ -163,6 +163,19 @@ describe("requireAuth — a device presenting its user's revoked certificate", (
     expect((await getAuth(await aliceRequest("/requests"))).user).toBe("alice") // fails soft
     expect((await requireAuth(await aliceRequest("/settings"))).user).toBe("alice")
     spy.mockRestore()
+  })
+
+  it("refuseRevokedDevice: 403 for the API whatever the method, nothing for a device that is fine", async () => {
+    await seedRevokedCert("alice")
+    for (const method of ["GET", "POST"]) {
+      const res = await catchResponse(
+        refuseRevokedDevice(await aliceRequest("/api/grants/export", { method }), "alice"),
+      )
+      expect(res.status).toBe(403)
+    }
+    await expect(refuseRevokedDevice(await aliceRequest("/api/x"), "bob")).resolves.toBeUndefined()
+    await truncateAll()
+    await expect(refuseRevokedDevice(await aliceRequest("/api/x"), "alice")).resolves.toBeUndefined()
   })
 
   it("leaves a device alone when the revoked certificate is another user's", async () => {

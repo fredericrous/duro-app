@@ -300,6 +300,33 @@ describe("DevicesPage: the presented certificate is revoked", () => {
     expect(asked).toEqual(["showClaimLink:email"])
   })
 
+  it("'Try again' after a failed re-send repeats the re-send, never issues a new certificate", async () => {
+    const asked: string[] = []
+    renderRoute({
+      route: {
+        path: "/devices",
+        Component: DevicesPage as never,
+        loader: pageData({
+          presentedRevoked: revoked,
+          pendingClaim: { expiresAt: new Date(Date.now() + 3600_000).toISOString() },
+        }),
+        action: async ({ request }) => {
+          const form = await request.formData()
+          asked.push(`${form.get("intent")}:${form.get("delivery")}`)
+          return { certError: "Please wait a minute before sending the link again." }
+        },
+      },
+      url: "/devices",
+    })
+    const waiting = await screen.findByText(/A device setup is waiting/)
+    const alert = screen.getAllByRole("alert").find((a) => a.contains(waiting)) as HTMLElement
+    await userEvent.click(within(alert).getByRole("button", { name: t("devices.pending.emailAction") }))
+    expect(await screen.findByText(t("devices.qr.sendErrorTitle"))).toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: t("devices.qr.retry") }))
+    await waitFor(() => expect(asked).toHaveLength(2))
+    expect(asked).toEqual(["showClaimLink:email", "showClaimLink:email"])
+  })
+
   it("points to the waiting setup, with no button, when one is pending", async () => {
     renderRoute({
       route: {

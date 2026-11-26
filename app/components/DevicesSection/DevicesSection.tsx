@@ -515,14 +515,17 @@ export function DevicesSection({
   const [session, setSession] = useState<{
     staleData: SettingsResult | undefined
     blockedUntil: string | null
+    /** What opened the dialog: "Try again" repeats THIS, never another action
+     *  (re-sending a waiting link must not issue a new certificate). */
+    intent: "issueCert" | "showClaimLink"
   } | null>(null)
 
   // A device presenting its revoked certificate gets the link by email only;
   // the server enforces it, the page just asks for what it will get.
   const delivery = presentedRevoked !== null ? "email" : "link"
 
-  const issue = () => {
-    fetcher.submit({ intent: "issueCert", delivery }, { method: "post", action: API_URL })
+  const submitIntent = (intent: "issueCert" | "showClaimLink") => {
+    fetcher.submit({ intent, delivery }, { method: "post", action: API_URL })
   }
 
   // The button never swallows a click: the dialog opens first, and whatever
@@ -531,20 +534,21 @@ export function DevicesSection({
   // the click without re-rendering on a timer.
   const openClaimDialog = () => {
     const full = budget.used >= budget.limit && budget.nextAvailable !== null
-    setSession({ staleData: fetcher.data, blockedUntil: full ? budget.nextAvailable : null })
-    if (!full) issue()
+    setSession({ staleData: fetcher.data, blockedUntil: full ? budget.nextAvailable : null, intent: "issueCert" })
+    if (!full) submitIntent("issueCert")
   }
 
   const retry = () => {
-    setSession({ staleData: fetcher.data, blockedUntil: null })
-    issue()
+    const intent = session?.intent ?? "issueCert"
+    setSession({ staleData: fetcher.data, blockedUntil: null, intent })
+    submitIntent(intent)
   }
 
   // Resume an interrupted setup: same certificate, fresh link, no budget
   // spent. Opens the same dialog so there is one place a claim link lives.
   const resumeClaim = () => {
-    setSession({ staleData: fetcher.data, blockedUntil: null })
-    fetcher.submit({ intent: "showClaimLink", delivery }, { method: "post", action: API_URL })
+    setSession({ staleData: fetcher.data, blockedUntil: null, intent: "showClaimLink" })
+    submitIntent("showClaimLink")
   }
 
   // Only THIS session's answer counts — `fetcher.data` outlives the dialog.

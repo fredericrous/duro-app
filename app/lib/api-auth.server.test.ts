@@ -7,19 +7,34 @@ vi.mock("./session.server", () => ({
 vi.mock("./runtime.server", () => ({
   runEffect: vi.fn(),
 }))
+vi.mock("./auth.server", () => ({
+  refuseRevokedDevice: vi.fn(),
+}))
 
 import { getSession } from "./session.server"
 import { runEffect } from "./runtime.server"
+import { refuseRevokedDevice } from "./auth.server"
 import { requireApiAuth, requireScope } from "./api-auth.server"
 
 const mockGetSession = vi.mocked(getSession)
 const mockRunEffect = vi.mocked(runEffect)
+const mockRefuse = vi.mocked(refuseRevokedDevice)
 
 beforeEach(() => {
   vi.clearAllMocks()
 })
 
 const req = (headers: Record<string, string> = {}) => new Request("http://localhost/api/x", { headers })
+
+describe("requireApiAuth: a device presenting its user's revoked certificate", () => {
+  it("is refused with 403 before the session is turned into a principal", async () => {
+    mockGetSession.mockResolvedValue({ sub: "alice-sub", name: "alice", email: "a@x", groups: [] } as never)
+    mockRefuse.mockRejectedValueOnce(new Response("revoked", { status: 403 }))
+    await expect(requireApiAuth(req())).rejects.toMatchObject({ status: 403 })
+    expect(mockRunEffect).not.toHaveBeenCalled()
+    expect(mockRefuse).toHaveBeenCalledWith(expect.any(Request), "alice")
+  })
+})
 
 describe("requireApiAuth", () => {
   it("returns a session-source result when the session resolves to a known principal (keyed on sub, not name)", async () => {

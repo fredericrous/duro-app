@@ -62,7 +62,10 @@ function presentedStatus(request: Request, user: string): Promise<PresentedCertS
   if (!status) {
     // runEffect only rejects on a defect outside the check: unknown, not a 500.
     status = runEffect(presentedCertStatus(request.headers.get("x-forwarded-client-cert"), user)).catch(
-      (): PresentedCertStatus => ({ _tag: "Unavailable" }),
+      (error): PresentedCertStatus => {
+        console.warn("presented-cert: the lookup rejected; treating the device's status as unavailable", error)
+        return { _tag: "Unavailable" }
+      },
     )
     statusByRequest.set(request, status)
   }
@@ -83,10 +86,10 @@ function presentedStatus(request: Request, user: string): Promise<PresentedCertS
  * /devices never pays for the lookup; elsewhere it is one indexed query, the
  * CA check only on a hit, once per request, under 300 ms (presented-cert.server).
  */
-async function isConfined(request: Request, auth: AuthInfo): Promise<boolean> {
-  if (!request.headers.get("x-forwarded-client-cert") || !auth.user) return false
+async function isConfined(request: Request, user: string | null): Promise<boolean> {
+  if (!request.headers.get("x-forwarded-client-cert") || !user) return false
   if (reachableWhileRevoked(new URL(request.url).pathname)) return false
-  return isRestricted(await presentedStatus(request, auth.user))
+  return isRestricted(await presentedStatus(request, user))
 }
 
 const isRead = (request: Request) => ["GET", "HEAD"].includes(request.method.toUpperCase())
@@ -96,7 +99,7 @@ const refusedWrite = () =>
 
 /** requireAuth: a confined device is sent to /devices, and its writes are refused. */
 async function confineRevokedDevice(request: Request, auth: AuthInfo): Promise<void> {
-  if (!(await isConfined(request, auth))) return
+  if (!(await isConfined(request, auth.user))) return
   if (isRead(request)) throw new Response(null, { status: 302, headers: { Location: "/devices" } })
   throw refusedWrite()
 }
@@ -158,7 +161,16 @@ export async function getAuth(request: Request): Promise<AuthInfo> {
       ? DEV_AUTH
       : null
   if (!user) return signedOut
-  if (!(await isConfined(request, user))) return user
+  if (!(await isConfined(request, user.user))) return user
   if (isRead(request)) return signedOut
   throw refusedWrite()
+}
+
+/**
+ * For API routes, which read the session cookie themselves (a session counts
+ * as scope `*` there): a device presenting its user's revoked certificate is
+ * refused with 403, whatever the method. There is no page to send it to.
+ */
+export async function refuseRevokedDevice(request: Request, user: string): Promise<void> {
+  if (await isConfined(request, user)) throw refusedWrite()
 }
