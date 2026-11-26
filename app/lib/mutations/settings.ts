@@ -171,7 +171,7 @@ function handleRenewCert(serialNumber: string, auth: AuthInfo) {
  * certificate: nothing is issued and the daily budget is untouched, so being
  * interrupted mid-setup no longer costs a day.
  */
-/** A re-sent claim link is mailed at most once a minute: earlier links stay live. */
+/** A re-sent claim link is mailed at most once a minute (earlier links stay live); a repeat inside it answers as sent. */
 const EMAIL_RESEND_INTERVAL_MS = 60_000
 
 function handleShowClaimLink(auth: AuthInfo, delivery: "email" | "link") {
@@ -182,7 +182,8 @@ function handleShowClaimLink(auth: AuthInfo, delivery: "email" | "link") {
       if (!auth.email) return { certError: "No email associated with your account." } as SettingsResult
       const latest = yield* (yield* CertRevealRepo).findLatestLive(auth.user!)
       if (latest && Date.now() - new Date(latest.createdAt).getTime() < EMAIL_RESEND_INTERVAL_MS) {
-        return { certError: "A link was just emailed to you. Check your inbox." } as SettingsResult
+        // Idempotent: a link already went out a moment ago, and says so.
+        return { certSent: true as const } as SettingsResult
       }
     }
     const pending = yield* reissueClaimLink(auth.user!)

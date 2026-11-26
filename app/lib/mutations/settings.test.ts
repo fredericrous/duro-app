@@ -346,10 +346,10 @@ describe("handleSettingsMutation — renewCert", () => {
         }) as Effect.Effect<void, never, never>,
       )
 
-    it("refuses to mail another link within a minute: earlier links stay live, so no pile of them", async () => {
+    it("mails no other link within a minute (earlier links stay live, so no pile): a repeat answers as sent", async () => {
       await run({ intent: "issueCert", delivery: "link", auth })
       const tooSoon = await run({ intent: "showClaimLink", delivery: "email", auth })
-      expect(tooSoon).toMatchObject({ certError: expect.stringContaining("just emailed") })
+      expect(tooSoon).toEqual({ certSent: true })
       const count = () =>
         testRunEffect(
           Effect.gen(function* () {
