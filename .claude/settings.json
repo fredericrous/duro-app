@@ -12,7 +12,7 @@
       {
         "hooks": [
           {
-            "command": "sh .claude/hooks/aval-heads.sh",
+            "command": "sh .claude/hooks/greentopo-heads.sh",
             "type": "command"
           }
         ]
@@ -22,8 +22,8 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "command": "sh .claude/hooks/greenrack-plan.sh"
+            "command": "sh .claude/hooks/greenrack-plan.sh",
+            "type": "command"
           }
         ]
       }
