@@ -53,6 +53,11 @@ export type PresentedCertStatus =
   /** The lookup itself failed or ran out of time: nothing is known. */
   | { readonly _tag: "Unavailable" }
 
+const notRevoked: PresentedCertStatus = { _tag: "NotRevoked" }
+const unproven: PresentedCertStatus = { _tag: "Unproven" }
+const unavailable: PresentedCertStatus = { _tag: "Unavailable" }
+const revoked = (cert: PresentedRevokedCert): PresentedCertStatus => ({ _tag: "Revoked", cert })
+
 /** Restricted: duro treats the device as presenting a revoked certificate. */
 export const isRestricted = (status: PresentedCertStatus): boolean =>
   status._tag === "Revoked" || status._tag === "Unproven"
@@ -67,7 +72,7 @@ export const presentedCertStatus = (
 ): Effect.Effect<PresentedCertStatus, never, CertificateRepo | ClientCaTrust> =>
   Effect.gen(function* () {
     const parsed = parseXfccCert(xfcc)
-    if (!username || !parsed) return { _tag: "NotRevoked" } as const
+    if (!username || !parsed) return notRevoked
     const serial = canonicalSerial(parsed.serial)
     const timeout = options.timeout ?? PRESENTED_CERT_TIMEOUT
 
@@ -77,7 +82,7 @@ export const presentedCertStatus = (
       const cert = yield* certRepo.findBySerialCanonical(serial)
       // Never reveal another user's certificate, nor an unrevoked one.
       if (!cert || cert.username !== username || cert.revokedAt === null) {
-        return { _tag: "NotRevoked" } as PresentedCertStatus
+        return notRevoked
       }
       // A serial is unique only within one issuer, and this listener also
       // trusts the break-glass root: prove pki-client signed it, last.
@@ -87,20 +92,23 @@ export const presentedCertStatus = (
       // it, only without waiting). ClientCaTrustLive bounds the fetch to 5 s.
       yield* Ref.set(step, "client CA check")
       const trust = yield* ClientCaTrust
-      const caCheck = yield* Effect.forkDaemon(trust.isIssuedByClientCa(parsed.pem))
-      const issuedByClientCa = yield* Fiber.join(caCheck)
-      if (!issuedByClientCa) return { _tag: "NotRevoked" } as PresentedCertStatus
+      const caCheck = yield* Effect.forkDaemon(trust.clientCaVerdict(parsed.pem))
+      const verdict = yield* Fiber.join(caCheck)
+      // No CA to ask is not "another CA signed it": a cold cache with Vault
+      // down must not let a lost device through (fails closed, like a timeout).
+      if (verdict === "unknown") return unproven
+      if (verdict === "not-issued") return notRevoked
       // The driver hands timestamptz back as a Date despite the row's string
       // type: normalise, so loader data and the notice see one ISO string.
       const revokedAt = new Date(cert.revokedAt).toISOString()
-      return { _tag: "Revoked", cert: { serial, revokedAt, label: cert.label } } as PresentedCertStatus
+      return revoked({ serial, revokedAt, label: cert.label })
     }).pipe(
       // Every cause, defects included: a bad row or a dying dependency must
       // cost the notice, never the page.
       Effect.catchAllCause((cause) =>
         Effect.logWarning("presented-cert: certificate lookup failed; its status is unknown", {
           cause: Cause.pretty(cause),
-        }).pipe(Effect.as({ _tag: "Unavailable" } as PresentedCertStatus)),
+        }).pipe(Effect.as(unavailable)),
       ),
     )
 
@@ -108,7 +116,7 @@ export const presentedCertStatus = (
     if (Option.isNone(outcome)) {
       const where = yield* Ref.get(step)
       yield* Effect.logWarning(`presented-cert: ${where} timed out after ${Duration.format(Duration.decode(timeout))}`)
-      return { _tag: where === "client CA check" ? "Unproven" : "Unavailable" } as PresentedCertStatus
+      return where === "client CA check" ? unproven : unavailable
     }
     const status = outcome.value
     if (status._tag === "Revoked") {

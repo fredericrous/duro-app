@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Clock, Effect } from "effect"
 import { errorMessage } from "~/lib/error-message"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
@@ -171,31 +171,37 @@ function handleRenewCert(serialNumber: string, auth: AuthInfo) {
  * certificate: nothing is issued and the daily budget is untouched, so being
  * interrupted mid-setup no longer costs a day.
  */
-/** A re-sent claim link is mailed at most once a minute (earlier links stay live); a repeat inside it answers as sent. */
+/**
+ * A claim link is minted for an email re-send at most once a minute: earlier
+ * links stay live, so each re-send would add one. A repeat inside the minute is
+ * answered as a wait, never as "sent": the latest link may have been shown on
+ * screen, not mailed (the reveal row does not record how it was delivered).
+ */
 const EMAIL_RESEND_INTERVAL_MS = 60_000
 
 function handleShowClaimLink(auth: AuthInfo, delivery: "email" | "link") {
   return Effect.gen(function* () {
+    // Before minting anything: no address means nothing to send, and the
+    // waiting link must not be replaced for nothing.
+    const email = delivery === "email" ? auth.email : null
     if (delivery === "email") {
-      // Before minting anything: no address means nothing to send, and the
-      // waiting link must not be replaced for nothing.
-      if (!auth.email) return { certError: "No email associated with your account." } as SettingsResult
+      if (!email) return { certError: "No email associated with your account." } as SettingsResult
       const latest = yield* (yield* CertRevealRepo).findLatestLive(auth.user!)
-      if (latest && Date.now() - new Date(latest.createdAt).getTime() < EMAIL_RESEND_INTERVAL_MS) {
-        // Idempotent: a link already went out a moment ago, and says so.
-        return { certSent: true as const } as SettingsResult
+      const now = yield* Clock.currentTimeMillis
+      if (latest && now - new Date(latest.createdAt).getTime() < EMAIL_RESEND_INTERVAL_MS) {
+        return { certError: "Please wait a minute before sending the link again." } as SettingsResult
       }
     }
     const pending = yield* reissueClaimLink(auth.user!)
     if (!pending) {
       return { certError: "No device setup is waiting." } as SettingsResult
     }
-    if (delivery === "email") {
+    if (email) {
       // The fresh link goes to the mailbox only: it never rides the response.
       const emailService = yield* EmailService
       const prefs = yield* PreferencesRepo
       const locale = yield* prefs.getLocale(auth.user!)
-      yield* emailService.sendCertRenewalEmail(auth.email!, locale, pending.token)
+      yield* emailService.sendCertRenewalEmail(email, locale, pending.token)
       return { certSent: true as const } as SettingsResult
     }
     return {

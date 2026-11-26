@@ -241,6 +241,7 @@
       "expiry": "Expiry"
     },
     "qr": {
+      "sendErrorTitle": "Couldn’t send the link",
       "sending": "Sending the link to your mailbox…",
       "sendingTitle": "Sending the link to your mailbox",
       "emailedTitle": "We emailed you the link",

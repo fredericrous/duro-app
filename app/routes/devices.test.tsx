@@ -158,6 +158,28 @@ const findWarning = async (text: RegExp) => {
   return warning
 }
 
+describe("DevicesPage: the server emailed though the page did not ask (status it could not settle)", () => {
+  it("shows the emailed text in a status region, and no QR layout", async () => {
+    renderRoute({
+      route: {
+        path: "/devices",
+        Component: DevicesPage as never,
+        // Not restricted as far as the loader knows: no warning, header button asks for a link.
+        loader: pageData({ presentedRevoked: null }),
+        action: async () => ({ certSent: true }),
+      },
+      url: "/devices",
+    })
+    await userEvent.click(await screen.findByRole("button", { name: t("devices.newCert") }))
+    await screen.findByText(t("devices.qr.emailedTitle"))
+    const region = within(screen.getByRole("dialog"))
+      .getAllByRole("status")
+      .find((r) => r.textContent?.includes(t("devices.qr.emailedBody")))
+    expect(region).toBeDefined()
+    expect(screen.queryByRole("button", { name: new RegExp(t("devices.qr.copyLink")) })).toBeNull()
+  })
+})
+
 describe("DevicesPage: the presented certificate is revoked", () => {
   const revoked = { revokedAt: "2026-09-23T16:22:23.000Z", label: null }
 

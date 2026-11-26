@@ -20,7 +20,7 @@ import { EmailService, EmailError } from "~/lib/services/EmailService.server"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
-import { ClientCaTrust } from "~/lib/services/ClientCaTrust.server"
+import { ClientCaTrust, clientCaTrustOf } from "~/lib/services/ClientCaTrust.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 
 const mockAudit = Layer.succeed(AuditService, {
@@ -1090,7 +1090,10 @@ describe("acceptInviteById", () => {
 describe("resolvePendingCertInvite", () => {
   /** The issuer check, stubbed: `trusted` says whether the pki-client CA signed it. */
   const trustLayer = (trusted: boolean) =>
-    Layer.succeed(ClientCaTrust, { isIssuedByClientCa: () => Effect.succeed(trusted) })
+    Layer.succeed(
+      ClientCaTrust,
+      clientCaTrustOf(() => Effect.succeed(trusted ? "issued" : "not-issued")),
+    )
   const trusted = trustLayer(true)
 
   const lookups = { count: 0 }

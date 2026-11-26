@@ -118,7 +118,7 @@ function ClaimLinkDialog({
     state?.kind === "cooldown"
       ? t("devices.qr.cooldownTitle")
       : state?.kind === "error"
-        ? t("devices.qr.errorTitle")
+        ? t(emailOnly ? "devices.qr.sendErrorTitle" : "devices.qr.errorTitle")
         : state?.kind === "emailed"
           ? t("devices.qr.emailedTitle")
           : emailOnly && state?.kind === "pending"
@@ -149,19 +149,15 @@ function ClaimLinkDialog({
           )}
 
           {/* One polite live region for the whole email path, so the swap from
-              "sending" to "emailed" is announced and the dialog keeps its shape. */}
-          {emailOnly && (state?.kind === "pending" || state?.kind === "emailed") && (
+              "sending" to "emailed" is announced and the dialog keeps its shape.
+              The server may email even when the page did not ask (a status it
+              could not settle), so "emailed" always renders here. */}
+          {((emailOnly && state?.kind === "pending") || state?.kind === "emailed") && (
             <Stack gap="md" align="center">
               <html.div role="status">
                 <Text as="p">{state.kind === "emailed" ? t("devices.qr.emailedBody") : t("devices.qr.sending")}</Text>
               </html.div>
               {state.kind === "pending" && <Spinner size="lg" />}
-            </Stack>
-          )}
-
-          {!emailOnly && state?.kind === "emailed" && (
-            <Stack gap="md">
-              <Text as="p">{t("devices.qr.emailedBody")}</Text>
             </Stack>
           )}
 

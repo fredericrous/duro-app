@@ -51,9 +51,10 @@ export async function action({ request }: Route.ActionArgs) {
   // A device presenting its user's revoked certificate gets new-device links
   // by email only, whatever the form asked (emailOnlyWhileRevoked), and so does
   // one whose certificate status could not be told: this is a security rule,
-  // so it fails closed. 5 s, not the page-load 300 ms: only a few writes pay it.
+  // so it fails closed. 6 s (above the CA fetch's own 5 s, so a dead Vault answers
+  // `unknown` rather than racing it), not the page-load 300 ms: only a few writes pay it.
   const status = await runEffect(
-    presentedCertStatus(request.headers.get("x-forwarded-client-cert"), auth.user, { timeout: Duration.seconds(5) }),
+    presentedCertStatus(request.headers.get("x-forwarded-client-cert"), auth.user, { timeout: Duration.seconds(6) }),
   )
   const mutation = emailOnly(status) ? emailOnlyWhileRevoked(parsed) : parsed
   return await runEffect(handleSettingsMutation(mutation).pipe(Effect.orDie))

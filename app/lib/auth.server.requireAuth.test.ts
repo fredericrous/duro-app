@@ -155,6 +155,16 @@ describe("requireAuth — a device presenting its user's revoked certificate", (
     spy.mockRestore()
   })
 
+  it("a lookup that dies fails soft: the device is treated as unavailable, not a 500", async () => {
+    await seedRevokedCert("alice")
+    const spy = vi
+      .spyOn(await import("~/lib/workflows/presented-cert.server"), "presentedCertStatus")
+      .mockImplementation((() => Effect.die(new Error("boom"))) as never)
+    expect((await getAuth(await aliceRequest("/requests"))).user).toBe("alice") // fails soft
+    expect((await requireAuth(await aliceRequest("/settings"))).user).toBe("alice")
+    spy.mockRestore()
+  })
+
   it("leaves a device alone when the revoked certificate is another user's", async () => {
     await seedRevokedCert("bob")
     expect((await requireAuth(await aliceRequest("/settings"))).user).toBe("alice")

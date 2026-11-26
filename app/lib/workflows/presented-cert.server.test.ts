@@ -6,7 +6,7 @@ import * as SqlClient from "@effect/sql/SqlClient"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { disposeTestRuntime, seedTestDb, testRunEffect, truncateAll } from "~/test/test-runtime"
-import { ClientCaTrust } from "~/lib/services/ClientCaTrust.server"
+import { ClientCaTrust, clientCaTrustOf } from "~/lib/services/ClientCaTrust.server"
 import { CertificateRepo, CertificateRepoError } from "~/lib/services/CertificateRepo.server"
 import {
   emailOnly,
@@ -38,8 +38,19 @@ const seedCert = (opts: { username?: string; revokedAt?: string | null; label?: 
   )
 
 /** The issuer check, stubbed: the pki-client CA signed every certificate, or none. */
-const signedByClientCa = Layer.succeed(ClientCaTrust, { isIssuedByClientCa: () => Effect.succeed(true) })
-const signedByAnotherCa = Layer.succeed(ClientCaTrust, { isIssuedByClientCa: () => Effect.succeed(false) })
+const signedByClientCa = Layer.succeed(
+  ClientCaTrust,
+  clientCaTrustOf(() => Effect.succeed("issued")),
+)
+const signedByAnotherCa = Layer.succeed(
+  ClientCaTrust,
+  clientCaTrustOf(() => Effect.succeed("not-issued")),
+)
+/** No CA could be obtained (Vault down, nothing cached): not the same as another CA. */
+const noCaAvailable = Layer.succeed(
+  ClientCaTrust,
+  clientCaTrustOf(() => Effect.succeed("unknown")),
+)
 
 const run = <A>(effect: Effect.Effect<A, never, CertificateRepo | ClientCaTrust>) => testRunEffect(effect)
 
@@ -129,10 +140,12 @@ describe("presentedRevokedCert (stubbed services)", () => {
     Effect.gen(function* () {
       const vaultAnswers = yield* Deferred.make<void>()
       const finished = yield* Ref.make(false)
-      const slowTrust = Layer.succeed(ClientCaTrust, {
-        isIssuedByClientCa: () =>
-          Deferred.await(vaultAnswers).pipe(Effect.zipRight(Ref.set(finished, true)), Effect.as(true)),
-      })
+      const slowTrust = Layer.succeed(
+        ClientCaTrust,
+        clientCaTrustOf(() =>
+          Deferred.await(vaultAnswers).pipe(Effect.zipRight(Ref.set(finished, true)), Effect.as("issued" as const)),
+        ),
+      )
       const check = presentedRevokedCert(XFCC, "daddy").pipe(
         Effect.provide(Layer.mergeAll(repoLayer(ownedRevoked), slowTrust)),
       )
@@ -187,10 +200,21 @@ describe("presentedRevokedCert (stubbed services)", () => {
 
   effectIt.effect("status: Unproven when a revoked row was found but the CA check ran out of time", () =>
     Effect.gen(function* () {
-      const neverAnswers = Layer.succeed(ClientCaTrust, { isIssuedByClientCa: () => Effect.never })
+      const neverAnswers = Layer.succeed(
+        ClientCaTrust,
+        clientCaTrustOf(() => Effect.never),
+      )
       const fiber = yield* Effect.fork(statusWith(ownedRevoked, neverAnswers))
       yield* TestClock.adjust("1 second")
       const status = yield* Fiber.join(fiber)
+      expect(status._tag).toBe("Unproven")
+      expect(isRestricted(status)).toBe(true)
+    }),
+  )
+
+  effectIt.effect("status: Unproven when there is no CA to ask (Vault down, nothing cached), not NotRevoked", () =>
+    Effect.gen(function* () {
+      const status = yield* statusWith(ownedRevoked, noCaAvailable)
       expect(status._tag).toBe("Unproven")
       expect(isRestricted(status)).toBe(true)
     }),
@@ -215,7 +239,10 @@ describe("presentedRevokedCert (stubbed services)", () => {
       Effect.provide(
         Layer.mergeAll(
           repoLayer(ownedRevoked),
-          Layer.succeed(ClientCaTrust, { isIssuedByClientCa: () => Effect.never }),
+          Layer.succeed(
+            ClientCaTrust,
+            clientCaTrustOf(() => Effect.never),
+          ),
         ),
       ),
     ),

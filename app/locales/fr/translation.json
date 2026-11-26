@@ -241,6 +241,7 @@
       "expiry": "Expiration"
     },
     "qr": {
+      "sendErrorTitle": "Impossible d’envoyer le lien",
       "sending": "Envoi du lien dans votre boîte mail…",
       "sendingTitle": "Envoi du lien dans votre boîte mail",
       "emailedTitle": "Nous vous avons envoyé le lien par e-mail",

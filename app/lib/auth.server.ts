@@ -60,7 +60,10 @@ const statusByRequest = new WeakMap<Request, Promise<PresentedCertStatus>>()
 function presentedStatus(request: Request, user: string): Promise<PresentedCertStatus> {
   let status = statusByRequest.get(request)
   if (!status) {
-    status = runEffect(presentedCertStatus(request.headers.get("x-forwarded-client-cert"), user))
+    // runEffect only rejects on a defect outside the check: unknown, not a 500.
+    status = runEffect(presentedCertStatus(request.headers.get("x-forwarded-client-cert"), user)).catch(
+      (): PresentedCertStatus => ({ _tag: "Unavailable" }),
+    )
     statusByRequest.set(request, status)
   }
   return status
