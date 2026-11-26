@@ -24,7 +24,7 @@ import type { AuthInfo } from "~/lib/auth.server"
 export type SettingsMutation =
   | { intent: "issueCert"; delivery: "email" | "link"; auth: AuthInfo }
   | { intent: "emailRevealLink"; revealToken: string; auth: AuthInfo }
-  | { intent: "showClaimLink"; auth: AuthInfo }
+  | { intent: "showClaimLink"; delivery: "email" | "link"; auth: AuthInfo }
   | { intent: "renewCert"; serialNumber: string; auth: AuthInfo }
   | { intent: "revokeCert"; serialNumber: string; auth: AuthInfo }
   | { intent: "renameCert"; serialNumber: string; label: string | null; auth: AuthInfo }
@@ -171,11 +171,20 @@ function handleRenewCert(serialNumber: string, auth: AuthInfo) {
  * certificate: nothing is issued and the daily budget is untouched, so being
  * interrupted mid-setup no longer costs a day.
  */
-function handleShowClaimLink(auth: AuthInfo) {
+function handleShowClaimLink(auth: AuthInfo, delivery: "email" | "link") {
   return Effect.gen(function* () {
     const pending = yield* reissueClaimLink(auth.user!)
     if (!pending) {
       return { certError: "No device setup is waiting." } as SettingsResult
+    }
+    if (delivery === "email") {
+      // The fresh link goes to the mailbox only: it never rides the response.
+      if (!auth.email) return { certError: "No email associated with your account." } as SettingsResult
+      const emailService = yield* EmailService
+      const prefs = yield* PreferencesRepo
+      const locale = yield* prefs.getLocale(auth.user!)
+      yield* emailService.sendCertRenewalEmail(auth.email, locale, pending.token)
+      return { certSent: true as const } as SettingsResult
     }
     return {
       certLinkReady: true as const,
@@ -300,7 +309,7 @@ export function handleSettingsMutation(mutation: SettingsMutation) {
     case "emailRevealLink":
       return handleEmailRevealLink(mutation.revealToken, mutation.auth)
     case "showClaimLink":
-      return handleShowClaimLink(mutation.auth)
+      return handleShowClaimLink(mutation.auth, mutation.delivery)
     case "renewCert":
       return handleRenewCert(mutation.serialNumber, mutation.auth)
     case "revokeCert":
@@ -329,6 +338,20 @@ function parseLabel(raw: FormDataEntryValue | null): string | null {
   return trimmed.length > 0 ? trimmed : null
 }
 
+/**
+ * A device presenting its user's revoked certificate may be the lost one,
+ * still holding a live session: a link shown on its screen would let it
+ * re-enroll itself and undo the revocation. So while it is restricted, every
+ * new-device link goes to the mailbox only (the person's decision, 2026-11-26,
+ * plan 2026-11-26-revoked-cert-notice). Applied by the /devices action.
+ */
+export function emailOnlyWhileRevoked(mutation: SettingsMutation): SettingsMutation {
+  if (mutation.intent === "issueCert" || mutation.intent === "showClaimLink") {
+    return { ...mutation, delivery: "email" }
+  }
+  return mutation
+}
+
 export function parseSettingsMutation(formData: FormData, auth: AuthInfo): SettingsMutation | { error: string } {
   const intent = formData.get("intent") as string | null
 
@@ -337,7 +360,8 @@ export function parseSettingsMutation(formData: FormData, auth: AuthInfo): Setti
     return { intent, delivery, auth }
   }
   if (intent === "showClaimLink") {
-    return { intent, auth }
+    const delivery = formData.get("delivery") === "email" ? ("email" as const) : ("link" as const)
+    return { intent, delivery, auth }
   }
   if (intent === "emailRevealLink") {
     const revealToken = formData.get("revealToken") as string

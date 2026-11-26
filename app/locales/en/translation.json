@@ -241,6 +241,8 @@
       "expiry": "Expiry"
     },
     "qr": {
+      "emailedTitle": "We emailed you the link",
+      "emailedBody": "The link to set up your new device is in your mailbox. Open it on the new device: it works once.",
       "title": "Scan with the new device",
       "hint": "Point the new device’s camera at the code — it opens the certificate page directly. Nothing was emailed.",
       "alt": "QR code opening this device’s certificate page",

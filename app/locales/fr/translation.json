@@ -241,6 +241,8 @@
       "expiry": "Expiration"
     },
     "qr": {
+      "emailedTitle": "Nous vous avons envoyé le lien par e-mail",
+      "emailedBody": "Le lien pour configurer votre nouvel appareil est dans votre boîte mail. Ouvrez-le sur le nouvel appareil : il ne fonctionne qu’une fois.",
       "title": "Scannez avec le nouvel appareil",
       "hint": "Pointez l’appareil photo du nouvel appareil vers le code — la page du certificat s’ouvre directement. Aucun e-mail n’a été envoyé.",
       "alt": "QR code ouvrant la page du certificat de cet appareil",

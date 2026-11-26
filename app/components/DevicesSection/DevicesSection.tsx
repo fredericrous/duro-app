@@ -79,6 +79,9 @@ type ClaimState =
   | { kind: "ready"; revealToken: string; expiresAt: string; claimUrl: string }
   | { kind: "cooldown"; nextAvailable: string }
   | { kind: "error"; message: string }
+  /** The link went to the mailbox only (a device presenting a revoked
+   *  certificate never gets it on screen: see emailOnlyWhileRevoked). */
+  | { kind: "emailed" }
 
 /**
  * The QR handoff for a freshly issued device certificate. The link is the
@@ -113,7 +116,9 @@ function ClaimLinkDialog({
       ? t("devices.qr.cooldownTitle")
       : state?.kind === "error"
         ? t("devices.qr.errorTitle")
-        : t("devices.qr.title")
+        : state?.kind === "emailed"
+          ? t("devices.qr.emailedTitle")
+          : t("devices.qr.title")
 
   return (
     <Dialog.Root
@@ -135,6 +140,12 @@ function ClaimLinkDialog({
                   limit: NEW_DEVICE_LIMIT,
                 })}
               </Text>
+            </Stack>
+          )}
+
+          {state?.kind === "emailed" && (
+            <Stack gap="md">
+              <Text as="p">{t("devices.qr.emailedBody")}</Text>
             </Stack>
           )}
 
@@ -494,8 +505,12 @@ export function DevicesSection({
     blockedUntil: string | null
   } | null>(null)
 
+  // A device presenting its revoked certificate gets the link by email only;
+  // the server enforces it, the page just asks for what it will get.
+  const delivery = presentedRevoked !== null ? "email" : "link"
+
   const issue = () => {
-    fetcher.submit({ intent: "issueCert", delivery: "link" }, { method: "post", action: API_URL })
+    fetcher.submit({ intent: "issueCert", delivery }, { method: "post", action: API_URL })
   }
 
   // The button never swallows a click: the dialog opens first, and whatever
@@ -517,7 +532,7 @@ export function DevicesSection({
   // spent. Opens the same dialog so there is one place a claim link lives.
   const resumeClaim = () => {
     setSession({ staleData: fetcher.data, blockedUntil: null })
-    fetcher.submit({ intent: "showClaimLink" }, { method: "post", action: API_URL })
+    fetcher.submit({ intent: "showClaimLink", delivery }, { method: "post", action: API_URL })
   }
 
   // Only THIS session's answer counts — `fetcher.data` outlives the dialog.
@@ -538,11 +553,13 @@ export function DevicesSection({
               }
             : "rateLimited" in sessionResult
               ? { kind: "cooldown", nextAvailable: sessionResult.nextAvailable }
-              : "certError" in sessionResult
-                ? { kind: "error", message: sessionResult.certError }
-                : "error" in sessionResult
-                  ? { kind: "error", message: sessionResult.error }
-                  : { kind: "pending" }
+              : "certSent" in sessionResult
+                ? { kind: "emailed" }
+                : "certError" in sessionResult
+                  ? { kind: "error", message: sessionResult.certError }
+                  : "error" in sessionResult
+                    ? { kind: "error", message: sessionResult.error }
+                    : { kind: "pending" }
 
   // Ambient hint so the limit is visible BEFORE the click too; the dialog is
   // what explains it after one.

@@ -1,5 +1,5 @@
 import { useRouteLoaderData } from "react-router"
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 import type { Route } from "./+types/devices"
 import { requireAuth } from "~/lib/auth.server"
 import { runEffect } from "~/lib/runtime.server"
@@ -7,8 +7,8 @@ import { isOriginAllowed } from "~/lib/config.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { findPendingClaim } from "~/lib/workflows/cert-reveal.server"
 import { deviceBudget } from "~/lib/workflows/device-budget.server"
-import { presentedRevokedNotice } from "~/lib/workflows/presented-cert.server"
-import { parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
+import { presentedRevokedCert, presentedRevokedNotice } from "~/lib/workflows/presented-cert.server"
+import { emailOnlyWhileRevoked, parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
 import { Header } from "~/components/Header/Header"
 import { DevicesSection } from "~/components/DevicesSection/DevicesSection"
 import { PageShell } from "@greenharness/greenrack-ui"
@@ -48,7 +48,11 @@ export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData()
   const parsed = parseSettingsMutation(formData as unknown as FormData, auth)
   if ("error" in parsed) return parsed
-  return await runEffect(handleSettingsMutation(parsed).pipe(Effect.orDie))
+  // A device presenting its user's revoked certificate gets new-device links
+  // by email only, whatever the form asked (emailOnlyWhileRevoked).
+  const revoked = await runEffect(presentedRevokedCert(request.headers.get("x-forwarded-client-cert"), auth.user))
+  const mutation = Option.isSome(revoked) ? emailOnlyWhileRevoked(parsed) : parsed
+  return await runEffect(handleSettingsMutation(mutation).pipe(Effect.orDie))
 }
 
 export default function DevicesPage({ loaderData }: Route.ComponentProps) {

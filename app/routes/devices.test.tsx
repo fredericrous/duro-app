@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 
 vi.mock("~/lib/auth.server", () => ({
   requireAuth: vi.fn(),
@@ -7,10 +7,10 @@ vi.mock("~/lib/auth.server", () => ({
 vi.mock("~/lib/runtime.server", () => ({
   runEffect: vi.fn(),
 }))
-vi.mock("~/lib/mutations/settings", () => ({
-  parseSettingsMutation: vi.fn(),
-  handleSettingsMutation: vi.fn(),
-}))
+vi.mock("~/lib/mutations/settings", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("~/lib/mutations/settings")>()
+  return { ...mod, parseSettingsMutation: vi.fn(), handleSettingsMutation: vi.fn() }
+})
 vi.mock("~/lib/config.server", () => ({
   isOriginAllowed: vi.fn().mockReturnValue(true),
 }))
@@ -71,6 +71,26 @@ describe("/devices loader: the certificate this device presented", () => {
     const loaderData = expectData<{ presentedRevoked: unknown }>(await callLoader(loader))
     expect(vi.mocked(presentedRevokedNotice)).toHaveBeenCalledWith(null, "alice")
     expect(loaderData.presentedRevoked).toBeNull()
+  })
+})
+
+describe("/devices action: a device presenting its revoked certificate", () => {
+  it("gets new-device links by email only, whatever the form asked", async () => {
+    mockParse.mockReturnValue({ intent: "issueCert", delivery: "link", auth: {} } as never)
+    mockHandle.mockReturnValue(Effect.void as never)
+    mockRunEffect
+      .mockResolvedValueOnce(Option.some({ serial: "a1b2c3d4e5f", revokedAt: "x", label: null }) as never)
+      .mockResolvedValueOnce({ certSent: true } as never)
+    await callAction(action, { formData: { intent: "issueCert", delivery: "link" } })
+    expect(mockHandle).toHaveBeenCalledWith(expect.objectContaining({ intent: "issueCert", delivery: "email" }))
+  })
+
+  it("keeps the asked delivery when the presented certificate is not revoked", async () => {
+    mockParse.mockReturnValue({ intent: "issueCert", delivery: "link", auth: {} } as never)
+    mockHandle.mockReturnValue(Effect.void as never)
+    mockRunEffect.mockResolvedValueOnce(Option.none() as never).mockResolvedValueOnce({ certLinkReady: true } as never)
+    await callAction(action, { formData: { intent: "issueCert", delivery: "link" } })
+    expect(mockHandle).toHaveBeenCalledWith(expect.objectContaining({ intent: "issueCert", delivery: "link" }))
   })
 })
 
@@ -162,6 +182,28 @@ describe("DevicesPage: the presented certificate is revoked", () => {
     await waitFor(() => {
       expect(within(warning).getByRole("button", { name: "Add a device" })).toBeDisabled()
     })
+  })
+
+  it("asks for the link by email and says it was emailed", async () => {
+    const asked: string[] = []
+    renderRoute({
+      route: {
+        path: "/devices",
+        Component: DevicesPage as never,
+        loader: pageData({ presentedRevoked: revoked }),
+        action: async ({ request }) => {
+          asked.push(String((await request.formData()).get("delivery")))
+          return { certSent: true }
+        },
+      },
+      url: "/devices",
+    })
+    const warning = await findWarning(/The certificate this device presented was revoked on/)
+    await userEvent.click(within(warning).getByRole("button", { name: "Add a device" }))
+    expect(await screen.findByText("We emailed you the link")).toBeInTheDocument()
+    expect(asked).toEqual(["email"])
+    // No QR code and no copyable link while restricted.
+    expect(screen.queryByRole("button", { name: /Copy link/ })).toBeNull()
   })
 
   it("points to the waiting setup, with no button, when one is pending", async () => {
