@@ -66,7 +66,7 @@ one pilot listener, then all except the two break-glass listeners.
 
 ## Phases
 
-### Phase 1 — duro-app: revocation that actually happens (PR 1, release)
+### Phase 1 — duro-app: revocation that actually happens (PR 1, release) — done
 
 <!-- panel: repos=duro-app -->
 
@@ -198,6 +198,29 @@ Files: `kubernetes/homelab/security/configs/kyverno-policies/generate-mtls-clien
   `auth.daddyshome.fr` keep accepting the Mac cert and are unchanged.
 - Staleness alerting: `promtool test rules` cases for each threshold, with `rule_files` pointing at the `yq '.spec'` extract (a stale
   CRL cannot safely be staged on prod).
+
+### Phase 1 results (PR 1, observed before push)
+
+| check                                    | input                                                                   | expected                                                                     | actual                                                            |
+| ---------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| unit suite                               | `pnpm run test` on 9abe231                                              | all green                                                                    | 171 files, 1586 tests passed                                      |
+| typecheck, lint                          | `pnpm run typecheck`, `pnpm run lint`                                   | 0 errors                                                                     | 0 errors (6 pre-existing lint warnings)                           |
+| recovery revokes in Vault                | recovery.server.test: revokeOthers, 2 certs                             | 2 Vault revokes, both `completed`                                            | passes                                                            |
+| admin revokes audited                    | admin-users / admin-invites tests                                       | one `cert.revoked` per serial, actor = admin `sub`                           | passes                                                            |
+| sweeper through the worker's Vault layer | worker/revocation-loop.test: real VaultCertManager over stub HttpClient | failed → completed; 1-of-2 Vault failure keeps the other, counts the attempt | passes                                                            |
+| orphan backfill                          | migration chain on PGlite with a NULL-`revoke_next_at` pending row      | swept in one tick                                                            | passes                                                            |
+| permanence                               | VaultPki it.each 400/401/403/408/422/429/503                            | 400/422 permanent; 401/403/408/429/503 transient                             | passes                                                            |
+| missing Vault env                        | revocationSweepLoop without NAS*VAULT*\*                                | worker keeps running, warning logged                                         | passes                                                            |
+| worker env in the release                | `helm template` chart/duro-app with homelab HelmRelease values          | duro-worker gets NAS_VAULT_ADDR + `duro-nas-vault-token`                     | both present; secret key `NAS_VAULT_TOKEN`, ExternalSecret-backed |
+
+Post-release (deliberate, accepted by implementation-review): the worker's first `worker: revocation sweep` log line in-cluster, and no "sweeper disabled" warning.
+
+## Implementation review
+
+- implementation-review (opus): approve after round 1 (4 blocking) and delta (1 blocking naming); all fixed; ~314k tokens over 3 rounds.
+- backend, architect, platform (opus): approve after delta; idempotent marks, worker-owned Vault wiring, 401/403 transient all fixed.
+- lang:typescript (opus): approve; `deliberate: certBatchRevokeToast keeps a local cast (optional low), revisit with Phase 2's admin UI`.
+- Follow-up (inbox): older audit paths (recovery, settings) still record display names; align actors on `sub`.
 
 ## Rollback
 
