@@ -20,7 +20,9 @@ export const CrlDbLive = Layer.effect(
     return {
       // revoked_at is the completing statement's start time, not its commit
       // time: two completions committing out of order can leave max() still.
-      // The count still moves, so the pair is a watermark nothing slips past.
+      // The count still moves, so the pair is a watermark nothing slips past,
+      // given that no code path deletes user_certificates rows (none does; a
+      // deletion is still caught by the 6 h cycle).
       revocationWatermark: named("watermark")(
         sql<{ watermark: string }>`SELECT
             count(*) FILTER (WHERE revoke_state = 'completed')::text || '|' ||

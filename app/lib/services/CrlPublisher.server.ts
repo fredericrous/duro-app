@@ -13,7 +13,7 @@
  * write when Vault hands back the very CRL KV already holds.
  *
  * Its ports are declared here and implemented by adapters: `VaultCrl`
- * (VaultPki.server.ts), `CrlDb` (CrlDb.server.ts) and `CertManager`.
+ * (VaultCrl.server.ts), `CrlDb` (CrlDb.server.ts) and `CertManager`.
  */
 // tsyringe, which @peculiar/x509 loads, throws at import without this polyfill.
 import "reflect-metadata"
@@ -28,21 +28,29 @@ export const PUBLISH_EVERY_MS = 6 * 3_600_000
 /** After a failed cycle, the next attempt waits this long (a down Vault is not hammered). */
 export const RETRY_AFTER_FAILURE_MS = 5 * 60_000
 export const TICK_EVERY = "30 seconds"
-/** A whole cycle (up to 6 Vault calls, one query, 10 re-revokes) gives up after this. */
-export const CYCLE_DEADLINE = "2 minutes"
 /** Re-revocations per cycle: a serial Vault keeps leaving out must not loop. */
 export const MAX_REREVOKES_PER_CYCLE = 10
+/** One re-revoke gives up after this, logged with its serial; the batch moves on. */
+export const REREVOKE_TIMEOUT = "8 seconds"
+/**
+ * A whole cycle gives up after this: its worst case, 6 Vault calls at 15 s and
+ * 10 re-revokes at 8 s, is 170 s. It stays under the 5 min retry interval.
+ */
+export const CYCLE_DEADLINE = "4 minutes"
 
 /** Colon hex as Vault and the DB store it, or bare hex from a CRL, compared alike. */
 export const canonicalSerial = (serial: string): string => serial.replace(/:/g, "").toLowerCase().replace(/^0+/, "")
 
 export class CrlInvalid extends Data.TaggedError("CrlInvalid")<{ readonly reason: string }> {}
 
+export type CrlSourceOperation = "rotate" | "crl/pem" | "cert/ca" | "read client-crl" | "write client-crl"
+
 /** A failed or timed-out call to the CRL's source (Vault). */
 export class CrlSourceError extends Data.TaggedError("CrlSourceError")<{
-  readonly operation: string
+  readonly operation: CrlSourceOperation
   readonly message: string
   readonly status?: number
+  readonly cause?: unknown
 }> {}
 
 export class CrlDbError extends Data.TaggedError("CrlDbError")<{
@@ -192,25 +200,31 @@ export const publishCycle = (
       yield* Effect.logWarning("crl: completed revocations missing from the CRL, revoking again").pipe(
         Effect.annotateLogs({ missing: missing.length, serials: batch.join(",") }),
       )
+      // Advanced before revoking: a cycle that dies mid-batch still moves on to
+      // the next serials instead of retrying the same ones.
+      yield* Ref.update(state, (current) => ({ ...current, rerevokeOffset: current.rerevokeOffset + batch.length }))
       yield* Effect.forEach(
         batch,
         (serial) =>
           certManager.revokeCert(serial).pipe(
-            Effect.tapError((e: CertManagerError) =>
+            Effect.timeoutFail({
+              duration: REREVOKE_TIMEOUT,
+              onTimeout: () => ({ message: `timed out after ${REREVOKE_TIMEOUT}` }),
+            }),
+            Effect.tapError((e: CertManagerError | { readonly message: string }) =>
               Effect.logError("crl: re-revoke failed").pipe(Effect.annotateLogs({ serial, error: e.message })),
             ),
             Effect.either,
           ),
         { discard: true },
       )
-      yield* Ref.update(state, (current) => ({ ...current, rerevokeOffset: current.rerevokeOffset + batch.length }))
       crl = yield* fetchValidated
     }
     const stillMissing = missingFrom(crl, completed).length
 
     const known = (yield* Ref.get(state)).published
     const published = known._tag === "Read" ? known.pem : yield* vault.readPublishedCrl
-    if (Option.getOrNull(published) !== crl.pem) {
+    if (!Option.contains(published, crl.pem)) {
       yield* vault.writePublishedCrl(crl.pem)
       yield* Effect.log("crl: published").pipe(
         Effect.annotateLogs({ nextUpdate: crl.nextUpdate.toISOString(), revoked: crl.serials.size }),

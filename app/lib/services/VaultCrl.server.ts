@@ -2,7 +2,7 @@ import { Config, Effect, Layer, Option, Redacted, Schema } from "effect"
 import * as HttpClient from "@effect/platform/HttpClient"
 import * as HttpClientRequest from "@effect/platform/HttpClientRequest"
 import { makeJsonApi } from "~/lib/http.server"
-import { CrlSourceError, VaultCrl } from "~/lib/services/CrlPublisher.server"
+import { CrlSourceError, type CrlSourceOperation, VaultCrl } from "~/lib/services/CrlPublisher.server"
 import { VaultPkiError } from "~/lib/services/VaultPki.server"
 
 // --- CRL publication: the adapter for CrlPublisher's VaultCrl port ---
@@ -41,22 +41,22 @@ export const VaultCrlLive = Layer.effect(
 
     /** Bounds the call and names it: every failure leaves as a CrlSourceError. */
     const call =
-      (operation: string) =>
+      (operation: CrlSourceOperation) =>
       <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, CrlSourceError> =>
         effect.pipe(
+          Effect.mapError(
+            (e) =>
+              new CrlSourceError({
+                operation,
+                message: e instanceof VaultPkiError ? e.message : String(e),
+                status: e instanceof VaultPkiError ? e.status : undefined,
+                cause: e,
+              }),
+          ),
           Effect.timeoutFail({
             duration: VAULT_CALL_TIMEOUT,
             onTimeout: () => new CrlSourceError({ operation, message: `timed out after ${VAULT_CALL_TIMEOUT}` }),
           }),
-          Effect.mapError((e) =>
-            e instanceof CrlSourceError
-              ? e
-              : new CrlSourceError({
-                  operation,
-                  message: e instanceof VaultPkiError ? e.message : String(e),
-                  status: e instanceof VaultPkiError ? e.status : undefined,
-                }),
-          ),
         )
 
     // crl/pem answers PEM text, not JSON, so it bypasses makeJsonApi.

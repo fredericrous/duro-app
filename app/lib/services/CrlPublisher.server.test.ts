@@ -8,8 +8,10 @@ import {
   CrlInvalid,
   type CrlPublisherState,
   CrlSourceError,
+  CYCLE_DEADLINE,
   MAX_REREVOKES_PER_CYCLE,
   PUBLISH_EVERY_MS,
+  REREVOKE_TIMEOUT,
   RETRY_AFTER_FAILURE_MS,
   VaultCrl,
   canonicalSerial,
@@ -325,6 +327,39 @@ describe("publisherTick", () => {
     }),
   )
 
+  it.effect("re-revokes the serials past the first batch on the next cycle", () =>
+    Effect.gen(function* () {
+      const [ca] = yield* pki
+      const stuck = Array.from({ length: MAX_REREVOKES_PER_CYCLE + 1 }, (_, index) => `0${(index + 16).toString(16)}`)
+      const { fakeVault, layer } = setup(ca, { sticky: new Set(stuck) }, { completed: [...stuck] })
+      const state = yield* Ref.make(initialCrlPublisherState)
+
+      yield* tick(state, layer)
+      expect(fakeVault.revokes).not.toContain(stuck.at(-1))
+      yield* TestClock.adjust(PUBLISH_EVERY_MS)
+      yield* tick(state, layer)
+      expect(fakeVault.revokes).toContain(stuck.at(-1))
+    }),
+  )
+
+  it.effect("gives up on a re-revoke that hangs, names it, and still publishes", () =>
+    Effect.gen(function* () {
+      const [ca] = yield* pki
+      const { fakeVault, layer } = setup(ca, {}, { completed: ["0c"] })
+      const hangingRevoke = Layer.succeed(CertManager, {
+        ...Effect.runSync(CertManager.pipe(Effect.provide(layer))),
+        revokeCert: () => Effect.never,
+      })
+      const state = yield* Ref.make(initialCrlPublisherState)
+
+      const running = yield* Effect.fork(tick(state, Layer.merge(layer, hangingRevoke)))
+      yield* TestClock.adjust(REREVOKE_TIMEOUT)
+      expect(yield* Fiber.join(running)).toBe(true)
+      expect(fakeVault.writes).toBe(1)
+      expect(Option.map((yield* Ref.get(state)).lastGood, (cycle) => cycle.missingSerials)).toEqual(Option.some(1))
+    }),
+  )
+
   it.effect("survives a failing Vault: no throw, no write", () =>
     Effect.gen(function* () {
       const [ca] = yield* pki
@@ -342,7 +377,7 @@ describe("publisherTick", () => {
       const state = yield* Ref.make(initialCrlPublisherState)
 
       const running = yield* Effect.fork(tick(state, layer))
-      yield* TestClock.adjust("2 minutes")
+      yield* TestClock.adjust(CYCLE_DEADLINE)
       expect(yield* Fiber.join(running)).toBe(true)
 
       const nowMs = yield* Clock.currentTimeMillis
