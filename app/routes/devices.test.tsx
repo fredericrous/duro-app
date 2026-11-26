@@ -28,6 +28,7 @@ import { runEffect } from "~/lib/runtime.server"
 import { parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
 import { isOriginAllowed } from "~/lib/config.server"
 import { presentedRevokedNotice } from "~/lib/workflows/presented-cert.server"
+import { data } from "react-router"
 import { action, loader } from "./devices"
 import { callAction, callLoader, expectData } from "~/test/route-utils"
 
@@ -81,11 +82,11 @@ describe("/devices loader: the certificate this device presented", () => {
     expect(loaderData.presentedRevoked).toBeNull()
   })
 
+  /** The class React Router's data() returns (its type export has no runtime value). */
+  const DataWithInit = data(null).constructor as new (...args: never[]) => { data: unknown; init: ResponseInit | null }
   /** The loader's answer, unwrapped when it came back through data() with headers. */
   const unwrap = (value: unknown) =>
-    value && typeof value === "object" && "init" in value && "data" in value
-      ? { payload: (value as { data: unknown }).data, init: (value as { init: ResponseInit }).init }
-      : { payload: value, init: null }
+    value instanceof DataWithInit ? { payload: value.data, init: value.init } : { payload: value, init: null }
 
   it("sets the once-a-day cookie when it shows the notice", async () => {
     mockRunEffect.mockResolvedValue({ budget, certificates: [], pendingClaim: null, presentedRevoked: notice } as never)
@@ -161,6 +162,14 @@ const pageData = (extra: Record<string, unknown>) => () => ({
   ...extra,
 })
 
+/** The warning Alert (greenrack renders every Alert as role="alert"), by its text. */
+const findWarning = async (text: RegExp) => {
+  await screen.findByText(text)
+  const warning = screen.getAllByRole("alert").find((alert) => text.test(alert.textContent ?? ""))
+  if (!warning) throw new Error(`no alert matching ${text}`)
+  return warning
+}
+
 describe("DevicesPage: the presented certificate is revoked", () => {
   const revoked = { revokedAt: "2026-09-23T16:22:23.000Z", label: null }
 
@@ -169,8 +178,7 @@ describe("DevicesPage: the presented certificate is revoked", () => {
       route: { path: "/devices", Component: DevicesPage as never, loader: pageData({ presentedRevoked: revoked }) },
       url: "/devices",
     })
-    const alert = await screen.findByText(/The certificate this device presented was revoked on/)
-    const warning = alert.closest('[role="alert"], [role="status"]') as HTMLElement
+    const warning = await findWarning(/The certificate this device presented was revoked on/)
     expect(warning).not.toBeNull()
     expect(within(warning).getByRole("button", { name: "Add a device" })).toBeEnabled()
     // The header keeps its own: same name, two buttons page-wide.
@@ -187,8 +195,7 @@ describe("DevicesPage: the presented certificate is revoked", () => {
       },
       url: "/devices",
     })
-    const alert = await screen.findByText(/The certificate this device presented was revoked on/)
-    const warning = alert.closest('[role="alert"], [role="status"]') as HTMLElement
+    const warning = await findWarning(/The certificate this device presented was revoked on/)
     await userEvent.click(within(warning).getByRole("button", { name: "Add a device" }))
     await waitFor(() => {
       expect(within(warning).getByRole("button", { name: "Add a device" })).toBeDisabled()
@@ -207,8 +214,7 @@ describe("DevicesPage: the presented certificate is revoked", () => {
       },
       url: "/devices",
     })
-    const alert = await screen.findByText(/Resume the device setup waiting below/)
-    const warning = alert.closest('[role="alert"], [role="status"]') as HTMLElement
+    const warning = await findWarning(/use “Show the link again” in the device setup below/)
     expect(within(warning).queryByRole("button")).toBeNull()
   })
 

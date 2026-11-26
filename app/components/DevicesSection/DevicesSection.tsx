@@ -548,6 +548,18 @@ export function DevicesSection({
   // what explains it after one.
   const atLimit = budget.used >= budget.limit && budget.nextAvailable !== null
 
+  // The warning for a revoked certificate this device presented: with a setup
+  // already waiting, resuming it is the one remedy (no second claim).
+  const revokedDate = presentedRevoked ? formatDateTime(presentedRevoked.revokedAt) : ""
+  const revokedMessage =
+    presentedRevoked === null
+      ? ""
+      : pendingClaim !== null
+        ? t("devices.presentedRevoked.bodyPending", { date: revokedDate })
+        : presentedRevoked.label
+          ? t("devices.presentedRevoked.bodyLabelled", { date: revokedDate, label: presentedRevoked.label })
+          : t("devices.presentedRevoked.body", { date: revokedDate })
+
   return (
     <CardSection
       title={t("devices.heading")}
@@ -575,19 +587,12 @@ export function DevicesSection({
         {presentedRevoked !== null && (
           <Alert variant="warning">
             <Stack gap="sm">
-              <Text as="p">
-                {pendingClaim !== null
-                  ? t("devices.presentedRevoked.bodyPending", { date: formatDateTime(presentedRevoked.revokedAt) })
-                  : presentedRevoked.label
-                    ? t("devices.presentedRevoked.bodyLabelled", {
-                        date: formatDateTime(presentedRevoked.revokedAt),
-                        label: presentedRevoked.label,
-                      })
-                    : t("devices.presentedRevoked.body", { date: formatDateTime(presentedRevoked.revokedAt) })}
-              </Text>
+              <Text as="p">{revokedMessage}</Text>
               {pendingClaim === null && (
                 <Inline gap="sm">
-                  <Button variant="secondary" size="small" disabled={isSubmitting} onClick={openClaimDialog}>
+                  {/* Default size, not small: this is the phone path, and a small
+                      button is under the 24 px target (WCAG 2.5.8). */}
+                  <Button variant="secondary" disabled={isSubmitting} onClick={openClaimDialog}>
                     {t("devices.presentedRevoked.action")}
                   </Button>
                 </Inline>

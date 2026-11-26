@@ -1,4 +1,4 @@
-import { Effect, Fiber, Option, Ref } from "effect"
+import { Cause, Duration, Effect, Fiber, Option, Ref } from "effect"
 import { canonicalSerial, parseXfccCert } from "~/lib/client-cert.server"
 import { ClientCaTrust } from "~/lib/services/ClientCaTrust.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
@@ -12,7 +12,8 @@ import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
  * revoked certificate still reaches duro there, and duro can point its owner
  * to the devices page instead of leaving them on a page that half works.
  *
- * Read-only, and never fails: anything it cannot prove is "no". The checks
+ * Read-only, and never fails, defects included: anything it cannot prove is
+ * "no" (home awaits it before streaming, so a throw here would be a 500). The checks
  * run cheapest first, so the common request (a valid cert) costs one parse
  * and one indexed query; the CA check (`ClientCaTrust`, which may refresh
  * from Vault) runs only for a revoked hit.
@@ -32,7 +33,7 @@ export interface PresentedRevokedNotice {
 }
 
 /** Budget for the whole check: home waits for it before it starts streaming. */
-export const PRESENTED_CERT_TIMEOUT = "300 millis"
+export const PRESENTED_CERT_TIMEOUT = Duration.millis(300)
 
 /** The cookie that holds the canonical serial already redirected today. */
 export const REVOKED_NOTICE_COOKIE = "duro_revoked_notice"
@@ -96,9 +97,11 @@ export const presentedRevokedCert = (
       const revokedAt = new Date(cert.revokedAt).toISOString()
       return Option.some<PresentedRevokedCert>({ serial, revokedAt, label: cert.label })
     }).pipe(
-      Effect.catchAll((error) =>
+      // Every cause, defects included: a bad row or a dying dependency must
+      // cost the notice, never the home page.
+      Effect.catchAllCause((cause) =>
         Effect.logWarning("presented-cert: certificate lookup failed; no revoked-cert notice", {
-          error: String(error),
+          cause: Cause.pretty(cause),
         }).pipe(Effect.as(Option.none<PresentedRevokedCert>())),
       ),
     )
@@ -107,7 +110,7 @@ export const presentedRevokedCert = (
     if (Option.isNone(outcome)) {
       const where = yield* Ref.get(step)
       yield* Effect.logWarning(
-        `presented-cert: ${where} timed out after ${PRESENTED_CERT_TIMEOUT}; no revoked-cert notice`,
+        `presented-cert: ${where} timed out after ${Duration.format(PRESENTED_CERT_TIMEOUT)}; no revoked-cert notice`,
       )
       return Option.none()
     }

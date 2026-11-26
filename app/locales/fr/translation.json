@@ -263,9 +263,9 @@
       "action": "Afficher le lien à nouveau"
     },
     "presentedRevoked": {
-      "body": "Le certificat présenté par cet appareil a été révoqué le {{date}}. Ajoutez un appareil pour en obtenir un nouveau, puis choisissez-le quand votre navigateur le demande. Vous devrez peut-être d’abord supprimer l’ancien certificat.",
-      "bodyLabelled": "Le certificat présenté par cet appareil, « {{label}} », a été révoqué le {{date}}. Ajoutez un appareil pour en obtenir un nouveau, puis choisissez-le quand votre navigateur le demande. Vous devrez peut-être d’abord supprimer l’ancien certificat.",
-      "bodyPending": "Le certificat présenté par cet appareil a été révoqué le {{date}}. Reprenez la configuration d’appareil en attente ci-dessous pour en obtenir un nouveau. Vous devrez peut-être d’abord supprimer l’ancien certificat.",
+      "body": "Le certificat présenté par cet appareil a été révoqué le {{date}}. Ajoutez un appareil pour en obtenir un nouveau. Si votre navigateur propose encore l’ancien certificat, supprimez-le, puis choisissez le nouveau quand votre navigateur le demande.",
+      "bodyLabelled": "Le certificat présenté par cet appareil, « {{label}} », a été révoqué le {{date}}. Ajoutez un appareil pour en obtenir un nouveau. Si votre navigateur propose encore l’ancien certificat, supprimez-le, puis choisissez le nouveau quand votre navigateur le demande.",
+      "bodyPending": "Le certificat présenté par cet appareil a été révoqué le {{date}}. Pour en obtenir un nouveau, utilisez « Afficher le lien à nouveau » dans la configuration d’appareil ci-dessous. Si votre navigateur propose encore l’ancien certificat, supprimez-le, puis choisissez le nouveau quand votre navigateur le demande.",
       "action": "Ajouter un appareil"
     }
   },

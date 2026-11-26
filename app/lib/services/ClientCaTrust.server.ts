@@ -66,6 +66,10 @@ export const ClientCaTrustLive = Layer.effect(
       }),
     )
 
+    // Concurrent refreshes are not shared: each caller on a stale cache fetches
+    // (at most 5 s each). holds-until: one revoked device at a time reaches the
+    // presented-cert check, and invites are rare; past that, share the
+    // in-flight refresh (Effect.cachedWithTTL or a Deferred in the Ref).
     const currentCaPem: Effect.Effect<string | null> = Effect.gen(function* () {
       const cached = yield* Ref.get(cache)
       const now = yield* Clock.currentTimeMillis

@@ -263,9 +263,9 @@
       "action": "Show the link again"
     },
     "presentedRevoked": {
-      "body": "The certificate this device presented was revoked on {{date}}. Add a device to get a new one, then choose it when your browser asks. You may need to remove the old certificate first.",
-      "bodyLabelled": "The certificate this device presented, “{{label}}”, was revoked on {{date}}. Add a device to get a new one, then choose it when your browser asks. You may need to remove the old certificate first.",
-      "bodyPending": "The certificate this device presented was revoked on {{date}}. Resume the device setup waiting below to get a new one. You may need to remove the old certificate first.",
+      "body": "The certificate this device presented was revoked on {{date}}. Add a device to get a new one. If your browser still offers the old certificate, remove it, then choose the new one when your browser asks.",
+      "bodyLabelled": "The certificate this device presented, “{{label}}”, was revoked on {{date}}. Add a device to get a new one. If your browser still offers the old certificate, remove it, then choose the new one when your browser asks.",
+      "bodyPending": "The certificate this device presented was revoked on {{date}}. To get a new one, use “Show the link again” in the device setup below. If your browser still offers the old certificate, remove it, then choose the new one when your browser asks.",
       "action": "Add a device"
     }
   },

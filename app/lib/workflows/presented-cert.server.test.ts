@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterAll, beforeEach, describe, expect, it } from "vitest"
 import { it as effectIt } from "@effect/vitest"
-import { Effect, Fiber, Layer, Option, TestClock } from "effect"
+import { Deferred, Effect, Fiber, Layer, Option, Ref, TestClock } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
@@ -113,6 +113,38 @@ describe("presentedRevokedCert (stubbed services)", () => {
         Layer.mergeAll(repoLayer(Effect.fail(new CertificateRepoError({ message: "db down" }))), signedByClientCa),
       ),
     ),
+  )
+
+  effectIt.effect("is None when a dependency dies (a defect, not a typed failure)", () =>
+    presentedRevokedCert(XFCC, "daddy").pipe(
+      Effect.tap((hit) => Effect.sync(() => expect(hit).toEqual(Option.none()))),
+      Effect.provide(Layer.mergeAll(repoLayer(Effect.die(new RangeError("bad row"))), signedByClientCa)),
+    ),
+  )
+
+  effectIt.effect("a timed-out request does not cancel the CA check: it runs to its end", () =>
+    // The CA check is where ClientCaTrustLive refreshes its cache from Vault.
+    // A request that stops waiting after 300 ms must leave it running, or a
+    // slow Vault would never warm the cache (the daemon fiber in the check).
+    Effect.gen(function* () {
+      const vaultAnswers = yield* Deferred.make<void>()
+      const finished = yield* Ref.make(false)
+      const slowTrust = Layer.succeed(ClientCaTrust, {
+        isIssuedByClientCa: () =>
+          Deferred.await(vaultAnswers).pipe(Effect.zipRight(Ref.set(finished, true)), Effect.as(true)),
+      })
+      const check = presentedRevokedCert(XFCC, "daddy").pipe(
+        Effect.provide(Layer.mergeAll(repoLayer(ownedRevoked), slowTrust)),
+      )
+
+      const first = yield* Effect.fork(check)
+      yield* TestClock.adjust("300 millis")
+      expect(yield* Fiber.join(first)).toEqual(Option.none()) // the request gave up
+
+      yield* Deferred.succeed(vaultAnswers, undefined) // Vault answers after it left
+      yield* Effect.yieldNow()
+      expect(yield* Ref.get(finished)).toBe(true) // the CA check was not interrupted
+    }),
   )
 
   effectIt.effect("is None within its 300 ms budget when the CA check never returns", () =>
