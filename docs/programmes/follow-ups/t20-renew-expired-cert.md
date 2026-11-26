@@ -19,6 +19,13 @@ dedicated listener that ignores certificate dates but still checks the CRL: a
 cert that is both revoked and expired gets no offer. Every other listener
 keeps `optional: false` and its date check.
 
+Holding the expired key must never be enough on its own. Otherwise a key
+leaked from a lost device renews itself forever, and the CRL never catches
+it, because every new serial starts out unrevoked. The renewal on that
+listener also needs a fresh OIDC login as the same user, and it is offered
+only within a cap after expiry (30 days unless the answer argues for
+another).
+
 Start after Phase 5 of
 `docs/plans/2026-11-25-gateway-enforces-client-cert-revocation.md`
 (enforcement on every listener).
@@ -38,7 +45,8 @@ Start after Phase 5 of
 
 Yes or no on Envoy Gateway support, with the CTP field or the gap named. If
 yes, a sketch of the listener (host, CTP, CRL ref) and of the duro route that
-reads the presented serial and offers renewal only to an unrevoked, expired
-cert of a known user.
+reads the presented serial. It offers renewal only to an unrevoked cert of a
+known user that expired within the cap, and only after a fresh OIDC login as
+that user. Both checks are named, with the test that proves each.
 
 Filed 2026-11-26 from the cert-revocation Phase 1 session's inbox.

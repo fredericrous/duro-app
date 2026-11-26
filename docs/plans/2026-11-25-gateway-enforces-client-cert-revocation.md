@@ -142,7 +142,7 @@ Files: `bootstrap/pkg/vault/nas_cluster_auth.go`, `bootstrap/pkg/vault/nas_clust
   failure, or a copied CRL with `nextUpdate` under 4 days, sets `success=1`
   (like `sync_service_ca`), failing the job so the existing broker-staleness
   alerts fire.
-  - Added after Phase 2 shipped: duro leaves the three `duro_crl_*` gauges out until the first good publish, so a threshold never fires on a publisher that has never succeeded. Also alert on `absent(duro_crl_published_timestamp_seconds)` for 1 h and on `up{service="duro-worker"} == 0`, each with a `promtool test rules` case.
+  - Added after Phase 2 shipped: duro leaves the three `duro_crl_*` gauges out until the first good publish, so a threshold never fires on a publisher that has never succeeded. Also alert on `absent(duro_crl_published_timestamp_seconds)` for 1 h and on `up{service="duro-worker"} == 0`, each with a `promtool test rules` case. One case has the `up` series absent (the Service or ServiceMonitor is gone), where only the `absent()` alert fires. Confirm the live `up` series carries `service="duro-worker"`.
 - Docs: `docs/operations/mtls-breakglass.md` and
   `docs/operations/nas-pki-and-mtls.md` rewritten to the new truth;
   a runbook "CRL stale → everyone refused" in the C4 style (numbered
