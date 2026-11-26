@@ -1,5 +1,6 @@
 ---
 status: active
+next: Phase 2 — release duro-app, bump kubernetes/homelab/apps/duro/helm-release.yaml, then the post-deploy checks and the person's iPhone visit
 branch: feat/revoked-cert-notice
 repos: [duro-app, homelab]
 adrs: []
@@ -89,7 +90,7 @@ Bump to the Phase 1 release, merge on green; Flux rolls the web pods.
 - `presented-cert.server.test.ts` also covers `presentedRevokedNotice` (Some → `{ revokedAt, label }`, None → null), since `devices.test.tsx` stubs `runEffect`.
 - `pnpm run test`, `pnpm run typecheck` and `pnpm run lint` exit 0 with 0 errors (lint gates the greenrack and role-selector rules).
 - `devices.test.tsx`: the loader calls a mocked `presentedRevokedNotice` with the request's XFCC and the `requireAuth` user; the page shows the warning, found by the Alert's accessible role and its text with the date, with its "Add a device" button by role and name, disabled while the fetcher is submitting; with a pending claim, the `bodyPending` text and no button; and none when null while a pending-claim Alert is shown (no test ids).
-- Local pilot (F2, UI): dev server (dev auth user `dev`, `ClientCaTrustDev`) with the fixture cert seeded as `dev`'s and revoked, behind a one-file local proxy that adds the XFCC header (scratch dir, not committed). A script asserts `curl -sS -o /dev/null -D - -w '%{http_code} %{redirect_url}'` on `/` gives `302 …/devices` with `Set-Cookie: duro_revoked_notice=`, then with `-b 'duro_revoked_notice=<serial>'` gives `200`, exiting non-zero on a mismatch (curl exits 0 on any status), and prints home's `time_starttransfer` with and without the header. `browser-check` on `/devices` through the proxy: the warning with the date, at desktop and 390 px, light and dark, no console error; also beside a pending claim, with no unrevoked device, at the device limit, and with a 60-character label at 390 px.
+- Local pilot (F2, UI): dev server (dev auth user `dev`, `ClientCaTrustDev`) with the fixture cert seeded as `dev`'s and revoked, behind a one-file local proxy that adds the XFCC header (scratch dir, not committed). A script asserts `curl -sS -o /dev/null -D - -w '%{http_code} %{redirect_url}'` on `/` gives `302 …/devices` with no Set-Cookie, `/devices` gives `200` with `Set-Cookie: duro_revoked_notice=`, then `/` with `-b 'duro_revoked_notice=<serial>'` gives `200`, exiting non-zero on a mismatch (curl exits 0 on any status), and prints home's `time_starttransfer` with and without the header. `browser-check` on `/devices` through the proxy: the warning with the date, at desktop and 390 px, light and dark, no console error; also beside a pending claim, with no unrevoked device, at the device limit, and with a 60-character label at 390 px.
 - After deploy (Phase 2): HelmRelease `duro` Ready at the new chart and the pods on its image (a failed upgrade is remediated back, `helm-release.yaml:20-26`); `mtls-duro-https` still has `xForwardedClientCert`; after the person's iPhone visit, one `logInfo` hit with serial 6F:5C… and the 302 in the web pods' logs; `duro-home` tier2 P99 (target 1.5 s) over the 24 h before and after, a rise over 100 ms is fixed before closing.
 
 ### Phase 1 results (observed before push)
@@ -125,6 +126,14 @@ Deliberate:
 - Light theme was not seen (interface-review, implementation-review): the dev server renders the dev user's saved theme and offers no switch, and saving `light` did not change the server render. The warning is greenrack's `Alert variant="warning"`, whose light colours are the design system's own; the person's iPhone visit (Your steps) is the first light-theme view.
 
 Deviation from the plan text: `Effect.forkDaemon` + `Fiber.join` instead of `Effect.disconnect` (the test above shows why). The first pilot pass got 400 on every POST: the scratch proxy rewrote Host, and React Router refuses a POST whose Origin and Host disagree; fixed in the proxy, not the app.
+
+## Implementation review
+
+- implementation-review (opus): approve-with-changes ×2; daemon fix tested through `presentedRevokedCert`, plan text corrected; deliberate: defects logged at warning, not error (the cause is logged whole with `Cause.pretty`; inbox). ~202k tokens, 163 s.
+- backend (opus): approve-with-changes → approve; daemon test, `catchAllCause` + die test, holds-until note. ~165k, 114 s.
+- lang:typescript (opus): approve-with-changes → approve; Duration, die test, role queries, `data()` class; deliberate: `revokedAt` normalised here, not in the shared repo mapper (inbox). The `getAuth` move cannot newly fail home: the dashboard layout's `requireAuth` reads the same session first. ~139k, 88 s.
+- react (opus): approve, round 1; its two lows (role queries, precomputed message) fixed. 60k, 40 s.
+- ui-design (interface-review, opus): approve-with-changes → approve; pending copy names "Show the link again", default-size button, steps in order; deliberate: light theme unseen (see above); pre-existing: the pending Alert's small "Show the link again" button (inbox). ~170k, 177 s.
 
 ## Rollback
 
