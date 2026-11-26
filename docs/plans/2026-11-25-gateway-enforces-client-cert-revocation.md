@@ -118,7 +118,7 @@ New service `app/lib/services/CrlPublisher.server.ts`, run by duro-worker using 
 
 - Tests (`app/lib/services/CrlPublisher.server.test.ts`, `it.effect` + TestClock): debounce collapses bursts; a CRL with nextUpdate < 3 d or a bad signature is not written; unchanged content is not rewritten; a completed serial missing from the CRL is re-revoked.
 
-### Phase 3 — homelab: Vault, ESO, alerts (PR 3a + PR 3b, no enforcement yet)
+### Phase 3 — homelab: Vault, ESO, alerts (PR 3a + PR 3b, no enforcement yet) — done
 
 <!-- panel: repos=homelab -->
 
@@ -266,6 +266,26 @@ Phase 3b's start condition holds: the first publish is in NAS KV `secret/pki/cli
 Before the release, check the Phase 3a gate against NAS Vault: `vault read pki-client/config/crl` shows 168h with auto_rebuild false, and the duro-pki token can GET `crl/rotate`.
 
 Decision log: the CRL handover through NAS KV `secret/pki/client-crl` (key `ca.crl`) is taken. The person decided "duro-app publishes the CRL via Vault → ESO", and Phase 3a (homelab a47f7e777), which grants duro-pki write on that path, is live.
+
+### Phase 3b results (homelab #1320, merged 2026-11-26 as `795c175df`)
+
+The record before the push, and its deviations, are in the homelab pointer `docs/plans/2026-11-25-gateway-enforces-client-cert-revocation.md`. In short:
+
+- The broker image (`alpine/k8s`) has no openssl. `crl_check.py`, a stdlib DER walk, checks a CRL before it is copied: one PEM CRL, issuer = the `pki-client` CA, nextUpdate in the future. duro and Envoy verify the signature.
+- The copy steps live in `crl_sync.sh`, tested with a stubbed curl.
+- With the NAS unreachable, the broker re-checks the main-Vault copy and fails under 4 days.
+
+Observed after Flux applied it:
+
+| gate | actual |
+| --- | --- |
+| `vault-nas-roles-setup` | Job re-created by Flux, Complete in 25 s |
+| broker run from the new CronJob | `client_crl_sync validated next_update=1796278776 revoked=18`, then `unchanged` (a scheduled run had already copied it); `broker_cycle success` |
+| ExternalSecret `envoy-gateway-system/client-crl` | `SecretSynced`, Ready True after a force-sync |
+| Secret `client-crl` key `ca.crl` | `openssl crl`: Next Update Dec 3 06:19:36 2026 GMT, 18 serials, `6F5C7F048F771661B80CB77D68847D2845F3EB` (the iPhone's) among them |
+| Prometheus group `client-crl` | 7 rules loaded, all `inactive`, health `ok` |
+
+Next: Phase 4. It starts with the person reissuing the iPhone cert from duro, because its current one is on the CRL and is refused once enforcement reaches its hosts.
 
 ## Implementation review
 
