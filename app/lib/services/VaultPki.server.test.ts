@@ -313,8 +313,8 @@ describe("VaultPki — revokeCert", () => {
     const rt = makeRuntime()
     const revokeFailure = await rt.runPromise(
       Effect.gen(function* () {
-        const v = yield* VaultPki
-        return yield* v.revokeCert("XX").pipe(Effect.flip)
+        const vaultPki = yield* VaultPki
+        return yield* vaultPki.revokeCert("XX").pipe(Effect.flip)
       }),
     )
     expect(revokeFailure.status).toBe(httpStatus)

@@ -227,10 +227,10 @@ describe("handleAdminInvitesMutation — send revocation prompt", () => {
 
 describe("handleAdminInvitesMutation — retry/resend", () => {
   it("returns 'Invite not found' (as error shape, not throw) when inviteId is unknown", async () => {
-    const result = await testRunEffect(
+    const mutationResponse = await testRunEffect(
       handleAdminInvitesMutation({ intent: "retry", inviteId: "does-not-exist" }, "admin-sub"),
     )
-    expect(result).toEqual({ error: "Invite not found" })
+    expect(mutationResponse).toEqual({ error: "Invite not found" })
   })
 })
 
@@ -279,13 +279,13 @@ describe("handleAdminInvitesMutation — revoke", () => {
 describe("handleAdminInvitesMutation — showLink", () => {
   it("hands back the pending invite's link: same token, nothing re-issued", async () => {
     await seedTestDb(seedPendingInvite())
-    const result = await testRunEffect(
+    const mutationResponse = await testRunEffect(
       handleAdminInvitesMutation({ intent: "showLink", inviteId: "inv-1" }, "admin-sub"),
     )
-    expect("success" in result && result.invite).toBeTruthy()
-    if ("success" in result && result.invite) {
-      expect(result.invite.url).toMatch(/\/invite\/token-1$/)
-      expect(result.invite.email).toBe("alice@example.com")
+    expect("success" in mutationResponse && mutationResponse.invite).toBeTruthy()
+    if ("success" in mutationResponse && mutationResponse.invite) {
+      expect(mutationResponse.invite.url).toMatch(/\/invite\/token-1$/)
+      expect(mutationResponse.invite.email).toBe("alice@example.com")
     }
   })
 
