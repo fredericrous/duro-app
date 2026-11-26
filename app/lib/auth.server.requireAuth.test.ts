@@ -13,7 +13,7 @@ vi.mock("./runtime.server", async () => {
   return { runEffect: mod.testRunEffect, runDbEffect: mod.testRunEffect }
 })
 
-const { requireAuth } = await import("./auth.server")
+const { requireAuth, getAuth } = await import("./auth.server")
 const { createSessionCookie } = await import("./session.server")
 const { seedTestDb, truncateAll } = await import("~/test/test-runtime")
 
@@ -121,6 +121,38 @@ describe("requireAuth — a device presenting its user's revoked certificate", (
     expect((await requireAuth(await aliceRequest("/devices"))).user).toBe("alice")
     expect((await requireAuth(await aliceRequest("/devices.data"))).user).toBe("alice")
     expect((await requireAuth(await aliceRequest("/devices", { method: "POST" }))).user).toBe("alice")
+  })
+
+  it("getAuth refuses a write with 403: actions reach a route without its layout", async () => {
+    await seedRevokedCert("alice")
+    for (const path of ["/requests", "/", "/admin/grants"]) {
+      const res = await catchResponse(getAuth(await aliceRequest(path, { method: "POST" })))
+      expect(res.status).toBe(403)
+    }
+  })
+
+  it("getAuth shows a confined device as signed out on reads, including ?_routes= data requests", async () => {
+    await seedRevokedCert("alice")
+    for (const path of ["/catalog.data?_routes=routes/catalog", "/requests"]) {
+      expect(await getAuth(await aliceRequest(path))).toEqual({ sub: null, user: null, email: null, groups: [] })
+    }
+  })
+
+  it("getAuth lets /devices through, and a device whose certificate is not revoked", async () => {
+    await seedRevokedCert("alice")
+    expect((await getAuth(await aliceRequest("/devices", { method: "POST" }))).user).toBe("alice")
+    await truncateAll()
+    expect((await getAuth(await aliceRequest("/requests", { method: "POST" }))).user).toBe("alice")
+  })
+
+  it("looks the certificate up once per request, however many loaders ask", async () => {
+    await seedRevokedCert("alice")
+    const request = await aliceRequest("/settings.data")
+    const spy = vi.spyOn(await import("~/lib/workflows/presented-cert.server"), "presentedCertStatus")
+    const outcomes = await Promise.allSettled([requireAuth(request), getAuth(request), requireAuth(request)])
+    expect(outcomes.map((o) => o.status)).toEqual(["rejected", "fulfilled", "rejected"])
+    expect(spy).toHaveBeenCalledTimes(1)
+    spy.mockRestore()
   })
 
   it("leaves a device alone when the revoked certificate is another user's", async () => {

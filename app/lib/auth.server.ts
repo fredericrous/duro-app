@@ -1,9 +1,9 @@
-import { Effect, Option } from "effect"
+import { Effect } from "effect"
 import { getSession, createPkceCookie } from "./session.server"
 import { OidcClient } from "./services/OidcClient.server"
 import { runEffect } from "./runtime.server"
 import { resolvePendingCertInvite } from "./workflows/invite.server"
-import { presentedRevokedCert } from "./workflows/presented-cert.server"
+import { isRestricted, presentedCertStatus, type PresentedCertStatus } from "./workflows/presented-cert.server"
 
 export interface AuthInfo {
   /**
@@ -52,42 +52,67 @@ function reachableWhileRevoked(pathname: string): boolean {
 }
 
 /**
+ * One navigation calls requireAuth/getAuth several times (the dashboard layout
+ * and each nested route): the lookup runs once per Request object.
+ */
+const statusByRequest = new WeakMap<Request, Promise<PresentedCertStatus>>()
+
+function presentedStatus(request: Request, user: string): Promise<PresentedCertStatus> {
+  let status = statusByRequest.get(request)
+  if (!status) {
+    status = runEffect(presentedCertStatus(request.headers.get("x-forwarded-client-cert"), user))
+    statusByRequest.set(request, status)
+  }
+  return status
+}
+
+/**
  * A device presenting one of its user's own revoked certificates may do one
  * thing on duro: get a new one. duro-https has no CRL (it is the way back in),
  * so the revoked certificate still reaches the app; everything but /devices
- * (and signing out) sends it there, and any other write is refused. The
- * person's decision, 2026-11-26 (plan 2026-11-26-revoked-cert-notice).
- * /devices itself never pays for the lookup; elsewhere it is one indexed
- * query, the CA check only on a hit, all under 300 ms (presented-cert.server).
+ * (and signing out) sends it there, and any write is refused. Applied by BOTH
+ * requireAuth and getAuth: an action or a `?_routes=` data request can reach a
+ * route without its layout, and many routes only call getAuth. The person's
+ * decision, 2026-11-26 (plan 2026-11-26-revoked-cert-notice).
+ *
+ * Fails soft when the lookup itself is unavailable (a slow query must not lock
+ * everyone out); a revoked row whose CA check did not answer is restricted.
+ * /devices never pays for the lookup; elsewhere it is one indexed query, the
+ * CA check only on a hit, once per request, under 300 ms (presented-cert.server).
  */
-async function restrictRevokedDevice(request: Request, auth: AuthInfo): Promise<void> {
-  const xfcc = request.headers.get("x-forwarded-client-cert")
-  if (!xfcc || !auth.user) return
-  if (reachableWhileRevoked(new URL(request.url).pathname)) return
-  const revoked = await runEffect(presentedRevokedCert(xfcc, auth.user))
-  if (Option.isNone(revoked)) return
-  const method = request.method.toUpperCase()
-  if (method === "GET" || method === "HEAD") {
-    throw new Response(null, { status: 302, headers: { Location: "/devices" } })
-  }
-  throw new Response("This device's certificate is revoked: get a new one from Devices.", { status: 403 })
+async function isConfined(request: Request, auth: AuthInfo): Promise<boolean> {
+  if (!request.headers.get("x-forwarded-client-cert") || !auth.user) return false
+  if (reachableWhileRevoked(new URL(request.url).pathname)) return false
+  return isRestricted(await presentedStatus(request, auth.user))
+}
+
+const isRead = (request: Request) => ["GET", "HEAD"].includes(request.method.toUpperCase())
+
+const refusedWrite = () =>
+  new Response("This device's certificate is revoked: get a new one from Devices.", { status: 403 })
+
+/** requireAuth: a confined device is sent to /devices, and its writes are refused. */
+async function confineRevokedDevice(request: Request, auth: AuthInfo): Promise<void> {
+  if (!(await isConfined(request, auth))) return
+  if (isRead(request)) throw new Response(null, { status: 302, headers: { Location: "/devices" } })
+  throw refusedWrite()
 }
 
 /**
  * Require authentication. Returns AuthInfo if the user has a valid session,
  * or throws a redirect to the OIDC login flow. A device presenting its user's
- * revoked certificate is confined to /devices (`restrictRevokedDevice`).
+ * revoked certificate is confined to /devices (`confineRevokedDevice`).
  */
 export async function requireAuth(request: Request): Promise<AuthInfo> {
   const session = await getSession(request)
   if (session) {
     const auth = { sub: session.sub, user: session.name, email: session.email, groups: session.groups }
-    await restrictRevokedDevice(request, auth)
+    await confineRevokedDevice(request, auth)
     return auth
   }
 
   if (isDevServer) {
-    await restrictRevokedDevice(request, DEV_AUTH)
+    await confineRevokedDevice(request, DEV_AUTH)
     return DEV_AUTH
   }
 
@@ -113,16 +138,24 @@ export async function requireAuth(request: Request): Promise<AuthInfo> {
 }
 
 /**
- * Get auth info from session without redirecting.
- * Use in child routes where the parent layout already called requireAuth.
+ * Get auth info from session without redirecting to sign in. Use in child
+ * routes where the parent layout already called requireAuth. A device
+ * presenting its user's revoked certificate is confined to /devices here too,
+ * because an action or a `?_routes=` data request reaches a route without its
+ * layout: its writes get a 403, and its reads see no one signed in (the
+ * existing no-session answer, so a loader that streams the result in a promise
+ * never rejects it unhandled).
  */
 export async function getAuth(request: Request): Promise<AuthInfo> {
   const session = await getSession(request)
-  if (session) {
-    return { sub: session.sub, user: session.name, email: session.email, groups: session.groups }
-  }
-  if (isDevServer) {
-    return DEV_AUTH
-  }
-  return { sub: null, user: null, email: null, groups: [] }
+  const signedOut: AuthInfo = { sub: null, user: null, email: null, groups: [] }
+  const user = session
+    ? { sub: session.sub, user: session.name, email: session.email, groups: session.groups }
+    : isDevServer
+      ? DEV_AUTH
+      : null
+  if (!user) return signedOut
+  if (!(await isConfined(request, user))) return user
+  if (isRead(request)) return signedOut
+  throw refusedWrite()
 }

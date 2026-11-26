@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import { Effect, Option } from "effect"
+import { Effect } from "effect"
 
 vi.mock("~/lib/auth.server", () => ({
   requireAuth: vi.fn(),
@@ -28,6 +28,7 @@ import { isOriginAllowed } from "~/lib/config.server"
 import { presentedRevokedNotice } from "~/lib/workflows/presented-cert.server"
 import { action, loader } from "./devices"
 import { callAction, callLoader, expectData } from "~/test/route-utils"
+import { t } from "~/test/test-utils"
 
 const mockRequireAuth = vi.mocked(requireAuth)
 const mockRunEffect = vi.mocked(runEffect)
@@ -74,23 +75,30 @@ describe("/devices loader: the certificate this device presented", () => {
   })
 })
 
-describe("/devices action: a device presenting its revoked certificate", () => {
-  it("gets new-device links by email only, whatever the form asked", async () => {
-    mockParse.mockReturnValue({ intent: "issueCert", delivery: "link", auth: {} } as never)
+describe("/devices action: links by email only for a revoked or unknown device", () => {
+  const asked = async (status: unknown, delivery: "link" | "email" = "link") => {
+    mockParse.mockReturnValue({ intent: "issueCert", delivery, auth: {} } as never)
     mockHandle.mockReturnValue(Effect.void as never)
-    mockRunEffect
-      .mockResolvedValueOnce(Option.some({ serial: "a1b2c3d4e5f", revokedAt: "x", label: null }) as never)
-      .mockResolvedValueOnce({ certSent: true } as never)
-    await callAction(action, { formData: { intent: "issueCert", delivery: "link" } })
-    expect(mockHandle).toHaveBeenCalledWith(expect.objectContaining({ intent: "issueCert", delivery: "email" }))
+    mockRunEffect.mockResolvedValueOnce(status as never).mockResolvedValueOnce({ certSent: true } as never)
+    await callAction(action, { formData: { intent: "issueCert", delivery } })
+    return mockHandle.mock.calls[0]![0]
+  }
+  const revokedCert = { serial: "a1b2c3d4e5f", revokedAt: "x", label: null }
+
+  it("a proven revoked certificate: email, whatever the form asked", async () => {
+    expect(await asked({ _tag: "Revoked", cert: revokedCert })).toMatchObject({ delivery: "email" })
   })
 
-  it("keeps the asked delivery when the presented certificate is not revoked", async () => {
-    mockParse.mockReturnValue({ intent: "issueCert", delivery: "link", auth: {} } as never)
-    mockHandle.mockReturnValue(Effect.void as never)
-    mockRunEffect.mockResolvedValueOnce(Option.none() as never).mockResolvedValueOnce({ certLinkReady: true } as never)
-    await callAction(action, { formData: { intent: "issueCert", delivery: "link" } })
-    expect(mockHandle).toHaveBeenCalledWith(expect.objectContaining({ intent: "issueCert", delivery: "link" }))
+  it("a revoked row whose CA check did not answer: email (the safe side)", async () => {
+    expect(await asked({ _tag: "Unproven" })).toMatchObject({ delivery: "email" })
+  })
+
+  it("a lookup that could not tell: email too (a security rule fails closed)", async () => {
+    expect(await asked({ _tag: "Unavailable" })).toMatchObject({ delivery: "email" })
+  })
+
+  it("a certificate that is not revoked keeps the asked delivery", async () => {
+    expect(await asked({ _tag: "NotRevoked" })).toMatchObject({ delivery: "link" })
   })
 })
 
@@ -144,7 +152,7 @@ const pageData = (extra: Record<string, unknown>) => () => ({
 
 /** The warning Alert (greenrack renders every Alert as role="alert"), by its text. */
 const findWarning = async (text: RegExp) => {
-  await screen.findByText(text)
+  await screen.findAllByText(text)
   const warning = screen.getAllByRole("alert").find((alert) => text.test(alert.textContent ?? ""))
   if (!warning) throw new Error(`no alert matching ${text}`)
   return warning
@@ -160,11 +168,11 @@ describe("DevicesPage: the presented certificate is revoked", () => {
     })
     const warning = await findWarning(/The certificate this device presented was revoked on/)
     expect(warning).not.toBeNull()
-    expect(within(warning).getByRole("button", { name: "Add a device" })).toBeEnabled()
+    expect(within(warning).getByRole("button", { name: t("devices.presentedRevoked.action") })).toBeEnabled()
     // The header keeps its own: same name, two buttons page-wide.
-    expect(screen.getAllByRole("button", { name: "Add a device" })).toHaveLength(2)
+    expect(screen.getAllByRole("button", { name: t("devices.presentedRevoked.action") })).toHaveLength(2)
     // Confined to Devices (requireAuth): the header drops "My requests".
-    expect(screen.queryByRole("link", { name: /My requests/ })).toBeNull()
+    expect(screen.queryByRole("link", { name: new RegExp(t("header.myRequests")) })).toBeNull()
   })
 
   it("disables its button while the device setup is being issued", async () => {
@@ -178,9 +186,9 @@ describe("DevicesPage: the presented certificate is revoked", () => {
       url: "/devices",
     })
     const warning = await findWarning(/The certificate this device presented was revoked on/)
-    await userEvent.click(within(warning).getByRole("button", { name: "Add a device" }))
+    await userEvent.click(within(warning).getByRole("button", { name: t("devices.presentedRevoked.action") }))
     await waitFor(() => {
-      expect(within(warning).getByRole("button", { name: "Add a device" })).toBeDisabled()
+      expect(within(warning).getByRole("button", { name: t("devices.presentedRevoked.action") })).toBeDisabled()
     })
   })
 
@@ -199,11 +207,75 @@ describe("DevicesPage: the presented certificate is revoked", () => {
       url: "/devices",
     })
     const warning = await findWarning(/The certificate this device presented was revoked on/)
-    await userEvent.click(within(warning).getByRole("button", { name: "Add a device" }))
-    expect(await screen.findByText("We emailed you the link")).toBeInTheDocument()
+    await userEvent.click(within(warning).getByRole("button", { name: t("devices.presentedRevoked.action") }))
+    expect(await screen.findByText(t("devices.qr.emailedTitle"))).toBeInTheDocument()
     expect(asked).toEqual(["email"])
     // No QR code and no copyable link while restricted.
-    expect(screen.queryByRole("button", { name: /Copy link/ })).toBeNull()
+    expect(screen.queryByRole("button", { name: new RegExp(t("devices.qr.copyLink")) })).toBeNull()
+  })
+
+  it("shows a sending state, with no QR and no copy button, while the email goes", async () => {
+    renderRoute({
+      route: {
+        path: "/devices",
+        Component: DevicesPage as never,
+        loader: pageData({ presentedRevoked: revoked }),
+        action: () => new Promise(() => {}), // never answers: stays in flight
+      },
+      url: "/devices",
+    })
+    const warning = await findWarning(/The certificate this device presented was revoked on/)
+    await userEvent.click(within(warning).getByRole("button", { name: t("devices.presentedRevoked.action") }))
+    expect(await screen.findByText(t("devices.qr.sendingTitle"))).toBeInTheDocument()
+    expect(screen.queryByText(t("devices.qr.title"))).toBeNull()
+    expect(screen.queryByRole("button", { name: new RegExp(t("devices.qr.copyLink")) })).toBeNull()
+    // The sending line sits in a polite live region, which the emailed text then replaces in place.
+    const sendingRegion = within(screen.getByRole("dialog"))
+      .getAllByRole("status")
+      .find((region) => region.textContent?.includes(t("devices.qr.sending")))
+    expect(sendingRegion).toBeDefined()
+  })
+
+  it("announces the emailed outcome in the same live region", async () => {
+    renderRoute({
+      route: {
+        path: "/devices",
+        Component: DevicesPage as never,
+        loader: pageData({ presentedRevoked: revoked }),
+        action: async () => ({ certSent: true }),
+      },
+      url: "/devices",
+    })
+    const warning = await findWarning(/The certificate this device presented was revoked on/)
+    await userEvent.click(within(warning).getByRole("button", { name: t("devices.presentedRevoked.action") }))
+    await screen.findByText(t("devices.qr.emailedTitle"))
+    expect(within(screen.getByRole("dialog")).getByRole("status")).toHaveTextContent(t("devices.qr.emailedBody"))
+  })
+
+  it("offers 'Email the link again' for a waiting setup, guarded while it is in flight", async () => {
+    const asked: string[] = []
+    renderRoute({
+      route: {
+        path: "/devices",
+        Component: DevicesPage as never,
+        loader: pageData({
+          presentedRevoked: revoked,
+          pendingClaim: { expiresAt: new Date(Date.now() + 3600_000).toISOString() },
+        }),
+        action: async ({ request }) => {
+          const form = await request.formData()
+          asked.push(`${form.get("intent")}:${form.get("delivery")}`)
+          return new Promise(() => {}) // never answers: stays in flight
+        },
+      },
+      url: "/devices",
+    })
+    const waiting = await screen.findByText(/A device setup is waiting/)
+    const alert = screen.getAllByRole("alert").find((a) => a.contains(waiting)) as HTMLElement
+    const button = within(alert).getByRole("button", { name: t("devices.pending.emailAction") })
+    await userEvent.click(button)
+    await waitFor(() => expect(button).toBeDisabled())
+    expect(asked).toEqual(["showClaimLink:email"])
   })
 
   it("points to the waiting setup, with no button, when one is pending", async () => {
@@ -218,7 +290,7 @@ describe("DevicesPage: the presented certificate is revoked", () => {
       },
       url: "/devices",
     })
-    const warning = await findWarning(/use “Show the link again” in the device setup below/)
+    const warning = await findWarning(new RegExp(t("devices.pending.emailAction")))
     expect(within(warning).queryByRole("button")).toBeNull()
   })
 

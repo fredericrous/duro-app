@@ -241,8 +241,10 @@
       "expiry": "Expiration"
     },
     "qr": {
+      "sending": "Envoi du lien dans votre boîte mail…",
+      "sendingTitle": "Envoi du lien dans votre boîte mail",
       "emailedTitle": "Nous vous avons envoyé le lien par e-mail",
-      "emailedBody": "Le lien pour configurer votre nouvel appareil est dans votre boîte mail. Ouvrez-le sur le nouvel appareil : il ne fonctionne qu’une fois.",
+      "emailedBody": "Le lien est dans votre boîte mail. Ouvrez-le sur l’appareil qui doit recevoir le nouveau certificat (celui-ci, si vous remplacez son certificat). Il ne fonctionne qu’une fois.",
       "title": "Scannez avec le nouvel appareil",
       "hint": "Pointez l’appareil photo du nouvel appareil vers le code — la page du certificat s’ouvre directement. Aucun e-mail n’a été envoyé.",
       "alt": "QR code ouvrant la page du certificat de cet appareil",
@@ -261,13 +263,14 @@
       "retry": "Réessayer"
     },
     "pending": {
+      "emailAction": "Renvoyer le lien par e-mail",
       "body": "Une configuration d’appareil est en attente — le lien est valide jusqu’au {{time}}.",
       "action": "Afficher le lien à nouveau"
     },
     "presentedRevoked": {
       "body": "Le certificat présenté par cet appareil a été révoqué le {{date}}. Ajoutez un appareil pour en obtenir un nouveau. Si votre navigateur propose encore l’ancien certificat, supprimez-le, puis choisissez le nouveau quand votre navigateur le demande.",
       "bodyLabelled": "Le certificat présenté par cet appareil, « {{label}} », a été révoqué le {{date}}. Ajoutez un appareil pour en obtenir un nouveau. Si votre navigateur propose encore l’ancien certificat, supprimez-le, puis choisissez le nouveau quand votre navigateur le demande.",
-      "bodyPending": "Le certificat présenté par cet appareil a été révoqué le {{date}}. Pour en obtenir un nouveau, utilisez « Afficher le lien à nouveau » dans la configuration d’appareil ci-dessous. Si votre navigateur propose encore l’ancien certificat, supprimez-le, puis choisissez le nouveau quand votre navigateur le demande.",
+      "bodyPending": "Le certificat présenté par cet appareil a été révoqué le {{date}}. Pour en obtenir un nouveau, utilisez « Renvoyer le lien par e-mail » dans la configuration d’appareil ci-dessous. Si votre navigateur propose encore l’ancien certificat, supprimez-le, puis choisissez le nouveau quand votre navigateur le demande.",
       "action": "Ajouter un appareil"
     }
   },

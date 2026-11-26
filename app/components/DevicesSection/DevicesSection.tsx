@@ -92,10 +92,13 @@ type ClaimState =
  */
 function ClaimLinkDialog({
   state,
+  emailOnly,
   onClose,
   onRetry,
 }: {
   state: ClaimState | null
+  /** The link goes to the mailbox only: no QR, no copy, a sending state while it goes. */
+  emailOnly: boolean
   onClose: () => void
   onRetry: () => void
 }) {
@@ -118,7 +121,9 @@ function ClaimLinkDialog({
         ? t("devices.qr.errorTitle")
         : state?.kind === "emailed"
           ? t("devices.qr.emailedTitle")
-          : t("devices.qr.title")
+          : emailOnly && state?.kind === "pending"
+            ? t("devices.qr.sendingTitle")
+            : t("devices.qr.title")
 
   return (
     <Dialog.Root
@@ -143,7 +148,18 @@ function ClaimLinkDialog({
             </Stack>
           )}
 
-          {state?.kind === "emailed" && (
+          {/* One polite live region for the whole email path, so the swap from
+              "sending" to "emailed" is announced and the dialog keeps its shape. */}
+          {emailOnly && (state?.kind === "pending" || state?.kind === "emailed") && (
+            <Stack gap="md" align="center">
+              <html.div role="status">
+                <Text as="p">{state.kind === "emailed" ? t("devices.qr.emailedBody") : t("devices.qr.sending")}</Text>
+              </html.div>
+              {state.kind === "pending" && <Spinner size="lg" />}
+            </Stack>
+          )}
+
+          {!emailOnly && state?.kind === "emailed" && (
             <Stack gap="md">
               <Text as="p">{t("devices.qr.emailedBody")}</Text>
             </Stack>
@@ -160,7 +176,7 @@ function ClaimLinkDialog({
             </Stack>
           )}
 
-          {(state?.kind === "pending" || state?.kind === "ready") && (
+          {!emailOnly && (state?.kind === "pending" || state?.kind === "ready") && (
             <Stack gap="md" align="center">
               <Text as="p" variant="bodySm" color="muted">
                 {state.kind === "ready" ? t("devices.qr.hint") : t("devices.qr.preparing")}
@@ -632,15 +648,25 @@ export function DevicesSection({
             <Stack gap="sm">
               <Text as="p">{t("devices.pending.body", { time: formatDateTime(pendingClaim.expiresAt) })}</Text>
               <Inline gap="sm">
-                <Button variant="secondary" size="small" onClick={resumeClaim}>
-                  {t("devices.pending.action")}
+                <Button
+                  variant="secondary"
+                  size={presentedRevoked !== null ? undefined : "small"}
+                  disabled={isSubmitting}
+                  onClick={resumeClaim}
+                >
+                  {presentedRevoked !== null ? t("devices.pending.emailAction") : t("devices.pending.action")}
                 </Button>
               </Inline>
             </Stack>
           </Alert>
         )}
 
-        <ClaimLinkDialog state={claimState} onClose={() => setSession(null)} onRetry={retry} />
+        <ClaimLinkDialog
+          state={claimState}
+          emailOnly={presentedRevoked !== null}
+          onClose={() => setSession(null)}
+          onRetry={retry}
+        />
 
         {rows.length > 0 && (
           <>

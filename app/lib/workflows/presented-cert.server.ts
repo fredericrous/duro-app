@@ -12,9 +12,9 @@ import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
  * revoked certificate still reaches duro there, and duro can point its owner
  * to the devices page instead of leaving them on a page that half works.
  *
- * Read-only, and never fails, defects included: anything it cannot prove is
- * "no" (home awaits it before streaming, so a throw here would be a 500). The checks
- * run cheapest first, so the common request (a valid cert) costs one parse
+ * Read-only, and never fails, defects included (every page waits for it, so a
+ * throw here would be a 500): what it cannot tell is `Unavailable` or
+ * `Unproven`, which callers treat by what is at stake. The checks run cheapest first, so the common request (a valid cert) costs one parse
  * and one indexed query; the CA check (`ClientCaTrust`, which may refresh
  * from Vault) runs only for a revoked hit.
  *
@@ -32,26 +32,52 @@ export interface PresentedRevokedNotice {
   readonly label: string | null
 }
 
-/** Budget for the whole check: home waits for it before it starts streaming. */
+/** Budget for the check on a page load: every request waits for it. */
 export const PRESENTED_CERT_TIMEOUT = Duration.millis(300)
 
-export const presentedRevokedCert = (
+/**
+ * What duro knows about the certificate a request's device presented.
+ * Absent and "not revoked" are different from "could not tell": the notice
+ * and the page confinement fail soft on Unavailable (a slow query must not
+ * lock everyone out), the email-only rule fails closed on it (a lost device
+ * must not get a link on screen because a lookup timed out).
+ */
+export type PresentedCertStatus =
+  /** One of the user's own certificates, revoked, and proven pki-client's. */
+  | { readonly _tag: "Revoked"; readonly cert: PresentedRevokedCert }
+  /** No certificate, another user's, unknown, unrevoked, or not pki-client's. */
+  | { readonly _tag: "NotRevoked" }
+  /** A revoked row of this user's matched, but the client CA check did not
+   *  answer in time: treated as revoked (the safe side). */
+  | { readonly _tag: "Unproven" }
+  /** The lookup itself failed or ran out of time: nothing is known. */
+  | { readonly _tag: "Unavailable" }
+
+/** Restricted: duro treats the device as presenting a revoked certificate. */
+export const isRestricted = (status: PresentedCertStatus): boolean =>
+  status._tag === "Revoked" || status._tag === "Unproven"
+
+/** Links by email only: restricted, or not even known (fail closed). */
+export const emailOnly = (status: PresentedCertStatus): boolean => status._tag !== "NotRevoked"
+
+export const presentedCertStatus = (
   xfcc: string | null | undefined,
   username: string | null | undefined,
-): Effect.Effect<Option.Option<PresentedRevokedCert>, never, CertificateRepo | ClientCaTrust> =>
+  options: { readonly timeout?: Duration.DurationInput } = {},
+): Effect.Effect<PresentedCertStatus, never, CertificateRepo | ClientCaTrust> =>
   Effect.gen(function* () {
-    if (!username) return Option.none()
     const parsed = parseXfccCert(xfcc)
-    if (!parsed) return Option.none()
+    if (!username || !parsed) return { _tag: "NotRevoked" } as const
     const serial = canonicalSerial(parsed.serial)
+    const timeout = options.timeout ?? PRESENTED_CERT_TIMEOUT
 
-    const step = yield* Ref.make("certificate lookup")
+    const step = yield* Ref.make<"certificate lookup" | "client CA check">("certificate lookup")
     const check = Effect.gen(function* () {
       const certRepo = yield* CertificateRepo
       const cert = yield* certRepo.findBySerialCanonical(serial)
       // Never reveal another user's certificate, nor an unrevoked one.
       if (!cert || cert.username !== username || cert.revokedAt === null) {
-        return Option.none<PresentedRevokedCert>()
+        return { _tag: "NotRevoked" } as PresentedCertStatus
       }
       // A serial is unique only within one issuer, and this listener also
       // trusts the break-glass root: prove pki-client signed it, last.
@@ -63,37 +89,43 @@ export const presentedRevokedCert = (
       const trust = yield* ClientCaTrust
       const caCheck = yield* Effect.forkDaemon(trust.isIssuedByClientCa(parsed.pem))
       const issuedByClientCa = yield* Fiber.join(caCheck)
-      if (!issuedByClientCa) return Option.none<PresentedRevokedCert>()
+      if (!issuedByClientCa) return { _tag: "NotRevoked" } as PresentedCertStatus
       // The driver hands timestamptz back as a Date despite the row's string
       // type: normalise, so loader data and the notice see one ISO string.
       const revokedAt = new Date(cert.revokedAt).toISOString()
-      return Option.some<PresentedRevokedCert>({ serial, revokedAt, label: cert.label })
+      return { _tag: "Revoked", cert: { serial, revokedAt, label: cert.label } } as PresentedCertStatus
     }).pipe(
       // Every cause, defects included: a bad row or a dying dependency must
-      // cost the notice, never the home page.
+      // cost the notice, never the page.
       Effect.catchAllCause((cause) =>
-        Effect.logWarning("presented-cert: certificate lookup failed; no revoked-cert notice", {
+        Effect.logWarning("presented-cert: certificate lookup failed; its status is unknown", {
           cause: Cause.pretty(cause),
-        }).pipe(Effect.as(Option.none<PresentedRevokedCert>())),
+        }).pipe(Effect.as({ _tag: "Unavailable" } as PresentedCertStatus)),
       ),
     )
 
-    const outcome = yield* check.pipe(Effect.timeoutOption(PRESENTED_CERT_TIMEOUT))
+    const outcome = yield* check.pipe(Effect.timeoutOption(timeout))
     if (Option.isNone(outcome)) {
       const where = yield* Ref.get(step)
-      yield* Effect.logWarning(
-        `presented-cert: ${where} timed out after ${Duration.format(PRESENTED_CERT_TIMEOUT)}; no revoked-cert notice`,
-      )
-      return Option.none()
+      yield* Effect.logWarning(`presented-cert: ${where} timed out after ${Duration.format(Duration.decode(timeout))}`)
+      return { _tag: where === "client CA check" ? "Unproven" : "Unavailable" } as PresentedCertStatus
     }
-    const hit = outcome.value
-    if (Option.isSome(hit)) {
+    const status = outcome.value
+    if (status._tag === "Revoked") {
       yield* Effect.logInfo("presented-cert: the device presented a revoked certificate of its user", {
-        serial: hit.value.serial,
+        serial: status.cert.serial,
       })
     }
-    return hit
+    return status
   })
+
+/** The revoked certificate this device presented, if proven: for the notice. */
+export const presentedRevokedCert = (xfcc: string | null | undefined, username: string | null | undefined) =>
+  presentedCertStatus(xfcc, username).pipe(
+    Effect.map((status) =>
+      status._tag === "Revoked" ? Option.some(status.cert) : Option.none<PresentedRevokedCert>(),
+    ),
+  )
 
 /** `presentedRevokedCert` in the plain shape loader data carries. */
 export const presentedRevokedNotice = (xfcc: string | null | undefined, username: string | null | undefined) =>

@@ -332,8 +332,48 @@ describe("handleSettingsMutation — renewCert", () => {
 
     it("re-sends a waiting setup by email: the answer carries no link", async () => {
       expect(await run({ intent: "issueCert", delivery: "link", auth })).toMatchObject({ certLinkReady: true })
+      await ageRevealRows()
       const shown = await run(emailOnlyWhileRevoked({ intent: "showClaimLink", delivery: "link", auth }))
       expect(shown).toEqual({ certSent: true })
+    })
+
+    /** The link was minted a while ago: past the one-a-minute resend interval. */
+    const ageRevealRows = () =>
+      testRunEffect(
+        Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          yield* sql`UPDATE cert_reveal_tokens SET created_at = now() - interval '5 minutes'`
+        }) as Effect.Effect<void, never, never>,
+      )
+
+    it("refuses to mail another link within a minute: earlier links stay live, so no pile of them", async () => {
+      await run({ intent: "issueCert", delivery: "link", auth })
+      const tooSoon = await run({ intent: "showClaimLink", delivery: "email", auth })
+      expect(tooSoon).toMatchObject({ certError: expect.stringContaining("just emailed") })
+      const count = () =>
+        testRunEffect(
+          Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient
+            const rows = yield* sql`SELECT count(*)::int AS n FROM cert_reveal_tokens`
+            return (rows[0] as { n: number }).n
+          }) as Effect.Effect<number, never, never>,
+        )
+      expect(await count()).toBe(1) // nothing was minted
+    })
+
+    it("checks the email address before it replaces the waiting link", async () => {
+      await run({ intent: "issueCert", delivery: "link", auth })
+      await ageRevealRows()
+      const noEmail = { ...auth, email: null }
+      const shown = await run({ intent: "showClaimLink", delivery: "email", auth: noEmail })
+      expect(shown).toMatchObject({ certError: expect.stringContaining("No email") })
+      const rows = await testRunEffect(
+        Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          return yield* sql`SELECT count(*)::int AS n FROM cert_reveal_tokens`
+        }) as Effect.Effect<ReadonlyArray<{ n: number }>, never, never>,
+      )
+      expect(rows[0]!.n).toBe(1) // the waiting link was not replaced
     })
   })
 

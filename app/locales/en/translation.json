@@ -241,8 +241,10 @@
       "expiry": "Expiry"
     },
     "qr": {
+      "sending": "Sending the link to your mailbox…",
+      "sendingTitle": "Sending the link to your mailbox",
       "emailedTitle": "We emailed you the link",
-      "emailedBody": "The link to set up your new device is in your mailbox. Open it on the new device: it works once.",
+      "emailedBody": "The link is in your mailbox. Open it on the device that should get the new certificate (this one, if you are replacing its certificate). It works once.",
       "title": "Scan with the new device",
       "hint": "Point the new device’s camera at the code — it opens the certificate page directly. Nothing was emailed.",
       "alt": "QR code opening this device’s certificate page",
@@ -261,13 +263,14 @@
       "retry": "Try again"
     },
     "pending": {
+      "emailAction": "Email the link again",
       "body": "A device setup is waiting — the link is still valid until {{time}}.",
       "action": "Show the link again"
     },
     "presentedRevoked": {
       "body": "The certificate this device presented was revoked on {{date}}. Add a device to get a new one. If your browser still offers the old certificate, remove it, then choose the new one when your browser asks.",
       "bodyLabelled": "The certificate this device presented, “{{label}}”, was revoked on {{date}}. Add a device to get a new one. If your browser still offers the old certificate, remove it, then choose the new one when your browser asks.",
-      "bodyPending": "The certificate this device presented was revoked on {{date}}. To get a new one, use “Show the link again” in the device setup below. If your browser still offers the old certificate, remove it, then choose the new one when your browser asks.",
+      "bodyPending": "The certificate this device presented was revoked on {{date}}. To get a new one, use “Email the link again” in the device setup below. If your browser still offers the old certificate, remove it, then choose the new one when your browser asks.",
       "action": "Add a device"
     }
   },

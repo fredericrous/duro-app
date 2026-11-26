@@ -1,5 +1,5 @@
 import { useRouteLoaderData } from "react-router"
-import { Effect, Option } from "effect"
+import { Duration, Effect } from "effect"
 import type { Route } from "./+types/devices"
 import { requireAuth } from "~/lib/auth.server"
 import { runEffect } from "~/lib/runtime.server"
@@ -7,7 +7,7 @@ import { isOriginAllowed } from "~/lib/config.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { findPendingClaim } from "~/lib/workflows/cert-reveal.server"
 import { deviceBudget } from "~/lib/workflows/device-budget.server"
-import { presentedRevokedCert, presentedRevokedNotice } from "~/lib/workflows/presented-cert.server"
+import { emailOnly, presentedCertStatus, presentedRevokedNotice } from "~/lib/workflows/presented-cert.server"
 import { emailOnlyWhileRevoked, parseSettingsMutation, handleSettingsMutation } from "~/lib/mutations/settings"
 import { Header } from "~/components/Header/Header"
 import { DevicesSection } from "~/components/DevicesSection/DevicesSection"
@@ -49,9 +49,13 @@ export async function action({ request }: Route.ActionArgs) {
   const parsed = parseSettingsMutation(formData as unknown as FormData, auth)
   if ("error" in parsed) return parsed
   // A device presenting its user's revoked certificate gets new-device links
-  // by email only, whatever the form asked (emailOnlyWhileRevoked).
-  const revoked = await runEffect(presentedRevokedCert(request.headers.get("x-forwarded-client-cert"), auth.user))
-  const mutation = Option.isSome(revoked) ? emailOnlyWhileRevoked(parsed) : parsed
+  // by email only, whatever the form asked (emailOnlyWhileRevoked), and so does
+  // one whose certificate status could not be told: this is a security rule,
+  // so it fails closed. 5 s, not the page-load 300 ms: only a few writes pay it.
+  const status = await runEffect(
+    presentedCertStatus(request.headers.get("x-forwarded-client-cert"), auth.user, { timeout: Duration.seconds(5) }),
+  )
+  const mutation = emailOnly(status) ? emailOnlyWhileRevoked(parsed) : parsed
   return await runEffect(handleSettingsMutation(mutation).pipe(Effect.orDie))
 }
 

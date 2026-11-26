@@ -8,7 +8,13 @@ import { fileURLToPath } from "node:url"
 import { disposeTestRuntime, seedTestDb, testRunEffect, truncateAll } from "~/test/test-runtime"
 import { ClientCaTrust } from "~/lib/services/ClientCaTrust.server"
 import { CertificateRepo, CertificateRepoError } from "~/lib/services/CertificateRepo.server"
-import { presentedRevokedCert, presentedRevokedNotice } from "./presented-cert.server"
+import {
+  emailOnly,
+  isRestricted,
+  presentedCertStatus,
+  presentedRevokedCert,
+  presentedRevokedNotice,
+} from "./presented-cert.server"
 
 // The fixture cert canonicalizes to serial "a1b2c3d4e5f"; Vault stores it in colon form.
 const FIXTURE_PEM = readFileSync(
@@ -138,6 +144,64 @@ describe("presentedRevokedCert (stubbed services)", () => {
       yield* Deferred.succeed(vaultAnswers, undefined) // Vault answers after it left
       yield* Effect.yieldNow()
       expect(yield* Ref.get(finished)).toBe(true) // the CA check was not interrupted
+    }),
+  )
+
+  const statusWith = (repo: Effect.Effect<unknown, CertificateRepoError>, trust: Layer.Layer<ClientCaTrust>) =>
+    presentedCertStatus(XFCC, "daddy").pipe(Effect.provide(Layer.mergeAll(repoLayer(repo), trust)))
+
+  effectIt.effect("status: Revoked for a proven revoked certificate of the user", () =>
+    Effect.gen(function* () {
+      const status = yield* statusWith(ownedRevoked, signedByClientCa)
+      expect(status._tag).toBe("Revoked")
+      expect(isRestricted(status)).toBe(true)
+      expect(emailOnly(status)).toBe(true)
+    }),
+  )
+
+  effectIt.effect("status: NotRevoked when the CA did not sign it, and no email-only rule applies", () =>
+    Effect.gen(function* () {
+      const status = yield* statusWith(ownedRevoked, signedByAnotherCa)
+      expect(status._tag).toBe("NotRevoked")
+      expect(isRestricted(status)).toBe(false)
+      expect(emailOnly(status)).toBe(false)
+    }),
+  )
+
+  effectIt.effect("status: Unavailable when the lookup fails; not restricted, but email-only (fails closed)", () =>
+    Effect.gen(function* () {
+      const status = yield* statusWith(Effect.fail(new CertificateRepoError({ message: "db down" })), signedByClientCa)
+      expect(status._tag).toBe("Unavailable")
+      expect(isRestricted(status)).toBe(false)
+      expect(emailOnly(status)).toBe(true)
+    }),
+  )
+
+  effectIt.effect("status: Unavailable when the lookup itself runs out of time", () =>
+    Effect.gen(function* () {
+      const fiber = yield* Effect.fork(statusWith(Effect.never, signedByClientCa))
+      yield* TestClock.adjust("1 second")
+      expect((yield* Fiber.join(fiber))._tag).toBe("Unavailable")
+    }),
+  )
+
+  effectIt.effect("status: Unproven when a revoked row was found but the CA check ran out of time", () =>
+    Effect.gen(function* () {
+      const neverAnswers = Layer.succeed(ClientCaTrust, { isIssuedByClientCa: () => Effect.never })
+      const fiber = yield* Effect.fork(statusWith(ownedRevoked, neverAnswers))
+      yield* TestClock.adjust("1 second")
+      const status = yield* Fiber.join(fiber)
+      expect(status._tag).toBe("Unproven")
+      expect(isRestricted(status)).toBe(true)
+    }),
+  )
+
+  effectIt.effect("status: NotRevoked with no certificate presented", () =>
+    Effect.gen(function* () {
+      const status = yield* presentedCertStatus(null, "daddy").pipe(
+        Effect.provide(Layer.mergeAll(repoLayer(ownedRevoked), signedByClientCa)),
+      )
+      expect(status._tag).toBe("NotRevoked")
     }),
   )
 
