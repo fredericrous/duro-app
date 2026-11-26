@@ -43,6 +43,7 @@ import m0034 from "./migrations/pg/0034_add_link_target_mode"
 import m0035 from "./migrations/pg/0035_drop_open_links_in_new_tab"
 import m0036 from "./migrations/pg/0036_index_cert_serial_normalized"
 import m0037 from "./migrations/pg/0037_approval_policy_unique_scope"
+import m0038 from "./migrations/pg/0038_cert_revoke_attempts"
 
 const snakeToCamel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
@@ -158,6 +159,7 @@ const migrations: Array<
   [35, "drop_open_links_in_new_tab", m0035],
   [36, "index_cert_serial_normalized", m0036],
   [37, "approval_policy_unique_scope", m0037],
+  [38, "cert_revoke_attempts", m0038],
 ]
 
 const runMigrations = Effect.gen(function* () {

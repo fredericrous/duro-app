@@ -4,6 +4,8 @@ import * as crypto from "node:crypto"
 export class CertManagerError extends Data.TaggedError("CertManagerError")<{
   readonly message: string
   readonly cause?: unknown
+  /** True when retrying the same call cannot succeed (a Vault 4xx other than the idempotent cases). */
+  readonly permanent?: boolean
 }> {}
 
 export class CertManager extends Context.Tag("CertManager")<

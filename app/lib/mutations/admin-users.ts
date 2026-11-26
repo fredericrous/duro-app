@@ -1,10 +1,9 @@
 import { Effect } from "effect"
 import { errorMessage } from "~/lib/error-message"
-import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { revokeUser, resendCert } from "~/lib/workflows/invite.server"
-import { revokeSerialForUser } from "~/lib/workflows/cert-revocation.server"
+import { revokeSerialForUser, type RevokeOutcome } from "~/lib/workflows/cert-revocation.server"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,17 +22,25 @@ export type AdminUsersResult =
   | { success: true; message: string; reinviteEmail?: string }
   | { error: string }
   | { certRevoked: true; serialNumber: string }
-  | { certsRevoked: true; count: number }
+  | { certsRevoked: true; count: number; failed: number }
 
 // ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
 
-export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
+const revokeAdminSerial = (serial: string, username: string | undefined, actorId: string) =>
+  revokeSerialForUser(serial, { auditUsername: username, actorId, path: "admin" })
+
+const tallyOutcomes = (outcomes: ReadonlyArray<RevokeOutcome>) => {
+  const count = outcomes.filter((outcome) => outcome._tag === "Revoked").length
+  return { count, failed: outcomes.length - count }
+}
+
+export function handleAdminUsersMutation(mutation: AdminUsersMutation, actorId: string) {
   return Effect.gen(function* () {
     switch (mutation.intent) {
       case "revokeUser": {
-        yield* revokeUser(mutation.username, mutation.email, "admin", mutation.reason)
+        yield* revokeUser(mutation.username, mutation.email, actorId, mutation.reason)
         return { success: true as const, message: `User ${mutation.username} revoked` }
       }
 
@@ -43,33 +50,28 @@ export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
       }
 
       case "revokeCert": {
-        const cert = yield* CertManager
         const certRepo = yield* CertificateRepo
+        const existing = yield* certRepo.findBySerial(mutation.serialNumber)
         const affected = yield* certRepo.markRevokePending(mutation.serialNumber)
         if (affected === 0) {
           return { error: "Certificate not found or already revoked" }
         }
-        yield* cert.revokeCert(mutation.serialNumber).pipe(
-          Effect.tap(() => certRepo.markRevokeCompleted(mutation.serialNumber)),
-          Effect.tapError((e) =>
-            certRepo.markRevokeFailed(mutation.serialNumber, String(e)).pipe(
-              Effect.catchAll((markError) =>
-                Effect.logWarning("cert revocation: marking failed failed", {
-                  serial: mutation.serialNumber,
-                  error: String(markError),
-                }),
-              ),
-            ),
-          ),
-        )
+        const outcome = yield* revokeAdminSerial(mutation.serialNumber, existing?.username, actorId)
+        if (outcome._tag === "RevokeFailed") {
+          return { error: `Revocation failed (${outcome.error}); it will be retried` }
+        }
         return { certRevoked: true as const, serialNumber: mutation.serialNumber }
       }
 
       case "revokeAllCerts": {
         const certRepo = yield* CertificateRepo
         const serials = yield* certRepo.revokeAllForUser(mutation.username)
-        yield* Effect.forEach(serials, (serial) => revokeSerialForUser(serial), { concurrency: 4 })
-        return { certsRevoked: true as const, count: serials.length }
+        const outcomes = yield* Effect.forEach(
+          serials,
+          (serial) => revokeAdminSerial(serial, mutation.username, actorId),
+          { concurrency: 4 },
+        )
+        return { certsRevoked: true as const, ...tallyOutcomes(outcomes) }
       }
 
       case "reinviteRevoked": {
@@ -87,34 +89,43 @@ export function handleAdminUsersMutation(mutation: AdminUsersMutation) {
 
       case "revokeCertsBatch": {
         const certRepo = yield* CertificateRepo
-        const revoked = yield* Effect.forEach(
+        const attempted = yield* Effect.forEach(
           mutation.serialNumbers,
           (serial) =>
             // The markRevokePending gate stays paired with its revoke: a serial
             // is only revoked (and counted) if the pending mark claimed it.
             Effect.gen(function* () {
               const affected = yield* certRepo.markRevokePending(serial)
-              if (affected === 0) return false
+              if (affected === 0) return "skipped" as const
               // Continue on failure (was Effect.tapError, which aborted the whole
               // batch on the first bad serial and reported total failure).
-              yield* revokeSerialForUser(serial)
-              return true
+              const existing = yield* certRepo.findBySerial(serial)
+              const outcome = yield* revokeAdminSerial(serial, existing?.username, actorId)
+              return outcome._tag
             }),
           { concurrency: 4 },
         )
-        return { certsRevoked: true as const, count: revoked.filter(Boolean).length }
+        const count = attempted.filter((tag) => tag === "Revoked").length
+        const failed = attempted.filter((tag) => tag === "RevokeFailed").length
+        return { certsRevoked: true as const, count, failed }
       }
 
       case "revokeAllCertsBatch": {
         const certRepo = yield* CertificateRepo
-        const counts = yield* Effect.forEach(mutation.usernames, (username) =>
+        const tallies = yield* Effect.forEach(mutation.usernames, (username) =>
           Effect.gen(function* () {
             const serials = yield* certRepo.revokeAllForUser(username)
-            yield* Effect.forEach(serials, (serial) => revokeSerialForUser(serial), { concurrency: 4 })
-            return serials.length
+            const outcomes = yield* Effect.forEach(serials, (serial) => revokeAdminSerial(serial, username, actorId), {
+              concurrency: 4,
+            })
+            return tallyOutcomes(outcomes)
           }),
         )
-        return { certsRevoked: true as const, count: counts.reduce((a, b) => a + b, 0) }
+        return {
+          certsRevoked: true as const,
+          count: tallies.reduce((sum, tally) => sum + tally.count, 0),
+          failed: tallies.reduce((sum, tally) => sum + tally.failed, 0),
+        }
       }
     }
   }).pipe(

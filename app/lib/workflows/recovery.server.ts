@@ -6,6 +6,7 @@ import { EmailService } from "~/lib/services/EmailService.server"
 import { DiscordNotifier } from "~/lib/services/DiscordNotifier.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 import { resendCert } from "~/lib/workflows/invite.server"
+import { revokeSerialForUser } from "~/lib/workflows/cert-revocation.server"
 import { config } from "~/lib/config.server"
 
 // ---------------------------------------------------------------------------
@@ -102,7 +103,8 @@ export const requestRecovery = (input: RecoveryRequestInput) =>
  * When `revokeOthers` is set (the default for a true loss), every existing cert
  * for the user is revoked FIRST so the freshly-issued one below survives — this
  * closes the hole where a lost/stolen device's cert stays valid until expiry.
- * Revocation completes asynchronously via the operator.
+ * Each serial is revoked in Vault here; one that fails stays `failed` and the
+ * duro-worker revocation sweeper retries it.
  */
 export const approveRecovery = (requestId: string, adminUser: string, revokeOthers: boolean) =>
   Effect.gen(function* () {
@@ -136,6 +138,12 @@ export const approveRecovery = (requestId: string, adminUser: string, revokeOthe
                 new RecoveryError({ code: "issue_failed", message: e instanceof Error ? e.message : "revoke failed" }),
             ),
           )
+        yield* Effect.forEach(
+          revoked,
+          (serial) =>
+            revokeSerialForUser(serial, { auditUsername: req.username, actorId: adminUser, path: "recovery" }),
+          { concurrency: 4 },
+        )
         revokedCount = revoked.length
       }
 

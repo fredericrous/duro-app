@@ -1,7 +1,6 @@
 import { Effect } from "effect"
 import { errorMessage } from "~/lib/error-message"
 import { PreferencesRepo } from "~/lib/services/PreferencesRepo.server"
-import { CertManager } from "~/lib/services/CertManager.server"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
 import { CertRevealRepo } from "~/lib/services/CertRevealRepo.server"
 import { EmailService } from "~/lib/services/EmailService.server"
@@ -9,6 +8,7 @@ import { hashToken } from "~/lib/crypto.server"
 import { config } from "~/lib/config.server"
 import { isLinkTargetMode, type LinkTargetMode } from "~/lib/link-target"
 import { resendCert } from "~/lib/workflows/invite.server"
+import { revokeSerialForUser } from "~/lib/workflows/cert-revocation.server"
 import { reissueClaimLink } from "~/lib/workflows/cert-reveal.server"
 import { deviceBudget } from "~/lib/workflows/device-budget.server"
 import { supportedLngs } from "~/lib/i18n"
@@ -193,25 +193,19 @@ function handleShowClaimLink(auth: AuthInfo) {
 
 function handleRevokeCert(serialNumber: string, auth: AuthInfo) {
   return Effect.gen(function* () {
-    const cert = yield* CertManager
     const certRepo = yield* CertificateRepo
     const affected = yield* certRepo.markRevokePending(serialNumber, auth.user!)
     if (affected === 0) {
       return yield* Effect.fail(new Error("Certificate not found"))
     }
-    yield* cert.revokeCert(serialNumber).pipe(
-      Effect.tap(() => certRepo.markRevokeCompleted(serialNumber)),
-      Effect.tapError((e) =>
-        certRepo.markRevokeFailed(serialNumber, String(e)).pipe(
-          Effect.catchAll((markError) =>
-            Effect.logWarning("cert revocation: marking failed failed", {
-              serial: serialNumber,
-              error: String(markError),
-            }),
-          ),
-        ),
-      ),
-    )
+    const outcome = yield* revokeSerialForUser(serialNumber, {
+      auditUsername: auth.user!,
+      actorId: auth.user!,
+      path: "self",
+    })
+    if (outcome._tag === "RevokeFailed") {
+      return yield* Effect.fail(new Error(outcome.error))
+    }
     // No budget bookkeeping to undo: the revoked cert simply stops counting
     // toward the rolling window, which frees its slot immediately.
     return { certRevoked: true as const } as SettingsResult

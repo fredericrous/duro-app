@@ -27,14 +27,14 @@ import { LldapClientLive } from "~/lib/services/LldapClient.server"
 import { OperatorClientLive } from "~/lib/services/OperatorClient.server"
 import { AppSyncServiceLive } from "~/lib/governance/AppSyncService.server"
 import { makeAppAutoSync } from "~/lib/governance/appAutoSync.server"
+import { CertificateRepoLive } from "~/lib/services/CertificateRepo.server"
+import { revocationSweepLoop } from "~/worker/revocation-loop"
 import { config } from "~/lib/config.server"
 import { FetchHttpClient } from "@effect/platform"
 import { OtelLayer } from "~/lib/telemetry.server"
 import * as SqlClient from "@effect/sql/SqlClient"
 
-// ---------------------------------------------------------------------------
 // Layer composition — same services as AppLayer but without web/oidc/email
-// ---------------------------------------------------------------------------
 
 const GovernanceRepos = Layer.mergeAll(
   PrincipalRepoLive,
@@ -55,6 +55,7 @@ const AppSyncWired = AppSyncServiceLive.pipe(
 )
 
 const WorkerLayer = Layer.mergeAll(
+  CertificateRepoLive,
   GovernanceRepos,
   ApplicationRepoLive,
   AuditServiceLive,
@@ -64,9 +65,7 @@ const WorkerLayer = Layer.mergeAll(
   AppSyncWired,
 ).pipe(Layer.provideMerge(DbLive), Layer.provide(OtelLayer), Layer.provide(FetchHttpClient.layer))
 
-// ---------------------------------------------------------------------------
 // Poll loop
-// ---------------------------------------------------------------------------
 
 // Poll interval — Effect Schedule.spaced accepts DurationInput strings
 
@@ -146,11 +145,9 @@ const pollLoop = pollOnce.pipe(
   ),
 )
 
-// ---------------------------------------------------------------------------
 // App sync loop — DashboardApps reach duro without an admin clicking "Sync from
 // cluster". Its own cadence (a conditional GET a minute, a forced full sync an
 // hour) and its own fiber, so a slow operator never delays provisioning.
-// ---------------------------------------------------------------------------
 
 const APP_SYNC_EVERY = "60 seconds"
 const APP_SYNC_FORCE_EVERY_TICKS = 60
@@ -168,9 +165,7 @@ const appSyncLoop = config.operatorApiUrl
     )
   : Effect.log("worker: OPERATOR_API_URL unset, app auto-sync off")
 
-// ---------------------------------------------------------------------------
 // Health server (for k8s liveness/readiness probes)
-// ---------------------------------------------------------------------------
 
 const HEALTH_PORT = parseInt(process.env.WORKER_HEALTH_PORT ?? "3001", 10)
 
@@ -214,9 +209,7 @@ const startHealthServer = Effect.gen(function* () {
   )
 })
 
-// ---------------------------------------------------------------------------
 // Main
-// ---------------------------------------------------------------------------
 
 const main = Effect.gen(function* () {
   yield* Effect.log("duro worker starting")
@@ -224,6 +217,10 @@ const main = Effect.gen(function* () {
   // The sync loop never fails (each tick recovers), so the poll loop alone
   // decides whether the worker lives: its crash still exits the process.
   yield* Effect.forkScoped(appSyncLoop)
+  // Retries cert revocations left pending or failed, on its own fiber so a slow
+  // Vault never delays provisioning. Its Vault layer is built inside the loop:
+  // unset NAS_VAULT_* disables the sweeper, never the worker.
+  yield* Effect.forkScoped(revocationSweepLoop(FetchHttpClient.layer))
   yield* pollLoop
 }).pipe(Effect.scoped)
 

@@ -349,6 +349,7 @@ const mockCertificateRepo = (calls: { method: string; args: unknown[] }[] = []) 
     },
     setLabel: (_serial, _username, _label) => Effect.succeed(1),
     setClaimedPlatform: () => Effect.void,
+    listDueRevocations: () => Effect.succeed([]),
     listValid: () => Effect.succeed([]),
     listUnrevoked: () => Effect.succeed([]),
     listRecentNewDevices: () => Effect.succeed([]),
@@ -361,12 +362,13 @@ const mockCertificateRepo = (calls: { method: string; args: unknown[] }[] = []) 
     },
     markRevokeCompleted: (serial) => {
       calls.push({ method: "markRevokeCompleted", args: [serial] })
-      return Effect.void
+      return Effect.succeed(true)
     },
     markRevokeFailed: (serial, error) => {
       calls.push({ method: "markRevokeFailed", args: [serial, error] })
-      return Effect.void
+      return Effect.succeed(1)
     },
+    markRevokeAbandoned: () => Effect.succeed(20),
     revokeAllForUser: (_username) => {
       calls.push({ method: "revokeAllForUser", args: [_username] })
       return Effect.succeed([])
@@ -760,7 +762,7 @@ describe("revokeInvite", () => {
     )
     const certCalls: { method: string; args: unknown[] }[] = []
 
-    return revokeInvite("inv-1").pipe(
+    return revokeInvite("inv-1", "admin-sub").pipe(
       Effect.tap(() =>
         Effect.sync(() => {
           // Cert cleanup
@@ -786,7 +788,7 @@ describe("revokeInvite", () => {
     )
     const certCalls: { method: string; args: unknown[] }[] = []
 
-    return revokeInvite("inv-1").pipe(
+    return revokeInvite("inv-1", "admin-sub").pipe(
       Effect.tap(() =>
         Effect.sync(() => {
           expect(certCalls.find((c) => c.method === "deleteCertByUsername" && c.args[0] === "bobsmith")).toBeDefined()
@@ -938,8 +940,9 @@ describe("audit emissions", () => {
       listAllByUsernames: () => Effect.succeed({}),
       findBySerial: () => Effect.succeed(null),
       markRevokePending: () => Effect.succeed(1),
-      markRevokeCompleted: () => Effect.void,
-      markRevokeFailed: () => Effect.void,
+      markRevokeCompleted: () => Effect.succeed(true),
+      markRevokeFailed: () => Effect.succeed(1),
+      markRevokeAbandoned: () => Effect.succeed(20),
       revokeAllForUser: () => Effect.succeed(["serial-1"]),
       findBySerialCanonical: () => Effect.succeed(null),
       setUserId: () => Effect.void,
@@ -1108,8 +1111,9 @@ describe("resolvePendingCertInvite", () => {
           return cert ? ({ serialNumber: "0a:1b", ...cert } as never) : null
         }),
       markRevokePending: () => Effect.succeed(0),
-      markRevokeCompleted: () => Effect.void,
-      markRevokeFailed: () => Effect.void,
+      markRevokeCompleted: () => Effect.succeed(true),
+      markRevokeFailed: () => Effect.succeed(1),
+      markRevokeAbandoned: () => Effect.succeed(20),
       revokeAllForUser: () => Effect.succeed([]),
       setUserId: () => Effect.void,
       updateUsername: () => Effect.void,

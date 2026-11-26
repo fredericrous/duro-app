@@ -94,13 +94,15 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  await requireAdminAction(request)
+  const auth = await requireAdminAction(request)
 
   const formData = await request.formData()
   const parsed = parseAdminInvitesMutation(formData as any)
   if ("error" in parsed) return parsed
 
-  return await runEffect(handleAdminInvitesMutation(parsed))
+  if (!auth.sub) return { error: "Cannot identify the acting admin" }
+
+  return await runEffect(handleAdminInvitesMutation(parsed, auth.sub))
 }
 
 function fmtDate(ts: string | null): string | null {

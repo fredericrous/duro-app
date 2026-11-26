@@ -1264,6 +1264,7 @@
         "revokeAllForUsers": "Révoquer les certs de {{count}} utilisateur(s)",
         "revokeSelected": "Révoquer {{count}} certificat(s)",
         "certsRevoked": "{{count}} certificat(s) révoqué(s)",
+        "certsRevokedWithFailures": "{{count}} certificat(s) révoqué(s), {{failed}} en échec (nouvelle tentative automatique)",
         "confirmRevokeUsersTitle": "Révoquer les certificats des utilisateurs sélectionnés ?",
         "confirmRevokeCertsTitle": "Révoquer les certificats sélectionnés ?",
         "confirmRevokeUsersBody": "Tous les certificats actifs de {{count}} utilisateur(s) seront révoqués. Les utilisateurs perdront l'accès jusqu'à l'émission d'un nouveau certificat.",

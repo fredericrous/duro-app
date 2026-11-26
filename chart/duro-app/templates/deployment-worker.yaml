@@ -64,6 +64,9 @@ spec:
             - name: health
               containerPort: {{ .Values.worker.port }}
               protocol: TCP
+          # The revocation sweeper revokes in NAS Vault: NAS_VAULT_ADDR arrives with
+          # .Values.env; NAS_VAULT_TOKEN comes from the release's envFrom (the
+          # duro-nas-vault-token secret in the homelab values), as for the web pods.
           env:
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}

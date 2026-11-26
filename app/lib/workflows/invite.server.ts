@@ -60,7 +60,7 @@ export const queueInvite = (input: InviteInput) =>
     const existingFailed = yield* inviteRepo.findFailed()
     const stale = existingFailed.find((i) => i.email === input.email)
     if (stale) {
-      yield* revokeInvite(stale.id)
+      yield* revokeInvite(stale.id, SYSTEM_ACTOR)
     }
 
     const invite = yield* inviteRepo.create(input)
@@ -295,7 +295,10 @@ export const acceptInviteById = (inviteId: string, input: AcceptInput) =>
 
 // --- Revoke Pending Invite (full cleanup) ---
 
-export const revokeInvite = (inviteId: string) =>
+/** Audit actor for revocations no person triggered (a stale-invite cleanup). */
+export const SYSTEM_ACTOR = "system"
+
+export const revokeInvite = (inviteId: string, actorId: string) =>
   Effect.gen(function* () {
     const inviteRepo = yield* InviteRepo
     const cert = yield* CertManager
@@ -325,9 +328,11 @@ export const revokeInvite = (inviteId: string) =>
     const serials = yield* certRepo
       .revokeAllForUser(certUsername)
       .pipe(Effect.catchAll(() => Effect.succeed([] as string[])))
-    yield* Effect.forEach(serials, (serial) => revokeSerialForUser(serial, { auditUsername: certUsername }), {
-      concurrency: 4,
-    })
+    yield* Effect.forEach(
+      serials,
+      (serial) => revokeSerialForUser(serial, { auditUsername: certUsername, actorId, path: "user-revoke" }),
+      { concurrency: 4 },
+    )
 
     yield* inviteRepo.revoke(inviteId)
   }).pipe(Effect.withSpan("revokeInvite", { attributes: { inviteId } }))
@@ -367,9 +372,11 @@ export const revokeUser = (username: string, email: string, revokedBy: string, r
     const serials = yield* certRepo
       .revokeAllForUser(username)
       .pipe(Effect.catchAll(() => Effect.succeed([] as string[])))
-    yield* Effect.forEach(serials, (serial) => revokeSerialForUser(serial, { auditUsername: certUsername }), {
-      concurrency: 4,
-    })
+    yield* Effect.forEach(
+      serials,
+      (serial) => revokeSerialForUser(serial, { auditUsername: certUsername, actorId: revokedBy, path: "user-revoke" }),
+      { concurrency: 4 },
+    )
 
     // Record revocation in audit log
     yield* inviteRepo.recordRevocation(email, username, revokedBy, reason)

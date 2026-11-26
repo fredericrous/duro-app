@@ -8,7 +8,17 @@ import { makeJsonApi } from "~/lib/http.server"
 export class VaultPkiError extends Data.TaggedError("VaultPkiError")<{
   readonly message: string
   readonly cause?: unknown
+  /** HTTP status of the Vault response that caused this error, when there was one. */
+  readonly status?: number
+  /** True when retrying the same call cannot succeed (a Vault 4xx other than the idempotent cases). */
+  readonly permanent?: boolean
 }> {}
+
+// 401 and 403 can clear when a token is renewed or a policy fixed; 408 and 429 say "try again later".
+const TRANSIENT_CLIENT_STATUSES = new Set([401, 403, 408, 429])
+
+const isPermanentStatus = (status: number | undefined): boolean =>
+  status !== undefined && status >= 400 && status < 500 && !TRANSIENT_CLIENT_STATUSES.has(status)
 
 // --- Vault response schemas ---
 
@@ -69,7 +79,7 @@ export const VaultPkiLive = Layer.effect(
         "X-Vault-Token": vaultToken,
         "Content-Type": "application/json",
       },
-      (e) => new VaultPkiError({ message: `Vault request failed: ${e}` }),
+      (e, status) => new VaultPkiError({ message: `Vault request failed: ${e}`, status }),
     )
 
     const createP12 = (cert: string, privateKey: string, caChain: string[], password: string): Buffer => {
@@ -236,14 +246,21 @@ export const VaultPkiLive = Layer.effect(
             if (msg.includes("already revoked") || msg.includes("404")) {
               return Effect.void
             }
-            return Effect.fail(new VaultPkiError({ message: `Failed to revoke cert: ${msg}` }))
+            return Effect.fail(
+              new VaultPkiError({
+                message: `Failed to revoke cert: ${msg}`,
+                status: e.status,
+                permanent: isPermanentStatus(e.status),
+              }),
+            )
           }),
         ),
     }
   }),
 )
 
-const mapVaultError = (e: VaultPkiError) => new CertManagerError({ message: e.message, cause: e.cause })
+const mapVaultError = (e: VaultPkiError) =>
+  new CertManagerError({ message: e.message, cause: e.cause, permanent: e.permanent })
 
 export const VaultCertManagerLive = Layer.effect(
   CertManager,
