@@ -15,20 +15,20 @@ importers:
   .:
     dependencies:
       '@effect/experimental':
-        specifier: ^0.58.0
-        version: 0.58.0(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5)
+        specifier: ^0.61.1
+        version: 0.61.1(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5)
       '@effect/opentelemetry':
-        specifier: ^0.61.0
-        version: 0.61.0(@effect/platform@0.94.5(effect@3.22.5))(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-node@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-web@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.40.0)(effect@3.22.5)
+        specifier: ^0.64.2
+        version: 0.64.2(@effect/platform@0.97.2(effect@3.22.5))(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-node@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-web@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.40.0)(effect@3.22.5)
       '@effect/platform':
-        specifier: ^0.94.5
-        version: 0.94.5(effect@3.22.5)
+        specifier: ^0.97.1
+        version: 0.97.2(effect@3.22.5)
       '@effect/sql':
-        specifier: ^0.49.0
-        version: 0.49.0(@effect/experimental@0.58.0(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5))(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5)
+        specifier: ^0.52.1
+        version: 0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5))(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5)
       '@effect/sql-pg':
-        specifier: ^0.50.3
-        version: 0.50.3(@effect/experimental@0.58.0(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5))(@effect/platform@0.94.5(effect@3.22.5))(@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5))(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5))(effect@3.22.5)
+        specifier: ^0.53.1
+        version: 0.53.1(@effect/experimental@0.61.1(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5))(@effect/platform@0.97.2(effect@3.22.5))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5))(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5))(effect@3.22.5)
       '@electric-sql/pglite':
         specifier: ^0.3.16
         version: 0.3.16
@@ -93,8 +93,8 @@ importers:
         specifier: 3.22.5
         version: 3.22.5
       i18next:
-        specifier: ^25.8.11
-        version: 25.10.10(typescript@5.9.3)
+        specifier: ^26.3.4
+        version: 26.7.2(typescript@5.9.3)
       isbot:
         specifier: ^5.1.0
         version: 5.1.40
@@ -124,7 +124,7 @@ importers:
         version: 7.75.0(react@19.2.4)
       react-i18next:
         specifier: ^16.5.4
-        version: 16.6.6(i18next@25.10.10(typescript@5.9.3))(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
+        version: 16.6.6(i18next@26.7.2(typescript@5.9.3))(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
       react-router:
         specifier: ^7.18.5
         version: 7.18.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -148,8 +148,8 @@ importers:
         specifier: 0.87.5
         version: 0.87.5
       '@effect/vitest':
-        specifier: ^0.27.0
-        version: 0.27.0(effect@3.22.5)(vitest@4.1.12)
+        specifier: ^0.30.1
+        version: 0.30.1(effect@3.22.5)(vitest@4.1.12)
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.3.0)
@@ -487,11 +487,11 @@ packages:
   '@effect/eslint-plugin@0.3.2':
     resolution: {integrity: sha512-c4Vs9t3r54A4Zpl+wo8+PGzZz3JWYsip41H+UrebRLjQ2Hk/ap63IeCgN/HWcYtxtyhRopjp7gW9nOQ2Snbl+g==}
 
-  '@effect/experimental@0.58.0':
-    resolution: {integrity: sha512-IEP9sapjF6rFy5TkoqDPc86st/fnqUfjT7Xa3pWJrFGr1hzaMXHo+mWsYOZS9LAOVKnpHuVziDK97EP5qsCHVA==}
+  '@effect/experimental@0.61.1':
+    resolution: {integrity: sha512-+P+PgGQeE2fXmsm63YoyENNcQIc7OiCkY4/HLkEdTvq93syfGIpwDfQD8u3xODMHJhZ5ZtRZHH4+UedFO0tLiA==}
     peerDependencies:
-      '@effect/platform': ^0.94.0
-      effect: ^3.19.13
+      '@effect/platform': ^0.97.1
+      effect: ^3.22.1
       ioredis: ^5
       lmdb: ^3
     peerDependenciesMeta:
@@ -504,10 +504,10 @@ packages:
     resolution: {integrity: sha512-np/zJgk71/PyHxtoqyUKLYcpQhoRBI+L6+1Z0ILk35JSQ/lvXzwlwOwddYZLDkeC4bdF2ukKekqKlla/F88R5w==}
     hasBin: true
 
-  '@effect/opentelemetry@0.61.0':
-    resolution: {integrity: sha512-aTg4qWzMxGDoUZKSyws/dMZqVNoSCQIvHaPDJnWitUAVuWDAPOXiaiHJDWO39cwDlySBTCSF6rEanm3+nR/2Mg==}
+  '@effect/opentelemetry@0.64.2':
+    resolution: {integrity: sha512-IhRWsT1S8/LeH4NlfIaFyWROCGCiOHhJigI29QPRm39OL3TGevplFMP5BhgX2GS651hkTGdkVwAZPlaCj8eXfQ==}
     peerDependencies:
-      '@effect/platform': ^0.94.2
+      '@effect/platform': ^0.97.3
       '@opentelemetry/api': ^1.9
       '@opentelemetry/resources': ^2.0.0
       '@opentelemetry/sdk-logs': '>=0.203.0 <0.300.0'
@@ -516,33 +516,33 @@ packages:
       '@opentelemetry/sdk-trace-node': ^2.0.0
       '@opentelemetry/sdk-trace-web': ^2.0.0
       '@opentelemetry/semantic-conventions': ^1.33.0
-      effect: ^3.19.15
+      effect: ^3.22.4
 
-  '@effect/platform@0.94.5':
-    resolution: {integrity: sha512-z05APUiDDPbodhTkH/RJqOLoCU11bU2IZLfcwLFrld03+ob1VeqRnELQlmueLIYm6NZifHAtjl32V+GRt34y4A==}
+  '@effect/platform@0.97.2':
+    resolution: {integrity: sha512-fof9J+pId374/b1WAt0P1H8QmvulzpHTjS6SUHiG20U/sFjkBUS5vGMy1/XfdTAVKX1IY+Z87dFhi/RFDfgBPQ==}
     peerDependencies:
-      effect: ^3.19.17
+      effect: ^3.22.2
 
-  '@effect/sql-pg@0.50.3':
-    resolution: {integrity: sha512-mKY8+qJFWvmMeX+TA2j1r01XXnI23Z5gu0KI1jDgjLATNImPXWsPIb1bnoZTyUNW5CIUu6X/wFT6M+8sZYLCiA==}
+  '@effect/sql-pg@0.53.1':
+    resolution: {integrity: sha512-9qn4ekEEQe412Fn7ebM+xOwD8ykKddKBvZT7M/vW8sjXqyzXWztTQttH0w9Oc26FK0Ws4PiRdWM+j/7o3NVdUw==}
     peerDependencies:
-      '@effect/experimental': ^0.58.0
-      '@effect/platform': ^0.94.4
-      '@effect/sql': ^0.49.0
-      effect: ^3.19.16
+      '@effect/experimental': ^0.61.1
+      '@effect/platform': ^0.97.2
+      '@effect/sql': ^0.52.1
+      effect: ^3.22.3
 
-  '@effect/sql@0.49.0':
-    resolution: {integrity: sha512-9UEKR+z+MrI/qMAmSvb/RiD9KlgIazjZUCDSpwNgm0lEK9/Q6ExEyfziiYFVCPiptp52cBw8uBHRic8hHnwqXA==}
+  '@effect/sql@0.52.1':
+    resolution: {integrity: sha512-dUVPjlUgpga6sDa/MtYipHAqzHx2St41hxI00nXTBt4IBBJaf2lTGaOvlEoBg/q6PHVAgSoKnxe19pWUvabC9g==}
     peerDependencies:
-      '@effect/experimental': ^0.58.0
-      '@effect/platform': ^0.94.0
-      effect: ^3.19.13
+      '@effect/experimental': ^0.61.1
+      '@effect/platform': ^0.97.1
+      effect: ^3.22.1
 
-  '@effect/vitest@0.27.0':
-    resolution: {integrity: sha512-8bM7n9xlMUYw9GqPIVgXFwFm2jf27m/R7psI64PGpwU5+26iwyxp9eAXEsfT5S6lqztYfpQQ1Ubp5o6HfNYzJQ==}
+  '@effect/vitest@0.30.1':
+    resolution: {integrity: sha512-RkVje95T+ni6vAgI787XRbM4scAe+x/5FSQxrqZH19LtvoTWeFgImaRCoJXOy5rOwvShb7skJtrRbYtqEZi65A==}
     peerDependencies:
-      effect: ^3.19.0
-      vitest: ^3.2.0
+      effect: ^3.22.4
+      vitest: ^3.2.0 || ^4.0.0
 
   '@electric-sql/pglite@0.3.16':
     resolution: {integrity: sha512-mZkZfOd9OqTMHsK+1cje8OSzfAQcpD7JmILXTl5ahdempjUDdmg4euf1biDex5/LfQIDJ3gvCu6qDgdnDxfJmA==}
@@ -2600,10 +2600,10 @@ packages:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
 
-  i18next@25.10.10:
-    resolution: {integrity: sha512-cqUW2Z3EkRx7NqSyywjkgCLK7KLCL6IFVFcONG7nVYIJ3ekZ1/N5jUsihHV6Bq37NfhgtczxJcxduELtjTwkuQ==}
+  i18next@26.7.2:
+    resolution: {integrity: sha512-RsOY3BeaCDdkk52NeJSFAXELQ2rQXBO/tOub6L8ue2ICPfR/FRDWDOfEDg4xMPd1SqO5goVYQ6i72qWEUB/PPw==}
     peerDependencies:
-      typescript: ^5 || ^6
+      typescript: ^5 || ^6 || ^7
     peerDependenciesMeta:
       typescript:
         optional: true
@@ -2967,8 +2967,8 @@ packages:
       typescript:
         optional: true
 
-  multipasta@0.2.7:
-    resolution: {integrity: sha512-KPA58d68KgGil15oDqXjkUBEBYc00XvbPj5/X+dyzeo/lWm9Nc25pQRlf1D+gv4OpK7NM0J1odrbu9JNNGvynA==}
+  multipasta@0.2.9:
+    resolution: {integrity: sha512-kAovZHgxryqb0xTFz7OTCPxbas8UBTTwCDhfrlaNecp1/z6xcMfp5PVhDxsW7jONHyDF10/ccp30MxA2+66GJw==}
 
   mute-stream@3.0.0:
     resolution: {integrity: sha512-dkEJPVvun4FryqBmZ5KhDo0K9iDXAwn08tMLDinNdRBNPcYEDiWYysLcc6k3mjTMlbP9KyylvRpd4wFtwrT9rw==}
@@ -4242,17 +4242,17 @@ snapshots:
       '@dprint/typescript': 0.91.8
       prettier-linter-helpers: 1.0.1
 
-  '@effect/experimental@0.58.0(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5)':
+  '@effect/experimental@0.61.1(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5)':
     dependencies:
-      '@effect/platform': 0.94.5(effect@3.22.5)
+      '@effect/platform': 0.97.2(effect@3.22.5)
       effect: 3.22.5
       uuid: 11.1.1
 
   '@effect/language-service@0.87.5': {}
 
-  '@effect/opentelemetry@0.61.0(@effect/platform@0.94.5(effect@3.22.5))(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-node@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-web@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.40.0)(effect@3.22.5)':
+  '@effect/opentelemetry@0.64.2(@effect/platform@0.97.2(effect@3.22.5))(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-node@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-web@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.40.0)(effect@3.22.5)':
     dependencies:
-      '@effect/platform': 0.94.5(effect@3.22.5)
+      '@effect/platform': 0.97.2(effect@3.22.5)
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/resources': 2.11.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-logs': 0.222.0(@opentelemetry/api@1.9.1)
@@ -4263,18 +4263,18 @@ snapshots:
       '@opentelemetry/semantic-conventions': 1.40.0
       effect: 3.22.5
 
-  '@effect/platform@0.94.5(effect@3.22.5)':
+  '@effect/platform@0.97.2(effect@3.22.5)':
     dependencies:
       effect: 3.22.5
       find-my-way-ts: 0.1.6
       msgpackr: 1.11.12
-      multipasta: 0.2.7
+      multipasta: 0.2.9
 
-  '@effect/sql-pg@0.50.3(@effect/experimental@0.58.0(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5))(@effect/platform@0.94.5(effect@3.22.5))(@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5))(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5))(effect@3.22.5)':
+  '@effect/sql-pg@0.53.1(@effect/experimental@0.61.1(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5))(@effect/platform@0.97.2(effect@3.22.5))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5))(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5))(effect@3.22.5)':
     dependencies:
-      '@effect/experimental': 0.58.0(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5)
-      '@effect/platform': 0.94.5(effect@3.22.5)
-      '@effect/sql': 0.49.0(@effect/experimental@0.58.0(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5))(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5)
+      '@effect/experimental': 0.61.1(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5)
+      '@effect/platform': 0.97.2(effect@3.22.5)
+      '@effect/sql': 0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5))(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5)
       effect: 3.22.5
       pg: 8.20.0
       pg-connection-string: 2.9.1
@@ -4284,14 +4284,14 @@ snapshots:
     transitivePeerDependencies:
       - pg-native
 
-  '@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5))(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5)':
+  '@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5))(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5)':
     dependencies:
-      '@effect/experimental': 0.58.0(@effect/platform@0.94.5(effect@3.22.5))(effect@3.22.5)
-      '@effect/platform': 0.94.5(effect@3.22.5)
+      '@effect/experimental': 0.61.1(@effect/platform@0.97.2(effect@3.22.5))(effect@3.22.5)
+      '@effect/platform': 0.97.2(effect@3.22.5)
       effect: 3.22.5
       uuid: 11.1.1
 
-  '@effect/vitest@0.27.0(effect@3.22.5)(vitest@4.1.12)':
+  '@effect/vitest@0.30.1(effect@3.22.5)(vitest@4.1.12)':
     dependencies:
       effect: 3.22.5
       vitest: 4.1.12(@opentelemetry/api@1.9.1)(@types/node@25.6.2)(@vitest/coverage-v8@4.1.5)(jsdom@29.1.1)(msw@2.14.4(@types/node@25.6.2)(typescript@5.9.3))(vite@6.4.6(@types/node@25.6.2)(terser@5.51.2)(tsx@4.23.15))
@@ -6222,9 +6222,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  i18next@25.10.10(typescript@5.9.3):
-    dependencies:
-      '@babel/runtime': 7.29.2
+  i18next@26.7.2(typescript@5.9.3):
     optionalDependencies:
       typescript: 5.9.3
 
@@ -6692,7 +6690,7 @@ snapshots:
     transitivePeerDependencies:
       - '@types/node'
 
-  multipasta@0.2.7: {}
+  multipasta@0.2.9: {}
 
   mute-stream@3.0.0: {}
 
@@ -6995,11 +6993,11 @@ snapshots:
     dependencies:
       react: 19.2.4
 
-  react-i18next@16.6.6(i18next@25.10.10(typescript@5.9.3))(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)(typescript@5.9.3):
+  react-i18next@16.6.6(i18next@26.7.2(typescript@5.9.3))(react-dom@19.2.4(react@19.2.4))(react-native@0.87.1(@babel/core@7.29.7)(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)(typescript@5.9.3):
     dependencies:
       '@babel/runtime': 7.29.2
       html-parse-stringify: 3.0.1
-      i18next: 25.10.10(typescript@5.9.3)
+      i18next: 26.7.2(typescript@5.9.3)
       react: 19.2.4
       use-sync-external-store: 1.6.0(react@19.2.4)
     optionalDependencies:
