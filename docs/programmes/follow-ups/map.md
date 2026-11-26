@@ -69,6 +69,8 @@ or closed as not worth doing. Reached when no ticket here is open.
 - Live state: nothing in flight.
 - Next, in order: t14 to t17, filed 2026-11-22 from the greenrack
   sweep's inbox, all due 2026-12-05.
+- [t18](t18-audit-actor-on-sub.md): filed 2026-11-26 from the
+  cert-revocation Phase 1 inbox: align audit `actorId` on `auth.sub`.
 - Lessons: drive admin mutations through the brief's URL; `localhost`
   is no longer needed. A feature file's mutation step is what catches
   an origin or CSRF regression: GET journeys never send an Origin.
