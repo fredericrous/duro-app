@@ -9,7 +9,7 @@ description: Polishes the surfaces, icons and motion in your project with exact 
 
 This skill holds the visual polish for surfaces, icons and motion, with the exact value each detail takes. It applies once the underlying interaction is sound, and a polish finding never outranks a broken interaction.
 
-A decision of this repository (resolved at its applicable scope with `aval resolve`) outranks a value in this skill. Apply token requirements and gap routing only where the repository's decisions require them, keeping their named exemptions. On `greenrack-stack`, a non-exempt measure without a token is a design-system gap under ADR-0006/0027, never a local literal.
+A decision of this repository (resolved at its applicable scope with `greentopo resolve`) outranks a value in this skill. Apply token requirements and gap routing only where the repository's decisions require them, keeping their named exemptions. On `greenrack-stack`, a non-exempt measure without a token is a design-system gap under ADR-0006/0027, never a local literal.
 
 Where greenrack defines the value, these win: the `spacing.css.ts` radii, `shadows.css.ts` and `motion.css.ts`.
 

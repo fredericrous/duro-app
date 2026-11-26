@@ -9,7 +9,7 @@ description: Sets and reviews how text renders in your product, from the type sc
 
 This skill sets and reviews how text renders, from the type scale and spacing to font loading, wrapping and punctuation. It writes every fix in the project's styling system, and the [cheat sheet](css-cheat-sheet.md) maps each declaration to its Tailwind utility.
 
-A decision of this repository (resolved at its applicable scope with `aval resolve`) outranks a value in this skill. Apply token requirements and gap routing only where the repository's decisions require them, keeping their named exemptions. On `greenrack-stack`, a non-exempt measure without a token is a design-system gap under ADR-0006/0027, never a local literal.
+A decision of this repository (resolved at its applicable scope with `greentopo resolve`) outranks a value in this skill. Apply token requirements and gap routing only where the repository's decisions require them, keeping their named exemptions. On `greenrack-stack`, a non-exempt measure without a token is a design-system gap under ADR-0006/0027, never a local literal.
 
 Where greenrack defines the value, these win: the CLAUDE.md "Typography Presets" table, `typography.css.ts` and `type-presets.css.ts`.
 

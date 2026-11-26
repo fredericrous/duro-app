@@ -11,8 +11,8 @@ Not restated here. They are vendored from the fleet corpus and the session
 hook prints the current ones; ask for any of them by name:
 
 ```console
-$ aval resolve ui.design-system --scope greenrack-stack
-$ aval heads
+$ greentopo resolve ui.design-system --scope greenrack-stack
+$ greentopo heads
 ```
 
 Which UI library, which config enforces it, which SQL layer, which effects
@@ -20,7 +20,7 @@ runtime and web framework — all decided there, once, and this repository keeps
 no records of its own. A local record deciding one of those slots is a
 contradiction, not a preference: change it in
 [`fredericrous/decisions`](https://github.com/fredericrous/decisions) and run
-`aval add github:fredericrous/decisions` here.
+`greentopo add github:fredericrous/decisions` here.
 
 ## greenrack design system (@greenharness/greenrack-ui 7.x)
 
@@ -45,7 +45,7 @@ Fleet decision `ui.mockup-handoff` (ADR-0016) is what this enforces; the
 session hook prints its constraints.
 
 Lint: `react` from `@greenharness/greenrack-eslint-config` 7 (`greenrack/*` rules) plus `effect`, `tests`
-and `adrLint` from `@aval-adr/eslint-config` (ADR-0048 moved the general
+and `greenspotter` from `@greenharness/greenspotter-eslint-config` (ADR-0048 moved the general
 presets there) enforce the critical rules (html.\* elements, deep token
 imports, form kit over bare `html.input`, no deprecated Table parts, raw
 design values in `css.create` — colours, off-scale spacing/radius, sizes,

@@ -4,22 +4,22 @@
 # corpus and is vendored, not restated. A record here deciding one of those
 # slots is a contradiction, which is what makes one decision one decision.
 #
-# `aval add github:fredericrous/decisions` refreshes the pack; nothing tells
-# this repository when a fleet decision changes, so `aval add --check` asks.
+# `greentopo add github:fredericrous/decisions` refreshes the pack; nothing tells
+# this repository when a fleet decision changes, so `greentopo add --check` asks.
 packs:
   - .adr/packs/decisions.pack
 scopes: []
 keys:
 
 # Which parts of this repository have which traits (aval 1.7, SEMANTICS
-# section 2.5), as `aval traits --detect` proposed and a reviewer accepted.
+# section 2.5), as `greentopo traits --detect` proposed and a reviewer accepted.
 # Rules about a trait not named here are left out of the session hook and
-# counted; `aval rules --all-traits` lists them. `aval traits --check`, run
+# counted; `greentopo rules --all-traits` lists them. `greentopo traits --check`, run
 # by this repository's gate, reports a package this stops describing.
 areas:
   # ui: package.json — `react` in dependencies
   "**": [ui]
 
 # The fleet stack scopes this repository is in (decisions ADR-0046):
-# aval answers resolve/relevant at them by default.
+# greentopo answers resolve/relevant at them by default.
 in_scopes: [effect-stack, greenrack-stack]

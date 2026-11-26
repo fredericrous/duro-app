@@ -1,10 +1,10 @@
 import { react } from "@greenharness/greenrack-eslint-config"
-import { effect, tests, adrLint } from "@aval-adr/eslint-config"
+import { effect, tests, greenspotter } from "@greenharness/greenspotter-eslint-config"
 
 export default [
   { ignores: ["build/**", ".react-router/**"] },
   // react (greenrack): base TS conventions + react-hooks + the greenrack plugin +
-  // UI-library policy. effect and tests (@aval-adr/eslint-config): Effect
+  // UI-library policy. effect and tests (@greenharness/greenspotter-eslint-config): Effect
   // server policy and accessibility-first test selectors (self-scoped).
   ...react,
   ...effect,
@@ -50,5 +50,5 @@ export default [
       "greenrack/no-tokens-barrel-import": "off",
     },
   },
-  ...adrLint(),
+  ...greenspotter(),
 ]
