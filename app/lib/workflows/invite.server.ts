@@ -60,7 +60,7 @@ export const queueInvite = (input: InviteInput) =>
     const existingFailed = yield* inviteRepo.findFailed()
     const stale = existingFailed.find((i) => i.email === input.email)
     if (stale) {
-      yield* revokeInvite(stale.id)
+      yield* revokeInvite(stale.id, SYSTEM_ACTOR)
     }
 
     const invite = yield* inviteRepo.create(input)
@@ -296,9 +296,9 @@ export const acceptInviteById = (inviteId: string, input: AcceptInput) =>
 // --- Revoke Pending Invite (full cleanup) ---
 
 /** Audit actor for revocations no person triggered (a stale-invite cleanup). */
-const SYSTEM_ACTOR = "system"
+export const SYSTEM_ACTOR = "system"
 
-export const revokeInvite = (inviteId: string, actorId: string = SYSTEM_ACTOR) =>
+export const revokeInvite = (inviteId: string, actorId: string) =>
   Effect.gen(function* () {
     const inviteRepo = yield* InviteRepo
     const cert = yield* CertManager

@@ -296,22 +296,29 @@ describe("VaultPki — revokeCert", () => {
   })
 
   it.each([
-    [403, true],
+    [400, true],
+    [401, false],
+    [403, false],
+    [408, false],
+    [422, true],
     [429, false],
     [503, false],
-  ])("marks a %i from Vault permanent=%s", async (status, permanent) => {
+  ])("marks a %i from Vault permanent=%s", async (httpStatus, expectedPermanent) => {
     server.use(
-      http.post(`${VAULT_URL}/v1/pki-client/revoke`, () => HttpResponse.json({ errors: ["nope"] }, { status })),
+      http.post(`${VAULT_URL}/v1/pki-client/revoke`, () =>
+        HttpResponse.json({ errors: ["nope"] }, { status: httpStatus }),
+      ),
     )
 
     const rt = makeRuntime()
-    const result = await rt.runPromise(
+    const revokeFailure = await rt.runPromise(
       Effect.gen(function* () {
         const v = yield* VaultPki
         return yield* v.revokeCert("XX").pipe(Effect.flip)
       }),
     )
-    expect(result.permanent).toBe(permanent)
+    expect(revokeFailure.status).toBe(httpStatus)
+    expect(revokeFailure.permanent).toBe(expectedPermanent)
     await rt.dispose()
   })
 })

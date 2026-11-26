@@ -1,5 +1,5 @@
-import { Effect } from "effect"
-import { CertManager } from "~/lib/services/CertManager.server"
+import { Data, Effect } from "effect"
+import { CertManager, CertManagerError } from "~/lib/services/CertManager.server"
 import { CertificateRepo, MAX_REVOKE_ATTEMPTS } from "~/lib/services/CertificateRepo.server"
 import { AuditService } from "~/lib/governance/AuditService.server"
 
@@ -14,10 +14,12 @@ export interface RevokeSerialOptions {
   readonly path: RevokePath
 }
 
-export type RevokeOutcome = { readonly _tag: "Revoked" } | { readonly _tag: "RevokeFailed"; readonly error: string }
+export type RevokeOutcome = Data.TaggedEnum<{
+  Revoked: Record<never, never>
+  RevokeFailed: { readonly error: string }
+}>
 
-const isPermanent = (error: unknown): boolean =>
-  typeof error === "object" && error !== null && "permanent" in error && error.permanent === true
+const { Revoked, RevokeFailed } = Data.taggedEnum<RevokeOutcome>()
 
 /**
  * Revoke one cert serial in the CA and record the result on its row. Never
@@ -42,9 +44,10 @@ export const revokeSerialForUser = (serial: string, opts: RevokeSerialOptions) =
     const recordFailure = (error: unknown) =>
       Effect.gen(function* () {
         const message = String(error)
-        const attempts = isPermanent(error)
-          ? yield* certRepo.markRevokeAbandoned(serial, message)
-          : yield* certRepo.markRevokeFailed(serial, message)
+        const attempts =
+          error instanceof CertManagerError && error.permanent
+            ? yield* certRepo.markRevokeAbandoned(serial, message)
+            : yield* certRepo.markRevokeFailed(serial, message)
         if (attempts >= MAX_REVOKE_ATTEMPTS) {
           yield* Effect.logError("revocation abandoned", { serial, attempts, error: message })
         }
@@ -67,10 +70,8 @@ export const revokeSerialForUser = (serial: string, opts: RevokeSerialOptions) =
     return yield* cert.revokeCert(serial).pipe(
       Effect.flatMap(() => certRepo.markRevokeCompleted(serial)),
       Effect.flatMap((completedNow) => (completedNow ? emitAudit : Effect.void)),
-      Effect.as({ _tag: "Revoked" } as RevokeOutcome),
-      Effect.catchAll((e) =>
-        recordFailure(e).pipe(Effect.as({ _tag: "RevokeFailed", error: String(e) } as RevokeOutcome)),
-      ),
+      Effect.as<RevokeOutcome>(Revoked()),
+      Effect.catchAll((e) => recordFailure(e).pipe(Effect.as<RevokeOutcome>(RevokeFailed({ error: String(e) })))),
     )
   })
 

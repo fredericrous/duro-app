@@ -3,6 +3,7 @@ import { describe, expect, it, beforeEach } from "vitest"
 import { Effect } from "effect"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { handleAdminInvitesMutation, parseAdminInvitesMutation } from "./admin-invites"
+import { AuditService } from "~/lib/governance/AuditService.server"
 import { seedTestDb, testRunEffect, truncateAll } from "~/test/test-runtime"
 
 beforeEach(async () => {
@@ -153,14 +154,17 @@ describe("handleAdminInvitesMutation — send revocation prompt", () => {
     await seedTestDb(seedRevokedEmail)
 
     const result = await testRunEffect(
-      handleAdminInvitesMutation({
-        intent: "send",
-        emails: ["alice@example.com"],
-        groups: ["1|family"],
-        locale: "en",
-        confirmed: false,
-        delivery: "email" as const,
-      }),
+      handleAdminInvitesMutation(
+        {
+          intent: "send",
+          emails: ["alice@example.com"],
+          groups: ["1|family"],
+          locale: "en",
+          confirmed: false,
+          delivery: "email" as const,
+        },
+        "admin-sub",
+      ),
     )
 
     expect("warning" in result).toBe(true)
@@ -176,14 +180,17 @@ describe("handleAdminInvitesMutation — send revocation prompt", () => {
     await seedTestDb(seedRevokedEmail)
 
     const result = await testRunEffect(
-      handleAdminInvitesMutation({
-        intent: "send",
-        emails: ["alice@example.com", "bob@example.com"],
-        groups: ["1|family"],
-        locale: "en",
-        confirmed: false,
-        delivery: "email" as const,
-      }),
+      handleAdminInvitesMutation(
+        {
+          intent: "send",
+          emails: ["alice@example.com", "bob@example.com"],
+          groups: ["1|family"],
+          locale: "en",
+          confirmed: false,
+          delivery: "email" as const,
+        },
+        "admin-sub",
+      ),
     )
     // No warning shape — the multi-email path falls through.
     expect("warning" in result).toBe(false)
@@ -193,15 +200,18 @@ describe("handleAdminInvitesMutation — send revocation prompt", () => {
     await seedTestDb(seedRevokedEmail)
 
     await testRunEffect(
-      handleAdminInvitesMutation({
-        intent: "send",
-        emails: ["alice@example.com"],
-        groups: ["1|family"],
-        locale: "en",
-        confirmed: true,
-        delivery: "email" as const,
-        revocationId: "rev-1",
-      }),
+      handleAdminInvitesMutation(
+        {
+          intent: "send",
+          emails: ["alice@example.com"],
+          groups: ["1|family"],
+          locale: "en",
+          confirmed: true,
+          delivery: "email" as const,
+          revocationId: "rev-1",
+        },
+        "admin-sub",
+      ),
     )
 
     const remaining = await testRunEffect(
@@ -217,7 +227,9 @@ describe("handleAdminInvitesMutation — send revocation prompt", () => {
 
 describe("handleAdminInvitesMutation — retry/resend", () => {
   it("returns 'Invite not found' (as error shape, not throw) when inviteId is unknown", async () => {
-    const result = await testRunEffect(handleAdminInvitesMutation({ intent: "retry", inviteId: "does-not-exist" }))
+    const result = await testRunEffect(
+      handleAdminInvitesMutation({ intent: "retry", inviteId: "does-not-exist" }, "admin-sub"),
+    )
     expect(result).toEqual({ error: "Invite not found" })
   })
 })
@@ -234,10 +246,42 @@ const seedPendingInvite = (expiresInMs = 86400_000) =>
                VALUES ('inv-1', 'token-1', 'hashed-token-1', 'alice@example.com', '[1]', '["family"]', 'admin', 'en', ${expires})`
   })
 
+describe("handleAdminInvitesMutation — revoke", () => {
+  it("emits cert.revoked with the acting admin's sub as actorId", async () => {
+    await seedTestDb(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* seedPendingInvite()
+        yield* sql`UPDATE invites SET cert_username = 'alice' WHERE id = 'inv-1'`
+        yield* sql`INSERT INTO user_certificates (id, invite_id, username, email, serial_number, issued_at, expires_at)
+                   VALUES ('cert-1', 'inv-1', 'alice', 'alice@example.com', 'SN-INVITE', NOW(), NOW() + INTERVAL '30 days')`
+      }),
+    )
+
+    const emittedAudit: Array<{ eventType: string; actorId?: string; targetId?: string }> = []
+    const recordingAudit = AuditService.of({
+      emit: (event) => Effect.sync(() => void emittedAudit.push(event)),
+      query: () => Effect.succeed([]),
+      subscribe: () => Effect.succeed(() => {}),
+    })
+
+    const mutationResponse = await testRunEffect(
+      handleAdminInvitesMutation({ intent: "revoke", inviteId: "inv-1" }, "admin-sub-42").pipe(
+        Effect.provideService(AuditService, recordingAudit),
+      ),
+    )
+
+    expect(mutationResponse).toMatchObject({ success: true })
+    expect(emittedAudit).toMatchObject([{ eventType: "cert.revoked", actorId: "admin-sub-42", targetId: "SN-INVITE" }])
+  })
+})
+
 describe("handleAdminInvitesMutation — showLink", () => {
   it("hands back the pending invite's link: same token, nothing re-issued", async () => {
     await seedTestDb(seedPendingInvite())
-    const result = await testRunEffect(handleAdminInvitesMutation({ intent: "showLink", inviteId: "inv-1" }))
+    const result = await testRunEffect(
+      handleAdminInvitesMutation({ intent: "showLink", inviteId: "inv-1" }, "admin-sub"),
+    )
     expect("success" in result && result.invite).toBeTruthy()
     if ("success" in result && result.invite) {
       expect(result.invite.url).toMatch(/\/invite\/token-1$/)
@@ -247,9 +291,13 @@ describe("handleAdminInvitesMutation — showLink", () => {
 
   it("refuses once the invite is no longer pending", async () => {
     await seedTestDb(seedPendingInvite(-1000))
-    const expired = await testRunEffect(handleAdminInvitesMutation({ intent: "showLink", inviteId: "inv-1" }))
+    const expired = await testRunEffect(
+      handleAdminInvitesMutation({ intent: "showLink", inviteId: "inv-1" }, "admin-sub"),
+    )
     expect(expired).toEqual({ error: "Invite is no longer pending" })
-    const unknown = await testRunEffect(handleAdminInvitesMutation({ intent: "showLink", inviteId: "nope" }))
+    const unknown = await testRunEffect(
+      handleAdminInvitesMutation({ intent: "showLink", inviteId: "nope" }, "admin-sub"),
+    )
     expect(unknown).toEqual({ error: "Invite is no longer pending" })
   })
 
@@ -258,14 +306,17 @@ describe("handleAdminInvitesMutation — showLink", () => {
     // with no way back to the code.
     await seedTestDb(seedPendingInvite())
     const result = await testRunEffect(
-      handleAdminInvitesMutation({
-        intent: "send",
-        emails: ["alice@example.com"],
-        groups: ["1|family"],
-        locale: "en",
-        confirmed: false,
-        delivery: "link" as const,
-      }),
+      handleAdminInvitesMutation(
+        {
+          intent: "send",
+          emails: ["alice@example.com"],
+          groups: ["1|family"],
+          locale: "en",
+          confirmed: false,
+          delivery: "link" as const,
+        },
+        "admin-sub",
+      ),
     )
     expect("success" in result && result.invite?.url).toMatch(/\/invite\/token-1$/)
 

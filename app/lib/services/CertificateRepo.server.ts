@@ -343,10 +343,10 @@ export const CertificateRepoLive = Layer.effect(
         withErr(
           // One statement: an expired row is neither returned nor marked pending
           // (it would stay pending forever), and no row can slip between a read and a write.
-          sql`UPDATE user_certificates
+          sql<{ serialNumber: string }>`UPDATE user_certificates
               SET revoke_state = 'pending', revoke_next_at = NOW() + INTERVAL '2 minutes'
               WHERE username = ${username} AND revoked_at IS NULL AND expires_at > NOW()
-              RETURNING serial_number`.pipe(Effect.map((rows) => rows.map((r: any) => r.serialNumber as string))),
+              RETURNING serial_number`.pipe(Effect.map((rows) => rows.map((row) => row.serialNumber))),
           "Failed to revoke all certificates for user",
         ),
 

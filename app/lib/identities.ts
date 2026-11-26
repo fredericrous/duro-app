@@ -59,10 +59,15 @@ export function certBatchRevokeToast(
   data: unknown,
   t: (key: string, opts?: Record<string, unknown>) => string,
 ): { variant: "success" | "error"; message: string } | null {
-  const d = data as { certsRevoked?: true; count?: number; error?: string }
+  const d = data as { certsRevoked?: true; count?: number; failed?: number; error?: string }
   if (d.error) return { variant: "error", message: d.error }
-  if (d.certsRevoked)
-    return { variant: "success", message: t("admin.users.certs.certsRevoked", { count: d.count ?? 0 }) }
+  if (d.certsRevoked) {
+    const count = d.count ?? 0
+    const failed = d.failed ?? 0
+    if (failed > 0)
+      return { variant: "error", message: t("admin.users.certs.certsRevokedWithFailures", { count, failed }) }
+    return { variant: "success", message: t("admin.users.certs.certsRevoked", { count }) }
+  }
   return null
 }
 

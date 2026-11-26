@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises"
 import { UserManager } from "~/lib/services/UserManager.server"
 import { InviteRepo } from "~/lib/services/InviteRepo.server"
 import { config } from "~/lib/config.server"
-import { queueInvite, revokeInvite, resendCert } from "~/lib/workflows/invite.server"
+import { queueInvite, revokeInvite, resendCert, SYSTEM_ACTOR } from "~/lib/workflows/invite.server"
 
 // ---------------------------------------------------------------------------
 // Error type — string codes are the contract surfaced to the UI/i18n layer
@@ -170,7 +170,7 @@ export const createAdminInvite = (email: string) =>
     const stale = pending.find((i) => i.email === cleanEmail)
     if (stale) {
       yield* Effect.logWarning(`bootstrap: revoking existing pending invite for ${cleanEmail}`)
-      yield* revokeInvite(stale.id).pipe(
+      yield* revokeInvite(stale.id, SYSTEM_ACTOR).pipe(
         Effect.catchAll((e) => Effect.logWarning("bootstrap: revoking the stale invite failed", { error: String(e) })),
       )
     }

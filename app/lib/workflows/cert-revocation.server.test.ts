@@ -103,7 +103,19 @@ const withVault = (
 ) =>
   effect.pipe(
     Effect.provideService(AuditService, recordingAudit(events)),
-    Effect.provideService(CertManager, { revokeCert } as never),
+    Effect.provideService(
+      CertManager,
+      CertManager.of({
+        revokeCert,
+        issueCertAndP12: () => Effect.die("not used by revocation"),
+        getP12Password: () => Effect.die("not used by revocation"),
+        getP12: () => Effect.die("not used by revocation"),
+        consumeP12Password: () => Effect.die("not used by revocation"),
+        deleteP12Secret: () => Effect.die("not used by revocation"),
+        checkCertProcessed: () => Effect.die("not used by revocation"),
+        deleteCertByUsername: () => Effect.die("not used by revocation"),
+      }),
+    ),
   )
 
 describe("revokeSerialForUser", () => {

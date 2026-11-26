@@ -762,7 +762,7 @@ describe("revokeInvite", () => {
     )
     const certCalls: { method: string; args: unknown[] }[] = []
 
-    return revokeInvite("inv-1").pipe(
+    return revokeInvite("inv-1", "admin-sub").pipe(
       Effect.tap(() =>
         Effect.sync(() => {
           // Cert cleanup
@@ -788,7 +788,7 @@ describe("revokeInvite", () => {
     )
     const certCalls: { method: string; args: unknown[] }[] = []
 
-    return revokeInvite("inv-1").pipe(
+    return revokeInvite("inv-1", "admin-sub").pipe(
       Effect.tap(() =>
         Effect.sync(() => {
           expect(certCalls.find((c) => c.method === "deleteCertByUsername" && c.args[0] === "bobsmith")).toBeDefined()

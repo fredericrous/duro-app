@@ -65,11 +65,11 @@ const isPending = (invite: Invite): boolean =>
 // Dispatcher
 // ---------------------------------------------------------------------------
 
-export function handleAdminInvitesMutation(mutation: AdminInvitesMutation) {
+export function handleAdminInvitesMutation(mutation: AdminInvitesMutation, actorId: string) {
   return Effect.gen(function* () {
     switch (mutation.intent) {
       case "revoke": {
-        yield* revokeInvite(mutation.inviteId)
+        yield* revokeInvite(mutation.inviteId, actorId)
         return { success: true as const, message: "Invite revoked" }
       }
 
