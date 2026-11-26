@@ -50,8 +50,16 @@ export class CrlSourceError extends Data.TaggedError("CrlSourceError")<{
   readonly operation: CrlSourceOperation
   readonly message: string
   readonly status?: number
+  /** The adapter's own error, for logs only: core code never branches on it. */
   readonly cause?: unknown
 }> {}
+
+/** A re-revoke that did not answer within `REREVOKE_TIMEOUT`. */
+export class RerevokeTimeout extends Data.TaggedError("RerevokeTimeout")<{ readonly serial: string }> {
+  override get message() {
+    return `re-revoke of ${this.serial} timed out after ${REREVOKE_TIMEOUT}`
+  }
+}
 
 export class CrlDbError extends Data.TaggedError("CrlDbError")<{
   readonly operation: "watermark" | "completedSerials" | "pendingCount"
@@ -209,9 +217,9 @@ export const publishCycle = (
           certManager.revokeCert(serial).pipe(
             Effect.timeoutFail({
               duration: REREVOKE_TIMEOUT,
-              onTimeout: () => ({ message: `timed out after ${REREVOKE_TIMEOUT}` }),
+              onTimeout: () => new RerevokeTimeout({ serial }),
             }),
-            Effect.tapError((e: CertManagerError | { readonly message: string }) =>
+            Effect.tapError((e: CertManagerError | RerevokeTimeout) =>
               Effect.logError("crl: re-revoke failed").pipe(Effect.annotateLogs({ serial, error: e.message })),
             ),
             Effect.either,

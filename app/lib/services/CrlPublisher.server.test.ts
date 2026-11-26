@@ -11,7 +11,6 @@ import {
   CYCLE_DEADLINE,
   MAX_REREVOKES_PER_CYCLE,
   PUBLISH_EVERY_MS,
-  REREVOKE_TIMEOUT,
   RETRY_AFTER_FAILURE_MS,
   VaultCrl,
   canonicalSerial,
@@ -148,6 +147,22 @@ const setup = (ca: Ca, vault: Partial<FakeVault> = {}, db: Partial<FakeDb> = {})
 
 const tick = (state: Ref.Ref<CrlPublisherState>, layer: Layer.Layer<VaultCrl | CertManager | CrlDb>) =>
   publisherTick(state).pipe(Effect.provide(layer))
+
+/**
+ * Drives the TestClock in 1 s steps until the fiber ends, yielding a real
+ * macrotask between steps: the fake signs CRLs with WebCrypto, so a timeout's
+ * sleep is registered only after that promise settles. Fails past `limitSeconds`.
+ */
+const advanceUntilDone = <A, E>(running: Fiber.RuntimeFiber<A, E>, limitSeconds: number) =>
+  Effect.gen(function* () {
+    for (let elapsed = 0; elapsed <= limitSeconds; elapsed++) {
+      const done = yield* Fiber.poll(running)
+      if (Option.isSome(done)) return yield* Fiber.join(running)
+      yield* Effect.promise(() => new Promise((resolve) => setImmediate(resolve)))
+      yield* TestClock.adjust("1 second")
+    }
+    return yield* Effect.dieMessage(`fiber still running after ${limitSeconds} s of TestClock`)
+  })
 
 describe("canonicalSerial", () => {
   it("matches Vault's colon hex with a CRL's bare hex, leading zeros either way", () => {
@@ -346,15 +361,16 @@ describe("publisherTick", () => {
     Effect.gen(function* () {
       const [ca] = yield* pki
       const { fakeVault, layer } = setup(ca, {}, { completed: ["0c"] })
-      const hangingRevoke = Layer.succeed(CertManager, {
-        ...Effect.runSync(CertManager.pipe(Effect.provide(layer))),
-        revokeCert: () => Effect.never,
-      })
+      const base = yield* CertManager.pipe(Effect.provide(layer))
+      const hangingRevoke = Layer.succeed(CertManager, { ...base, revokeCert: () => Effect.never })
       const state = yield* Ref.make(initialCrlPublisherState)
 
-      const running = yield* Effect.fork(tick(state, Layer.merge(layer, hangingRevoke)))
-      yield* TestClock.adjust(REREVOKE_TIMEOUT)
-      expect(yield* Fiber.join(running)).toBe(true)
+      // The inner provide answers CertManager first: the override is explicit, not merge order.
+      const running = yield* Effect.fork(
+        publisherTick(state).pipe(Effect.provide(hangingRevoke), Effect.provide(layer)),
+      )
+      // Well under the 4 min cycle deadline: only the per-re-revoke timeout can end it.
+      expect(yield* advanceUntilDone(running, 30)).toBe(true)
       expect(fakeVault.writes).toBe(1)
       expect(Option.map((yield* Ref.get(state)).lastGood, (cycle) => cycle.missingSerials)).toEqual(Option.some(1))
     }),
@@ -378,7 +394,7 @@ describe("publisherTick", () => {
 
       const running = yield* Effect.fork(tick(state, layer))
       yield* TestClock.adjust(CYCLE_DEADLINE)
-      expect(yield* Fiber.join(running)).toBe(true)
+      expect(yield* advanceUntilDone(running, 5)).toBe(true)
 
       const nowMs = yield* Clock.currentTimeMillis
       expect((yield* Ref.get(state)).nextCycleAtMs).toBe(nowMs + RETRY_AFTER_FAILURE_MS)
