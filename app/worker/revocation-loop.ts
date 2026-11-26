@@ -1,7 +1,8 @@
 import { Effect, Layer, type Ref, Schedule } from "effect"
 import type * as HttpClient from "@effect/platform/HttpClient"
-import { VaultCertManagerLive, VaultCrlLive, VaultPkiLive } from "~/lib/services/VaultPki.server"
-import { CrlDbLive, type CrlPublisherState, crlPublisherLoop } from "~/lib/services/CrlPublisher.server"
+import { VaultCertManagerLive, VaultPkiLive } from "~/lib/services/VaultPki.server"
+import { VaultCrlLive } from "~/lib/services/VaultCrl.server"
+import { type CrlPublisherState, crlPublisherLoop } from "~/lib/services/CrlPublisher.server"
 import { sweepRevocations } from "~/lib/workflows/revocation-sweep.server"
 
 const REVOCATION_SWEEP_EVERY = "10 minutes"
@@ -37,9 +38,13 @@ export const revocationSweepLoop = (httpClient: Layer.Layer<HttpClient.HttpClien
     ),
   )
 
-/** The CRL publisher's Vault services over the given HTTP client; fails with a ConfigError when NAS_VAULT_* is unset. */
+/**
+ * The CRL publisher's Vault-backed ports (VaultCrl, and CertManager for
+ * re-revoking) over the given HTTP client; fails with a ConfigError when
+ * NAS_VAULT_* is unset.
+ */
 export const makeCrlPublisherVaultLayer = (httpClient: Layer.Layer<HttpClient.HttpClient>) =>
-  Layer.mergeAll(VaultCrlLive, VaultPkiLive).pipe(Layer.provide(httpClient))
+  Layer.mergeAll(VaultCrlLive, VaultCertManagerLive).pipe(Layer.provide(httpClient))
 
 /**
  * The worker's CRL publisher: publishes at start, then ticks every 30 s for as
@@ -47,13 +52,14 @@ export const makeCrlPublisherVaultLayer = (httpClient: Layer.Layer<HttpClient.Ht
  * disables it with a warning instead of failing the worker; /metrics then
  * shows no publish timestamps: only an alert on the absent series (homelab
  * Phase 3b) notices that, a threshold on a missing series never fires.
+ * `CrlDb` comes from the caller (the worker's composition root).
  */
 export const crlPublisherWorkerLoop = (
   httpClient: Layer.Layer<HttpClient.HttpClient>,
   state: Ref.Ref<CrlPublisherState>,
 ) =>
   crlPublisherLoop(state).pipe(
-    Effect.provide(Layer.merge(makeCrlPublisherVaultLayer(httpClient), CrlDbLive)),
+    Effect.provide(makeCrlPublisherVaultLayer(httpClient)),
     Effect.catchAll((layerError) =>
       Effect.logWarning("worker: CRL publisher disabled: Vault layer unavailable").pipe(
         Effect.annotateLogs({ error: String(layerError) }),

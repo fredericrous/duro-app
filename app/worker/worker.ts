@@ -12,11 +12,13 @@
 import { Effect, Layer, Ref, Schedule } from "effect"
 import * as Http from "node:http"
 import {
-  CrlDbLive,
+  type CrlDb,
   type CrlPublisherState,
+  crlMetricsSnapshot,
   initialCrlPublisherState,
-  renderCrlMetrics,
 } from "~/lib/services/CrlPublisher.server"
+import { CrlDbLive } from "~/lib/services/CrlDb.server"
+import { formatCrlMetrics } from "~/worker/metrics"
 import { ProvisioningService, ProvisioningServiceLive } from "~/lib/governance/ProvisioningService.server"
 import { expireGrants } from "~/lib/workflows/grant-activation.server"
 import { PluginHostLive } from "~/lib/plugins/PluginHost.server"
@@ -62,6 +64,7 @@ const AppSyncWired = AppSyncServiceLive.pipe(
 
 const WorkerLayer = Layer.mergeAll(
   CertificateRepoLive,
+  CrlDbLive,
   GovernanceRepos,
   ApplicationRepoLive,
   AuditServiceLive,
@@ -182,10 +185,10 @@ const HEALTH_PORT = parseInt(process.env.WORKER_HEALTH_PORT ?? "3001", 10)
 // same port, scraped through the worker Service's ServiceMonitor.
 const startHealthServer = (crlState: Ref.Ref<CrlPublisherState>) =>
   Effect.gen(function* () {
-    const runtime = yield* Effect.runtime<SqlClient.SqlClient>()
-    const runProbe = <A>(eff: Effect.Effect<A, unknown, SqlClient.SqlClient>) =>
+    const runtime = yield* Effect.runtime<SqlClient.SqlClient | CrlDb>()
+    const runProbe = <A>(eff: Effect.Effect<A, unknown, SqlClient.SqlClient | CrlDb>) =>
       Effect.runPromise(Effect.provide(eff, runtime))
-    const metrics = renderCrlMetrics(crlState).pipe(Effect.provide(CrlDbLive), Effect.timeout("3 seconds"))
+    const metrics = crlMetricsSnapshot(crlState).pipe(Effect.map(formatCrlMetrics), Effect.timeout("3 seconds"))
     return yield* Effect.acquireRelease(
       Effect.sync(() => {
         const server = Http.createServer((req, res) => {

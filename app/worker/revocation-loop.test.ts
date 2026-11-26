@@ -1,12 +1,13 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from "vitest"
-import { ConfigProvider, Effect, Layer, Logger, Ref } from "effect"
+import { ConfigProvider, Effect, Layer, Logger, Option, Ref } from "effect"
 import * as HttpClient from "@effect/platform/HttpClient"
 import * as HttpClientResponse from "@effect/platform/HttpClientResponse"
 import * as SqlClient from "@effect/sql/SqlClient"
 import { CertificateRepo } from "~/lib/services/CertificateRepo.server"
-import { CrlDb, CrlDbLive, initialCrlPublisherState } from "~/lib/services/CrlPublisher.server"
-import { VaultCrl, VaultCrlLive } from "~/lib/services/VaultPki.server"
+import { CrlDb, VaultCrl, initialCrlPublisherState } from "~/lib/services/CrlPublisher.server"
+import { CrlDbLive } from "~/lib/services/CrlDb.server"
+import { VaultCrlLive } from "~/lib/services/VaultCrl.server"
 import { sweepRevocations } from "~/lib/workflows/revocation-sweep.server"
 import { crlPublisherWorkerLoop, makeRevocationSweeperLayer, revocationSweepLoop } from "./revocation-loop"
 import { testRunEffect, truncateAll } from "~/test/test-runtime"
@@ -123,7 +124,7 @@ describe("CrlDbLive on the real schema", () => {
   }).pipe(Effect.provide(CrlDbLive))
 
   it("reads the watermark, completed unexpired serials and pending count", async () => {
-    expect(await run(query)).toEqual({ watermark: null, completed: [], pending: 0 })
+    expect(await run(query)).toEqual({ watermark: "0|", completed: [], pending: 0 })
 
     await run(
       Effect.gen(function* () {
@@ -141,7 +142,7 @@ describe("CrlDbLive on the real schema", () => {
     )
 
     const after = await run(query)
-    expect(after.watermark).not.toBeNull()
+    expect(after.watermark).toMatch(/^2\|\d{4}-/)
     expect(after.completed).toEqual(["AA:01"])
     expect(after.pending).toBe(1)
   })
@@ -165,19 +166,23 @@ describe("VaultCrlLive", () => {
   const viaVault = <A, E>(e: Effect.Effect<A, E, VaultCrl>) =>
     e.pipe(Effect.provide(VaultCrlLive), Effect.provide(vault), Effect.withConfigProvider(vaultConfig))
 
-  it("returns crl/pem as text, the CA from JSON, null for an unwritten KV entry, and writes ca.crl", async () => {
-    const got = await run(
+  it("returns crl/pem as text, the CA from JSON, none for an unwritten KV entry, and writes ca.crl", async () => {
+    const observed = await run(
       viaVault(
         Effect.gen(function* () {
-          const v = yield* VaultCrl
-          yield* v.rotateCrl
-          const out = { pem: yield* v.getCrlPem, ca: yield* v.getCaPem, kv: yield* v.readPublishedCrl }
-          yield* v.writePublishedCrl(PEM)
-          return out
+          const vaultCrl = yield* VaultCrl
+          yield* vaultCrl.rotateCrl
+          const reads = {
+            pem: yield* vaultCrl.getCrlPem,
+            ca: yield* vaultCrl.getCaPem,
+            kv: yield* vaultCrl.readPublishedCrl,
+          }
+          yield* vaultCrl.writePublishedCrl(PEM)
+          return reads
         }),
       ),
     )
-    expect(got).toEqual({ pem: PEM, ca: "CA", kv: null })
+    expect(observed).toEqual({ pem: PEM, ca: "CA", kv: Option.none() })
     expect(requests).toEqual([
       "GET https://vault.test/v1/pki-client/crl/rotate",
       "GET https://vault.test/v1/pki-client/crl/pem",
@@ -199,6 +204,7 @@ describe("crlPublisherWorkerLoop without Vault configuration", () => {
 
     await run(
       crlPublisherWorkerLoop(stubVault([]), state).pipe(
+        Effect.provide(CrlDbLive),
         Effect.withConfigProvider(ConfigProvider.fromMap(new Map())),
         Effect.provide(capture),
       ),

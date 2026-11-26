@@ -1,7 +1,6 @@
 import { Context, Effect, Data, Layer, Config, Redacted, Schema, pipe } from "effect"
 import { CertManager, CertManagerError } from "./CertManager.server"
 import * as HttpClient from "@effect/platform/HttpClient"
-import * as HttpClientRequest from "@effect/platform/HttpClientRequest"
 import * as crypto from "node:crypto"
 import forge from "node-forge"
 import { makeJsonApi } from "~/lib/http.server"
@@ -256,99 +255,6 @@ export const VaultPkiLive = Layer.effect(
             )
           }),
         ),
-    }
-  }),
-)
-
-// --- CRL publication (duro-worker's CrlPublisher) ---
-
-const VaultCaCertResponse = Schema.Struct({ data: Schema.Struct({ certificate: Schema.String }) })
-const VaultPublishedCrl = Schema.Struct({
-  data: Schema.Struct({ data: Schema.Struct({ "ca.crl": Schema.optional(Schema.String) }) }),
-})
-const decodeCaCert = Schema.decodeUnknown(VaultCaCertResponse)
-const decodePublishedCrl = Schema.decodeUnknown(VaultPublishedCrl)
-
-/** The KV v2 path Phase 3's broker copies to main Vault for Envoy. */
-export const PUBLISHED_CRL_PATH = "/secret/data/pki/client-crl"
-
-/**
- * The NAS Vault calls that publish the `pki-client` CRL: rebuild it, read it
- * and the CA that signs it, and read or write the copy in KV. The `duro-pki`
- * policy grants exactly these paths.
- */
-export class VaultCrl extends Context.Tag("VaultCrl")<
-  VaultCrl,
-  {
-    /** `GET pki-client/crl/rotate`: rebuilds the CRL with a fresh nextUpdate. */
-    readonly rotateCrl: Effect.Effect<void, VaultPkiError>
-    /** `GET pki-client/crl/pem`: the current CRL, PEM text. */
-    readonly getCrlPem: Effect.Effect<string, VaultPkiError>
-    /** `GET pki-client/cert/ca`: the issuing CA, PEM. */
-    readonly getCaPem: Effect.Effect<string, VaultPkiError>
-    /** The CRL last written to KV, or null when none was (a 404). */
-    readonly readPublishedCrl: Effect.Effect<string | null, VaultPkiError>
-    readonly writePublishedCrl: (pem: string) => Effect.Effect<void, VaultPkiError>
-  }
->() {}
-
-export const VaultCrlLive = Layer.effect(
-  VaultCrl,
-  Effect.gen(function* () {
-    const vaultAddr = yield* Config.string("NAS_VAULT_ADDR")
-    const vaultToken = Redacted.value(yield* Config.redacted("NAS_VAULT_TOKEN"))
-    const http = yield* HttpClient.HttpClient
-    const headers = { "X-Vault-Token": vaultToken, "Content-Type": "application/json" }
-    const vault = makeJsonApi(
-      http,
-      `${vaultAddr}/v1`,
-      headers,
-      (e, status) => new VaultPkiError({ message: `Vault request failed: ${e}`, status }),
-    )
-    const invalid = (what: string) => (cause: unknown) =>
-      new VaultPkiError({ message: `Invalid ${what} response from Vault`, cause })
-
-    // crl/pem answers PEM text, not JSON, so it bypasses makeJsonApi.
-    const getText = (path: string) =>
-      http.execute(HttpClientRequest.get(`${vaultAddr}/v1${path}`).pipe(HttpClientRequest.setHeaders(headers))).pipe(
-        Effect.flatMap((response) =>
-          response.text.pipe(
-            Effect.flatMap((body) =>
-              response.status >= 200 && response.status < 300
-                ? Effect.succeed(body)
-                : Effect.fail(
-                    new VaultPkiError({
-                      message: `Vault request failed: ${response.status} - ${body.slice(0, 500)}`,
-                      status: response.status,
-                    }),
-                  ),
-            ),
-          ),
-        ),
-        Effect.mapError((e) =>
-          e instanceof VaultPkiError ? e : new VaultPkiError({ message: `Vault request failed: ${e}`, cause: e }),
-        ),
-        Effect.scoped,
-      )
-
-    return {
-      rotateCrl: vault.get(`/pki-client/crl/rotate`).pipe(Effect.asVoid),
-      getCrlPem: getText(`/pki-client/crl/pem`),
-      getCaPem: vault.get(`/pki-client/cert/ca`).pipe(
-        Effect.flatMap(decodeCaCert),
-        Effect.mapError((e) => (e instanceof VaultPkiError ? e : invalid("CA certificate")(e))),
-        Effect.map((r) => r.data.certificate),
-      ),
-      readPublishedCrl: vault.get(PUBLISHED_CRL_PATH).pipe(
-        Effect.flatMap((body) => decodePublishedCrl(body).pipe(Effect.mapError(invalid("published CRL")))),
-        Effect.map((r) => r.data.data["ca.crl"] ?? null),
-        Effect.catchIf(
-          (e) => e.status === 404,
-          () => Effect.succeed(null),
-        ),
-      ),
-      writePublishedCrl: (pem: string) =>
-        vault.post(PUBLISHED_CRL_PATH, { data: { "ca.crl": pem } }).pipe(Effect.asVoid),
     }
   }),
 )
